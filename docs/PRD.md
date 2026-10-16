@@ -223,6 +223,7 @@ For each candidate region r at the current pyramid level:
 
 ### Rules
 
+0. **Survey:** when one look at a coarser level can hold every candidate window and the budget leaves at least one more look, that look comes first (cause `survey`); its follow-ups use rules 2 and 3, and candidates are then scored at their own level as below
 1. **Next gaze:** argmax score(r); ties broken by larger a\_r, then by position (top-left first) for determinism
 2. **Escalate** (zoom one level finer, same centre) when entropy > τ (default 0.5) or the mask area is below A\_min px (default 64), down to L0
 3. **Verify** when a mask appears at a new level: re-segment and record the IoU with the previous level; IoU < 0.5 schedules one more gaze or, for a critical class, a human review

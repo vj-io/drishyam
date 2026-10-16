@@ -57,6 +57,19 @@ def test_pixel_cap_is_never_exceeded(scene, cap):
         assert done["status"] == "halted" and done["unvisited"]
 
 
+def test_survey_look_comes_first_only_when_a_second_look_is_affordable(scene):
+    """Coarse to fine: one look whose window holds every candidate, then finer looks; no survey on a one-look budget."""
+    _, events = run(scene, pixel_cap=0.3)
+    first, second = steps(events)[:2]
+    assert first["cause"] == "survey" and first["decision"]["args"]["level"] > second["decision"]["args"]["level"]
+    x, y, w, h = first["window"]
+    H, W = scene.shape[:2]
+    for bx, by, bw, bh in (c["box"] for c in events[1]["candidates"]):
+        assert x <= max(0, bx) and min(W, bx + bw) <= x + w and y <= max(0, by) and min(H, by + bh) <= y + h
+    _, events = run(scene, pixel_cap=0.12)  # the overview plus one 512^2 look
+    assert [s["cause"] for s in steps(events)][0] != "survey"
+
+
 def test_seconds_and_usd_caps_halt():
     from .conftest import concrete
 

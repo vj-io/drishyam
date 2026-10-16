@@ -88,10 +88,10 @@ Severity classes: `crack`, `spalling`, `efflorescence`, `exposed_rebar`,
 `40000` px² area. Finding states: `draft`, `pending_review`, `approved`,
 `rejected`.
 
-Step `decision.action` values: `gaze` (first look at a region), `escalate`
+Step `decision.action` values: `gaze` (first look at a region, or the survey), `escalate`
 (one level finer, same centre, because the last look was uncertain), `verify`
 (one level finer to confirm a mask), `halt`. Trace `cause` values:
-`best-score`, `entropy>tau`, `area<A_min`, `verify-new-mask`, `iou<0.5`,
+`survey`, `best-score`, `entropy>tau`, `area<A_min`, `verify-new-mask`, `iou<0.5`,
 `p95>SLA`, `warp-spike`, `usd≥80%`, `cap-hit`, `kill-switch`,
 `planner-fallback`, `planner:<strategy>`, `replay`.
 

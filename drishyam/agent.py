@@ -238,6 +238,11 @@ class Job:
                 r = self.regions.setdefault(f"x{i + 1}", Region(f"x{i + 1}", x, y, 0.0, level))
             self.forced.append((action, r, level, "replay", "replayed from an earlier trace"))
         n_replay = len(self.forced)
+        looks = (self.budget.pixels_cap - self.budget.pixels_used) // cfg.size**2
+        if not self.replay and (s := survey_look(cands, (W, H), cfg.size, first, self.max_level, looks)):
+            r = self.regions["s0"] = Region("s0", s[0], s[1], max(c.prior for c in cands), s[2])
+            self.forced.append(("gaze", r, s[2], "survey", f"one L{s[2]} look covers all {len(cands)} candidates "
+                                                           f"before zooming; {looks} looks affordable"))
         value, cost_ms, halt_cause, halt_why = 0.0, 0.0, None, ""
         self.step = 0
 
@@ -423,6 +428,19 @@ class Job:
                "coverage": round(coverage, 4),
                "unvisited": [r.id for r in self.regions.values() if not r.looks],
                "work_order": self.work_order}
+
+
+def survey_look(cands, l0_size, size, first, max_level, looks) -> tuple[int, int, int] | None:
+    """Binoculars before the zoom: (x, y, level) of one look whose window covers every candidate window.
+    Only when it is coarser than a first look and the budget leaves a second look to act on what it shows
+    (a coarse look whose uncertainty can never be resolved is a wasted look); otherwise None."""
+    if looks < 2 or not cands:
+        return None
+    W, H = l0_size
+    x0, y0 = max(0, min(c.box[0] for c in cands)), max(0, min(c.box[1] for c in cands))
+    x1, y1 = min(W, max(c.box[0] + c.box[2] for c in cands)), min(H, max(c.box[1] + c.box[3] for c in cands))
+    level = min(max_level, math.ceil(math.log2(max(x1 - x0, y1 - y0, 1) / size)))
+    return ((x0 + x1) // 2, (y0 + y1) // 2, level) if level > first else None
 
 
 def _inside(a, b) -> float:
