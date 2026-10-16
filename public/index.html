@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Drishyam · virtual-PTZ bridge inspector</title>
+<meta name="description" content="Drishyam looks where it matters, zooms until it is sure, and asks a human before anything critical. An OpenCV agentic-vision inspector for bridge photos.">
+<meta name="theme-color" content="#BFE6FF">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23FF4FD8' stroke='%232440FF' stroke-width='3'/%3E%3Ccircle cx='11' cy='10' r='4' fill='white' opacity='.85'/%3E%3C/svg%3E">
+<link rel="preload" href="fonts/BricolageGrotesque-800.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="styles.css">
+<script type="module" src="app.js"></script>
+</head>
+<body>
+
+<div class="bg" aria-hidden="true">
+  <i class="orb orb--pink bg-orb bg-orb--1"></i>
+  <i class="orb orb--lime bg-orb bg-orb--2"></i>
+  <i class="orb orb--cobalt bg-orb bg-orb--3"></i>
+  <i class="orb orb--chrome bg-orb bg-orb--4"></i>
+  <i class="orb orb--pink bg-orb bg-orb--5"></i>
+  <i class="orb orb--lime bg-orb bg-orb--6"></i>
+  <i class="spark bg-spark bg-spark--1"></i>
+  <i class="spark spark--pink bg-spark bg-spark--2"></i>
+  <i class="spark spark--lime bg-spark bg-spark--3"></i>
+  <i class="spark bg-spark bg-spark--4"></i>
+  <i class="spark spark--cobalt bg-spark bg-spark--5"></i>
+  <i class="spark spark--pink bg-spark bg-spark--6"></i>
+</div>
+<div id="fx" class="fx" aria-hidden="true"></div>
+<div id="toasts" class="toasts" role="status" aria-live="polite"></div>
+
+<a class="skip" href="#app">Skip to the app</a>
+
+<header class="hero">
+  <div class="hero__inner">
+    <div class="hero__main">
+      <p class="eyebrow">OpenCV agentic vision <span class="eyebrow__dot"></span> virtual PTZ for bridge photos</p>
+      <h1 class="chrome-text wordmark" data-text="DRISHYAM"><span>DRISHYAM</span></h1>
+      <p class="hero__pitch">looks where it matters <b>·</b> zooms until it&rsquo;s sure <b>·</b> asks a human before anything critical</p>
+      <ul class="stats">
+        <li class="stat" id="stat-recall"><span class="stat__k">recall vs tiling</span><b class="stat__v">see benchmarks</b><span class="stat__s">a hypothesis until it is measured</span></li>
+        <li class="stat" id="stat-cost"><span class="stat__k">$ per image</span><b class="stat__v">see benchmarks</b><span class="stat__s">wall time &times; $0.339/h</span></li>
+        <li class="stat" id="stat-ops"><span class="stat__k">slowest micro-op</span><b class="stat__v">see benchmarks</b><span class="stat__s">p95, stock OpenCV 5</span></li>
+      </ul>
+      <a class="btn btn--lime btn--xl" href="#app">Run an inspection</a>
+    </div>
+
+    <div class="art" aria-hidden="true">
+      <div class="win art__w art__w--scan">
+        <div class="win__bar"><i class="win__orb"></i><span class="win__title">scan.exe</span><span class="win__ctrls"><span>_</span><span>&#9633;</span><span>X</span></span></div>
+        <div class="win__body"><p class="art__line">reading overview&hellip;</p><div class="dl"><div class="dl__fill"></div></div><p class="art__pct"></p></div>
+      </div>
+      <div class="win art__w art__w--gaze">
+        <div class="win__bar"><i class="win__orb"></i><span class="win__title">gaze.exe</span><span class="win__ctrls"><span>_</span><span>&#9633;</span><span>X</span></span></div>
+        <div class="win__body">
+          <div class="gz">
+            <i class="gz__dot gz__dot--1">1</i><i class="gz__dot gz__dot--2">2</i><i class="gz__dot gz__dot--3">3</i><i class="gz__dot gz__dot--4">4</i>
+            <i class="gz__orb"><i class="orb orb--pink"></i></i>
+          </div>
+        </div>
+      </div>
+      <div class="win art__w art__w--find">
+        <div class="win__bar"><i class="win__orb"></i><span class="win__title">finding.dll</span><span class="win__ctrls"><span>_</span><span>&#9633;</span><span>X</span></span></div>
+        <div class="win__body"><span class="badge">NEEDS A HUMAN</span><p class="art__line">exposed_rebar &middot; 310 px</p></div>
+      </div>
+      <i class="spark spark--lime art__spark art__spark--1"></i>
+      <i class="spark spark--pink art__spark art__spark--2"></i>
+      <i class="spark art__spark art__spark--3"></i>
+    </div>
+  </div>
+</header>
+
+<div class="marquee" aria-hidden="true">
+  <div class="marquee__track">
+    <span>&#10022; look where it matters &#10022; zoom until it&rsquo;s sure &#10022; ask a human first &#10022; pixels, not millimetres &#10022; every move has a cause &#10022;</span>
+    <span>&#10022; look where it matters &#10022; zoom until it&rsquo;s sure &#10022; ask a human first &#10022; pixels, not millimetres &#10022; every move has a cause &#10022;</span>
+  </div>
+</div>
+
+<main>
+<section id="app" class="section" aria-labelledby="h-app">
+  <h2 id="h-app" class="chrome-text stretch" data-text="INSPECT"><span>INSPECT</span></h2>
+  <div class="desktop">
+
+    <div class="taskbar" id="taskbar">
+      <div class="taskbar__id"><i class="win__orb"></i><span>drishyam.job</span></div>
+      <p class="taskbar__status"><span id="job-pill" class="pill pill--idle">ready</span><span id="job-text">Pick a photo, set a budget, hit LOOK.</span><span id="job-steps" class="taskbar__steps" aria-hidden="true"></span></p>
+      <div class="taskbar__actions">
+        <button class="btn btn--pink btn--kill" id="kill" type="button" hidden>KILL</button>
+        <button class="btn btn--cobalt" id="resume" type="button" hidden>Resume</button>
+        <button class="btn btn--chrome btn--sm" id="sound" type="button" aria-pressed="false">Sound: off</button>
+      </div>
+    </div>
+
+    <div class="col col--left">
+      <section class="win pop win--load" aria-labelledby="t-load">
+        <div class="win__bar"><i class="win__orb"></i><h3 class="win__title" id="t-load">load_image.exe</h3><span class="win__ctrls" aria-hidden="true"><span>_</span><span>&#9633;</span><span>X</span></span></div>
+        <div class="win__body stack">
+          <div>
+            <h4 class="label">1 &middot; pick a photo</h4>
+            <ul class="gallery" id="gallery" aria-label="Sample photos"></ul>
+            <p class="note" id="gallery-empty" hidden>No sample photos are bundled here yet. Drop your own JPEG or PNG below.</p>
+            <label class="drop" id="drop">
+              <input class="vh" type="file" id="file" accept="image/jpeg,image/png">
+              <span class="drop__big">Drop a JPEG or PNG</span>
+              <span class="drop__small">or click to browse &middot; large files are shrunk in your browser first</span>
+            </label>
+            <p class="note" id="prep" role="status"></p>
+          </div>
+
+          <fieldset class="group">
+            <legend class="label">2 &middot; set the budget</legend>
+            <div class="field">
+              <label for="cap-px">Pixel cap <small>(share of full-res pixels)</small></label>
+              <output class="field__out" id="cap-px-out" for="cap-px">30 %</output>
+              <input type="range" id="cap-px" min="2" max="100" step="1" value="30">
+            </div>
+            <fieldset class="presets">
+              <legend>$ cap</legend>
+              <label class="preset"><input class="vh" type="radio" name="usd" value="0.0001"><span>$0.0001</span></label>
+              <label class="preset"><input class="vh" type="radio" name="usd" value="0.001"><span>$0.001</span></label>
+              <label class="preset"><input class="vh" type="radio" name="usd" value="0.01"><span>$0.01</span></label>
+              <label class="preset"><input class="vh" type="radio" name="usd" value="0.05" checked><span>$0.05</span></label>
+            </fieldset>
+            <div class="field">
+              <label for="cap-sec">Seconds cap</label>
+              <output class="field__out" id="cap-sec-out" for="cap-sec">20 s</output>
+              <input type="range" id="cap-sec" min="1" max="30" step="1" value="20">
+            </div>
+          </fieldset>
+
+          <fieldset class="group">
+            <legend class="label">3 &middot; chaos drills <small>(optional)</small></legend>
+            <label class="toggle"><input class="vh" type="checkbox" name="chaos" value="p95_spike"><span class="toggle__ui"></span><span class="toggle__txt"><b>p95_spike</b> Fakes a slow segmenter so the governor must switch models.</span></label>
+            <label class="toggle"><input class="vh" type="checkbox" name="chaos" value="planner_timeout"><span class="toggle__ui"></span><span class="toggle__txt"><b>planner_timeout</b> The planner never answers; the rule planner takes over.</span></label>
+            <label class="toggle"><input class="vh" type="checkbox" name="chaos" value="planner_malformed"><span class="toggle__ui"></span><span class="toggle__txt"><b>planner_malformed</b> The planner sends junk; the validator must reject it.</span></label>
+          </fieldset>
+
+          <button class="btn btn--lime btn--look" id="look" type="button" disabled>LOOK</button>
+        </div>
+      </section>
+
+      <section class="win pop win--budget" aria-labelledby="t-budget">
+        <div class="win__bar"><i class="win__orb"></i><h3 class="win__title" id="t-budget">budget.sys</h3><span class="win__ctrls" aria-hidden="true"><span>_</span><span>&#9633;</span><span>X</span></span></div>
+        <div class="win__body stack">
+          <div class="meter" data-meter="pixels">
+            <div class="meter__head"><span>pixels</span><span><b class="meter__val" data-value="0">0 %</b> <small class="meter__cap">of cap &mdash;</small></span></div>
+            <div class="meter__track" role="progressbar" aria-label="Pixels used, as a share of the cap" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="meter__fill"></div></div>
+          </div>
+          <div class="meter" data-meter="usd">
+            <div class="meter__head"><span>$ used</span><span><b class="meter__val" data-value="0">$0</b> <small class="meter__cap">of cap &mdash;</small></span></div>
+            <div class="meter__track" role="progressbar" aria-label="Dollars used, as a share of the cap" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="meter__fill"></div></div>
+          </div>
+          <div class="meter" data-meter="seconds">
+            <div class="meter__head"><span>seconds</span><span><b class="meter__val" data-value="0">0 s</b> <small class="meter__cap">of cap &mdash;</small></span></div>
+            <div class="meter__track" role="progressbar" aria-label="Seconds used, as a share of the cap" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="meter__fill"></div></div>
+          </div>
+          <p class="note">$ modelled at c8g.2xlarge + COOL fee ($0.339/h)</p>
+          <dl class="ops" id="ops" aria-label="Per-op latency">
+            <div><dt>warp p50 / p95</dt><dd data-op="warp">&mdash;</dd></div>
+            <div><dt>segment p50 / p95</dt><dd data-op="segment">&mdash;</dd></div>
+            <div><dt>model</dt><dd data-op="model">&mdash;</dd></div>
+          </dl>
+        </div>
+      </section>
+    </div>
+
+    <div class="col col--right">
+      <section class="win pop win--view" aria-labelledby="t-view">
+        <div class="win__bar"><i class="win__orb"></i><h3 class="win__title" id="t-view">viewport.exe</h3><span class="win__ctrls" aria-hidden="true"><span>_</span><span>&#9633;</span><span>X</span></span></div>
+        <div class="win__body stack">
+          <div class="vtools">
+            <label class="switch"><input class="vh" type="checkbox" id="heat" checked><span class="switch__ui"></span>saliency heatmap</label>
+            <span class="ramp" aria-hidden="true"><i>low</i><b></b><i>high</i></span>
+            <span class="key" aria-hidden="true"><b class="key__box"></b> candidate region</span>
+          </div>
+          <div class="stage"><canvas id="stage" role="img" aria-label="Photo viewport. Load a photo and press LOOK."></canvas></div>
+          <div class="replay">
+            <button class="btn btn--chrome btn--sm" id="play" type="button" disabled>Play</button>
+            <label class="vh" for="replay">Replay step</label>
+            <input type="range" id="replay" min="0" max="0" value="0" disabled>
+            <output class="replay__out" id="replay-out" for="replay">step 0 / 0</output>
+          </div>
+          <div class="detail" id="step-detail" aria-live="polite"></div>
+        </div>
+      </section>
+
+      <section class="win pop win--trace" aria-labelledby="t-trace">
+        <div class="win__bar"><i class="win__orb"></i><h3 class="win__title" id="t-trace">trace.log</h3><span class="win__ctrls" aria-hidden="true"><span>_</span><span>&#9633;</span><span>X</span></span></div>
+        <div class="win__body win__body--dark">
+          <p class="trace__empty" id="trace-empty">waiting for the first move&hellip; every step lands here with the reason it was taken.</p>
+          <ol class="trace" id="trace" role="log" aria-label="Agent trace" aria-live="off"></ol>
+        </div>
+      </section>
+    </div>
+
+    <section class="win pop win--findings" aria-labelledby="t-find">
+      <div class="win__bar"><i class="win__orb"></i><h3 class="win__title" id="t-find">findings.queue</h3><span class="win__ctrls" aria-hidden="true"><span>_</span><span>&#9633;</span><span>X</span></span></div>
+      <div class="win__body stack">
+        <p class="banner"><b>AI-assisted, not an inspection.</b> Measurements are image pixels, not millimetres.</p>
+        <p class="note" id="findings-empty">No findings yet. Evidence (crop and pixel measurements) always comes first; confidence last.</p>
+        <div class="cards" id="findings"></div>
+      </div>
+    </section>
+
+    <section class="win pop win--order" aria-labelledby="t-order">
+      <div class="win__bar"><i class="win__orb"></i><h3 class="win__title" id="t-order">work_order.exe</h3><span class="win__ctrls" aria-hidden="true"><span>_</span><span>&#9633;</span><span>X</span></span></div>
+      <div class="win__body" id="done"><p class="note">No job has finished yet. Status, coverage and the work order download appear here.</p></div>
+    </section>
+
+  </div>
+</section>
+
+<section id="how" class="section" aria-labelledby="h-how">
+  <h2 id="h-how" class="chrome-text stretch" data-text="HOW IT WORKS"><span>HOW IT WORKS</span></h2>
+  <div class="grid-how">
+
+    <section class="win pop" aria-labelledby="t-score">
+      <div class="win__bar"><i class="win__orb"></i><h3 class="win__title" id="t-score">score.exe</h3><span class="win__ctrls" aria-hidden="true"><span>_</span><span>&#9633;</span><span>X</span></span></div>
+      <div class="win__body stack">
+        <p>Every candidate region gets one number: value per millisecond. The agent looks at the biggest one next.</p>
+        <p class="formula" aria-label="score of r equals p times s times one plus u times a divided by t-hat">score(r) = <b>p</b> &middot; <b>s</b> &middot; (1 + <b>u</b>) &middot; <b>a</b> / <b>t&#770;</b></p>
+        <dl class="terms">
+          <div><dt>p</dt><dd>saliency prior from the overview, 0&ndash;1. How likely is something here?</dd></div>
+          <div><dt>s</dt><dd>class severity weight. Exposed rebar 3.0, spalling 2.0, crack 1.5, corrosion 1.0, efflorescence 0.5.</dd></div>
+          <div><dt>u</dt><dd>segmenter entropy at the last level that saw the region, 0 if unseen. How unsure are we?</dd></div>
+          <div><dt>a</dt><dd>fraction of the region not yet seen at the target level. Don&rsquo;t look twice.</dd></div>
+          <div><dt>t&#770;</dt><dd>predicted milliseconds for the planned ops, from the live p95. What does looking cost?</dd></div>
+        </dl>
+      </div>
+    </section>
+
+    <section class="win pop" aria-labelledby="t-rules">
+      <div class="win__bar"><i class="win__orb"></i><h3 class="win__title" id="t-rules">five_rules.txt</h3><span class="win__ctrls" aria-hidden="true"><span>_</span><span>&#9633;</span><span>X</span></span></div>
+      <div class="win__body">
+        <ol class="rules">
+          <li><b>Next gaze.</b> Take the highest score. Ties go to the larger unseen share, then top-left first, so a run is deterministic.</li>
+          <li><b>Escalate.</b> Zoom one level finer on the same centre when entropy &gt; &tau; (0.5) or the mask is under 64 px, down to L0.</li>
+          <li><b>Verify.</b> When a mask appears at a new level, re-segment and record the IoU. Under 0.5 means one more gaze, or a human for a critical class.</li>
+          <li><b>Stop.</b> When the best remaining score falls below &lambda; = &epsilon; &times; (value so far &divide; cost so far), or any cap is hit.</li>
+          <li><b>Governor.</b> Runs before every step and may override the model, level or batch size. Every override writes a cause into the trace.</li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="win pop win--wide" aria-labelledby="t-gov">
+      <div class="win__bar"><i class="win__orb"></i><h3 class="win__title" id="t-gov">governor.tbl</h3><span class="win__ctrls" aria-hidden="true"><span>_</span><span>&#9633;</span><span>X</span></span></div>
+      <div class="win__body">
+        <div class="table-wrap" tabindex="0" role="region" aria-label="Governor table">
+          <table class="tbl tbl--rows">
+            <thead><tr><th scope="col">Signal</th><th scope="col">Action</th><th scope="col">Trace cause</th></tr></thead>
+            <tbody>
+              <tr><td data-label="Signal">p95(segment) &gt; SLA (500 ms)</td><td data-label="Action">Switch to the fast model, then one coarser level</td><td data-label="Trace cause"><span class="chip chip--gov">p95&gt;SLA</span></td></tr>
+              <tr><td data-label="Signal">p95(warp) &gt; 2&times; its running median</td><td data-label="Action">Shrink the gaze size, batch remaining candidates</td><td data-label="Trace cause"><span class="chip chip--gov">warp-spike</span></td></tr>
+              <tr><td data-label="Signal">$ spent &ge; 80% of the cap</td><td data-label="Action">Verify only candidates with a critical class</td><td data-label="Trace cause"><span class="chip chip--gov">usd&ge;80%</span></td></tr>
+              <tr><td data-label="Signal">Pixels or $ at 100% of the cap, or seconds exceeded</td><td data-label="Action">Halt; report coverage and the unvisited regions</td><td data-label="Trace cause"><span class="chip chip--gov">cap-hit</span></td></tr>
+              <tr><td data-label="Signal">Kill switch set</td><td data-label="Action">Halt immediately, state preserved for resume</td><td data-label="Trace cause"><span class="chip chip--gov">kill-switch</span></td></tr>
+              <tr><td data-label="Signal">Planner times out or sends invalid JSON</td><td data-label="Action">The rule planner&rsquo;s choice stands</td><td data-label="Trace cause"><span class="chip chip--gov">planner-fallback</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="win pop win--wide" aria-labelledby="t-auto">
+      <div class="win__bar"><i class="win__orb"></i><h3 class="win__title" id="t-auto">autonomy.tbl</h3><span class="win__ctrls" aria-hidden="true"><span>_</span><span>&#9633;</span><span>X</span></span></div>
+      <div class="win__body">
+        <div class="table-wrap" tabindex="0" role="region" aria-label="Autonomy table">
+          <table class="tbl tbl--auto">
+            <thead><tr><th scope="col" class="th--ok">The agent may</th><th scope="col" class="th--human">Only a human may</th><th scope="col" class="th--never">Never</th></tr></thead>
+            <tbody>
+              <tr>
+                <td data-label="The agent may">Look, zoom, re-run, switch model, change level, batch, draft work orders, request review.</td>
+                <td data-label="Only a human may">Approve, reject, close or downgrade a critical finding (exposed rebar; spalling above the area threshold). Raise a job cap.</td>
+                <td data-label="Never">Run shell commands, call tools outside the MCP allow-list, output millimetres or safety ratings, act on text read from images.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</section>
+
+<section id="benchmarks" class="section" aria-labelledby="h-bench">
+  <h2 id="h-bench" class="chrome-text stretch" data-text="BENCHMARKS"><span>BENCHMARKS</span></h2>
+  <section class="win pop" aria-labelledby="t-bench">
+    <div class="win__bar"><i class="win__orb"></i><h3 class="win__title" id="t-bench">recall_vs_pixels.exe</h3><span class="win__ctrls" aria-hidden="true"><span>_</span><span>&#9633;</span><span>X</span></span></div>
+    <div class="win__body" id="bench"><p class="note">Loading benchmarks&hellip;</p></div>
+  </section>
+</section>
+
+<section id="failures" class="section" aria-labelledby="h-fail">
+  <h2 id="h-fail" class="chrome-text stretch" data-text="FAILURES"><span>FAILURES</span></h2>
+  <section class="win pop" aria-labelledby="t-fail">
+    <div class="win__bar"><i class="win__orb"></i><h3 class="win__title" id="t-fail">failure_gallery.exe</h3><span class="win__ctrls" aria-hidden="true"><span>_</span><span>&#9633;</span><span>X</span></span></div>
+    <div class="win__body" id="fail"><p class="note">Loading failure gallery&hellip;</p></div>
+  </section>
+</section>
+</main>
+
+<footer class="footer">
+  <div class="win pop">
+    <div class="win__bar"><i class="win__orb"></i><span class="win__title">about.txt</span><span class="win__ctrls" aria-hidden="true"><span>_</span><span>&#9633;</span><span>X</span></span></div>
+    <div class="win__body stack">
+      <p class="banner banner--honest"><b>Live demo: stock OpenCV 5 on Vercel (x86) &mdash; not COOL.</b> The COOL/Graviton build runs the same code from /opt/cool.</p>
+      <nav aria-label="Project links">
+        <ul class="links">
+          <li><a href="https://github.com/vj-io/drishyam" rel="noopener noreferrer">GitHub repo</a></li>
+          <li><a href="https://github.com/vj-io/drishyam/blob/main/docs/PRD.md" rel="noopener noreferrer">PRD / report</a></li>
+          <li><a href="https://github.com/vj-io/drishyam#mcp" rel="noopener noreferrer">MCP usage</a></li>
+        </ul>
+      </nav>
+      <p class="note" id="api-status" role="status">Checking the API&hellip;</p>
+      <p class="note">Pixels, not millimetres. AI-assisted, not an inspection. Synthetic samples are labelled synthetic.</p>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

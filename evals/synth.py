@@ -510,8 +510,11 @@ def build_samples(out_dir="public/samples"):
         buf, q = _jpeg_under(img, SAMPLE_LIMIT)
         name = f"bridge_{k:02d}.jpg"
         (out / name).write_bytes(buf.tobytes())
-        manifest.append({"file": name, "title": title, "note": note, "synthetic": True, "width": 3000,
-                         "height": 2250, "boxes": gt, "distractors": extra})
+        (out / "thumbs").mkdir(exist_ok=True)
+        thumb = cv2.resize(img, (480, 360), interpolation=cv2.INTER_AREA)
+        cv2.imwrite(str(out / "thumbs" / name), thumb, [cv2.IMWRITE_JPEG_QUALITY, 80])
+        manifest.append({"file": name, "thumb": f"thumbs/{name}", "title": title, "note": note, "synthetic": True,
+                         "width": 3000, "height": 2250, "boxes": gt, "distractors": extra})
         print(f"{name}: {len(buf):,} bytes (q={q}), {len(gt)} boxes")
     (out / "index.json").write_text(json.dumps(manifest, indent=1))
     return manifest

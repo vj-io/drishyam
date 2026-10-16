@@ -1,6 +1,7 @@
 [
  {
   "file": "bridge_01.jpg",
+  "thumb": "thumbs/bridge_01.jpg",
   "title": "Hairline cracks",
   "note": "Five 1-2 px cracks that all but vanish in a thumbnail.",
   "synthetic": true,
@@ -57,6 +58,7 @@
  },
  {
   "file": "bridge_02.jpg",
+  "thumb": "thumbs/bridge_02.jpg",
   "title": "Crack with efflorescence",
   "note": "A crack with chalky salt deposits leached out beneath it.",
   "synthetic": true,
@@ -104,6 +106,7 @@
  },
  {
   "file": "bridge_03.jpg",
+  "thumb": "thumbs/bridge_03.jpg",
   "title": "Exposed rebar",
   "note": "A broken-out spall exposing reinforcing bars: the critical finding.",
   "synthetic": true,
@@ -151,6 +154,7 @@
  },
  {
   "file": "bridge_04.jpg",
+  "thumb": "thumbs/bridge_04.jpg",
   "title": "Corrosion run-off",
   "note": "Rust staining bleeding down the face in streaks.",
   "synthetic": true,
@@ -189,6 +193,7 @@
  },
  {
   "file": "bridge_05.jpg",
+  "thumb": "thumbs/bridge_05.jpg",
   "title": "Mixed defects",
   "note": "Cracks, spalling, exposed bars, rust and efflorescence on one wall.",
   "synthetic": true,
@@ -272,6 +277,7 @@
  },
  {
   "file": "bridge_06.jpg",
+  "thumb": "thumbs/bridge_06.jpg",
   "title": "Graffiti and one real crack",
   "note": "Spray-paint tags that are not damage, plus one genuine crack.",
   "synthetic": true,
@@ -302,6 +308,7 @@
  },
  {
   "file": "bridge_07.jpg",
+  "thumb": "thumbs/bridge_07.jpg",
   "title": "Glare and blur",
   "note": "A blown-out highlight and a blurred patch hiding a thin crack.",
   "synthetic": true,
@@ -341,6 +348,7 @@
  },
  {
   "file": "bridge_08.jpg",
+  "thumb": "thumbs/bridge_08.jpg",
   "title": "Clean concrete",
   "note": "Sound concrete with one straight formwork groove; nothing here is damage.",
   "synthetic": true,
