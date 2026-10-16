@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import hashlib
 import json
 import logging
 import os
@@ -24,6 +25,9 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
+
+os.environ.setdefault("VERCEL_TELEMETRY_DISABLED", "1")  # the cache SDK phones home unless told not to
+from vercel.cache import AsyncRuntimeCache
 
 from . import __version__, findings, imaging, privacy
 from .agent import Job, JobConfig
@@ -48,6 +52,15 @@ def _signing_key() -> bytes:
 
 
 KEY = _signing_key()
+# KILL must reach a job running in another function instance; the browser's aborted stream
+# does not (Vercel's proxy keeps the function side open). The regional Runtime Cache does,
+# and falls back to an in-process dict when run locally.
+KILLS = AsyncRuntimeCache(namespace="drishyam-kill")
+KILL_TTL_S = 300
+
+
+def _kill_key(job_id: str, kill_token: str) -> str:
+    return f"{job_id}-{hashlib.sha256(kill_token.encode()).hexdigest()[:32]}"
 
 app = FastAPI(title="Drishyam", docs_url=None, redoc_url=None, openapi_url=None)
 
@@ -146,25 +159,55 @@ async def create_job(
     except ValueError as exc:
         return error(422, str(exc))
 
+    kill_token = secrets.token_urlsafe(18)
+    kill_key = _kill_key(job.id, kill_token)
+
     async def events():
         it = job.run()
+        finished = False
         try:
             while (ev := await run_in_threadpool(next, it, None)) is not None:
                 if ev["type"] == "job":
                     ev["privacy"] = priv
+                    ev["kill_token"] = kill_token
                 elif ev["type"] == "done":
                     ev["token"] = findings.sign(ev["work_order"], KEY)
                 yield json.dumps(ev, separators=(",", ":")) + "\n"
-                if await request.is_disconnected():
-                    stop.set()  # the viewer pressed KILL: halt within one step
+                # The viewer pressed KILL: the governor halts the job before its next look.
+                if ev["type"] == "step" and (await request.is_disconnected() or await KILLS.get(kill_key)):
+                    stop.set()
                 if ev["type"] == "done":
+                    finished = True
                     log.info("job %s %s cause=%s steps=%s px=%.3f s=%.2f", job.id, ev["status"], ev["cause"],
                              ev["summary"]["steps"], ev["summary"]["pixels_frac"], ev["summary"]["seconds"])
         except Exception:
             log.exception("job %s failed", job.id)
             yield json.dumps({"type": "error", "message": "the job failed; it has been logged"}) + "\n"
+        finally:
+            if not finished:  # the server cancelled the stream because the viewer left or pressed KILL
+                stop.set()
+                log.info("job %s halted cause=kill-switch (stream closed by the client after step %s)",
+                         job.id, getattr(job, "step", 0))
 
     return StreamingResponse(events(), media_type="application/x-ndjson")
+
+
+class KillIn(BaseModel):
+    job: str = Field(pattern=r"^j_[0-9a-f]{6}$")
+    kill_token: str = Field(pattern=r"^[A-Za-z0-9_-]{24}$")
+
+
+@app.post("/api/kill")
+async def kill(request: Request):
+    raw = await _read_capped(request, 1_000)
+    if raw is None:
+        return error(413, "kill body too large")
+    try:
+        body = KillIn.model_validate_json(raw)
+    except ValueError:
+        return error(400, "body must be JSON with job and kill_token")
+    await KILLS.set(_kill_key(body.job, body.kill_token), 1, {"ttl": KILL_TTL_S})
+    return {"ok": True, "job": body.job}
 
 
 class ReviewIn(BaseModel):

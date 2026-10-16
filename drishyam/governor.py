@@ -55,12 +55,13 @@ class RuntimeStats:
         }
 
 
+def kill_path() -> str:
+    return os.environ.get("DRISHYAM_KILL_FILE") or os.path.expanduser("~/.drishyam/KILL")
+
+
 def global_kill() -> bool:
-    """Operator-wide stop: an env flag, or a file whose mere existence halts every job."""
-    if os.environ.get("DRISHYAM_KILL_SWITCH") == "1":
-        return True
-    path = os.environ.get("DRISHYAM_KILL_FILE")
-    return bool(path) and os.path.exists(path)
+    """Operator-wide stop: an env flag, or a file (`drishyam kill`) whose existence halts every job."""
+    return os.environ.get("DRISHYAM_KILL_SWITCH") == "1" or os.path.exists(kill_path())
 
 
 @dataclass

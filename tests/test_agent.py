@@ -18,7 +18,7 @@ def steps(events):
 
 
 def test_event_order_and_every_step_has_a_cause(scene):
-    job, events = run(scene)
+    _job, events = run(scene)
     assert [e["type"] for e in events[:2]] == ["job", "overview"]
     assert events[-1]["type"] == "done"
     assert all(s["cause"] for s in steps(events))
@@ -50,7 +50,7 @@ def test_deterministic_for_a_fixed_clock(scene):
 
 @pytest.mark.parametrize("cap", [0.05, 0.1, 0.3])
 def test_pixel_cap_is_never_exceeded(scene, cap):
-    job, events = run(scene, pixel_cap=cap)
+    _job, events = run(scene, pixel_cap=cap)
     done = events[-1]
     assert done["summary"]["pixels_frac"] <= cap + 1e-9
     if done["cause"] == "cap-hit":

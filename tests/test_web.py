@@ -77,7 +77,10 @@ def test_replay_header_validation(photo):
     assert ok.status_code == 200 and steps[0]["cause"] == "replay"
 
 
-def test_chaos_drills_over_http(photo):
+def test_chaos_drills_over_http(photo, monkeypatch):
+    from drishyam import agent
+
+    monkeypatch.setattr(agent.JobConfig, "eps", 0.0)  # real clock: keep the stop rule from ending before step 6
     ev = lines(post(photo, params="?pixel_cap=1&chaos=p95_spike,planner_malformed"))
     assert any(e.get("cause") == "p95>SLA" for e in ev)
     assert any(e["type"] == "planner" and e["status"] == "rejected" for e in ev)
@@ -126,3 +129,22 @@ def test_privacy_blur_applies_before_analysis(monkeypatch):
     privacy.blur_boxes(blurred, [[100, 100, 200, 200]])
     assert blurred[100:300, 100:300].std() < img[100:300, 100:300].std() / 5
     assert np.array_equal(blurred[400:], img[400:])
+
+
+def test_kill_endpoint_halts_a_running_job(photo, monkeypatch):
+    """TestClient buffers whole streams, so the kill lands first; the job must halt after its first look."""
+    from drishyam import web
+
+    token = "K" * 24
+    monkeypatch.setattr(web.secrets, "token_urlsafe", lambda n: token)
+    monkeypatch.setattr(web.secrets, "token_hex", lambda n: "abc123")  # job id j_abc123
+    assert client.post("/api/kill", json={"job": "j_abc123", "kill_token": "x" * 24}).status_code == 200
+    untouched = lines(post(photo, params="?pixel_cap=1"))
+    assert untouched[-1]["cause"] != "kill-switch"  # a wrong token kills nothing
+    assert client.post("/api/kill", json={"job": "j_abc123", "kill_token": token}).status_code == 200
+    events = lines(post(photo, params="?pixel_cap=1"))
+    looks = [e for e in events if e["type"] == "step" and e["decision"]["action"] != "halt"]
+    assert events[0]["job"] == "j_abc123" and events[0]["kill_token"] == token
+    assert events[-1]["cause"] == "kill-switch" and events[-1]["status"] == "halted" and len(looks) == 1
+    assert client.post("/api/kill", json={"job": "j_zzzzzz", "kill_token": "a" * 24}).status_code == 400
+    assert client.post("/api/kill", json={"job": "j_abcdef", "kill_token": "short"}).status_code == 400

@@ -28,6 +28,8 @@ SPIKE_MS = 900.0
 PLANNER_TIMEOUT_STEP = 3
 PLANNER_MALFORMED_STEP = 6
 REPLAY_ACTIONS = ("gaze", "escalate", "verify")
+DOMINATED_BY = {"corrosion": ("exposed_rebar",), "crack": ("spalling", "exposed_rebar"),
+                "efflorescence": ("spalling", "exposed_rebar")}
 MAX_REPLAY = 200
 
 
@@ -188,6 +190,9 @@ class Job:
         cv2.drawContours(view, cs, -1, (216, 79, 255), max(1, view.shape[0] // 160))
         thumb = imaging.jpeg_b64(view, 256) if self.cfg.thumbs else None
         conf = seg.confidence[cls]
+        # One physical defect, one finding: rust on exposed bars is the bar, a spall's rim is the spall.
+        if any(f.cls in DOMINATED_BY.get(cls, ()) and _inside(box, f.box) >= 0.5 for f in self.findings):
+            return None, False
         same = [f for f in self.findings if f.cls == cls and (f.region == r.id or imaging.box_iou(f.box, box) > 0.3)]
         if same:
             f = same[0]
@@ -317,14 +322,18 @@ class Job:
                 follow = ("escalate", r, level - 1, "entropy>tau", f"entropy {seg.entropy:.2f} > {cfg.tau} at L{level}")
             elif level > 0 and not batch and best and area < cfg.a_min:
                 follow = ("escalate", r, level - 1, "area<A_min", f"{best} area {area} px < {cfg.a_min} at L{level}")
-            elif best:
+            elif best and (present := sorted((c for c, a in seg.areas.items() if a >= cfg.a_min),
+                                             key=lambda c: -SEVERITY[c])):
                 # Every class with a confident mask becomes evidence, most severe first.
-                present = sorted((c for c, a in seg.areas.items() if a >= cfg.a_min), key=lambda c: -SEVERITY[c]) or [best]
                 r.cls = present[0]
                 critical = None
+                # Realised value of the look, in the same units as a region's expected value
+                # (one class's severity), so the stop rule compares like with like.
+                value += max(SEVERITY[c] * seg.confidence[c] for c in present)
                 for c in present:
                     f, is_new = self._log_finding(r, c, seg, crop, to_l0, level)
-                    value += SEVERITY[c] * seg.confidence[c]
+                    if f is None:
+                        continue
                     new_events.append({"type": "finding", "finding": f.to_dict()})
                     if f.critical:
                         critical = critical or f
@@ -395,7 +404,7 @@ class Job:
         halted = halt_cause in ("cap-hit", "kill-switch")
         rec = {"type": "step", "job": self.id, "step": self.step, "t": now_iso(), "region": None,
                "decision": {"action": "halt", "args": {}}, "rationale": halt_why, "cause": halt_cause,
-               "planner": "rule", "pixels_used": self.budget.pixels_used,
+               "planner": "rule", "model": self.settings.model, "pixels_used": self.budget.pixels_used,
                "pixels_frac": round(self.budget.pixels_used / (W * H), 4),
                "usd_used": round(self.budget.usd_used, 6), "seconds_used": round(self.budget.seconds_used, 3),
                "runtime": self.stats.snapshot(self.budget.usd_used)}
@@ -414,6 +423,13 @@ class Job:
                "coverage": round(coverage, 4),
                "unvisited": [r.id for r in self.regions.values() if not r.looks],
                "work_order": self.work_order}
+
+
+def _inside(a, b) -> float:
+    """Fraction of box a's area that lies inside box b."""
+    iw = max(0, min(a[0] + a[2], b[0] + b[2]) - max(a[0], b[0]))
+    ih = max(0, min(a[1] + a[3], b[1] + b[3]) - max(a[1], b[1]))
+    return iw * ih / max(1, a[2] * a[3])
 
 
 def look_iou(prev_mask: np.ndarray, prev_to_l0: np.ndarray, cur_mask: np.ndarray, cur_to_l0: np.ndarray) -> float:

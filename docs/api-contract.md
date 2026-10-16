@@ -1,7 +1,7 @@
 # Drishyam web API contract
 
-The browser UI (`public/`) talks to the Python function (`api/index.py`) through
-three endpoints. Every response is JSON or NDJSON. All coordinates are **L0
+The browser UI (`public/`) talks to the Python function (`app.py` → `drishyam/web.py`) through
+four endpoints. Every response is JSON or NDJSON. All coordinates are **L0
 pixels** (full-resolution image), `[x, y, w, h]` boxes have their origin at the
 top-left. All measurements are pixels; there are no millimetres anywhere.
 
@@ -40,7 +40,8 @@ Event types, in order:
 {"type": "job", "job": "j_3f9a1c", "width": 3000, "height": 2250,
  "levels": [[3000, 2250], [1500, 1125], [750, 563], [375, 282], [188, 141]],
  "budget": {"pixel_cap_frac": 0.3, "pixels_cap": 2025000, "usd_cap": 0.05, "seconds_cap": 20},
- "privacy": {"faces_blurred": 0, "people_blurred": 0}}
+ "privacy": {"faces_blurred": 0, "people_blurred": 0, "vehicles_blurred": 0, "boxes": [[x, y, w, h]]},
+ "kill_token": "<24 url-safe chars; POST it to /api/kill to stop this job>"}
 
 {"type": "overview", "heatmap_png_b64": "<PNG, saliency 0-255, size of level 3>",
  "candidates": [{"id": "r1", "box": [1200, 640, 768, 768], "prior": 0.81}],
@@ -93,6 +94,17 @@ Step `decision.action` values: `gaze` (first look at a region), `escalate`
 `best-score`, `entropy>tau`, `area<A_min`, `verify-new-mask`, `iou<0.5`,
 `p95>SLA`, `warp-spike`, `usd≥80%`, `cap-hit`, `kill-switch`,
 `planner-fallback`, `planner:<strategy>`, `replay`.
+
+## `POST /api/kill`
+
+```json
+{"job": "j_3f9a1c", "kill_token": "<from the job event>"}
+```
+
+Sets a flag in the regional Vercel Runtime Cache (TTL 5 min) that the running job
+reads after every step; the governor then halts before the next look with cause
+`kill-switch`. A wrong token is accepted and kills nothing (no oracle). Returns
+`{"ok": true, "job": "..."}`; 400 on malformed ids.
 
 ## Work order
 
