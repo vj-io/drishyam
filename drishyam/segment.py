@@ -17,6 +17,7 @@ import numpy as np
 CLASSES = ("background", "crack", "spalling", "efflorescence", "exposed_rebar", "corrosion")
 DEFECTS = CLASSES[1:]
 MIN_BLOB_PX = 12  # connected components smaller than this are noise
+ENTROPY_MIN_PX = 64  # fewer ambiguous pixels than this is not uncertainty worth a closer look
 DEFECT_PX_BG_MAX = 0.7  # a pixel counts toward entropy when p(background) is below this
 
 
@@ -77,7 +78,7 @@ def finish(probs: np.ndarray, t0: float, model: str) -> Segmentation:
     # 1.0 is a coin flip; a crisp mask scores ~0.2 (its anti-aliased rim).
     p_def = 1.0 - probs[0]
     defect_like = p_def > 1.0 - DEFECT_PX_BG_MAX
-    if np.count_nonzero(defect_like) >= MIN_BLOB_PX:
+    if np.count_nonzero(defect_like) >= ENTROPY_MIN_PX:
         q = np.clip(p_def[defect_like], 1e-6, 1 - 1e-6)
         ent = float((-(q * np.log2(q) + (1 - q) * np.log2(1 - q))).mean())
     else:
@@ -116,14 +117,21 @@ class ClassicalSegmenter:
         mu = cv2.GaussianBlur(gf, (0, 0), sig)
         rough = np.sqrt(np.maximum(cv2.GaussianBlur(gf * gf, (0, 0), sig) - mu * mu, 0))
         r_med, r_noise = _robust(rough)
-        darker = np.clip((_wide_blur(gf, sig * 6) - mu) / 25.0, 0, 1)
-        spall = np.clip((rough - r_med - 2.5 * r_noise) / (3.0 * r_noise), 0, 1) * np.clip(2.5 * darker, 0, 1)
+        # Spalling is a wide, dark, rough patch. Darkness is read from a wide median (which
+        # erases cracks up to ~k px wide) and the map is opened with a kernel wider than any
+        # crack, so neither a crack's contrast nor the rim of a stain can pass as a spall.
+        wide = 2 * k + 1
+        cf = cv2.GaussianBlur(cv2.medianBlur(gray, wide).astype(np.float32), (0, 0), sig)
+        darker = np.clip((_wide_blur(gf, sig * 6) - cf) / 25.0, 0, 1)
+        spall_raw = np.clip((rough - r_med - 2.5 * r_noise) / (3.0 * r_noise), 0, 1) * np.clip(2.5 * darker, 0, 1)
+        open_k = cv2.getStructuringElement(cv2.MORPH_RECT, (wide, wide))  # rect: separable, fast
 
         hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
         rust = cv2.GaussianBlur(
             cv2.inRange(hsv, (3, 70, 35), (25, 255, 235)).astype(np.float32) / 255, (0, 0), 2.0
         )
-        near_spall = cv2.dilate(spall, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k * 3, k * 3)))
+        spall = cv2.morphologyEx(spall_raw * (1 - rust), cv2.MORPH_OPEN, open_k)
+        near_spall = cv2.dilate(spall, cv2.getStructuringElement(cv2.MORPH_RECT, (k * 3, k * 3)))
         rebar = rust * np.clip(2 * near_spall, 0, 1)
         corrosion = rust * (1 - np.clip(2 * near_spall, 0, 1))
 
@@ -133,8 +141,9 @@ class ClassicalSegmenter:
         efflo = np.clip((lift - 22.0) / 25.0, 0, 1) * white
         efflo = cv2.morphologyEx(efflo, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)))
 
-        # A thin dark line inside rough, dark spalling is the spall's own edge, not a crack.
+        # A thin dark line inside spalling is the spall's own edge, and rust inside it is the bar.
         crack = crack * (1 - np.clip(1.5 * spall, 0, 1))
+        spall = spall * (1 - np.clip(1.5 * rebar, 0, 1))
         return np.stack([crack, spall, efflo, rebar, corrosion]).astype(np.float32)
 
     def predict(self, crop: np.ndarray, model: str = "accurate") -> Segmentation:

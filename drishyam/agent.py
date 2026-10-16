@@ -21,7 +21,7 @@ from .findings import SEVERITY, Finding, now_iso, work_order
 from .governor import USD_PER_HOUR, Budget, RuntimeStats, Settings, check
 from .measure import measure
 from .planner import TIMEOUT_S, ChaosPlanner, consult
-from .segment import CLASSES, ClassicalSegmenter
+from .segment import CLASSES, DEFECT_PX_BG_MAX, MIN_BLOB_PX, ClassicalSegmenter
 
 SPIKE_STEP = 4  # chaos p95_spike lands here; the governor reacts on the next step
 SPIKE_MS = 900.0
@@ -113,7 +113,9 @@ class Job:
         return 1.0 - float(patch.mean()) if patch.size else 0.0
 
     def _t_hat(self) -> float:
-        return self.stats.p("warp", 95, 5.0) + self.stats.p(f"segment:{self.settings.model}", 95, 30.0)
+        """Predicted ms for one look; a model with no samples yet borrows the median of all segment calls."""
+        seg_prior = self.stats.median("segment") or 30.0
+        return self.stats.p("warp", 95, 5.0) + self.stats.p(f"segment:{self.settings.model}", 95, seg_prior)
 
     def _score(self, r: Region):
         level = min(r.next_level + self.settings.level_bias, self.max_level)
@@ -251,9 +253,14 @@ class Job:
         while self.step < cfg.max_steps:
             self.step += 1
             step_t0 = clock()
-            governor_cause = None
             replaying = n_replay > 0
-            # 1. choose the next look
+            # 1. governor first: it may halt, or change the model, level or gaze size, before a look is chosen
+            verdict = check(self.budget, self.stats, self.settings, self.settings.size ** 2, cfg.sla_ms, self.kill())
+            if verdict.halt:
+                halt_cause, halt_why = verdict.cause, verdict.rationale
+                break
+            governor_cause = verdict.cause
+            # 2. choose the next look
             if self.forced:
                 action, r, level, cause, why = self.forced.popleft()
                 n_replay -= 1 if replaying else 0
@@ -272,13 +279,8 @@ class Job:
                     break
                 action, level, cause = "gaze", r.next_level, "best-score"
                 why = f"argmax score {best:.2e}: prior {r.prior:.2f}, unseen {a:.2f}, t_hat {self._t_hat():.0f} ms"
-            # 2. governor
-            verdict = check(self.budget, self.stats, self.settings, self.settings.size ** 2, cfg.sla_ms, self.kill())
-            if verdict.halt:
-                halt_cause, halt_why = verdict.cause, verdict.rationale
-                break
-            if verdict.cause:
-                governor_cause, why = verdict.cause, f"{verdict.rationale}; {why}"
+            if governor_cause:
+                why = f"{verdict.rationale}; {why}"
             if not replaying:
                 level = min(level + self.settings.level_bias, self.max_level)
             if self.settings.critical_only and action == "verify" and not any(
@@ -310,6 +312,7 @@ class Job:
                 injected = "p95_spike"
             y0, y1, x0, x1 = _rect_on(self.seen[level].shape, window, self.ov_scale)
             self.seen[level][y0:y1, x0:x1] = True
+            sal_max = round(float(sal[y0:y1, x0:x1].max()), 4) if y1 > y0 and x1 > x0 else 0.0
 
             # 5. what the measurements say to do next
             best = seg.best if q["ok"] else None
@@ -329,14 +332,22 @@ class Job:
             elif level > 0 and not batch and best and area < cfg.a_min:
                 follow = ("escalate", r, level - 1, "area<A_min", f"{best} area {area} px < {cfg.a_min} at L{level}")
             elif best:
-                r.cls = best
-                f, is_new = self._log_finding(r, best, seg, crop, to_l0, level)
-                value += SEVERITY[best] * seg.confidence[best]
-                new_events.append({"type": "finding", "finding": f.to_dict()})
-                if is_new and f.critical:
-                    new_events.append({"type": "review_request", "finding_id": f.id, "reason": f"{best} is critical"})
+                # Every class with a confident mask becomes evidence, most severe first.
+                present = sorted((c for c, a in seg.areas.items() if a >= cfg.a_min), key=lambda c: -SEVERITY[c]) or [best]
+                r.cls = present[0]
+                critical = None
+                for c in present:
+                    f, is_new = self._log_finding(r, c, seg, crop, to_l0, level)
+                    value += SEVERITY[c] * seg.confidence[c]
+                    new_events.append({"type": "finding", "finding": f.to_dict()})
+                    if f.critical:
+                        critical = critical or f
+                        if is_new:
+                            new_events.append({"type": "review_request", "finding_id": f.id,
+                                               "reason": f"{c} is critical"})
                 disagree = f"iou {iou:.2f} < 0.5 between L{prev_level} and L{level}" if iou is not None else ""
-                if iou is not None and iou < 0.5 and f.critical:
+                if iou is not None and iou < 0.5 and critical:
+                    f = critical
                     new_events.append({"type": "review_request", "finding_id": f.id, "reason": disagree})
                     r.done = True
                 elif iou is not None and iou < 0.5 and not r.extra_used and level > 0:
@@ -352,6 +363,7 @@ class Job:
                 r.done = True
             # While replaying, the trace already holds the follow-ups; only the last replayed look may queue one.
             if follow and (not replaying or n_replay == 0):
+                r.cx, r.cy = _focus(seg, to_l0, (cx, cy))
                 self.forced.appendleft(follow)
             elif follow:
                 r.done = True
@@ -368,7 +380,7 @@ class Job:
                 "decision": {"action": action, "args": {"x": cx, "y": cy, "level": level, "yaw": 0, "pitch": 0,
                                                         "size": size}},
                 "window": window,
-                "observation": {"entropy": seg.entropy, "saliency_max": r.prior, "mask_area_px": int(sum(seg.areas.values())),
+                "observation": {"entropy": seg.entropy, "saliency_max": sal_max, "mask_area_px": int(sum(seg.areas.values())),
                                 "sharpness": q["sharpness"], "exposure": q["exposure"],
                                 "classes": {c: a for c, a in seg.areas.items() if a}},
                 "quality": {"ok": q["ok"], "reason": q["reason"]},
@@ -416,6 +428,18 @@ class Job:
                "coverage": round(coverage, 4),
                "unvisited": [r.id for r in self.regions.values() if not r.looks],
                "work_order": self.work_order}
+
+
+def _focus(seg, to_l0, fallback: tuple[int, int]) -> tuple[int, int]:
+    """Where the next, finer look should centre: the defect pixels of this look, else the
+    pixels the segmenter is unsure about, else the same centre."""
+    ys, xs = np.nonzero(seg.labels)
+    if xs.size < MIN_BLOB_PX:
+        ys, xs = np.nonzero(seg.probs[0] < DEFECT_PX_BG_MAX)
+    if xs.size < MIN_BLOB_PX:
+        return fallback
+    (fx, fy), = imaging.map_points(to_l0, [[float(xs.mean()), float(ys.mean())]])
+    return int(fx), int(fy)
 
 
 def validate_replay(replay: list, shape) -> list[tuple[str, int, int, int]]:

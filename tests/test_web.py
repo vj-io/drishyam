@@ -1,0 +1,128 @@
+import base64
+import json
+
+import cv2
+import numpy as np
+import pytest
+from fastapi.testclient import TestClient
+
+from drishyam import findings
+from drishyam.web import KEY, MAX_UPLOAD_BYTES, app
+
+from .conftest import add_rebar_spall, concrete
+
+client = TestClient(app)
+
+
+def jpeg(img, q=90):
+    return cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, q])[1].tobytes()
+
+
+@pytest.fixture(scope="module")
+def photo():
+    return jpeg(add_rebar_spall(concrete(1200, 1600, 21), (800, 600)))
+
+
+def post(data, ctype="image/jpeg", params="", headers=None):
+    return client.post(f"/api/jobs{params}", content=data, headers={"Content-Type": ctype, **(headers or {})})
+
+
+def lines(resp):
+    return [json.loads(x) for x in resp.text.splitlines() if x]
+
+
+def test_health_and_security_headers():
+    r = client.get("/api/health")
+    assert r.status_code == 200 and r.json()["ok"] and r.json()["opencv"].startswith("5.")
+    assert r.headers["cache-control"] == "no-store" and r.headers["x-content-type-options"] == "nosniff"
+    assert client.get("/docs").status_code == 404 and client.get("/openapi.json").status_code == 404
+
+
+def test_job_streams_contract_events(photo):
+    r = post(photo, params="?pixel_cap=0.5")
+    assert r.status_code == 200 and r.headers["content-type"].startswith("application/x-ndjson")
+    ev = lines(r)
+    assert ev[0]["type"] == "job" and ev[0]["privacy"]["boxes"] == []
+    assert ev[1]["type"] == "overview" and base64.b64decode(ev[1]["heatmap_png_b64"])[:4] == b"\x89PNG"
+    done = ev[-1]
+    assert done["type"] == "done" and findings.verify(done["token"], KEY)["job"] == done["work_order"]["job"]
+
+
+def test_rejects_bad_uploads(photo):
+    assert post(b"hello", "text/plain").status_code == 400
+    assert post(b"GIF89a" + b"0" * 100, "image/png").status_code == 400
+    assert post(photo[:2000]).status_code == 400
+    big = b"\xff\xd8\xff" + b"0" * (MAX_UPLOAD_BYTES + 10)
+    assert post(big).status_code == 413
+    lie = client.post("/api/jobs", content=photo, headers={"Content-Type": "image/jpeg", "Content-Length": "abc"})
+    assert lie.status_code in (400, 413)
+
+
+@pytest.mark.parametrize("q", ["?pixel_cap=0", "?pixel_cap=2", "?usd_cap=1", "?seconds_cap=999",
+                               "?chaos=rm_rf", "?pixel_cap=nan", "?chaos=" + "x" * 100])
+def test_rejects_bad_params(photo, q):
+    r = post(photo, params=q)
+    assert r.status_code == 422 and "error" in r.json()
+
+
+def test_replay_header_validation(photo):
+    def hdr(obj):
+        return {"X-Drishyam-Replay": base64.urlsafe_b64encode(json.dumps(obj).encode()).decode().rstrip("=")}
+
+    assert post(photo, headers={"X-Drishyam-Replay": "!!!"}).status_code == 422
+    assert post(photo, headers=hdr([["shell", 1, 1, 1]])).status_code == 422
+    assert post(photo, headers={"X-Drishyam-Replay": "A" * 20000}).status_code == 422
+    ok = post(photo, params="?pixel_cap=0.2", headers=hdr([["gaze", 800, 600, 1]]))
+    steps = [e for e in lines(ok) if e["type"] == "step"]
+    assert ok.status_code == 200 and steps[0]["cause"] == "replay"
+
+
+def test_chaos_drills_over_http(photo):
+    ev = lines(post(photo, params="?pixel_cap=1&chaos=p95_spike,planner_malformed"))
+    assert any(e.get("cause") == "p95>SLA" for e in ev)
+    assert any(e["type"] == "planner" and e["status"] == "rejected" for e in ev)
+
+
+def test_review_flow_and_tampering(photo):
+    done = lines(post(photo, params="?pixel_cap=1"))[-1]
+    pending = [f for f in done["work_order"]["findings"] if f["state"] == "pending_review"]
+    assert pending, "fixture should yield a critical finding"
+    fid = pending[0]["id"]
+    body = {"token": done["token"], "finding_id": fid, "decision": "approve", "reviewer": "Test Engineer"}
+    r = client.post("/api/review", json=body)
+    assert r.status_code == 200
+    wo = r.json()["work_order"]
+    assert next(f for f in wo["findings"] if f["id"] == fid)["state"] == "approved"
+    assert wo["approvals"][0]["reviewer"] == "Test Engineer"
+    assert client.post("/api/review", json={**body, "token": r.json()["token"]}).status_code == 409
+    forged = findings.sign(done["work_order"], b"x" * 32)
+    assert client.post("/api/review", json={**body, "token": forged}).status_code == 403
+    assert client.post("/api/review", json={**body, "decision": "downgrade"}).status_code == 400
+    assert client.post("/api/review", json={**body, "finding_id": "../etc"}).status_code == 400
+    assert client.post("/api/review", json={**body, "reviewer": "a\nb"}).status_code == 400
+    assert client.post("/api/review", content=b"x" * 200_000,
+                       headers={"Content-Type": "application/json"}).status_code == 413
+
+
+def test_people_dominant_image_refused(monkeypatch, photo):
+    from drishyam import privacy
+
+    def refuse(img):
+        raise privacy.PeopleDominant("a person fills 60% of the frame")
+
+    monkeypatch.setattr(privacy, "privacy_pass", refuse)
+    r = post(photo)
+    assert r.status_code == 422 and "person" in r.json()["error"]
+
+
+def test_privacy_blur_applies_before_analysis(monkeypatch):
+    from drishyam import privacy
+
+    img = concrete(800, 800, 22)
+    img[100:300, 100:300] = (np.indices((200, 200)).sum(0) % 2 * 255)[..., None]  # a sharp pattern
+    stats = privacy.privacy_pass(img.copy())
+    assert stats["boxes"] == []
+    blurred = img.copy()
+    privacy.blur_boxes(blurred, [[100, 100, 200, 200]])
+    assert blurred[100:300, 100:300].std() < img[100:300, 100:300].std() / 5
+    assert np.array_equal(blurred[400:], img[400:])
