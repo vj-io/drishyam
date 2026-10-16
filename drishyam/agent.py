@@ -196,8 +196,7 @@ class Job:
         same = [f for f in self.findings if f.cls == cls and (f.region == r.id or imaging.box_iou(f.box, box) > 0.3)]
         if same:
             f = same[0]
-            if level <= f.level:
-                f.agent_update(confidence=conf, measure=m, box=box, step=self.step, level=level, crop_jpeg_b64=thumb)
+            f.agent_update(confidence=conf, measure=m, box=box, step=self.step, level=level, crop_jpeg_b64=thumb)
             return f, False
         f = Finding(f"f{len(self.findings) + 1}", cls, conf, m, box, self.step, level, r.id, crop_jpeg_b64=thumb)
         self.findings.append(f)

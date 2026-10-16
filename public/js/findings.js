@@ -60,11 +60,12 @@ export class Findings {
     const m = f.measure ?? {};
     const crop = dataUrl('image/jpeg', f.crop_jpeg_b64);
     const state = h('span', { class: 'chip chip--state' }, STATE[f.state] ?? f.state);
+    const refined = Array.isArray(f.steps) && f.steps.length > 1 ? `, refined at ${f.steps.slice(1).join(', ')}` : '';
     return {
       state,
       head: h('header', { class: 'finding__head' },
         h('span', { class: `chip chip--cls chip--${f.cls}` }, f.cls),
-        h('span', { class: 'finding__where' }, `found at step ${f.step}, L${f.level}`),
+        h('span', { class: 'finding__where' }, `found at step ${f.step}${refined}, L${f.level}`),
         state),
       body: h('div', { class: 'finding__body' },
         crop ? h('img', { class: 'finding__crop', src: crop, alt: `Crop of the ${f.cls} finding`, width: 128, height: 128 }) : h('div', { class: 'finding__crop finding__crop--none' }, 'no crop'),

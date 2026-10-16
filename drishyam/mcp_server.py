@@ -583,9 +583,9 @@ def log_finding(job: JobId, gaze_id: RecordId, cls: Defect) -> str:
             ),
             None,
         )
-        if same and g.level <= same.level:  # a finer look refines the finding it already supports
+        if same:  # another look joins the evidence trail of the finding it already supports
             same.agent_update(confidence=seg.confidence[cls], measure=m, box=box, step=g.step, level=g.level)
-        elif not same:
+        else:
             pad = max(8, max(w, h) // 3)
             py, px = max(0, y - pad), max(0, x - pad)
             view = g.crop[py : y + h + pad, px : x + w + pad].copy()

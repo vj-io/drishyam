@@ -369,7 +369,9 @@ def test_desktop_mock(browser, base):
     for fid, f in FINDINGS.items():
         c = card(p, fid)
         expect(c.locator(".chip--cls")).to_have_text(f["cls"])
-        expect(c.locator(".finding__where")).to_have_text(f"found at step {f['step']}, L{f['level']}")
+        later = f.get("steps", [])[1:]
+        refined = f", refined at {', '.join(map(str, later))}" if later else ""
+        expect(c.locator(".finding__where")).to_have_text(f"found at step {f['step']}{refined}, L{f['level']}")
         expect(c.locator(".chip--state")).to_have_text("needs review" if f["state"] == "pending_review" else f["state"])
         expect(c.locator("dl")).to_contain_text(f"{f['measure']['area_px']:,}")
         if f["critical"]:

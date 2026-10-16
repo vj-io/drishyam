@@ -186,11 +186,11 @@ def gaze_to_l0(x: int, y: int, level: int, size: int) -> np.ndarray:
 
 def finding_components(job: Job, segs: list) -> list[dict]:
     """Drishyam's evidence in the baselines' box semantics: per-component boxes of the classes behind each
-    finding, from the look that produced it. Lets the harness score both box conventions (see `run`)."""
+    finding, from every look in its evidence trail. Lets the harness score both box conventions (see `run`)."""
     looks = [r for r in job.trace if r["decision"]["action"] != "halt"]
     out = []
     for rec, seg in zip(looks, segs, strict=True):
-        classes = {f.cls for f in job.findings if f.step == rec["step"]}
+        classes = {f.cls for f in job.findings if rec["step"] in f.steps}
         if classes:
             a = rec["decision"]["args"]
             out += [{**p, "step": rec["step"], "level": a["level"]}

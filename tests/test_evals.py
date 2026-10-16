@@ -94,14 +94,14 @@ def test_predictions_map_back_to_l0():
 
 
 def test_drishyam_components_reproduce_finding_boxes(scene):
-    """The rebuilt per-component boxes of a finding's look must sit inside that finding's own (union) box."""
+    """The rebuilt per-component boxes of every look in a finding's trail must sit inside its own (union) box."""
     rec = harness.RecordingSegmenter()
     job = harness.Job(scene, harness.JobConfig(pixel_cap=0.3, thumbs=False), segmenter=rec)
     list(job.run())
     comps = harness.finding_components(job, rec.log)
     assert job.findings and comps
     for c in comps:
-        f = next(f for f in job.findings if f.cls == c["cls"] and f.step == c["step"])
+        f = next(f for f in job.findings if f.cls == c["cls"] and c["step"] in f.steps)
         fx, fy, fw, fh = f.box
         assert c["box"][0] >= fx - 2 and c["box"][1] >= fy - 2
         assert c["box"][0] + c["box"][2] <= fx + fw + 2 and c["box"][1] + c["box"][3] <= fy + fh + 2

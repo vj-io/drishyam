@@ -70,6 +70,35 @@ def test_survey_look_comes_first_only_when_a_second_look_is_affordable(scene):
     assert [s["cause"] for s in steps(events)][0] != "survey"
 
 
+
+def test_evidence_trail_keeps_the_look_that_found_it(scene, monkeypatch):
+    """A finer look re-centred on a defect refines its finding; the look that found it stays in the trail and box."""
+    from drishyam.findings import Finding
+    boxes, init, update = {}, Finding.__post_init__, Finding.agent_update
+
+    def spy_init(f):
+        init(f)
+        boxes[f.id] = [list(f.box)]
+
+    def spy_update(f, **kw):
+        boxes[f.id].append(list(kw["box"]))
+        update(f, **kw)
+
+    monkeypatch.setattr(Finding, "__post_init__", spy_init)
+    monkeypatch.setattr(Finding, "agent_update", spy_update)
+    job, events = run(scene, pixel_cap=1.0)
+    looks = {s["step"]: s["decision"] for s in steps(events)}
+    assert any(looks[s]["action"] in ("escalate", "verify") and looks[s]["args"]["x"] != looks[f.step]["args"]["x"]
+               for f in job.findings for s in f.steps[1:]), "no finding was refined by a re-centred finer look"
+    for f in job.findings:
+        assert f.steps[0] == f.step and f.steps == sorted(set(f.steps)) and len(boxes[f.id]) == len(f.steps)
+        x, y, w, h = f.box
+        assert all(x <= bx and y <= by and bx + bw <= x + w and by + bh <= y + h for bx, by, bw, bh in boxes[f.id])
+        assert f.level == min(looks[s]["args"]["level"] for s in f.steps)
+        flags = [e["finding"]["critical"] for e in events if e["type"] == "finding" and e["finding"]["id"] == f.id]
+        assert flags == sorted(flags), "a finding went from critical back to non-critical"
+    assert [wf["steps"] for wf in events[-1]["work_order"]["findings"]] == [f.steps for f in job.findings]
+
 def test_seconds_and_usd_caps_halt():
     from .conftest import concrete
 

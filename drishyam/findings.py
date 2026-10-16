@@ -59,17 +59,29 @@ class Finding:
     critical: bool = False
     state: str = "draft"
     crop_jpeg_b64: str | None = field(default=None, repr=False)
+    steps: list[int] = field(default_factory=list, init=False)  # every look that saw it, in order
 
     def __post_init__(self) -> None:
         self.critical = is_critical(self.cls, self.measure.get("area_px", 0))
         self.state = "pending_review" if self.critical else "draft"
+        self.steps = [self.step]
 
     def agent_update(self, *, confidence: float, measure: dict, box: list[int], step: int, level: int,
                      crop_jpeg_b64: str | None = None) -> None:
-        """New evidence from a finer look. Class, criticality and state are not the agent's to change."""
-        self.confidence, self.measure, self.box, self.step, self.level = confidence, measure, box, step, level
-        if crop_jpeg_b64:
-            self.crop_jpeg_b64 = crop_jpeg_b64
+        """Another look at the same defect joins its evidence trail. `step` stays the look that found it; the box
+        grows to the union of every look's box (its extent at every scale); confidence is the best seen; measure,
+        level and crop come from the finest look (ties: the latest). Class and state are not the agent's to
+        change, and criticality only rises: any look that measures a critical defect makes it critical."""
+        if step not in self.steps:
+            self.steps.append(step)
+        x0, y0 = min(self.box[0], box[0]), min(self.box[1], box[1])
+        self.box = [x0, y0, max(self.box[0] + self.box[2], box[0] + box[2]) - x0,
+                    max(self.box[1] + self.box[3], box[1] + box[3]) - y0]
+        self.confidence = max(self.confidence, confidence)
+        if level <= self.level:
+            self.measure, self.level = measure, level
+            if crop_jpeg_b64:
+                self.crop_jpeg_b64 = crop_jpeg_b64
         if not self.critical and is_critical(self.cls, measure.get("area_px", 0)):
             self.critical, self.state = True, "pending_review"
 
