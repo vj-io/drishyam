@@ -1,3 +1,5 @@
+from itertools import pairwise
+
 import cv2
 import numpy as np
 import pytest
@@ -28,6 +30,17 @@ def test_hairline_crack_is_more_uncertain_when_downscaled():
     coarse = SEG.predict(cv2.pyrDown(img))
     assert fine.areas["crack"] > 0
     assert coarse.areas["crack"] * 4 < fine.areas["crack"] * 4 or coarse.entropy >= fine.entropy
+
+
+def test_crack_that_fades_midway_stays_one_component():
+    """Hysteresis: the faint middle of a crack is linked to its dark ends, not dropped."""
+    img = concrete(512, 512, 19)
+    pts = [(x, 256 + int(10 * np.sin(x / 40))) for x in range(60, 453)]
+    for (x0, y0), (x1, y1) in pairwise(pts):
+        v = int(145 - 90 * abs(x0 - 256) / 196)  # 55 at the ends, 145 on a ~170 surface mid-way
+        cv2.line(img, (x0, y0), (x1, y1), (v, v, v + 3), 2, cv2.LINE_AA)
+    n, _, stats, _ = cv2.connectedComponentsWithStats(SEG.predict(img).mask("crack"), connectivity=8)
+    assert n > 1 and stats[1:, cv2.CC_STAT_WIDTH].max() > 0.9 * 392
 
 
 def test_rust_in_spall_is_rebar_and_rust_alone_is_corrosion():

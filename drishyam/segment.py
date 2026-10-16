@@ -21,6 +21,7 @@ DEFECTS = CLASSES[1:]
 MIN_BLOB_PX = 12  # connected components smaller than this are noise
 ENTROPY_MIN_PX = 64  # fewer ambiguous pixels than this is not uncertainty worth a closer look
 DEFECT_PX_BG_MAX = 0.7  # a pixel counts toward entropy when p(background) is below this
+CRACK_LINK_SIGMA = 2.5  # crack hysteresis low threshold: half the 5-sigma seed threshold (Canny's 2:1)
 
 
 @dataclass
@@ -54,6 +55,20 @@ def _wide_blur(x: np.ndarray, sigma: float) -> np.ndarray:
     h, w = x.shape[:2]
     small = cv2.resize(x, (max(1, w // 8), max(1, h // 8)), interpolation=cv2.INTER_AREA)
     return cv2.resize(cv2.GaussianBlur(small, (0, 0), sigma / 8), (w, h), interpolation=cv2.INTER_LINEAR)
+
+
+def _hysteresis(strong: np.ndarray, weak: np.ndarray, min_len: int) -> np.ndarray:
+    """Canny-style linking for a linear defect: a pixel whose `weak` evidence passes the coin
+    flip counts as crack when it is 8-connected through such pixels to one whose `strong`
+    evidence does, and the linked trace spans at least `min_len` px (a line, not a speck).
+    A faint stretch of a crack then stays part of the crack at every scale, while faint
+    texture around an isolated dark speck stays background."""
+    n, lab, stats, _ = cv2.connectedComponentsWithStats((weak > 0.5).astype(np.uint8), connectivity=8)
+    keep = np.zeros(n, bool)
+    keep[lab[strong > 0.5]] = True
+    keep &= np.maximum(stats[:, cv2.CC_STAT_WIDTH], stats[:, cv2.CC_STAT_HEIGHT]) >= min_len
+    keep[0] = False
+    return np.where(keep[lab], np.maximum(strong, weak), strong)
 
 
 def _softmax(logits: np.ndarray) -> np.ndarray:
@@ -112,7 +127,10 @@ class ClassicalSegmenter:
         bh = cv2.morphologyEx(g, cv2.MORPH_BLACKHAT, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k)))
         bh = bh.astype(np.float32)
         med, noise = _robust(bh)
-        crack = np.clip((bh - med - 3.0 * noise) / (4.0 * noise), 0, 1)
+        crack = np.clip((bh - med - 3.0 * noise) / (4.0 * noise), 0, 1)  # coin flip at 5 sigma
+        # The same ramp with its coin flip at CRACK_LINK_SIGMA: evidence a crack pixel may have
+        # when it continues a confident one (hysteresis, below).
+        linked = np.clip((bh - med - (CRACK_LINK_SIGMA - 2.0) * noise) / (4.0 * noise), 0, 1)
 
         gf = gray.astype(np.float32)
         sig = max(3.0, min(h, w) / 60)
@@ -144,7 +162,10 @@ class ClassicalSegmenter:
         efflo = cv2.morphologyEx(efflo, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)))
 
         # A thin dark line inside spalling is the spall's own edge, and rust inside it is the bar.
-        crack = crack * (1 - np.clip(1.5 * spall, 0, 1))
+        # Linking never runs through rust (a faint dark line there is the bar's or the stain's edge),
+        # and a linked trace must be longer than k, the widest dark line the blackhat passes.
+        not_spall = 1 - np.clip(1.5 * spall, 0, 1)
+        crack = _hysteresis(crack * not_spall, linked * not_spall * (1 - rust), k)
         spall = spall * (1 - np.clip(1.5 * rebar, 0, 1))
         return np.stack([crack, spall, efflo, rebar, corrosion]).astype(np.float32)
 
