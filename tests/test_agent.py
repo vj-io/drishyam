@@ -1,9 +1,13 @@
 import time
 
+import cv2
+import numpy as np
 import pytest
 
+from drishyam import imaging
 from drishyam.agent import Job, JobConfig, gaze_path_from_trace, validate_replay
-from drishyam.findings import ForbiddenTransition, decide
+from drishyam.findings import SPALL_CRITICAL_AREA_PX, ForbiddenTransition, decide
+from drishyam.segment import CLASSES, finish, segment_view
 
 from .conftest import FakeClock
 
@@ -98,6 +102,66 @@ def test_evidence_trail_keeps_the_look_that_found_it(scene, monkeypatch):
         flags = [e["finding"]["critical"] for e in events if e["type"] == "finding" and e["finding"]["id"] == f.id]
         assert flags == sorted(flags), "a finding went from critical back to non-critical"
     assert [wf["steps"] for wf in events[-1]["work_order"]["findings"]] == [f.steps for f in job.findings]
+
+def inside_image(box, shape) -> bool:
+    x, y, w, h = box
+    return 0 <= x and 0 <= y and x + w <= shape[1] and y + h <= shape[0]
+
+
+def test_survey_window_larger_than_the_image_reports_nothing_outside_it(scene, monkeypatch):
+    """The 2048-px survey view of a 2000 x 1500 scene is mostly reflection; no label and no box may come from there."""
+    from drishyam import agent
+
+    looks = []
+
+    def spy(segmenter, crop, model, valid):
+        looks.append((segment_view(segmenter, crop, model, valid), valid))
+        return looks[-1][0]
+
+    monkeypatch.setattr(agent, "segment_view", spy)
+    job, events = run(scene, pixel_cap=0.3)
+    x, y, w, h = steps(events)[0]["window"]
+    assert steps(events)[0]["cause"] == "survey" and (x < 0 or y < 0) and (w > scene.shape[1] or h > scene.shape[0])
+    assert looks[0][1].mean() < 0.8  # most of the survey view is not the image
+    assert all(not seg.labels[~valid].any() for seg, valid in looks)
+    assert job.findings
+    for f in events[-1]["work_order"]["findings"]:
+        assert inside_image(f["box"], scene.shape), f
+
+
+class DarkIsSpall:
+    """Every dark pixel is spalling, crisply: measured areas are exact, so mirrored area shows up 1:1."""
+
+    def predict(self, crop, model="accurate"):
+        dark = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY) < 105
+        probs = np.zeros((len(CLASSES), *dark.shape), np.float32)
+        probs[0], probs[CLASSES.index("spalling")] = ~dark, dark
+        return finish(probs, time.perf_counter(), model)
+
+
+def test_reflection_does_not_inflate_spall_area_to_critical(monkeypatch):
+    """A half-disc spall on the top edge, 30k px^2 inside the image, is mirrored by every view that runs past the
+    edge; counted twice it is over the 40k critical area, and criticality can never be taken back."""
+    from .conftest import concrete
+
+    img = concrete(900, 1100, 6)
+    cv2.circle(img, (550, 0), 140, (40, 40, 40), -1)
+    true_area = int(np.count_nonzero(img[..., 0] == 40))
+    assert true_area < SPALL_CRITICAL_AREA_PX <= 2 * true_area
+
+    def spalls():
+        job = Job(img, JobConfig(thumbs=False, pixel_cap=1.0), clock=FakeClock(), segmenter=DarkIsSpall())
+        list(job.run())
+        assert any(r["window"][1] < 0 for r in job.trace if r.get("window"))  # some view does run past the edge
+        return [f for f in job.findings if f.cls == "spalling"]
+
+    with monkeypatch.context() as m:  # without the footprint (the old behaviour) the mirror makes it critical
+        m.setattr(imaging, "footprint", lambda to_l0, l0_size, size: np.ones((size, size), bool))
+        assert any(f.critical for f in spalls())
+    found = spalls()
+    assert found and not any(f.critical for f in found)
+    assert all(f.measure["area_px"] <= 1.02 * true_area and inside_image(f.box, img.shape) for f in found)
+
 
 def test_seconds_and_usd_caps_halt():
     from .conftest import concrete

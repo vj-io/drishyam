@@ -36,7 +36,7 @@ from .findings import Finding, now_iso, order_status
 from .findings import work_order as make_work_order
 from .governor import Budget, RuntimeStats, Settings, check, global_kill
 from .measure import measure as measure_px
-from .segment import DEFECTS, default_segmenter
+from .segment import DEFECTS, default_segmenter, segment_view
 
 MAX_LEVEL = 3
 OVERVIEW_LEVEL = imaging.OVERVIEW_LEVEL
@@ -245,7 +245,8 @@ def _look(s: Session, rec: dict, x: int, y: int, level: int, yaw: float = 0.0, p
 
 def _segment(s: Session, rec: dict, g: Gaze, model: str) -> tuple[object, str]:
     used = "fast" if s.settings.model == "fast" else model  # the governor may have downgraded the model
-    g.seg, ms = _timed(s, f"segment:{used}", s.segmenter.predict, g.crop, used)
+    valid = imaging.footprint(g.to_l0, s.shape[::-1], g.crop.shape[0])  # no mirrored defects past the image
+    g.seg, ms = _timed(s, f"segment:{used}", segment_view, s.segmenter, g.crop, used, valid)
     s.stats.record("segment", ms)
     areas = {c: a for c, a in g.seg.areas.items() if a}
     rec["observation"] = {
@@ -573,8 +574,7 @@ def log_finding(job: JobId, gaze_id: RecordId, cls: Defect) -> str:
         mask = seg.mask(cls)
         m = measure_px(mask, 2**g.level, linear=cls == "crack")
         x, y, w, h = cv2.boundingRect(cv2.findNonZero(mask))
-        (x0, y0), (x1, y1) = imaging.map_points(g.to_l0, [[x, y], [x + w, y + h]])
-        box = [int(x0), int(y0), int(x1 - x0), int(y1 - y0)]
+        box = imaging.l0_box((x, y, w, h), g.to_l0, s.shape[::-1])
         same = next(
             (
                 f

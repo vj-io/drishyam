@@ -92,7 +92,10 @@ A finding event repeats, with the same `id`, whenever another look sees the same
 defect. The finding is its evidence trail: `step` is the look that found it,
 `steps` every look that saw it in order, `box` the union of those looks' boxes,
 `confidence` the highest, and `measure`, `level` and the crop come from the
-finest look. `critical` never goes back to `false`.
+finest look. `critical` never goes back to `false`. A look whose `window` runs past the
+image (a survey wider than the image, a level-1 look at a small photo) is filled by
+reflection for the segmenter, but those pixels count as background: no label, area,
+entropy or box ever comes from outside the image, and every finding `box` lies inside it.
 
 Step `decision.action` values: `gaze` (first look at a region, or the survey), `escalate`
 (one level finer, same centre, because the last look was uncertain), `verify`

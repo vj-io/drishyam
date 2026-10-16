@@ -63,6 +63,18 @@ def test_gaze_maps_back_to_l0_exactly(level):
     assert (cx, cy) == (1024, 1024)
 
 
+def test_footprint_marks_the_crop_pixels_that_show_the_image():
+    pyr = imaging.build_pyramid(np.zeros((600, 800, 3), np.uint8))
+    _, to_l0 = imaging.gaze(pyr, 400, 300, 1, size=512)  # L0 window [-112, -212, 1024, 1024]
+    valid = imaging.footprint(to_l0, (800, 600), 512)
+    ys, xs = np.nonzero(valid)
+    assert (xs.min(), xs.max(), ys.min(), ys.max()) == (56, 455, 106, 405)  # x = 2u - 112 in [0, 799]
+    _, tilted = imaging.gaze(pyr, 400, 300, 0, yaw=20, pitch=-10, size=256)  # the general (homography) path
+    inside = cv2.warpPerspective(np.ones((600, 800), np.uint8), tilted, (256, 256),
+                                 flags=cv2.INTER_NEAREST | cv2.WARP_INVERSE_MAP, borderValue=0) > 0
+    assert np.mean(imaging.footprint(tilted, (800, 600), 256) == inside) > 0.995
+
+
 def test_gaze_yaw_pitch_changes_view():
     pyr = imaging.build_pyramid((np.random.default_rng(1).random((1024, 1024, 3)) * 255).astype(np.uint8))
     straight, _ = imaging.gaze(pyr, 512, 512, 0, size=128)

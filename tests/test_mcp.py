@@ -207,6 +207,25 @@ async def test_paths_outside_the_roots_are_refused(d, tmp_path, monkeypatch):
     assert await d.open(root / "tiny.jpg")  # the same root still opens a real image
 
 
+async def test_a_view_past_the_border_shows_no_mirrored_crack(d, tmp_path, monkeypatch):
+    """A level-1 look at a 800 x 600 image is mostly reflection; a crack 15 px from the left edge must be
+    segmented, measured and logged as the crack inside the image only."""
+    root = tmp_path / "images"
+    root.mkdir()
+    img = concrete(600, 800, 5)
+    cv2.line(img, (15, 40), (25, 560), (55, 55, 58), 3, cv2.LINE_AA)
+    cv2.imwrite(str(root / "edge.png"), img)
+    monkeypatch.setenv("DRISHYAM_IMAGE_ROOT", str(root))
+    job = await d.open(root / "edge.png")
+    g, _ = await d.ok("gaze", job=job, x=400, y=300, level=1)
+    assert g["window"] == [-112, -212, 1024, 1024]
+    seg, _ = await d.ok("segment", job=job, gaze_id=g["gaze"])
+    assert 500 < seg["areas"]["crack"] < 2000  # the line, not the line plus its mirror image (about 3800 px)
+    f, _ = await d.ok("log_finding", job=job, gaze_id=g["gaze"], cls="crack")
+    x, y, w, h = f["finding"]["box"]
+    assert 0 <= x <= 15 and 0 <= y and x + w <= 40 and y + h <= 600
+
+
 async def test_a_cap_can_be_lowered_never_raised(d, tmp_path):
     job = await d.open()
     first, _ = await d.ok("set_budget", job=job, pixel_cap=0.5, usd_cap=0.01, seconds_cap=15)

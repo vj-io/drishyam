@@ -21,7 +21,7 @@ from .findings import SEVERITY, Finding, now_iso, work_order
 from .governor import USD_PER_HOUR, Budget, RuntimeStats, Settings, check
 from .measure import measure
 from .planner import TIMEOUT_S, ChaosPlanner, consult
-from .segment import CLASSES, DEFECT_PX_BG_MAX, MIN_BLOB_PX, default_segmenter
+from .segment import CLASSES, DEFECT_PX_BG_MAX, MIN_BLOB_PX, default_segmenter, segment_view
 
 SPIKE_STEP = 4  # chaos p95_spike lands here; the governor reacts on the next step
 SPIKE_MS = 900.0
@@ -180,9 +180,7 @@ class Job:
         mask = seg.mask(cls)
         m = measure(mask, 2**level, linear=cls == "crack")
         x, y, w, h = cv2.boundingRect(cv2.findNonZero(mask))
-        corners = imaging.map_points(to_l0, [[x, y], [x + w, y + h]])
-        box = [int(corners[0][0]), int(corners[0][1]), int(corners[1][0] - corners[0][0]),
-               int(corners[1][1] - corners[0][1])]
+        box = imaging.l0_box((x, y, w, h), to_l0, self.image.shape[1::-1])
         pad = max(8, max(w, h) // 3)
         y0, x0 = max(0, y - pad), max(0, x - pad)
         view = crop[y0 : y + h + pad, x0 : x + w + pad].copy()
@@ -298,7 +296,9 @@ class Job:
             (crop, to_l0), warp_ms = self._timed("warp", imaging.gaze, pyr, cx, cy, level, size=size)
             q, _ = self._timed("quality", imaging.quality, crop)
             model = self.settings.model
-            seg, seg_ms = self._timed(f"segment:{model}", self.segmenter.predict, crop, model)
+            # Background wherever the view runs past the image: gaze fills that by reflection (a mirrored defect).
+            valid = imaging.footprint(to_l0, (W, H), size)
+            seg, seg_ms = self._timed(f"segment:{model}", segment_view, self.segmenter, crop, model, valid)
             self.stats.record("segment", seg_ms)
             injected = None
             if "p95_spike" in cfg.chaos and self.step == SPIKE_STEP:

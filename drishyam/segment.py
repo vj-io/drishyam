@@ -103,6 +103,23 @@ def finish(probs: np.ndarray, t0: float, model: str) -> Segmentation:
     return Segmentation(probs, labels, round(ent, 4), areas, conf, (time.perf_counter() - t0) * 1000, model)
 
 
+def restrict(seg: Segmentation, valid: np.ndarray) -> Segmentation:
+    """`seg` with background forced wherever `valid` is False (crop pixels that are not the image, see
+    `imaging.footprint`), so labels, areas, confidence, entropy and everything built on them see no
+    mirrored defect."""
+    if valid.all():
+        return seg
+    probs = seg.probs.copy()
+    probs[:, ~valid] = 0.0
+    probs[0, ~valid] = 1.0
+    return finish(probs, time.perf_counter() - seg.latency_ms / 1000, seg.model)
+
+
+def segment_view(segmenter, crop: np.ndarray, model: str, valid: np.ndarray) -> Segmentation:
+    """Segment a gaze crop, keeping only what lies inside the image (`valid`, from `imaging.footprint`)."""
+    return restrict(segmenter.predict(crop, model), valid)
+
+
 class ClassicalSegmenter:
     """Hand-built evidence maps turned into calibrated class probabilities.
 

@@ -219,6 +219,28 @@ def map_points(to_l0: np.ndarray, pts) -> np.ndarray:
     return cv2.perspectiveTransform(p, to_l0).reshape(-1, 2)
 
 
+def footprint(to_l0: np.ndarray, l0_size: tuple[int, int], size: int) -> np.ndarray:
+    """(size, size) bool: crop pixels that show the image, i.e. map inside the W x H L0 frame. Where a view
+    runs past the image, `gaze` fills it by reflection, so anything seen there is a mirror image."""
+    W, H = l0_size
+    h = to_l0
+    if np.allclose(h[[0, 1, 2, 2], [1, 0, 0, 1]], 0):  # yaw = pitch = 0: a scaled translation, rows x columns
+        u = np.arange(size)
+        x, y = (h[0, 0] * u + h[0, 2]) / h[2, 2], (h[1, 1] * u + h[1, 2]) / h[2, 2]
+        return ((y >= 0) & (y <= H - 1))[:, None] & ((x >= 0) & (x <= W - 1))[None, :]
+    v, u = np.mgrid[:size, :size]
+    x, y = map_points(h, np.stack([u.ravel(), v.ravel()], 1)).T
+    return ((x >= 0) & (x <= W - 1) & (y >= 0) & (y <= H - 1)).reshape(size, size)
+
+
+def l0_box(rect, to_l0: np.ndarray, l0_size: tuple[int, int]) -> list[int]:
+    """Crop rect (x, y, w, h) as an L0 box [x, y, w, h], clipped to the W x H image."""
+    x, y, w, h = rect
+    (x0, y0), (x1, y1) = map_points(to_l0, [[x, y], [x + w, y + h]])
+    x0, y0, x1, y1 = max(0.0, x0), max(0.0, y0), min(float(l0_size[0]), x1), min(float(l0_size[1]), y1)
+    return [int(x0), int(y0), int(x1 - x0), int(y1 - y0)]
+
+
 def quality(crop: np.ndarray) -> dict:
     """Sharpness (Laplacian variance) and exposure gate; a failed gate means 'do not trust this view'."""
     gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)

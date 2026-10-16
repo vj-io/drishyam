@@ -4,7 +4,8 @@ import cv2
 import numpy as np
 import pytest
 
-from drishyam.segment import CLASSES, ClassicalSegmenter, OnnxSegmenter, finish, mask_iou
+from drishyam import imaging
+from drishyam.segment import CLASSES, ClassicalSegmenter, OnnxSegmenter, finish, mask_iou, segment_view
 
 from .conftest import add_crack, add_rebar_spall, concrete
 
@@ -51,6 +52,22 @@ def test_rust_in_spall_is_rebar_and_rust_alone_is_corrosion():
     cv2.ellipse(stain, (256, 256), (90, 60), 0, 0, 360, (40, 80, 150), -1)
     seg = SEG.predict(stain)
     assert seg.best == "corrosion" and seg.areas["exposed_rebar"] < seg.areas["corrosion"] / 10
+
+
+def test_a_border_crack_is_not_mirrored_outside_the_image():
+    """A view wider than the image is filled by reflection, so a crack 15 px from the edge has a twin at -15 px.
+    Only pixels that map inside the image may be labelled."""
+    img = concrete(600, 800, 5)
+    cv2.line(img, (15, 40), (25, 560), (55, 55, 58), 3, cv2.LINE_AA)
+    crop, to_l0 = imaging.gaze(imaging.build_pyramid(img), 400, 300, 1, size=512)  # L0 window [-112, -212, 1024, 1024]
+    valid = imaging.footprint(to_l0, (800, 600), 512)
+    raw = SEG.predict(crop)
+    assert np.count_nonzero(raw.mask("crack") & ~valid) > 1000  # the mirrored twin is there to be found
+    seg = segment_view(SEG, crop, "accurate", valid)
+    assert seg.areas["crack"] > 500 and not np.any(seg.labels[~valid])
+    ys, xs = np.nonzero(seg.mask("crack"))
+    x, y = imaging.map_points(to_l0, np.stack([xs, ys], 1)).T
+    assert x.min() >= 0 and y.min() >= 0 and x.max() < 800 and y.max() < 600
 
 
 def test_fast_model_agrees_roughly_and_is_faster():

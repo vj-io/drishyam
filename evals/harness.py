@@ -29,7 +29,7 @@ from drishyam import imaging
 from drishyam.agent import PLANNER_MALFORMED_STEP, PLANNER_TIMEOUT_STEP, Job, JobConfig
 from drishyam.findings import SPALL_CRITICAL_AREA_PX, is_critical
 from drishyam.governor import USD_PER_HOUR
-from drishyam.segment import DEFECTS, ClassicalSegmenter
+from drishyam.segment import DEFECTS, ClassicalSegmenter, restrict
 from evals import codebrim, synth
 
 CLASSES = DEFECTS  # crack, spalling, efflorescence, exposed_rebar, corrosion
@@ -188,13 +188,14 @@ def finding_components(job: Job, segs: list) -> list[dict]:
     """Drishyam's evidence in the baselines' box semantics: per-component boxes of the classes behind each
     finding, from every look in its evidence trail. Lets the harness score both box conventions (see `run`)."""
     looks = [r for r in job.trace if r["decision"]["action"] != "halt"]
-    out = []
+    out, wh = [], job.image.shape[1::-1]
     for rec, seg in zip(looks, segs, strict=True):
         classes = {f.cls for f in job.findings if rec["step"] in f.steps}
         if classes:
             a = rec["decision"]["args"]
-            out += [{**p, "step": rec["step"], "level": a["level"]}
-                    for p in preds_from_seg(seg, gaze_to_l0(a["x"], a["y"], a["level"], a["size"])) if p["cls"] in classes]
+            to_l0 = gaze_to_l0(a["x"], a["y"], a["level"], a["size"])
+            seen = restrict(seg, imaging.footprint(to_l0, wh, a["size"]))  # what the job saw: no mirrored pixels
+            out += [{**p, "step": rec["step"], "level": a["level"]} for p in preds_from_seg(seen, to_l0) if p["cls"] in classes]
     return out
 
 
