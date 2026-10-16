@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Browser test for the Drishyam UI under the production CSP.
 
 Run:  ~/.claude/brag-scaled-venv/bin/python tests/e2e/test_ui_mock.py
@@ -351,7 +350,7 @@ def test_desktop_mock(browser, base):
             s.shot("desktop-running.png")
             shot_taken = True
         time.sleep(0.15)
-    expect(p.locator("#job-pill")).to_have_text(re.compile(DONE_LABEL, re.I), timeout=T)
+    expect(p.locator("#job-pill")).to_have_text(re.compile(DONE_LABEL, re.IGNORECASE), timeout=T)
     live_causes = [st["cause"] for st in STEPS if st["step"] > replayed]
     if any(c in GOVERNOR for c in live_causes):
         assert shot_taken, "a governor pop-up window should have appeared during the run"
@@ -449,10 +448,10 @@ def test_live_api_contract(browser, base):
     truncated = JOB_LINES[: third + 1]                      # the stream dies after step 3, before `done`
     patched_job = json.loads(JOB_LINES[0])
     patched_job["privacy"] = {**patched_job.get("privacy", {}), "faces_blurred": 1, "boxes": [BOX]}
-    first_step = json.loads(JOB_LINES[[i for i, e in enumerate(EVENTS) if e["type"] == "step"][0]])
+    first_step = json.loads(JOB_LINES[next(i for i, e in enumerate(EVENTS) if e["type"] == "step")])
     first_step["runtime"]["p50_ms"].update({"segment:accurate": 30, "pyrDown": 2, "saliency": 4, "quality": 1})   # extra op keys
     full = [json.dumps(patched_job), *JOB_LINES[1:]]
-    full[[i for i, e in enumerate(EVENTS) if e["type"] == "step"][0]] = json.dumps(first_step)
+    full[next(i for i, e in enumerate(EVENTS) if e["type"] == "step")] = json.dumps(first_step)
     LIVE["plans"] = [{"lines": truncated, "delay": 0}, {"lines": full, "delay": 0}, {"lines": JOB_LINES, "delay": 0.25}]
     LIVE["jobs"].clear(); LIVE["kills"].clear(); LIVE["reviews"].clear(); LIVE["tokens"] = 0
     LIVE["order"] = json.loads(json.dumps(DONE["work_order"]))
@@ -478,7 +477,7 @@ def test_live_api_contract(browser, base):
     plain = blur_energy(p)
     assert plain > 1, f"probe region has no texture to blur: {plain}"
     p.click("#resume")
-    expect(p.locator("#job-pill")).to_have_text(re.compile(DONE_LABEL, re.I), timeout=T)
+    expect(p.locator("#job-pill")).to_have_text(re.compile(DONE_LABEL, re.IGNORECASE), timeout=T)
     first, second = LIVE["jobs"]
     q = first["query"]
     assert first["headers"]["content-type"] == "image/jpeg" and first["size"] == len(MOCK_JPG), "the full file is uploaded, not the thumbnail"
@@ -532,7 +531,7 @@ def test_mobile(browser, base):
     expect(p.locator("#kill")).to_be_visible()
     box = p.locator("#kill").bounding_box()
     assert 0 <= box["y"] and box["y"] + box["height"] <= 812, f"KILL not on screen: {box}"
-    expect(p.locator("#job-pill")).to_have_text(re.compile(DONE_LABEL, re.I), timeout=T)
+    expect(p.locator("#job-pill")).to_have_text(re.compile(DONE_LABEL, re.IGNORECASE), timeout=T)
     expect(p.locator(".finding")).to_have_count(len(FINDINGS))
     s.scroll_through()
     off = hscroll_offenders(p)
@@ -559,7 +558,7 @@ def test_reduced_motion(browser, base):
     assert p.evaluate("getComputedStyle(document.querySelector('.art__w')).animationName") == "none"
     assert p.evaluate("getComputedStyle(document.querySelector('.pop')).opacity") == "1"   # no hidden-until-scrolled state
     p.click("#look")
-    expect(p.locator("#job-pill")).to_have_text(re.compile(DONE_LABEL, re.I), timeout=T)
+    expect(p.locator("#job-pill")).to_have_text(re.compile(DONE_LABEL, re.IGNORECASE), timeout=T)
     expect(p.locator(".finding")).to_have_count(len(FINDINGS))
     assert p.locator("#fx > *").count() == 0, "no bursts or confetti under prefers-reduced-motion"
     expect(p.locator("[data-meter=pixels] .meter__val")).to_have_text(f"{STEPS[-1]['pixels_frac'] * 100:.1f} %")   # counts land without animating

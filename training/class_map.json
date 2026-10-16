@@ -1,0 +1,31 @@
+{
+  "_comment": "dacl10k (19 sigmoid channels) -> Drishyam (6-way) merge. Channel order is dacl10k-toolkit Dacl10kDataset.TARGET_LIST; the model's 19 output channels follow it. Edit 'map' and re-run export_onnx.py: the merge lives in the exported graph, so no retraining is needed.",
+  "source": "https://github.com/phiyodr/dacl10k-toolkit (dacl10k/dacl10kdataset.py TARGET_LIST; README 'Labels/Classes'); paper Flotzinger et al., WACV 2024, arXiv:2309.00460, appendix Tables 7-9",
+  "drishyam_classes": ["background", "crack", "spalling", "efflorescence", "exposed_rebar", "corrosion"],
+  "dacl10k_classes": [
+    "Crack", "ACrack", "Wetspot", "Efflorescence", "Rust", "Rockpocket", "Hollowareas", "Cavity",
+    "Spalling", "Graffiti", "Weathering", "Restformwork", "ExposedRebars",
+    "Bearing", "EJoint", "Drainage", "PEquipment", "JTape", "WConccor"
+  ],
+  "map": {
+    "Crack": "crack",
+    "ACrack": "crack",
+    "Wetspot": "background",
+    "Efflorescence": "efflorescence",
+    "Rust": "corrosion",
+    "Rockpocket": "spalling",
+    "Hollowareas": "spalling",
+    "Cavity": "spalling",
+    "Spalling": "spalling",
+    "Graffiti": "background",
+    "Weathering": "background",
+    "Restformwork": "background",
+    "ExposedRebars": "exposed_rebar",
+    "Bearing": "background",
+    "EJoint": "background",
+    "Drainage": "background",
+    "PEquipment": "background",
+    "JTape": "background",
+    "WConccor": "spalling"
+  }
+}
