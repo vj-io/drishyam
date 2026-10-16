@@ -8,6 +8,8 @@ entropy, so swapping engines changes no other code.
 
 from __future__ import annotations
 
+import functools
+import os
 import time
 from dataclasses import dataclass
 
@@ -204,3 +206,10 @@ def mask_iou(a: np.ndarray, b: np.ndarray) -> float:
     inter = np.count_nonzero(a & b)
     union = np.count_nonzero(a | b)
     return inter / union if union else 1.0
+
+
+@functools.cache
+def default_segmenter():
+    """The ONNX model named by DRISHYAM_ONNX (optional DRISHYAM_ONNX_FP16), else the classical engine."""
+    path = os.environ.get("DRISHYAM_ONNX")
+    return OnnxSegmenter(path, os.environ.get("DRISHYAM_ONNX_FP16")) if path else ClassicalSegmenter()

@@ -1,0 +1,47 @@
+# Security model
+
+Drishyam takes untrusted photos from anyone on the internet and drives an agent
+with them. This page lists what an attacker controls, what they could try, and
+the control that stops it. Every control named here has a test in `tests/`.
+
+## What an attacker controls
+
+- The bytes of an uploaded image, its declared `Content-Type` and `Content-Length`.
+- The query string (`pixel_cap`, `usd_cap`, `seconds_cap`, `chaos`).
+- The `X-Drishyam-Replay` header (decisions to resume a killed job).
+- The review request body (`token`, `finding_id`, `decision`, `reviewer`).
+- Anything painted on the photographed structure (graffiti, signs, text).
+- For the MCP server: the arguments an LLM passes to each tool.
+
+## Threats and controls
+
+| Threat | Control | Where | Test |
+| --- | --- | --- | --- |
+| Decompression bomb (tiny file, huge canvas) | Width and height are read from the PNG IHDR / JPEG SOF header and refused above 25 MP **before** any pixel is decoded; decoded size must match the header | `imaging.sniff_size`, `decode_image` | `test_imaging.py::test_rejects_non_images_and_bombs` |
+| Oversized body / slow memory exhaustion | Body is read in chunks and abandoned the moment it passes 4.4 MB; lying `Content-Length` is refused; Vercel also caps bodies at 4.5 MB | `web._read_capped` | `test_web.py::test_rejects_bad_uploads` |
+| Non-image or polyglot upload | Content-Type allow-list (JPEG, PNG) **and** magic-byte sniffing; OpenCV decodes only after both pass | `web.create_job`, `imaging.sniff_size` | `test_web.py::test_rejects_bad_uploads` |
+| Budget abuse (huge jobs) | Every cap range-checked server-side (pixels 2–100 %, $0.0001–0.05, 1–30 s); job halts inside one step of any cap; function `maxDuration` 60 s; Vercel WAF rate limit of 12 job starts per IP per minute | `web.create_job`, `governor.check`, `vercel.json`, Vercel firewall | `test_web.py::test_rejects_bad_params`, `test_agent.py::test_pixel_cap_is_never_exceeded` |
+| Forged replay decisions | Replay is decoded from base64url JSON (16 KB max), then every entry is checked: action in the allow-list, integer coordinates inside the image, level 0–3, at most 200 | `web._parse_replay`, `agent.validate_replay` | `test_agent.py::test_replay_input_is_validated`, `test_web.py::test_replay_header_validation` |
+| Agent approving its own critical finding | The state machine only lets `actor="human"` leave `pending_review`; there is no agent code path, MCP tool or planner strategy that approves, rejects, closes or downgrades; new evidence can raise criticality, never lower it | `findings.decide`, `Finding.agent_update` | `test_findings.py::test_agent_cannot_decide_or_downgrade`, `test_agent.py::test_critical_finding_blocks_work_order_and_agent_cannot_close_it` |
+| Tampered or replayed work order | Work orders are HMAC-SHA256 signed with a 384-bit secret held only in a Vercel *sensitive* env var; constant-time comparison; 7-day expiry; a decided finding cannot be decided again | `findings.sign`, `verify`, `apply_review` | `test_findings.py::test_tampering_expiry_and_reviewer_validation`, `test_web.py::test_review_flow_and_tampering` |
+| Prompt injection via text in the image | There is no OCR. The optional LLM planner receives a numeric digest only (numbers, generated ids, fixed class and model names); its reply must be one allow-listed strategy with range-checked parameters or it is discarded; 2 s timeout; rule planner always decides on failure | `planner.validate`, `Job.digest` | `test_planner_governor.py::test_planner_sees_numbers_and_fixed_names_only`, `::test_validator_rejects`, `::test_20_timeouts_and_20_malformed_all_recover` |
+| Planner endpoint used for SSRF | Planner URL comes only from server env; must be `https://` or loopback `http://` | `planner.HttpPlanner` | `test_planner_governor.py::test_http_planner_url_policy` |
+| Shell or file access from the agent | The agent has no shell tool and no file-write tool; MCP tools are a fixed allow-list; `open_image` resolves real paths under an allow-listed root only | `mcp_server.py` | `test_mcp.py` |
+| XSS in the UI | Strict CSP (`script-src 'self'`, no inline script or style, no `eval`); DOM built with `textContent`; base64 images checked against a strict alphabet before use | `vercel.json`, `public/js/*` | `tests/e2e` runs under the production CSP and fails on any violation |
+| Clickjacking, MIME sniffing, referrer leaks | `frame-ancestors 'none'`, `X-Frame-Options: DENY`, `nosniff`, `strict-origin-when-cross-origin`, HSTS with preload, COOP/CORP same-origin, Permissions-Policy denying camera, mic, geolocation, payment, USB | `vercel.json`, `web._api_headers` | `test_web.py::test_health_and_security_headers` |
+| Information leaks in errors | Generic 500 body, details only in server logs; FastAPI docs and OpenAPI schema disabled | `web._crash`, `FastAPI(docs_url=None, ...)` | `test_web.py::test_health_and_security_headers` |
+| Surveillance / personal data | Faces (YuNet) and people and vehicles (NanoDet) blurred before analysis, crops or display; images mostly filled by a person are refused; uploads are never stored by the web demo | `privacy.privacy_pass` | `test_web.py::test_people_dominant_image_refused`, `::test_privacy_blur_applies_before_analysis` |
+| Secrets in the repository | Signing key only in Vercel env (sensitive); `.env*` git-ignored; commits scanned for token patterns before every push | `.gitignore`, release checklist | — |
+
+## Known limits (stated, not hidden)
+
+- The web demo is stateless: a signed work order lives in the browser, so the
+  audit trail is the downloaded `work_order.json`, not a database. The PRD's
+  DynamoDB + SNS approval store is the AWS deployment path.
+- `/api/review` is not rate-limited by the WAF (the Hobby plan allows one rate
+  limit rule, spent on job starts); it is cheap, size-capped and HMAC-gated.
+- The kill switch in the browser aborts the stream; the server notices the
+  disconnect and halts at its next step. The operator-wide switch is
+  `DRISHYAM_KILL_SWITCH=1` (env) or the `DRISHYAM_KILL_FILE` flag file.
+- Anyone holding a token can review it: there is no multi-tenant auth (a PRD
+  non-goal).

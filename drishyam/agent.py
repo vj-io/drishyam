@@ -21,7 +21,7 @@ from .findings import SEVERITY, Finding, now_iso, work_order
 from .governor import USD_PER_HOUR, Budget, RuntimeStats, Settings, check
 from .measure import measure
 from .planner import TIMEOUT_S, ChaosPlanner, consult
-from .segment import CLASSES, DEFECT_PX_BG_MAX, MIN_BLOB_PX, ClassicalSegmenter
+from .segment import CLASSES, DEFECT_PX_BG_MAX, MIN_BLOB_PX, default_segmenter
 
 SPIKE_STEP = 4  # chaos p95_spike lands here; the governor reacts on the next step
 SPIKE_MS = 900.0
@@ -82,7 +82,7 @@ class Job:
         self.image = image
         self.cfg = config or JobConfig()
         self.id = job_id or "j_" + secrets.token_hex(3)
-        self.segmenter = segmenter or ClassicalSegmenter()
+        self.segmenter = segmenter or default_segmenter()
         self.planner = planner
         self.kill = kill
         self.clock = clock
@@ -198,20 +198,6 @@ class Job:
         self.findings.append(f)
         return f, True
 
-    @staticmethod
-    def _iou_between(prev, cur_mask, cur_to_l0) -> float:
-        """Agreement of two looks' masks, compared in the finer look's frame with a 2-px tolerance."""
-        _, prev_mask, prev_to_l0 = prev
-        size = cur_mask.shape[::-1]
-        m = np.linalg.inv(cur_to_l0) @ prev_to_l0
-        warped = cv2.warpPerspective(prev_mask, m, size, flags=cv2.INTER_NEAREST)
-        footprint = cv2.warpPerspective(np.ones_like(prev_mask), m, size, flags=cv2.INTER_NEAREST) > 0
-        k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
-        a = cv2.dilate(cur_mask, k).astype(bool) & footprint
-        b = cv2.dilate(warped, k).astype(bool)
-        union = np.count_nonzero(a | b)
-        return round(np.count_nonzero(a & b) / union, 3) if union else 1.0
-
     # ---- the loop ------------------------------------------------------------------------------
     def run(self):
         cfg, clock = self.cfg, self.clock
@@ -320,7 +306,7 @@ class Job:
             r.entropy = seg.entropy
             mask = seg.mask(best) if best else np.zeros(seg.labels.shape, np.uint8)
             prev = next((lk for lk in reversed(r.looks) if lk[1].any()), None)
-            iou = self._iou_between(prev, mask, to_l0) if (prev is not None and best) else None
+            iou = look_iou(prev[1], prev[2], mask, to_l0) if (prev is not None and best) else None
             prev_level = prev[0] if prev is not None else None
             r.looks.append((level, mask, to_l0))
             new_events, follow = [], None
@@ -428,6 +414,19 @@ class Job:
                "coverage": round(coverage, 4),
                "unvisited": [r.id for r in self.regions.values() if not r.looks],
                "work_order": self.work_order}
+
+
+def look_iou(prev_mask: np.ndarray, prev_to_l0: np.ndarray, cur_mask: np.ndarray, cur_to_l0: np.ndarray) -> float:
+    """Agreement of two looks' masks, compared in the finer (current) look's frame with a 2-px tolerance."""
+    size = cur_mask.shape[::-1]
+    m = np.linalg.inv(cur_to_l0) @ prev_to_l0
+    warped = cv2.warpPerspective(prev_mask, m, size, flags=cv2.INTER_NEAREST)
+    footprint = cv2.warpPerspective(np.ones_like(prev_mask), m, size, flags=cv2.INTER_NEAREST) > 0
+    k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+    a = cv2.dilate(cur_mask, k).astype(bool) & footprint
+    b = cv2.dilate(warped, k).astype(bool)
+    union = np.count_nonzero(a | b)
+    return round(np.count_nonzero(a & b) / union, 3) if union else 1.0
 
 
 def _focus(seg, to_l0, fallback: tuple[int, int]) -> tuple[int, int]:

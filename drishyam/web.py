@@ -27,7 +27,9 @@ from starlette.concurrency import run_in_threadpool
 
 from . import __version__, findings, imaging, privacy
 from .agent import Job, JobConfig
+from .segment import default_segmenter
 
+logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message)s")
 log = logging.getLogger("drishyam")
 MAX_UPLOAD_BYTES = 4_400_000  # Vercel caps function request bodies at 4.5 MB
 MAX_REPLAY_HEADER = 16_384
@@ -80,7 +82,7 @@ async def _api_headers(request: Request, call_next):
 def health() -> dict:
     return {"ok": True, "version": __version__, "opencv": cv2.__version__,
             "build": "COOL" if cv2.__file__.startswith("/opt/cool") else "stock (not COOL)",
-            "segmenter": "classical-v1", "max_upload_bytes": MAX_UPLOAD_BYTES, "max_pixels": imaging.MAX_PIXELS}
+            "segmenter": default_segmenter().name, "max_upload_bytes": MAX_UPLOAD_BYTES, "max_pixels": imaging.MAX_PIXELS}
 
 
 async def _read_capped(request: Request, cap: int) -> bytes | None:
@@ -155,6 +157,9 @@ async def create_job(
                 yield json.dumps(ev, separators=(",", ":")) + "\n"
                 if await request.is_disconnected():
                     stop.set()  # the viewer pressed KILL: halt within one step
+                if ev["type"] == "done":
+                    log.info("job %s %s cause=%s steps=%s px=%.3f s=%.2f", job.id, ev["status"], ev["cause"],
+                             ev["summary"]["steps"], ev["summary"]["pixels_frac"], ev["summary"]["seconds"])
         except Exception:
             log.exception("job %s failed", job.id)
             yield json.dumps({"type": "error", "message": "the job failed; it has been logged"}) + "\n"
