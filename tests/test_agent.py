@@ -163,3 +163,38 @@ def test_small_image_still_runs():
     _, events = run(img, pixel_cap=1.0)
     assert events[-1]["type"] == "done"
     assert all(s["decision"]["args"]["level"] == 0 for s in steps(events) if s["decision"]["action"] != "halt")
+
+
+def _three_cracks():
+    from .conftest import add_crack, concrete
+
+    img = concrete(1536, 2048, seed=0)
+    add_crack(img, (200, 300), width=4)
+    add_crack(img, (1300, 1000), n=200, width=4, seed=7, step=(1, 2))
+    return add_crack(img, (1500, 200), n=200, width=4, seed=9, step=(2, 3))
+
+
+def test_tight_budget_skips_noncritical_verify_with_a_cause():
+    """Three 512^2 looks, three crack areas: each look goes to unseen ground, and every skipped verify is traced."""
+    img = _three_cracks()
+    _, tight = run(img, pixel_cap=0.3)
+    looks = [s for s in steps(tight) if s["decision"]["action"] != "halt"]
+    assert [s["decision"]["action"] for s in looks] == ["gaze"] * 3 and len({s["region"] for s in looks}) == 3
+    noted = [(s, k) for s in steps(tight) for k in s.get("skipped", [])]
+    assert noted and all(k["cause"] == "looks≤candidates" and s["rationale"].startswith(k["rationale"])
+                         for s, k in noted)
+    _, loose = run(img, pixel_cap=1.0)
+    assert any(s["cause"] == "verify-new-mask" for s in steps(loose))
+
+
+def test_critical_masks_are_verified_even_when_the_budget_rule_would_skip(monkeypatch):
+    from .conftest import add_crack, add_rebar_spall, concrete
+
+    monkeypatch.setattr(Job, "_verify_crowded_out", lambda self, r, *a: {
+        "action": "verify", "region": r.id, "level": 0, "cause": "looks≤candidates", "rationale": "forced"})
+    img = add_crack(add_rebar_spall(concrete(1536, 2048, seed=1), (900, 700), r=320), (1500, 200), n=200, width=4,
+                    seed=9, step=(2, 3))
+    job, events = run(img, pixel_cap=1.0)
+    critical = {f.region for f in job.findings if f.critical}
+    assert any(s["cause"] == "verify-new-mask" and s["region"] in critical for s in steps(events))
+    assert not any(k["region"] in critical for s in steps(events) for k in s.get("skipped", []))
