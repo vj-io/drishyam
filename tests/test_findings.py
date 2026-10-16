@@ -60,6 +60,22 @@ def test_criticality_only_rises_along_the_trail():
         s.agent_update(confidence=0.5, measure={"area_px": area}, box=[0, 0, 1, 1], step=step, level=0)
         assert s.critical and s.state == "pending_review"
 
+def test_the_look_that_made_it_critical_is_recorded():
+    """Criticality can come from any look in the trail while `measure` is the finest look's: the work order says
+    which look crossed the threshold and with what area, so a 30k px^2 measure on a critical spall is explained."""
+    s = make("spalling", 30_000)  # found at step 3, L1: below the threshold
+    assert (s.critical_step, s.critical_area_px) == (None, None)
+    s.agent_update(confidence=0.5, measure={"area_px": 52_000}, box=[0, 0, 1, 1], step=5, level=2)  # coarser look
+    s.agent_update(confidence=0.5, measure={"area_px": 61_000}, box=[0, 0, 1, 1], step=6, level=2)  # already critical
+    s.agent_update(confidence=0.5, measure={"area_px": 31_000}, box=[0, 0, 1, 1], step=7, level=0)  # finest look
+    assert s.critical and s.measure["area_px"] == 31_000 and s.level == 0
+    assert (s.critical_step, s.critical_area_px) == (5, 52_000)
+    rebar = make("exposed_rebar", 500)  # critical by class from the look that found it
+    assert (rebar.critical_step, rebar.critical_area_px) == (3, 500)
+    wo = F.work_order("j_x", [s, rebar, make("crack", fid="f3")], [])
+    assert [(f["critical_step"], f["critical_area_px"]) for f in wo["findings"]] == [(5, 52_000), (3, 500), (None, None)]
+
+
 def test_human_decision_once():
     d = make().to_dict()
     F.decide(d, "approve", actor="human")

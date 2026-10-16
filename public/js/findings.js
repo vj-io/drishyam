@@ -61,6 +61,10 @@ export class Findings {
     const crop = dataUrl('image/jpeg', f.crop_jpeg_b64);
     const state = h('span', { class: 'chip chip--state' }, STATE[f.state] ?? f.state);
     const refined = Array.isArray(f.steps) && f.steps.length > 1 ? `, refined at ${f.steps.slice(1).join(', ')}` : '';
+    // Criticality may come from a coarser look than the one `measure` shows: say which, and with what area.
+    const trigger = f.critical && num(f.critical_step)
+      ? h('div', { class: 'finding__trigger' }, h('dt', {}, 'critical at'), h('dd', {}, `step ${f.critical_step}, ${px(f.critical_area_px)} px²`))
+      : null;
     return {
       state,
       head: h('header', { class: 'finding__head' },
@@ -73,7 +77,8 @@ export class Findings {
           h('div', {}, h('dt', {}, 'length'), h('dd', {}, `${px(m.length_px, 1)} px`)),
           h('div', {}, h('dt', {}, 'width'), h('dd', {}, `${px(m.width_px, 1)} px`)),
           h('div', {}, h('dt', {}, 'area'), h('dd', {}, `${px(m.area_px)} px²`)),
-          h('div', {}, h('dt', {}, 'orientation'), h('dd', {}, `${px(m.orientation_deg, 0)}°`)))),
+          h('div', {}, h('dt', {}, 'orientation'), h('dd', {}, `${px(m.orientation_deg, 0)}°`)),
+          trigger)),
       conf: h('p', { class: 'finding__conf' }, 'confidence ', h('b', {}, num(f.confidence) ? `${Math.round(f.confidence * 100)} %` : '–')),
     };
   }

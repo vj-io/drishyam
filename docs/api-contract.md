@@ -66,7 +66,8 @@ Event types, in order:
 
 {"type": "finding", "finding": {"id": "f1", "cls": "crack", "critical": false, "state": "draft",
   "confidence": 0.74, "measure": {"length_px": 812.0, "width_px": 3.1, "area_px": 2530, "orientation_deg": 63.0},
-  "box": [2010, 1300, 420, 380], "step": 3, "steps": [3, 4], "level": 0, "crop_jpeg_b64": "<256 px JPEG>"}}
+  "box": [2010, 1300, 420, 380], "step": 3, "steps": [3, 4], "level": 0,
+  "critical_step": null, "critical_area_px": null, "crop_jpeg_b64": "<256 px JPEG>"}}
 
 {"type": "review_request", "finding_id": "f2", "reason": "exposed_rebar is critical"}
 
@@ -92,7 +93,9 @@ A finding event repeats, with the same `id`, whenever another look sees the same
 defect. The finding is its evidence trail: `step` is the look that found it,
 `steps` every look that saw it in order, `box` the union of those looks' boxes,
 `confidence` the highest, and `measure`, `level` and the crop come from the
-finest look. `critical` never goes back to `false`. A look whose `window` runs past the
+finest look. `critical` never goes back to `false`; `critical_step` is the look that
+made the finding critical and `critical_area_px` the area that look measured (both `null`
+while it is not critical), since that look may be coarser than the one `measure` comes from. A look whose `window` runs past the
 image (a survey wider than the image, a level-1 look at a small photo) is filled by
 reflection for the segmenter, but those pixels count as background: no label, area,
 entropy or box ever comes from outside the image, and every finding `box` lies inside it.
@@ -128,7 +131,8 @@ reads after every step; the governor then halts before the next look with cause
  "status": "blocked",
  "findings": [{"id": "f1", "cls": "crack", "critical": false, "state": "draft", "confidence": 0.74,
                "measure": {"length_px": 812.0, "width_px": 3.1, "area_px": 2530, "orientation_deg": 63.0},
-               "box": [2010, 1300, 420, 380], "step": 3, "steps": [3, 4], "level": 0}],
+               "box": [2010, 1300, 420, 380], "step": 3, "steps": [3, 4], "level": 0,
+               "critical_step": null, "critical_area_px": null}],
  "gaze_path": [[2210, 1480, 1], [2210, 1480, 0]],
  "approvals": [{"finding_id": "f2", "decision": "approve", "reviewer": "A. Engineer", "at": "2026-10-24T17:05:00Z"}],
  "disclaimer": "AI-assisted, not an inspection. Measurements are image pixels, not millimetres."}

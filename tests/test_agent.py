@@ -251,7 +251,10 @@ def test_critical_finding_blocks_work_order_and_agent_cannot_close_it(scene):
     assert any(e["type"] == "review_request" for e in events)
     assert events[-1]["status"] in ("awaiting_review", "halted")
     assert events[-1]["work_order"]["status"] == "blocked"
+    wo = {f["id"]: f for f in events[-1]["work_order"]["findings"]}
     for f in critical:
+        assert f.critical_step in f.steps and wo[f.id]["critical_step"] == f.critical_step  # which look made it critical
+        assert wo[f.id]["critical_area_px"] == f.critical_area_px > 0
         d = f.to_dict()
         with pytest.raises(ForbiddenTransition):
             decide(d, "approve", actor="agent")

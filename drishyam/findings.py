@@ -60,11 +60,17 @@ class Finding:
     state: str = "draft"
     crop_jpeg_b64: str | None = field(default=None, repr=False)
     steps: list[int] = field(default_factory=list, init=False)  # every look that saw it, in order
+    # The look that made it critical and the area it measured: `measure` is the finest look's, which may be
+    # smaller than the (coarser) look that crossed the threshold.
+    critical_step: int | None = field(default=None, init=False)
+    critical_area_px: int | None = field(default=None, init=False)
 
     def __post_init__(self) -> None:
         self.critical = is_critical(self.cls, self.measure.get("area_px", 0))
         self.state = "pending_review" if self.critical else "draft"
         self.steps = [self.step]
+        if self.critical:
+            self.critical_step, self.critical_area_px = self.step, self.measure.get("area_px", 0)
 
     def agent_update(self, *, confidence: float, measure: dict, box: list[int], step: int, level: int,
                      crop_jpeg_b64: str | None = None) -> None:
@@ -84,6 +90,7 @@ class Finding:
                 self.crop_jpeg_b64 = crop_jpeg_b64
         if not self.critical and is_critical(self.cls, measure.get("area_px", 0)):
             self.critical, self.state = True, "pending_review"
+            self.critical_step, self.critical_area_px = step, measure.get("area_px", 0)
 
     def to_dict(self, crop: bool = True) -> dict:
         d = asdict(self)

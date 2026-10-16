@@ -84,6 +84,8 @@ def _progress(ev: dict) -> None:
     elif t == "finding":
         f = ev["finding"]
         line = f"finding {f['id']}  {f['cls']}  state {f['state']}  confidence {f['confidence']}"
+        if f.get("critical_step") is not None:
+            line += f"  critical from step {f['critical_step']} ({f['critical_area_px']} px^2)"
     elif t == "review_request":
         line = f"review requested for {ev['finding_id']}: {ev['reason']}"
     elif t == "planner":
