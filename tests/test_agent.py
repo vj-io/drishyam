@@ -198,6 +198,19 @@ def test_forced_p95_spike_changes_next_steps_model(scene):
     assert spike["model"] == "accurate" and after["model"] == "fast"
 
 
+def test_governor_override_on_a_halting_step_reaches_the_trace(scene):
+    """PRD rule 5: every override writes a cause. With eps = 1 the stop rule ends the job on the step right
+    after the spike, the same step on which the governor switched the model; the halt record carries it."""
+    job, events = run(scene, pixel_cap=1.0, chaos=("p95_spike",), eps=1.0)
+    spike = next(s for s in steps(events) if s.get("injected") == "p95_spike")
+    halt = steps(events)[-1]
+    assert halt["step"] == spike["step"] + 1 and halt["cause"] == "stop-rule"  # the case this test exists for
+    assert job.settings.history == ["p95>SLA"] and halt["model"] == "fast"
+    assert halt["governor"]["cause"] == "p95>SLA" and "model -> fast" in halt["governor"]["rationale"]
+    overrides = [s.get("governor", {}).get("cause") or s["cause"] for s in steps(events)]
+    assert overrides.count("p95>SLA") == len(job.settings.history)
+
+
 def test_planner_drills_fall_back_and_job_continues(scene):
     _, events = run(scene, pixel_cap=1.0, chaos=("planner_timeout", "planner_malformed"), planner_timeout_s=0.05)
     planner = [e for e in events if e["type"] == "planner"]

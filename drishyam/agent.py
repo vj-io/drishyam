@@ -241,6 +241,7 @@ class Job:
             self.forced.append(("gaze", r, s[2], "survey", (f"one L{s[2]} look covers all {len(cands)} candidates "
                                                            f"before zooming; {looks} looks affordable")))
         value, cost_ms, halt_cause, halt_why = 0.0, 0.0, None, ""
+        gov = None  # a governor override not yet written to the trace (PRD rule 5: every override writes a cause)
         self.step = 0
 
         while self.step < cfg.max_steps:
@@ -252,7 +253,7 @@ class Job:
             if verdict.halt:
                 halt_cause, halt_why = verdict.cause, verdict.rationale
                 break
-            governor_cause = verdict.cause
+            gov = verdict if verdict.cause else gov
             # 2. choose the next look
             if self.forced:
                 action, r, level, cause, why = self.forced.popleft()
@@ -272,8 +273,8 @@ class Job:
                     break
                 action, level, cause = "gaze", r.next_level, "best-score"
                 why = f"argmax score {best:.2e}: prior {r.prior:.2f}, unseen {a:.2f}, t_hat {self._t_hat():.0f} ms"
-            if governor_cause:
-                why = f"{verdict.rationale}; {why}"
+            if gov:
+                why = f"{gov.rationale}; {why}"
             if not replaying:
                 level = min(level + self.settings.level_bias, self.max_level)
             if self.settings.critical_only and action == "verify" and not any(
@@ -385,7 +386,7 @@ class Job:
                 "quality": {"ok": q["ok"], "reason": q["reason"]},
                 "runtime": self.stats.snapshot(self.budget.usd_used),
                 "rationale": why if q["ok"] else f"{why}; quality gate: {q['reason']}",
-                "cause": governor_cause or planner_cause or cause,
+                "cause": (gov and gov.cause) or planner_cause or cause,
                 "planner": "llm" if planner_cause and planner_cause.startswith("planner:") else "rule",
                 "model": model, "latency_ms": round(warp_ms + seg_ms, 1),
                 "cost_usd": round(self.budget.usd_used - usd_before, 8),
@@ -399,6 +400,7 @@ class Job:
             if cfg.thumbs:
                 rec["crop_jpeg_b64"] = imaging.jpeg_b64(crop, 160, 70)
             self.trace.append(rec)
+            gov = None
             yield rec
             yield from new_events
         else:
@@ -412,6 +414,8 @@ class Job:
                "pixels_frac": round(self.budget.pixels_used / (W * H), 4),
                "usd_used": round(self.budget.usd_used, 6), "seconds_used": round(self.budget.seconds_used, 3),
                "runtime": self.stats.snapshot(self.budget.usd_used)}
+        if gov:  # the governor changed settings on the step that then halted: the override still gets its cause
+            rec["governor"] = {"cause": gov.cause, "rationale": gov.rationale}
         self.trace.append(rec)
         yield rec
         pending = sum(f.state == "pending_review" for f in self.findings)

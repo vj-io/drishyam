@@ -247,11 +247,13 @@ def run_chaos(img: np.ndarray, kind: str) -> dict:
         out["detail"] = {"status": ev and ev["status"], "reason": ev and ev["reason"], "step_cause": step and step["cause"]}
     else:
         spike = next((s for s in steps if s.get("injected") == "p95_spike"), None)
-        after = next((s for s in steps if spike and s["step"] == spike["step"] + 1), None)
+        # The next record: a look, or a halt record (stop rule, exhausted) that carries the override under `governor`.
+        after = next((e for e in events if spike and e["type"] == "step" and e["step"] == spike["step"] + 1), None)
+        cause = after and (after.get("governor") or after)["cause"]
         out["fired"] = spike is not None
-        out["ok"] = bool(after and after["cause"] == "p95>SLA"
-                         and (after["model"] != spike["model"] or job.settings.level_bias > 0))
-        out["detail"] = {"next_step_cause": after and after["cause"], "model": [spike and spike["model"], after and after["model"]]}
+        out["ok"] = bool(cause == "p95>SLA" and (after["model"] != spike["model"] or job.settings.level_bias > 0))
+        out["detail"] = {"next_step_cause": cause, "next_action": after and after["decision"]["action"],
+                         "model": [spike and spike["model"], after and after["model"]]}
     return out
 
 

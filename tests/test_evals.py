@@ -1,5 +1,4 @@
 """Evaluation harness, CODEBRIM loader and parity tool: matching rule, tiling accounting, an end-to-end tiny run."""
-import functools
 import json
 
 import cv2
@@ -108,11 +107,9 @@ def test_drishyam_components_reproduce_finding_boxes(scene):
         assert c["box"][0] + c["box"][2] <= fx + fw + 2 and c["box"][1] + c["box"][3] <= fy + fh + 2
 
 
-def test_chaos_drills_recover(scene, monkeypatch):
-    # Real clock: keep the stop rule from ending the job before the drills at steps 3-5 (as test_web does).
-    # With the survey look and hysteresis crack linking, the first looks bank enough value that lambda can
-    # halt the job on the step right after the p95 spike, before any look could carry the p95>SLA cause.
-    monkeypatch.setattr(harness, "JobConfig", functools.partial(harness.JobConfig, eps=0.0))
+def test_chaos_drills_recover(scene):
+    # Real clock, real stop rule: the job may halt on the step right after the p95 spike; the governor's
+    # model switch is then recorded on that halt record (`governor`), which the drill accepts.
     out = harness.run_chaos(scene, "planner_timeout")
     assert out["fired"] and out["ok"] and out["detail"]["reason"] == "timeout"
     spike = harness.run_chaos(scene, "p95_spike")

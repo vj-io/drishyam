@@ -97,6 +97,12 @@ image (a survey wider than the image, a level-1 look at a small photo) is filled
 reflection for the segmenter, but those pixels count as background: no label, area,
 entropy or box ever comes from outside the image, and every finding `box` lies inside it.
 
+The last `step` record has `decision.action` `halt` and the halt `cause`. When the
+governor changed a setting on that same step before the job stopped (say `p95>SLA`
+switched the model, then the stop rule ended the job), the override is not lost: the
+halt record carries it as `"governor": {"cause": "p95>SLA", "rationale": "..."}`,
+and its own `cause` stays the halt cause.
+
 Step `decision.action` values: `gaze` (first look at a region, or the survey), `escalate`
 (one level finer, same centre, because the last look was uncertain), `verify`
 (one level finer to confirm a mask), `halt`. Trace `cause` values:
