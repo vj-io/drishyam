@@ -240,8 +240,8 @@ class Job:
         looks = (self.budget.pixels_cap - self.budget.pixels_used) // cfg.size**2
         if not self.replay and (s := survey_look(cands, (W, H), cfg.size, first, self.max_level, looks)):
             r = self.regions["s0"] = Region("s0", s[0], s[1], max(c.prior for c in cands), s[2])
-            self.forced.append(("gaze", r, s[2], "survey", f"one L{s[2]} look covers all {len(cands)} candidates "
-                                                           f"before zooming; {looks} looks affordable"))
+            self.forced.append(("gaze", r, s[2], "survey", (f"one L{s[2]} look covers all {len(cands)} candidates "
+                                                           f"before zooming; {looks} looks affordable")))
         value, cost_ms, halt_cause, halt_why = 0.0, 0.0, None, ""
         self.step = 0
 

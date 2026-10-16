@@ -67,7 +67,7 @@ def test_survey_look_comes_first_only_when_a_second_look_is_affordable(scene):
     for bx, by, bw, bh in (c["box"] for c in events[1]["candidates"]):
         assert x <= max(0, bx) and min(W, bx + bw) <= x + w and y <= max(0, by) and min(H, by + bh) <= y + h
     _, events = run(scene, pixel_cap=0.12)  # the overview plus one 512^2 look
-    assert [s["cause"] for s in steps(events)][0] != "survey"
+    assert next(s["cause"] for s in steps(events)) != "survey"
 
 
 
