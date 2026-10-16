@@ -11,3 +11,4 @@ runs/
 node_modules/
 .DS_Store
 test-results/
+results/eval_*.json

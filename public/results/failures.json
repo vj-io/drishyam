@@ -1,0 +1,74 @@
+[
+ {
+  "image": "failures/f01.jpg",
+  "category": "Graffiti read as damage",
+  "what_happened": "s0160, drishyam@1.0: a spalling finding (confidence 0.97, step 5 at L1) lies within the bounding box of a graffiti patch and overlaps no ground-truth box of any class.",
+  "rule_that_would_catch_it": "Chroma gate before drafting: spray paint is far more saturated than concrete or rust, so a candidate whose median saturation sits well above the surrounding concrete and outside the rust hue band is dropped as non-structural. Not implemented."
+ },
+ {
+  "image": "failures/f02.jpg",
+  "category": "Graffiti read as damage",
+  "what_happened": "s0117, drishyam@0.3: a spalling finding (confidence 0.96, step 3 at L1) lies within the bounding box of a graffiti patch and overlaps no ground-truth box of any class.",
+  "rule_that_would_catch_it": "Chroma gate before drafting: spray paint is far more saturated than concrete or rust, so a candidate whose median saturation sits well above the surrounding concrete and outside the rust hue band is dropped as non-structural. Not implemented."
+ },
+ {
+  "image": "failures/f03.jpg",
+  "category": "Formwork line read as crack",
+  "what_happened": "s0051, drishyam@0.3: a crack finding (confidence 0.93, step 3 at L1) lies within the bounding box of a formwork line patch and overlaps no ground-truth box of any class.",
+  "rule_that_would_catch_it": "Straightness test on the crack mask: a centreline that fits one straight line within about 1.5 px over a length of 20x its width is a formwork seam, not a crack, because real cracks meander (cv2.fitLine residual, minAreaRect aspect). Not implemented."
+ },
+ {
+  "image": "failures/f04.jpg",
+  "category": "Formwork line read as crack",
+  "what_happened": "s0167, drishyam@1.0: a crack finding (confidence 0.92, step 8 at L1) lies within the bounding box of a formwork line patch and overlaps no ground-truth box of any class.",
+  "rule_that_would_catch_it": "Straightness test on the crack mask: a centreline that fits one straight line within about 1.5 px over a length of 20x its width is a formwork seam, not a crack, because real cracks meander (cv2.fitLine residual, minAreaRect aspect). Not implemented."
+ },
+ {
+  "image": "failures/f05.jpg",
+  "category": "Glare caught by the quality gate",
+  "what_happened": "s0038, drishyam@1.0: step 6 (L0) was refused by the quality gate (glare, sharpness 36.7) because the window covers a blown-out highlight. 2 ground-truth box(es) have their centre in that window (exposed_rebar, spalling); 2 not found by the finished job. The gate did what it should; the cost is an area the work order silently leaves unassessed.",
+  "rule_that_would_catch_it": "The gate (more than 20% blown-out pixels) works. The missing rule is bookkeeping: a refused window is written to the work order as 'not assessed' with a re-shoot suggestion, so the area never reads as clean. Not implemented."
+ },
+ {
+  "image": "failures/f06.jpg",
+  "category": "Glare caught by the quality gate",
+  "what_happened": "s0191, drishyam@0.3: step 2 (L0) was refused by the quality gate (glare, sharpness 23.9) because the window covers a blown-out highlight. 2 ground-truth box(es) have their centre in that window (crack); 2 not found by the finished job. The gate did what it should; the cost is an area the work order silently leaves unassessed.",
+  "rule_that_would_catch_it": "The gate (more than 20% blown-out pixels) works. The missing rule is bookkeeping: a refused window is written to the work order as 'not assessed' with a re-shoot suggestion, so the area never reads as clean. Not implemented."
+ },
+ {
+  "image": "failures/f07.jpg",
+  "category": "Crack hidden in blur",
+  "what_happened": "s0085, drishyam@1.0: a 233x460 px crack inside a blurred patch was not found; it was looked at (step 1, L1, sharpness 70.7), the gate accepted the view, and no crack mask came out of it.",
+  "rule_that_would_catch_it": "A local sharpness map: where Laplacian variance falls below the gate, report the area as unreadable and ask for a re-shoot; where the gate accepted the view, scale the sharpness threshold to the expected crack width. Not implemented."
+ },
+ {
+  "image": "failures/f08.jpg",
+  "category": "Crack hidden in blur",
+  "what_happened": "s0004, drishyam@1.0: a 283x366 px crack inside a blurred patch was not found; it was looked at (step 3, L1, sharpness 36.3), the gate accepted the view, and no crack mask came out of it.",
+  "rule_that_would_catch_it": "A local sharpness map: where Laplacian variance falls below the gate, report the area as unreadable and ask for a re-shoot; where the gate accepted the view, scale the sharpness threshold to the expected crack width. Not implemented."
+ },
+ {
+  "image": "failures/f09.jpg",
+  "category": "Crack missed under a small budget",
+  "what_happened": "s0022, drishyam@0.3: a 164x51 px crack box is missed under the 30% cap but found by drishyam@1.0 and tiling@L0; its window was never visited: the job ended after 3 looks (cap-hit) before the saliency ranking reached it.",
+  "rule_that_would_catch_it": "Reserve a small share of the pixel cap for a coarse sweep of low-saliency regions, or lower the stop-rule epsilon so the job does not stop while unvisited candidates remain. Both trade pixels for recall. Not implemented."
+ },
+ {
+  "image": "failures/f10.jpg",
+  "category": "Crack missed under a small budget",
+  "what_happened": "s0047, drishyam@0.3: a 138x188 px crack box is missed under the 30% cap but found by drishyam@1.0 and tiling@L0; its window was never visited: the job ended after 3 looks (cap-hit) before the saliency ranking reached it.",
+  "rule_that_would_catch_it": "Reserve a small share of the pixel cap for a coarse sweep of low-saliency regions, or lower the stop-rule epsilon so the job does not stop while unvisited candidates remain. Both trade pixels for recall. Not implemented."
+ },
+ {
+  "image": "failures/f11.jpg",
+  "category": "Rebar, spall and stain confusion",
+  "what_happened": "s0085, drishyam@1.0: ground truth is exposed_rebar, the job reported corrosion there (confidence 0.95, step 8 at L0) and no exposed_rebar finding overlaps the box.",
+  "rule_that_would_catch_it": "Shape and co-occurrence rule: exposed bars need rust inside a spall rim and a linear shape (minAreaRect aspect above 3); rust with no spall rim is corrosion. Where two classes clear the threshold on one region, send it to human review instead of choosing. The rust-near-spall part exists; the review-on-ambiguity step does not."
+ },
+ {
+  "image": "failures/f12.jpg",
+  "category": "Rebar, spall and stain confusion",
+  "what_happened": "s0162, drishyam@0.3: ground truth is spalling, the job reported corrosion there (confidence 0.94, step 2 at L0) and no spalling finding overlaps the box.",
+  "rule_that_would_catch_it": "Shape and co-occurrence rule: exposed bars need rust inside a spall rim and a linear shape (minAreaRect aspect above 3); rust with no spall rim is corrosion. Where two classes clear the threshold on one region, send it to human review instead of choosing. The rust-near-spall part exists; the review-on-ambiguity step does not."
+ }
+]
