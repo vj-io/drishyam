@@ -25,16 +25,18 @@ function marker(kind, x, y, cls) {
 
 function chart(policies) {
   const W = 640, H = 380, L = 58, R = 20, T = 18, B = 58;
-  const X = (v) => L + v * (W - L - R);
+  // Overlapping tiles can process more than 100% of the pixels, so the x axis grows to fit.
+  const xmax = Math.max(1, ...SERIES.flatMap(([key]) => points(policies[key]).map((p) => p.pixels_frac)));
+  const X = (v) => L + (v / xmax) * (W - L - R);
   const Y = (v) => T + (1 - v) * (H - T - B);
   const root = svg('svg', { viewBox: `0 0 ${W} ${H}`, class: 'chart', role: 'img', 'aria-label': 'Line chart of recall against the fraction of full-resolution pixels processed, for three policies. A data table follows.' });
   for (let i = 0; i <= 5; i++) {
     const v = i / 5;
     root.append(
       svg('line', { class: 'chart__grid', x1: L, x2: W - R, y1: Y(v), y2: Y(v) }),
-      svg('line', { class: 'chart__grid', x1: X(v), x2: X(v), y1: T, y2: H - B }),
+      svg('line', { class: 'chart__grid', x1: X(v * xmax), x2: X(v * xmax), y1: T, y2: H - B }),
       svg('text', { class: 'chart__tick', x: L - 8, y: Y(v) + 4, 'text-anchor': 'end' }, v.toFixed(1)),
-      svg('text', { class: 'chart__tick', x: X(v), y: H - B + 18, 'text-anchor': 'middle' }, `${Math.round(v * 100)}%`));
+      svg('text', { class: 'chart__tick', x: X(v * xmax), y: H - B + 18, 'text-anchor': 'middle' }, `${Math.round(v * xmax * 100)}%`));
   }
   root.append(
     svg('line', { class: 'chart__axis', x1: L, x2: W - R, y1: H - B, y2: H - B }),
@@ -76,7 +78,8 @@ function microTable(micro) {
 
 function heroChips(sum) {
   const drishyam = points(sum.policies?.drishyam).filter((p) => p.pixels_frac <= 0.3).pop();
-  const tiling = points(sum.policies?.tiling).reduce((best, p) => (!best || p.recall > best.recall ? p : best), null);
+  // Exhaustive tiling (the most pixels) is the PRD's reference point for the headline ratio.
+  const tiling = points(sum.policies?.tiling).pop();
   const fill = (id, value, opts, sub) => {
     const el = $(`#${id}`);
     countUp($('.stat__v', el), value, opts);
