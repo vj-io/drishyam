@@ -143,45 +143,48 @@ def box_iou(a, b) -> float:
     return inter / float(aw * ah + bw * bh - inter) if inter else 0.0
 
 
+def _window_sums(m: np.ndarray, wy: int, wx: int) -> np.ndarray:
+    """Sum of `m` under every wy x wx window that lies inside the map, indexed by its top-left corner."""
+    ii = cv2.integral(m)
+    h, w = m.shape
+    return ii[wy:, wx:] - ii[: h - wy + 1, wx:] - ii[wy:, : w - wx + 1] + ii[: h - wy + 1, : w - wx + 1]
+
+
 def find_candidates(
     sal: np.ndarray, level: int, window_l0: int, l0_size: tuple[int, int], max_n: int = 20, thresh: float = 0.5
 ) -> list[Candidate]:
-    """Ranked candidate windows: salient blobs at the overview level, split into first-look windows."""
+    """Ranked first-look windows: a greedy maximum cover of the salient mass at the overview level.
+
+    Each pick is the in-image window holding the most salient mass (saliency summed over pixels at or
+    above `thresh`) that no earlier pick covers; among equals, the one overlapping earlier picks least.
+    So the first k looks see the most distinct evidence, rather than k views of one strong blob. The
+    prior is the mean saliency of the salient pixels the window newly covers.
+    """
     scale = 2**level
     win = max(4, window_l0 // scale)
-    mask = cv2.dilate((sal >= thresh).astype(np.uint8), cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)))
-    n, labels, stats, _ = cv2.connectedComponentsWithStats(mask, connectivity=8)
+    h, w = sal.shape
+    wy, wx = min(win, h), min(win, w)
     W, H = l0_size
-    raw = []
-    for i in range(1, n):
-        x, y, w, h, area = stats[i]
-        if area < 4:
-            continue
-        step = max(1, int(win * 0.75))
-        xs = range(x + min(w, win) // 2, x + w + 1, step) if w > win else [x + w // 2]
-        ys = range(y + min(h, win) // 2, y + h + 1, step) if h > win else [y + h // 2]
-        for cy in ys:
-            for cx in xs:
-                x0, y0 = max(0, cx - win // 2), max(0, cy - win // 2)
-                tile = sal[y0 : cy + win // 2, x0 : cx + win // 2]
-                tile_lab = labels[y0 : cy + win // 2, x0 : cx + win // 2]
-                inside = tile[tile_lab == i]
-                if inside.size == 0:
-                    continue
-                # Re-centre on the strongest pixel of this blob inside the tile.
-                ty, tx = np.unravel_index(np.argmax(np.where(tile_lab == i, tile, -1)), tile.shape)
-                px = int(min(max((x0 + tx) * scale, 0), W - 1))
-                py = int(min(max((y0 + ty) * scale, 0), H - 1))
-                raw.append((float(inside.mean()), py, px))  # mean: max saturates at 1 after _norm
-    raw.sort(key=lambda t: (-t[0], t[1], t[2]))
+    salient = sal >= thresh
+    mass = np.where(salient, sal, 0).astype(np.float32)
+    covered = np.zeros(sal.shape, np.float32)
     kept: list[Candidate] = []
-    for prior, py, px in raw:
-        box = (px - window_l0 // 2, py - window_l0 // 2, window_l0, window_l0)
-        if any(box_iou(box, k.box) > 0.3 for k in kept):
-            continue
-        kept.append(Candidate(f"r{len(kept) + 1}", px, py, box, round(prior, 4)))
-        if len(kept) >= max_n:
+    while len(kept) < max_n:
+        sums = _window_sums(mass, wy, wx)
+        best = float(sums.max())
+        if best <= 0:
             break
+        overlap = np.where(sums >= best * (1 - 1e-6), _window_sums(covered, wy, wx), np.inf)
+        y0, x0 = np.unravel_index(np.argmin(overlap), overlap.shape)  # first index on ties: deterministic
+        new = salient[y0 : y0 + wy, x0 : x0 + wx]
+        prior = float(mass[y0 : y0 + wy, x0 : x0 + wx].sum()) / max(1, int(np.count_nonzero(new)))
+        px = int(min(max((x0 + wx / 2) * scale, 0), W - 1))
+        py = int(min(max((y0 + wy / 2) * scale, 0), H - 1))
+        box = (px - window_l0 // 2, py - window_l0 // 2, window_l0, window_l0)
+        kept.append(Candidate(f"r{len(kept) + 1}", px, py, box, round(min(prior, 1.0), 4)))
+        mass[y0 : y0 + wy, x0 : x0 + wx] = 0
+        salient[y0 : y0 + wy, x0 : x0 + wx] = False
+        covered[y0 : y0 + wy, x0 : x0 + wx] = 1
     return kept
 
 

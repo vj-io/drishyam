@@ -91,6 +91,19 @@ def test_overview_finds_the_salient_spot(scene):
     assert any(abs(c.cx - 1500) < 400 and abs(c.cy - 450) < 400 for c in cands[:3])
 
 
+def test_candidates_cover_distinct_salient_mass():
+    """Windows are ranked by the salient mass they newly cover, and two specks one look can see share one window."""
+    sal = np.zeros((192, 256), np.float32)  # overview (L3) of a 2048 x 1536 image; a first look spans 128 px here
+    sal[40:50, 20:30] = sal[120:130, 100:110] = 0.9  # two strong specks, 90 px apart
+    sal[90:110, 200:240] = 0.6  # one weaker but larger patch, out of their reach
+    cands = imaging.find_candidates(sal, 3, 1024, (2048, 1536))
+    assert len(cands) == 2
+    assert cands[0].cx > 1024 and abs(cands[0].prior - 0.6) < 1e-3  # 800 px x 0.6 outweighs 200 px x 0.9
+    x, y, w, h = cands[1].box
+    assert abs(cands[1].prior - 0.9) < 1e-3
+    assert all(x <= px and px + 80 <= x + w and y <= py and py + 80 <= y + h for px, py in ((160, 320), (800, 960)))
+
+
 def test_decoded_bytes_budget():
     """A small 16-bit RGBA PNG header claiming 25 MP would make libpng allocate ~200 MB: refused."""
     import struct as st
