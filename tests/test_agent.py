@@ -46,10 +46,17 @@ def test_opencv_output_changes_the_next_tool_call(scene):
     assert s["region"] == prev["region"]
 
 
-def test_deterministic_for_a_fixed_clock(scene):
-    a = [(s["decision"], s["cause"]) for s in steps(run(scene)[1])]
-    b = [(s["decision"], s["cause"]) for s in steps(run(scene)[1])]
-    assert a == b
+@pytest.mark.parametrize("cap", [0.3, 1.0])
+def test_deterministic_for_a_fixed_clock(scene, cap):
+    """Same image, same clock: the same decisions, causes and findings, including the survey look and its trail."""
+    def once():
+        job, events = run(scene, pixel_cap=cap)
+        return ([(s["decision"], s.get("window"), s["cause"], s.get("governor")) for s in steps(events)],
+                [f.to_dict() for f in job.findings], events[-1]["cause"])
+
+    a = once()
+    assert a[0][0][2] == "survey" and a[1]  # the survey fires on this scene, and something is found
+    assert a == once()
 
 
 @pytest.mark.parametrize("cap", [0.05, 0.1, 0.3])
