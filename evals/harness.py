@@ -398,16 +398,23 @@ def point(m: dict) -> dict:
 
 
 def headline(scored: dict, primary: str, n: int, label: str) -> str:
-    m, ratio_of = scored[primary], lambda sc: sc[f"drishyam@{HEADLINE_BUDGET}"]["recall"] / sc["tiling@L0"]["recall"]
-    d, t, s = m[f"drishyam@{HEADLINE_BUDGET}"], m["tiling@L0"], m["downscale"]
+    """Two sentences: the hypothesis test against L0 tiling, then every other baseline, as recall ratios."""
+    m, key = scored[primary], f"drishyam@{HEADLINE_BUDGET}"
+    ratio_of = lambda sc, base, f="recall": sc[key][f] / sc[base][f] if sc[base][f] else float("nan")
+    d, t, s = m[key], m["tiling@L0"], m["downscale"]
     px = d["pixels_frac"] / t["pixels_frac"]
-    verdict = "meets" if ratio_of(m) >= 0.9 and px <= 0.3 else "does not meet"
+    verdict = "meets" if ratio_of(m, "tiling@L0") >= 0.9 and px <= 0.3 else "does not meet"
     names = {"components": "per-component", "union": "one-box-per-class", "as_specified": "as-specified mixed"}
-    others = ", ".join(f"{ratio_of(sc):.2f}x with {names[name]} boxes" for name, sc in scored.items() if name != primary)
+    others = ", ".join(f"{ratio_of(sc, 'tiling@L0'):.2f}x with {names[name]} boxes" for name, sc in scored.items() if name != primary)
+    best = max((f"tiling@L{lv}" for lv in TILE_LEVELS), key=lambda k: m[k]["recall"])
+    grids = " and ".join(f"{ratio_of(m, k):.2f}x L{k[-1]} tiling ({m[k]['recall']:.2f} at {m[k]['pixels_frac']:.2f}"
+                         f"{', the best grid' if k == best else ''})" for k in ("tiling@L1", "tiling@L2"))
     return (f"On {n} {label}, Drishyam at a {HEADLINE_BUDGET:.0%} pixel cap found {d['recall']:.2f} of ground-truth boxes using "
             f"{d['pixels_frac']:.2f} of the image's pixels, versus {t['recall']:.2f} for 20%-overlap 512-px tiling using "
-            f"{t['pixels_frac']:.2f}: {ratio_of(m):.2f}x its recall ({others}) at {px:.2f}x its pixels, which {verdict} the "
-            f"0.9x-at-0.3x hypothesis; a single 1024-px downscale found {s['recall']:.2f} at {s['pixels_frac']:.2f}.")
+            f"{t['pixels_frac']:.2f}: {ratio_of(m, 'tiling@L0'):.2f}x its recall ({others}) at {px:.2f}x its pixels, which "
+            f"{verdict} the 0.9x-at-0.3x hypothesis. It is {ratio_of(m, 'downscale'):.2f}x a single 1024-px downscale "
+            f"({s['recall']:.2f} at {s['pixels_frac']:.2f} of the pixels), {grids}, and {ratio_of(m, 'tiling@L0', 'recall_iou_only'):.2f}x "
+            f"L0 tiling when a match needs IoU >= {IOU_MIN} (no contains-the-centre clause).")
 
 
 # ---------------------------------------------------------------- run

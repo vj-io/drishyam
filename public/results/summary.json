@@ -558,5 +558,5 @@
   "timestamp": "2026-10-16T21:04:01Z",
   "build": "stock (not COOL)"
  },
- "headline": "On 200 labelled synthetic images, Drishyam at a 30% pixel cap found 0.34 of ground-truth boxes using 0.27 of the image's pixels, versus 0.43 for 20%-overlap 512-px tiling using 1.67: 0.78x its recall (0.65x with one-box-per-class boxes, 1.33x with as-specified mixed boxes) at 0.16x its pixels, which does not meet the 0.9x-at-0.3x hypothesis; a single 1024-px downscale found 0.39 at 0.25."
+ "headline": "On 200 labelled synthetic images, Drishyam at a 30% pixel cap found 0.34 of ground-truth boxes using 0.27 of the image's pixels, versus 0.43 for 20%-overlap 512-px tiling using 1.67: 0.78x its recall (0.65x with one-box-per-class boxes, 1.33x with as-specified mixed boxes) at 0.16x its pixels, which does not meet the 0.9x-at-0.3x hypothesis. It is 0.88x a single 1024-px downscale (0.39 at 0.25 of the pixels), 0.75x L1 tiling (0.46 at 0.50, the best grid) and 0.92x L2 tiling (0.37 at 0.06), and 0.79x L0 tiling when a match needs IoU >= 0.3 (no contains-the-centre clause)."
 }

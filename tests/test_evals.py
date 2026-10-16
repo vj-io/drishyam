@@ -136,7 +136,10 @@ def test_three_image_run_writes_valid_summary_and_gallery(tmp_path):
     assert set(on_disk["provenance"]) == {"cv2", "build_info_sha256", "machine", "cpu", "python", "timestamp", "build"}
     am = on_disk["agent_metrics"]
     assert am["steps_with_cause_pct"] == 100.0 and set(am["box_convention"]["recall"]) == {"components", "union", "as_specified"}
-    assert isinstance(on_disk["headline"], str) and "tiling" in on_disk["headline"]
+    head = on_disk["headline"]
+    assert isinstance(head, str) and head.count(". ") == 1  # two sentences
+    for baseline in ("20%-overlap 512-px tiling", "1024-px downscale", "L1 tiling", "L2 tiling", "IoU >= 0.3"):
+        assert baseline in head, baseline
     gallery = json.loads((pub / "failures.json").read_text())
     for g in gallery:
         assert set(g) == {"image", "category", "what_happened", "rule_that_would_catch_it"}
