@@ -178,7 +178,7 @@ class Job:
 
     def _log_finding(self, r, cls, seg, crop, to_l0, level):
         mask = seg.mask(cls)
-        m = measure(mask, 2**level)
+        m = measure(mask, 2**level, linear=cls == "crack")
         x, y, w, h = cv2.boundingRect(cv2.findNonZero(mask))
         corners = imaging.map_points(to_l0, [[x, y], [x + w, y + h]])
         box = [int(corners[0][0]), int(corners[0][1]), int(corners[1][0] - corners[0][0]),

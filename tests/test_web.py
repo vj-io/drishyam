@@ -78,9 +78,12 @@ def test_replay_header_validation(photo):
 
 
 def test_chaos_drills_over_http(photo, monkeypatch):
-    from drishyam import agent
+    import functools
 
-    monkeypatch.setattr(agent.JobConfig, "eps", 0.0)  # real clock: keep the stop rule from ending before step 6
+    from drishyam import agent, web
+
+    # Real clock: keep the stop rule from ending the job before the drills at steps 4-6.
+    monkeypatch.setattr(web, "JobConfig", functools.partial(agent.JobConfig, eps=0.0))
     ev = lines(post(photo, params="?pixel_cap=1&chaos=p95_spike,planner_malformed"))
     assert any(e.get("cause") == "p95>SLA" for e in ev)
     assert any(e["type"] == "planner" and e["status"] == "rejected" for e in ev)

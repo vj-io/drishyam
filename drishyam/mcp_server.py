@@ -138,9 +138,9 @@ def _seg(g: Gaze):
     return g.seg
 
 
-def _timed(s: Session, op: str, fn, *args):
+def _timed(s: Session, op: str, fn, *args, **kw):
     t0 = time.perf_counter()
-    out = fn(*args)
+    out = fn(*args, **kw)
     ms = (time.perf_counter() - t0) * 1000
     s.stats.record(op, ms)
     return out, ms
@@ -451,7 +451,7 @@ def measure(job: JobId, gaze_id: RecordId, cls: Defect) -> str:
         seg = _seg(g)
         if not seg.areas[cls]:
             raise ToolError(f"no {cls} in the last segmentation of {g.id}")
-        m, _ = _timed(s, "measure", measure_px, seg.mask(cls), 2**g.level)
+        m, _ = _timed(s, "measure", measure_px, seg.mask(cls), 2**g.level, linear=cls == "crack")
         rec.update(region=g.id, observation={"classes": {cls: seg.areas[cls]}})
         return _reply(rec, gaze=g.id, cls=cls, measure=m, unit="L0 pixels")
 
@@ -571,7 +571,7 @@ def log_finding(job: JobId, gaze_id: RecordId, cls: Defect) -> str:
         if not seg.areas[cls]:
             raise ToolError(f"no {cls} in the last segmentation of {g.id}")
         mask = seg.mask(cls)
-        m = measure_px(mask, 2**g.level)
+        m = measure_px(mask, 2**g.level, linear=cls == "crack")
         x, y, w, h = cv2.boundingRect(cv2.findNonZero(mask))
         (x0, y0), (x1, y1) = imaging.map_points(g.to_l0, [[x, y], [x + w, y + h]])
         box = [int(x0), int(y0), int(x1 - x0), int(y1 - y0)]
