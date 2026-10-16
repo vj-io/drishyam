@@ -1,0 +1,362 @@
+[
+ {
+  "file": "bridge_01.jpg",
+  "title": "Hairline cracks",
+  "note": "Five 1-2 px cracks that all but vanish in a thumbnail.",
+  "synthetic": true,
+  "width": 3000,
+  "height": 2250,
+  "boxes": [
+   {
+    "cls": "crack",
+    "box": [
+     1111,
+     210,
+     113,
+     363
+    ]
+   },
+   {
+    "cls": "crack",
+    "box": [
+     2038,
+     1697,
+     191,
+     269
+    ]
+   },
+   {
+    "cls": "crack",
+    "box": [
+     684,
+     1377,
+     565,
+     194
+    ]
+   },
+   {
+    "cls": "crack",
+    "box": [
+     1758,
+     1377,
+     220,
+     169
+    ]
+   },
+   {
+    "cls": "crack",
+    "box": [
+     2100,
+     1406,
+     362,
+     378
+    ]
+   }
+  ],
+  "distractors": []
+ },
+ {
+  "file": "bridge_02.jpg",
+  "title": "Crack with efflorescence",
+  "note": "A crack with chalky salt deposits leached out beneath it.",
+  "synthetic": true,
+  "width": 3000,
+  "height": 2250,
+  "boxes": [
+   {
+    "cls": "crack",
+    "box": [
+     1763,
+     650,
+     127,
+     544
+    ]
+   },
+   {
+    "cls": "crack",
+    "box": [
+     1807,
+     529,
+     270,
+     339
+    ]
+   },
+   {
+    "cls": "efflorescence",
+    "box": [
+     1798,
+     1306,
+     291,
+     238
+    ]
+   },
+   {
+    "cls": "efflorescence",
+    "box": [
+     1754,
+     865,
+     40,
+     323
+    ]
+   }
+  ],
+  "distractors": []
+ },
+ {
+  "file": "bridge_03.jpg",
+  "title": "Exposed rebar",
+  "note": "A broken-out spall exposing reinforcing bars: the critical finding.",
+  "synthetic": true,
+  "width": 3000,
+  "height": 2250,
+  "boxes": [
+   {
+    "cls": "spalling",
+    "box": [
+     493,
+     1875,
+     313,
+     299
+    ]
+   },
+   {
+    "cls": "spalling",
+    "box": [
+     1326,
+     1296,
+     570,
+     529
+    ]
+   },
+   {
+    "cls": "exposed_rebar",
+    "box": [
+     1333,
+     1456,
+     563,
+     212
+    ]
+   },
+   {
+    "cls": "crack",
+    "box": [
+     2463,
+     907,
+     314,
+     348
+    ]
+   }
+  ],
+  "distractors": []
+ },
+ {
+  "file": "bridge_04.jpg",
+  "title": "Corrosion run-off",
+  "note": "Rust staining bleeding down the face in streaks.",
+  "synthetic": true,
+  "width": 3000,
+  "height": 2250,
+  "boxes": [
+   {
+    "cls": "corrosion",
+    "box": [
+     1130,
+     321,
+     222,
+     497
+    ]
+   },
+   {
+    "cls": "corrosion",
+    "box": [
+     381,
+     656,
+     116,
+     468
+    ]
+   },
+   {
+    "cls": "crack",
+    "box": [
+     651,
+     791,
+     319,
+     751
+    ]
+   }
+  ],
+  "distractors": []
+ },
+ {
+  "file": "bridge_05.jpg",
+  "title": "Mixed defects",
+  "note": "Cracks, spalling, exposed bars, rust and efflorescence on one wall.",
+  "synthetic": true,
+  "width": 3000,
+  "height": 2250,
+  "boxes": [
+   {
+    "cls": "corrosion",
+    "box": [
+     1630,
+     720,
+     262,
+     593
+    ]
+   },
+   {
+    "cls": "spalling",
+    "box": [
+     467,
+     775,
+     117,
+     154
+    ]
+   },
+   {
+    "cls": "spalling",
+    "box": [
+     626,
+     1499,
+     522,
+     654
+    ]
+   },
+   {
+    "cls": "exposed_rebar",
+    "box": [
+     632,
+     1814,
+     474,
+     26
+    ]
+   },
+   {
+    "cls": "crack",
+    "box": [
+     684,
+     205,
+     583,
+     417
+    ]
+   },
+   {
+    "cls": "crack",
+    "box": [
+     328,
+     340,
+     544,
+     537
+    ]
+   },
+   {
+    "cls": "crack",
+    "box": [
+     1196,
+     555,
+     353,
+     249
+    ]
+   },
+   {
+    "cls": "efflorescence",
+    "box": [
+     1443,
+     650,
+     284,
+     279
+    ]
+   }
+  ],
+  "distractors": []
+ },
+ {
+  "file": "bridge_06.jpg",
+  "title": "Graffiti and one real crack",
+  "note": "Spray-paint tags that are not damage, plus one genuine crack.",
+  "synthetic": true,
+  "width": 3000,
+  "height": 2250,
+  "boxes": [
+   {
+    "cls": "crack",
+    "box": [
+     1599,
+     581,
+     421,
+     165
+    ]
+   }
+  ],
+  "distractors": [
+   {
+    "kind": "graffiti",
+    "box": [
+     1878,
+     761,
+     600,
+     858
+    ]
+   }
+  ]
+ },
+ {
+  "file": "bridge_07.jpg",
+  "title": "Glare and blur",
+  "note": "A blown-out highlight and a blurred patch hiding a thin crack.",
+  "synthetic": true,
+  "width": 3000,
+  "height": 2250,
+  "boxes": [
+   {
+    "cls": "crack",
+    "box": [
+     1289,
+     1338,
+     358,
+     575
+    ]
+   }
+  ],
+  "distractors": [
+   {
+    "kind": "blur_region",
+    "box": [
+     1044,
+     1093,
+     848,
+     1065
+    ]
+   },
+   {
+    "kind": "glare",
+    "box": [
+     221,
+     1266,
+     762,
+     349
+    ]
+   }
+  ]
+ },
+ {
+  "file": "bridge_08.jpg",
+  "title": "Clean concrete",
+  "note": "Sound concrete with one straight formwork groove; nothing here is damage.",
+  "synthetic": true,
+  "width": 3000,
+  "height": 2250,
+  "boxes": [],
+  "distractors": [
+   {
+    "kind": "formwork_line",
+    "box": [
+     2219,
+     1260,
+     31,
+     990
+    ]
+   }
+  ]
+ }
+]
