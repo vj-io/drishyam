@@ -237,6 +237,8 @@ def test_critical_masks_are_verified_even_when_the_budget_rule_would_skip(monkey
     img = add_crack(add_rebar_spall(concrete(1536, 2048, seed=1), (900, 700), r=320), (1500, 200), n=200, width=4,
                     seed=9, step=(2, 3))
     job, events = run(img, pixel_cap=1.0)
-    critical = {f.region for f in job.findings if f.critical}
+    region = {s["step"]: s["region"] for s in steps(events)}
+    # Regions of every look in a critical finding's trail: the survey may find the bar before another region.
+    critical = {region[n] for f in job.findings if f.critical for n in f.steps}
     assert any(s["cause"] == "verify-new-mask" and s["region"] in critical for s in steps(events))
     assert not any(k["region"] in critical for s in steps(events) for k in s.get("skipped", []))
