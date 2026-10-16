@@ -3,8 +3,9 @@
 The tool list is a fixed allow-list. There is no shell, no file-write and no approve/reject tool: a person
 approves a critical finding with `drishyam review`, and a cap can only be lowered here. Every call runs the
 budget governor first (so the kill switch stops a job within one call) and appends one line to
-runs/<job>/trace.jsonl. Tool results hold numbers, class names and ids only; there is no OCR, so text in a
-photo never reaches the model through this server.
+runs/<job>/trace.jsonl. There is no OCR. `overview`, `gaze` and `enhance` do return images (the heatmap and
+the crop) so a vision-capable client can look; anything painted in a photo is therefore visible to that
+client and must be treated as untrusted data, and no tool lets the model act on it beyond the allow-list.
 """
 
 from __future__ import annotations

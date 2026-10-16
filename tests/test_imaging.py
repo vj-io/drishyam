@@ -89,3 +89,22 @@ def test_overview_finds_the_salient_spot(scene):
     assert all(0 <= c.prior <= 1 for c in cands)
     # The rebar spall (around x=1500, y=450) is the most salient thing in the scene.
     assert any(abs(c.cx - 1500) < 400 and abs(c.cy - 450) < 400 for c in cands[:3])
+
+
+def test_decoded_bytes_budget():
+    """A small 16-bit RGBA PNG header claiming 25 MP would make libpng allocate ~200 MB: refused."""
+    import struct as st
+
+    def png16(w, h, colour=6, depth=16):
+        ihdr = st.pack(">IIBBBBB", w, h, depth, colour, 0, 0, 0)
+        chunk = b"IHDR" + ihdr
+        return b"\x89PNG\r\n\x1a\n" + st.pack(">I", 13) + chunk + st.pack(">I", zlib.crc32(chunk))
+
+    with pytest.raises(imaging.ImageError, match="decode to"):
+        imaging.decode_image(png16(5000, 5000))
+    assert imaging.sniff(png16(100, 100))[2] == 8.0
+    assert imaging.sniff(png16(100, 100, colour=2, depth=8))[2] == 3.0
+    with pytest.raises(imaging.ImageError, match="colour type"):
+        imaging.sniff(png16(100, 100, colour=5))
+    sixteen = (np.random.default_rng(3).random((300, 300, 3)) * 65535).astype(np.uint16)
+    assert imaging.decode_image(cv2.imencode(".png", sixteen)[1].tobytes()).dtype == np.uint8

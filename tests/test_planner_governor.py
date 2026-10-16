@@ -130,3 +130,10 @@ def test_usd_80_percent_switches_to_critical_only():
     b = budget(usd_cap=0.001, seconds_used=0.81 * 0.001 * 3600 / G.USD_PER_HOUR)
     assert G.check(b, G.RuntimeStats(), st, 1000, 500, kill=False).cause == "usd≥80%"
     assert st.critical_only
+
+
+def test_http_planner_rejects_lookalike_loopback_hosts():
+    for bad in ("http://localhost.evil.com/v1", "http://127.0.0.1.evil.com/v1", "ftp://127.0.0.1/", "https:///x"):
+        with pytest.raises(ValueError):
+            P.HttpPlanner(bad)
+    P.HttpPlanner("http://[::1]:8080/v1")

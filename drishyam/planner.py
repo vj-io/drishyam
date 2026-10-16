@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import os
 import threading
+import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FutureTimeout
@@ -20,6 +21,7 @@ STRATEGIES = ("continue", "switch_model", "change_level", "reverify", "batch_rem
 MODELS = ("fast", "fp16", "accurate")
 RATIONALE_MAX = 200
 TIMEOUT_S = 2.0
+LOOPBACK = {"127.0.0.1", "::1", "localhost"}
 
 SYSTEM_PROMPT = (
     "You steer a bridge-photo inspection agent. You receive a JSON digest of numbers. "
@@ -81,7 +83,8 @@ class HttpPlanner:
     name = "llm"
 
     def __init__(self, url: str, model: str = "qwen2.5-3b-instruct", key: str | None = None) -> None:
-        if not url.startswith(("http://127.0.0.1", "http://localhost", "https://")):
+        u = urllib.parse.urlsplit(url)
+        if not (u.scheme == "https" and u.hostname or u.scheme == "http" and u.hostname in LOOPBACK):
             raise ValueError("planner URL must be https:// or a loopback http:// address")
         self.url = url.rstrip("/") + "/chat/completions"
         self.model, self.key = model, key

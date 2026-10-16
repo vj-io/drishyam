@@ -16,6 +16,7 @@ import cv2
 import numpy as np
 
 MAX_PIXELS = 25_000_000
+MAX_DECODED_BYTES = 100_000_000  # what libpng/libjpeg may allocate; 16-bit RGBA at 25 MP would be 200 MB
 MIN_SIDE = 64
 LEVELS = 5  # L0 (full resolution) .. L4
 OVERVIEW_LEVEL = 3
@@ -30,12 +31,19 @@ class ImageError(ValueError):
     """The upload is not an image we accept."""
 
 
-def sniff_size(data: bytes) -> tuple[int, int]:
-    """Width and height from the PNG or JPEG header, read before any pixel is decoded."""
+_PNG_CHANNELS = {0: 1, 2: 3, 3: 3, 4: 2, 6: 4}  # colour type -> channels after decode (palette expands)
+
+
+def sniff(data: bytes) -> tuple[int, int, float]:
+    """Width, height and decoded bytes per pixel from the header, before any pixel is decoded."""
     if data[:8] == b"\x89PNG\r\n\x1a\n":
-        if len(data) < 24 or data[12:16] != b"IHDR":
+        if len(data) < 26 or data[12:16] != b"IHDR":
             raise ImageError("corrupt PNG header")
-        return struct.unpack(">II", data[16:24])
+        w, h = struct.unpack(">II", data[16:24])
+        depth, colour = data[24], data[25]
+        if colour not in _PNG_CHANNELS or depth not in (1, 2, 4, 8, 16):
+            raise ImageError("unsupported PNG colour type or bit depth")
+        return w, h, _PNG_CHANNELS[colour] * max(depth, 8) / 8
     if data[:3] == b"\xff\xd8\xff":
         i = 2
         while i + 9 <= len(data):
@@ -52,22 +60,31 @@ def sniff_size(data: bytes) -> tuple[int, int]:
             if seg_len < 2:
                 raise ImageError("corrupt JPEG segment")
             if marker in _SOF:
+                precision = data[i + 4]
                 h, w = struct.unpack(">HH", data[i + 5 : i + 9])
-                return w, h
+                comps = data[i + 9] if i + 9 < len(data) else 3
+                return w, h, max(comps, 3) * max(precision, 8) / 8
             i += 2 + seg_len
         raise ImageError("JPEG has no frame header")
     raise ImageError("only JPEG and PNG images are accepted")
+
+
+def sniff_size(data: bytes) -> tuple[int, int]:
+    return sniff(data)[:2]
 
 
 def decode_image(data: bytes, max_pixels: int = MAX_PIXELS) -> np.ndarray:
     """Decode an upload to BGR, refusing decompression bombs before decoding."""
     if not data:
         raise ImageError("empty upload")
-    w, h = sniff_size(data)
+    w, h, bpp = sniff(data)
     if w < MIN_SIDE or h < MIN_SIDE:
         raise ImageError(f"image is {w}x{h}; the minimum side is {MIN_SIDE} px")
     if w * h > max_pixels:
         raise ImageError(f"image is {w}x{h} = {w * h / 1e6:.1f} MP; the limit is {max_pixels / 1e6:.0f} MP")
+    if w * h * bpp > MAX_DECODED_BYTES:
+        raise ImageError(f"image would decode to {w * h * bpp / 1e6:.0f} MB; the limit is "
+                         f"{MAX_DECODED_BYTES / 1e6:.0f} MB (use 8-bit colour)")
     img = cv2.imdecode(np.frombuffer(data, np.uint8), cv2.IMREAD_COLOR)
     # EXIF orientation may swap the axes; anything else means the header lied.
     if img is None or sorted(img.shape[:2]) != sorted((h, w)):
@@ -155,7 +172,7 @@ def find_candidates(
                 ty, tx = np.unravel_index(np.argmax(np.where(tile_lab == i, tile, -1)), tile.shape)
                 px = int(min(max((x0 + tx) * scale, 0), W - 1))
                 py = int(min(max((y0 + ty) * scale, 0), H - 1))
-                raw.append((float(inside.max()), py, px))
+                raw.append((float(inside.mean()), py, px))  # mean: max saturates at 1 after _norm
     raw.sort(key=lambda t: (-t[0], t[1], t[2]))
     kept: list[Candidate] = []
     for prior, py, px in raw:

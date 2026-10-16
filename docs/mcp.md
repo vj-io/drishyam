@@ -25,8 +25,10 @@ npx @modelcontextprotocol/inspector drishyam mcp  # MCP Inspector: lists and cal
 | `request_human_review(job, finding_id, reason)` | Records the request in the trace. Changes no state. |
 | `draft_work_order(job)` | Writes `runs/<job>/work_order.json` and `crops/` and returns the order. |
 
-There is no shell, no file-write and no approve/reject tool, and no OCR: tool results hold numbers, class
-names and ids, so text painted on a bridge cannot reach the model. `open_image` resolves the real path and
+There is no shell, no file-write and no approve/reject tool, and no OCR. `overview`, `gaze` and `enhance`
+return images (heatmap, crop) so a vision-capable client can look; text painted on a bridge is therefore
+visible to that client and must be treated as untrusted data. Whatever it reads, the model can only call
+the tools above, none of which approves, writes files or runs commands. `open_image` resolves the real path and
 refuses anything outside the allowed roots (`..`, absolute paths, symlinks that lead out), and anything that
 is not a JPEG or PNG by magic bytes or is over 25 MP.
 

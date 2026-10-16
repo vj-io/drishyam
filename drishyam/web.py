@@ -47,6 +47,8 @@ def _signing_key() -> bytes:
     key = os.environ.get("DRISHYAM_SIGNING_KEY", "")
     if len(key) >= 32:
         return key.encode()
+    if os.environ.get("VERCEL_ENV"):  # deployed: per-instance keys would break review across instances
+        raise RuntimeError("DRISHYAM_SIGNING_KEY must be set (>= 32 chars) on a deployment")
     log.warning("DRISHYAM_SIGNING_KEY unset or short; using an ephemeral key (tokens die with this process)")
     return secrets.token_bytes(32)
 

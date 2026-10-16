@@ -148,3 +148,14 @@ def test_kill_endpoint_halts_a_running_job(photo, monkeypatch):
     assert events[-1]["cause"] == "kill-switch" and events[-1]["status"] == "halted" and len(looks) == 1
     assert client.post("/api/kill", json={"job": "j_zzzzzz", "kill_token": "a" * 24}).status_code == 400
     assert client.post("/api/kill", json={"job": "j_abcdef", "kill_token": "short"}).status_code == 400
+
+
+def test_signing_key_fails_closed_on_a_deployment(monkeypatch):
+    from drishyam import web
+
+    monkeypatch.delenv("DRISHYAM_SIGNING_KEY", raising=False)
+    monkeypatch.setenv("VERCEL_ENV", "production")
+    with pytest.raises(RuntimeError, match="DRISHYAM_SIGNING_KEY"):
+        web._signing_key()
+    monkeypatch.setenv("DRISHYAM_SIGNING_KEY", "s" * 48)
+    assert web._signing_key() == b"s" * 48
