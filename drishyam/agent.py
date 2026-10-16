@@ -126,6 +126,33 @@ class Job:
         ev = r.prior * SEVERITY.get(r.cls, 1.0) * (1 + r.entropy) * a
         return ev / max(self._t_hat(), 1e-3), ev, a
 
+    def _verify_crowded_out(self, r: Region, seg, level: int, value: float, cost_ms: float) -> dict | None:
+        """Rule 3 under a pixel budget, for a non-critical mask. A verify re-reads covered ground, so it is scored
+        like a region with the prior replaced by the doubt left in the mask (1 - confidence), and it keeps its look
+        only if the looks left after this one also cover the unseen ground of every unvisited candidate that
+        outscores it and the stop rule's lambda. Returns the skip record for the trace, or None to verify."""
+        b, size = self.budget, self.settings.size
+        looks_left = (b.pixels_cap - b.pixels_used) // size**2 - 1
+        ev = SEVERITY[r.cls] * (1 + seg.entropy) * (1 - seg.confidence[r.cls])
+        score = ev / max(self._t_hat(), 1e-3)
+        bar = max(score, self.cfg.eps * value / cost_ms if cost_ms else 0.0)
+        need, win_px, n = np.zeros(self.seen[0].shape, bool), 1.0, 0
+        for o in self.regions.values():
+            if o.done or o.looks or self._score(o)[0] < bar:
+                continue
+            lvl = min(o.next_level + self.settings.level_bias, self.max_level)
+            y0, y1, x0, x1 = _rect_on(need.shape, self._window(o.cx, o.cy, lvl, size)[2], self.ov_scale)
+            need[y0:y1, x0:x1] |= ~np.logical_or.reduce(self.seen[: lvl + 1])[y0:y1, x0:x1]
+            win_px, n = max(win_px, (size * 2**lvl / self.ov_scale) ** 2), n + 1
+        # ponytail: looks needed = unseen area / one window, a lower bound (looks overlap); errs toward verifying
+        looks_needed = math.ceil(np.count_nonzero(need) / win_px)
+        if not 0 < looks_left <= looks_needed:
+            return None
+        return {"action": "verify", "region": r.id, "level": level - 1, "cause": "looks≤candidates",
+                "rationale": f"skipped L{level - 1} verify of {r.cls} on {r.id} (score {score:.2e}): "
+                             f"{looks_left} look(s) left, {n} unvisited candidate(s) score higher and need "
+                             f"{looks_needed} look(s) to cover"}
+
     def digest(self) -> dict:
         """Numbers and fixed names only: what the optional LLM planner is allowed to see."""
         b, s = self.budget, self.settings
@@ -243,6 +270,7 @@ class Job:
             self.forced.append(("gaze", r, s[2], "survey", f"one L{s[2]} look covers all {len(cands)} candidates "
                                                            f"before zooming; {looks} looks affordable"))
         value, cost_ms, halt_cause, halt_why = 0.0, 0.0, None, ""
+        skipped: list[dict] = []  # verifies not taken; written into the next trace record
         self.step = 0
 
         while self.step < cfg.max_steps:
@@ -281,6 +309,8 @@ class Job:
             if self.settings.critical_only and action == "verify" and not any(
                     f.critical and f.region == r.id for f in self.findings):
                 r.done = True
+                skipped.append({"action": "verify", "region": r.id, "level": level, "cause": "usd≥80%",
+                                "rationale": f"skipped L{level} verify on {r.id}: verifying critical classes only"})
                 self.step -= 1
                 continue
             # 3. optional planner
@@ -318,7 +348,7 @@ class Job:
             iou = look_iou(prev[1], prev[2], mask, to_l0) if (prev is not None and best) else None
             prev_level = prev[0] if prev is not None else None
             r.looks.append((level, mask, to_l0))
-            new_events, follow = [], None
+            new_events, follow, skip = [], None, None
             batch = self.settings.batch
             if not q["ok"]:
                 r.done = True
@@ -353,8 +383,14 @@ class Job:
                     r.extra_used = True
                     follow = ("verify", r, level - 1, "iou<0.5", disagree)
                 elif iou is None and level > 0 and not batch and not r.verified:
-                    follow = ("verify", r, level - 1, "verify-new-mask",
-                              f"new {best} mask at L{level}; confirming at L{level - 1}")
+                    # Critical masks are always confirmed (or sent to a human); others compete for the budget.
+                    if not critical and (not replaying or n_replay == 0):
+                        skip = self._verify_crowded_out(r, seg, level, value, cost_ms + (clock() - step_t0) * 1000)
+                    if skip:
+                        r.done = True
+                    else:
+                        follow = ("verify", r, level - 1, "verify-new-mask",
+                                  f"new {best} mask at L{level}; confirming at L{level - 1}")
                 else:
                     r.verified = iou is not None and iou >= 0.5
                     r.done = True
@@ -398,6 +434,9 @@ class Job:
                 rec["verify"] = {"iou": iou, "against_level": prev_level}
             if cfg.thumbs:
                 rec["crop_jpeg_b64"] = imaging.jpeg_b64(crop, 160, 70)
+            _note_skipped(rec, skipped)
+            if skip:
+                skipped.append(skip)
             self.trace.append(rec)
             yield rec
             yield from new_events
@@ -412,6 +451,7 @@ class Job:
                "pixels_frac": round(self.budget.pixels_used / (W * H), 4),
                "usd_used": round(self.budget.usd_used, 6), "seconds_used": round(self.budget.seconds_used, 3),
                "runtime": self.stats.snapshot(self.budget.usd_used)}
+        _note_skipped(rec, skipped)
         self.trace.append(rec)
         yield rec
         pending = sum(f.state == "pending_review" for f in self.findings)
@@ -440,6 +480,14 @@ def survey_look(cands, l0_size, size, first, max_level, looks) -> tuple[int, int
     x1, y1 = min(W, max(c.box[0] + c.box[2] for c in cands)), min(H, max(c.box[1] + c.box[3] for c in cands))
     level = min(max_level, math.ceil(math.log2(max(x1 - x0, y1 - y0, 1) / size)))
     return ((x0 + x1) // 2, (y0 + y1) // 2, level) if level > first else None
+
+
+def _note_skipped(rec: dict, skipped: list[dict]) -> None:
+    """Verifies not taken go into the next trace record, each with its cause, ahead of that record's rationale."""
+    if skipped:
+        rec["skipped"] = skipped[:]
+        rec["rationale"] = "; ".join([*(s["rationale"] for s in skipped), rec["rationale"]])
+        skipped.clear()
 
 
 def _inside(a, b) -> float:

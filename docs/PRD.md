@@ -226,7 +226,7 @@ For each candidate region r at the current pyramid level:
 0. **Survey:** when one look at a coarser level can hold every candidate window and the budget leaves at least one more look, that look comes first (cause `survey`); its follow-ups use rules 2 and 3, and candidates are then scored at their own level as below
 1. **Next gaze:** argmax score(r); ties broken by larger a\_r, then by position (top-left first) for determinism
 2. **Escalate** (zoom one level finer, same centre) when entropy > τ (default 0.5) or the mask area is below A\_min px (default 64), down to L0
-3. **Verify** when a mask appears at a new level: re-segment and record the IoU with the previous level; IoU < 0.5 schedules one more gaze or, for a critical class, a human review
+3. **Verify** when a mask appears at a new level: re-segment and record the IoU with the previous level; IoU < 0.5 schedules one more gaze or, for a critical class, a human review. A critical mask is always verified; a non-critical one competes for the pixel budget: its verify is scored like a region with p\_r replaced by the mask's doubt (1 − confidence), and it is skipped when the looks left after the current one cannot also cover the unseen ground of the unvisited candidates scoring above it and above λ. The skip is written into the next trace record (`skipped`, cause `looks≤candidates`)
 4. **Stop** when the best remaining score is below λ = ε × (value gained so far ÷ cost spent so far), ε default 0.25, or when any cap is hit
 5. **Governor** runs before every step (table below) and can override the model, level or batch size; every override writes a cause into the trace
 

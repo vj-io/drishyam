@@ -101,6 +101,11 @@ Step `decision.action` values: `gaze` (first look at a region, or the survey), `
 `p95>SLA`, `warp-spike`, `usd≥80%`, `cap-hit`, `kill-switch`,
 `planner-fallback`, `planner:<strategy>`, `replay`.
 
+A verify the policy decided not to take is never silent: the next step (or
+`halt`) record carries `"skipped": [{"action": "verify", "region": "r1",
+"level": 0, "cause": "looks≤candidates" | "usd≥80%", "rationale": "..."}]`,
+and its `rationale` starts with each skip's rationale.
+
 ## `POST /api/kill`
 
 ```json
