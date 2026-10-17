@@ -133,7 +133,7 @@ function heroChips(sum) {
     fill('stat-recall', drishyam.recall / tiling.recall, { decimals: 2, suffix: '× tiling' }, `recall at ${(drishyam.pixels_frac * 100).toFixed(0)}% of the pixels, synthetic set`);
   }
   if (drishyam && num(drishyam.usd)) {
-    fill('stat-cost', drishyam.usd, { decimals: 4, prefix: '$' }, num(tiling?.usd) ? `per image, vs $${tiling.usd} for tiling` : 'per image, modelled');
+    fill('stat-cost', drishyam.usd, { decimals: 6, prefix: '$' }, num(tiling?.usd) ? `per image, vs $${tiling.usd} for tiling` : 'per image, modelled');
   }
   // Agentic evidence, not speed: injected planner and governor faults the agent recovered from.
   const am = sum.agent_metrics ?? {};
