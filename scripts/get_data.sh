@@ -37,8 +37,9 @@ else:
 [ -n "$md5" ] || { echo "Zenodo published no checksum for $FILE; refusing to continue." >&2; exit 1; }
 [ -n "$url" ] || url="https://zenodo.org/records/$RECORD/files/$FILE?download=1"
 
-# Zenodo caps each connection at roughly 300 kB/s (7 hours for this file) and sometimes resets them, so fetch PARTS
-# byte ranges in parallel and resume each from its current length, in passes, until all are complete.
+# Zenodo caps each connection at roughly 300 kB/s (7 hours for this file), and sometimes closes a connection or
+# leaves it open without sending, so fetch PARTS byte ranges in parallel, give up on any connection slower than
+# 10 kB/s for a minute, and resume each part from its current length, in passes, until all are complete.
 bytes() { if [ -f "$1" ]; then wc -c <"$1" | tr -d ' '; else echo 0; fi; }
 if [ "$(bytes "$ZIP")" -ne "$size" ]; then
   [ "$size" -gt 0 ] || { echo "Zenodo published no size for $FILE; refusing to continue." >&2; exit 1; }
@@ -52,7 +53,7 @@ if [ "$(bytes "$ZIP")" -ne "$size" ]; then
       have=$(bytes "$ZIP.parts/$i")
       [ "$have" -lt $((b - a + 1)) ] || continue
       short=$((short + 1))
-      if [ "$pass" -le 10 ]; then curl -fsSL --retry 5 -r "$((a + have))-$b" "$url" >> "$ZIP.parts/$i" & fi
+      if [ "$pass" -le 10 ]; then curl -fsSL --retry 5 --speed-limit 10240 --speed-time 60 -r "$((a + have))-$b" "$url" >> "$ZIP.parts/$i" & fi
     done
     [ "$short" -gt 0 ] && [ "$pass" -le 10 ] || break
     echo "pass $pass: fetching $short part(s)"
@@ -78,7 +79,6 @@ if [ "$actual" != "$md5" ]; then
 fi
 echo "md5 verified: $md5"
 
-mkdir -p "$DEST"
-unzip -q -n "$ZIP" -d "$DEST"
-"$PYTHON" -m evals.codebrim --root "$DEST" --out "$DEST/eval200.txt"
+# Not unzip: the archive's offsets wrap past 4 GiB (no zip64 records), which evals.codebrim --unpack works around.
+"$PYTHON" -m evals.codebrim --unpack "$ZIP" --root "$DEST" --out "$DEST/eval200.txt"
 echo "Done. Evaluate with: make eval-real"
