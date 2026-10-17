@@ -4,4 +4,4 @@
 # Same shape as awslabs/aws-lambda-web-adapter examples/fastapi-response-streaming-zip/app/run.sh.
 PATH=$PATH:$LAMBDA_TASK_ROOT/bin \
     PYTHONPATH=$LAMBDA_TASK_ROOT:$PYTHONPATH:/opt/python:$LAMBDA_RUNTIME_DIR \
-    exec python -m uvicorn --port=8080 app:app
+    exec python -m uvicorn --port=8080 drishyam.web:app

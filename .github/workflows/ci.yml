@@ -18,7 +18,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
       - run: uv sync --all-extras --locked
-      - run: uv run ruff check drishyam app.py tests evals training
+      - run: uv run ruff check drishyam tests evals training
       - run: uv run python -c "import cv2, platform; print(cv2.__version__, platform.machine())"
       - run: uv run pytest -q --ignore=tests/e2e
       # The CDK synth tests (IAM, Dual Auth, WAF, budget), which the step above skips for want of CDK.
