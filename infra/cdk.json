@@ -1,0 +1,3 @@
+{
+  "app": "../.venv-infra/bin/python app.py"
+}
