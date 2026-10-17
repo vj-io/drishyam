@@ -64,7 +64,7 @@ def _rate_rule(name: str, priority: int, limit: int, scope: waf.CfnWebACL.Statem
 
 class DrishyamStack(Stack):
     def __init__(self, scope: Construct, cid: str, *, code: lambda_.Code, reserved_concurrency: int | None = 5,
-                 commit: str = "", **kwargs) -> None:
+                 commit: str = "", onnx: str = "", onnx_fp16: str = "", **kwargs) -> None:
         super().__init__(scope, cid, description="Drishyam bridge inspector on Lambda arm64 behind CloudFront and WAF",
                          **kwargs)
 
@@ -93,11 +93,15 @@ class DrishyamStack(Stack):
         }
         if commit:
             env["DRISHYAM_COMMIT"] = commit
+        # The segmenter: an ONNX file inside the package (models/...), which Lambda unpacks to /var/task.
+        for name, path in (("DRISHYAM_ONNX", onnx), ("DRISHYAM_ONNX_FP16", onnx_fp16)):
+            if path:
+                env[name] = f"/var/task/{path}"
         fn = lambda_.Function(
             self, "Web", function_name=FUNCTION_NAME, description="Drishyam FastAPI app behind the Lambda Web Adapter",
             runtime=lambda_.Runtime.PYTHON_3_12, architecture=lambda_.Architecture.ARM_64, handler="run.sh", code=code,
             layers=[lambda_.LayerVersion.from_layer_version_arn(self, "WebAdapter", LWA_LAYER.format(region=self.region))],
-            memory_size=3008, timeout=Duration.seconds(60),  # 60 s: the same ceiling as vercel.json maxDuration
+            memory_size=3008, timeout=Duration.seconds(60),  # 60 s: MAX_PACED_S and the 30 s seconds cap fit in it
             reserved_concurrent_executions=reserved_concurrency, role=role, log_group=log_group,
             tracing=lambda_.Tracing.ACTIVE, environment=env)
         url = fn.add_function_url(auth_type=lambda_.FunctionUrlAuthType.AWS_IAM,

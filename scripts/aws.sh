@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The AWS copy of Drishyam (docs/aws.md): one command per operation. Account 242441136319 through the
+# Drishyam on AWS (docs/aws.md): one command per operation. Account 242441136319 through the
 # CLI profile drishyam (override with AWS_PROFILE), region us-east-1 (CloudFront's WAF scope lives there).
 #
 #   scripts/aws.sh deploy    build the Lambda package, bootstrap CDK if needed, deploy, print the URLs
@@ -10,6 +10,8 @@
 #   scripts/aws.sh destroy   delete the stack: function, distribution, WAF, table, secret, logs, alarms, budget
 #
 # RESERVED=none deploys without a reserved concurrency, for an account whose Lambda quota is too small for one.
+# ONNX=models/drishyam_dacl10k.onnx (optionally ONNX_FP16=models/drishyam_dacl10k.fp16.onnx) deploys with that
+# segmenter instead of the classical engine; the file must be in models/, which build_lambda.sh packages.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 export AWS_PROFILE=${AWS_PROFILE:-drishyam} AWS_REGION=us-east-1 CDK_DISABLE_CLI_TELEMETRY=true
@@ -49,7 +51,8 @@ EOF
     fi
     commit=$(git rev-parse HEAD)$(git diff --quiet HEAD || echo -dirty)
     (cd infra && $CDK bootstrap "aws://$ACCOUNT/$AWS_REGION" &&
-      $CDK deploy "$STACK" -c reserved_concurrency="$RESERVED" -c commit="$commit")  # asks before IAM changes
+      $CDK deploy "$STACK" -c reserved_concurrency="$RESERVED" -c commit="$commit" \
+        ${ONNX:+-c "onnx=$ONNX"} ${ONNX_FP16:+-c "onnx_fp16=$ONNX_FP16"})  # asks before IAM changes
     echo "site:   $(out Url)"
     echo "alerts: aws sns subscribe --topic-arn $(out AlertTopicArn) --protocol email --notification-endpoint YOUR_EMAIL --profile $AWS_PROFILE --region us-east-1"
     ;;

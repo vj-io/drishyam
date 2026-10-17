@@ -16,7 +16,7 @@
 # 4. runs evals.model_eval on --n images of data/synth200: this model (fixed cost model, its own job_ops timing)
 #    against the classical engine, into runs/model-eval/ (never public/results; `make eval-model` adds the
 #    leakage check and CODEBRIM and publishes), and prints the before/after table. 200 is the published eval;
-# 5. prints the Vercel commands that would make the live site use the model. It does not run them.
+# 5. prints the git and scripts/aws.sh commands that would make the live site use the model. It does not run them.
 #
 # PY defaults to .venv/bin/python (the repo venv: OpenCV 5, no torch needed).
 set -euo pipefail
@@ -183,14 +183,11 @@ for f in "$DST16" models/drishyam_dacl10k.metrics.json models/drishyam_dacl10k.r
 done
 echo "  git add $ADD"
 echo "  git commit -m \"models: dacl10k segmenter\""
-echo "  printf %s $DST | vercel env add DRISHYAM_ONNX production"
-if [ -n "$FP16" ]; then echo "  printf %s $DST16 | vercel env add DRISHYAM_ONNX_FP16 production"
-else echo "Only if an earlier install set DRISHYAM_ONNX_FP16 (that file is gone now):"
-  echo "  vercel env rm DRISHYAM_ONNX_FP16 production --yes"; fi
-echo "Deploy, or push if the project deploys from git:"
-echo "  vercel deploy --prod"
-echo "Then expect \"segmenter\":\"onnx:drishyam_dacl10k.onnx\" from:"
-echo "  curl -s https://drishyam-seven.vercel.app/api/health"
-echo "The paths are relative on purpose: a Vercel Python function runs from the project root, where models/ is bundled."
+if [ -n "$FP16" ]; then echo "  ONNX=$DST ONNX_FP16=$DST16 scripts/aws.sh deploy"
+else echo "  ONNX=$DST scripts/aws.sh deploy"; fi
+echo "scripts/build_lambda.sh packages every models/*.onnx, and ONNX (ONNX_FP16) sets DRISHYAM_ONNX (DRISHYAM_ONNX_FP16)"
+echo "on the function; a deploy without them puts the classical engine back. Then expect"
+echo "\"segmenter\":\"onnx:drishyam_dacl10k.onnx\" from:"
+echo "  curl -s https://<cloudfront-domain>/api/health"
 echo
 echo "To undo later: training/README.md, section 7 (not printed here, so pasting all of the above never runs it)."
