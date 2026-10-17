@@ -2,12 +2,18 @@
 
 The same FastAPI app as on Vercel runs on Lambda arm64 (Python 3.12 zip plus the Lambda Web Adapter layer),
 streams NDJSON through a Function URL (RESPONSE_STREAM, AWS_IAM auth) and is reached only through
-CloudFront, which signs every origin request with Origin Access Control. A WAF web ACL rate-limits the
-POST endpoints per IP. KILL flags live in a DynamoDB table and the work-order signing key in Secrets
-Manager, so both work across Lambda instances. Logs, a dashboard, alarms and a monthly budget complete it.
+CloudFront, which signs every origin request with Origin Access Control. CloudFront serves the static
+site (public/) from a private S3 bucket, also through OAC, so only /api/* reaches the function. A WAF web
+ACL rate-limits requests per IP. KILL flags live in a DynamoDB table and the work-order signing key in
+Secrets Manager, so both work across Lambda instances. Logs, a dashboard, alarms and a monthly budget
+complete it.
 """
 
 from __future__ import annotations
+
+import json
+import re
+from pathlib import Path
 
 from aws_cdk import CfnOutput, Duration, RemovalPolicy, Stack
 from aws_cdk import aws_budgets as budgets
@@ -19,6 +25,8 @@ from aws_cdk import aws_dynamodb as ddb
 from aws_cdk import aws_iam as iam
 from aws_cdk import aws_lambda as lambda_
 from aws_cdk import aws_logs as logs
+from aws_cdk import aws_s3 as s3
+from aws_cdk import aws_s3_deployment as s3deploy
 from aws_cdk import aws_secretsmanager as sm
 from aws_cdk import aws_sns as sns
 from aws_cdk import aws_wafv2 as waf
@@ -29,6 +37,7 @@ from constructs import Construct
 # us-east-1 reports Description "Layer for AWS Lambda Adapter arm64: 1.1.0", created 2026-09-18.
 LWA_LAYER = "arn:aws:lambda:{region}:753240598075:layer:LambdaAdapterLayerArm64:30"
 FUNCTION_NAME = "drishyam-web"
+ROOT = Path(__file__).resolve().parents[1]
 JOBS_PER_MINUTE = 12  # POST /api/jobs per IP per 60 s (the Vercel firewall rule, now in code)
 KILL_REVIEW_PER_MINUTE = 30  # /api/kill and /api/review together, per IP per 60 s
 BUDGET_USD = 20
@@ -76,7 +85,6 @@ class DrishyamStack(Stack):
             "AWS_LAMBDA_EXEC_WRAPPER": "/opt/bootstrap",  # the adapter starts run.sh and proxies to port 8080
             "AWS_LWA_INVOKE_MODE": "response_stream",
             "AWS_LWA_READINESS_CHECK_PATH": "/api/health",
-            "DRISHYAM_SERVE_STATIC": "1",  # the same StaticFiles mount and vercel.json headers as local runs
             "DRISHYAM_KILL_TABLE": kills.table_name,
             "DRISHYAM_SIGNING_KEY_SECRET_ARN": key.secret_arn,
         }
@@ -110,17 +118,49 @@ class DrishyamStack(Stack):
                         _path_is("/api/kill"), _path_is("/api/review")]))),
             ])
 
+        # The static site: a private bucket read only by this distribution (OAC), with the response headers
+        # of vercel.json, so CSP and HSTS are the same as on Vercel and in local runs.
+        site = s3.Bucket(self, "Site", block_public_access=s3.BlockPublicAccess.BLOCK_ALL, enforce_ssl=True,
+                         encryption=s3.BucketEncryption.S3_MANAGED, removal_policy=RemovalPolicy.DESTROY,
+                         auto_delete_objects=True)
+        headers = {h["key"]: h["value"] for rule in json.loads((ROOT / "vercel.json").read_text())["headers"]
+                   for h in rule["headers"]}
+        hsts = headers.pop("Strict-Transport-Security")
+        headers.pop("X-Content-Type-Options")  # its only value is nosniff
+        page_headers = cf.ResponseHeadersPolicy(
+            self, "PageHeaders", comment="Drishyam page headers, from vercel.json",
+            security_headers_behavior=cf.ResponseSecurityHeadersBehavior(
+                content_security_policy=cf.ResponseHeadersContentSecurityPolicy(
+                    content_security_policy=headers.pop("Content-Security-Policy"), override=True),
+                content_type_options=cf.ResponseHeadersContentTypeOptions(override=True),
+                frame_options=cf.ResponseHeadersFrameOptions(
+                    frame_option=cf.HeadersFrameOption[headers.pop("X-Frame-Options")], override=True),
+                referrer_policy=cf.ResponseHeadersReferrerPolicy(referrer_policy=cf.HeadersReferrerPolicy[
+                    headers.pop("Referrer-Policy").replace("-", "_").upper()], override=True),
+                strict_transport_security=cf.ResponseHeadersStrictTransportSecurity(
+                    access_control_max_age=Duration.seconds(int(re.search(r"max-age=(\d+)", hsts)[1])),
+                    include_subdomains="includeSubDomains" in hsts, preload="preload" in hsts, override=True)),
+            custom_headers_behavior=cf.ResponseCustomHeadersBehavior(custom_headers=[
+                cf.ResponseCustomHeader(header=k, value=v, override=True) for k, v in headers.items()]))
+
         origin = origins.FunctionUrlOrigin.with_origin_access_control(url, read_timeout=Duration.seconds(60))
         dist = cf.Distribution(
             self, "Cdn", comment="Drishyam web app", web_acl_id=acl.attr_arn, price_class=cf.PriceClass.PRICE_CLASS_100,
-            http_version=cf.HttpVersion.HTTP2_AND_3,
-            default_behavior=cf.BehaviorOptions(  # the static site: cached; scripts/aws.sh invalidates on deploy
-                origin=origin, viewer_protocol_policy=cf.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-                cache_policy=cf.CachePolicy.CACHING_OPTIMIZED),
+            http_version=cf.HttpVersion.HTTP2_AND_3, default_root_object="index.html",
+            default_behavior=cf.BehaviorOptions(  # the static site: cached; the deployment below invalidates it
+                origin=origins.S3BucketOrigin.with_origin_access_control(site),
+                viewer_protocol_policy=cf.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+                cache_policy=cf.CachePolicy.CACHING_OPTIMIZED, response_headers_policy=page_headers),
             additional_behaviors={"/api/*": cf.BehaviorOptions(  # never cached; query, body and headers pass through
                 origin=origin, viewer_protocol_policy=cf.ViewerProtocolPolicy.HTTPS_ONLY,
                 allowed_methods=cf.AllowedMethods.ALLOW_ALL, cache_policy=cf.CachePolicy.CACHING_DISABLED,
                 origin_request_policy=cf.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER, compress=False)})
+        # Uploads public/ on each deploy that changes it, deletes files no longer there and invalidates /*.
+        s3deploy.BucketDeployment(
+            self, "SiteFiles", sources=[s3deploy.Source.asset(str(ROOT / "public"))], destination_bucket=site,
+            distribution=dist, distribution_paths=["/*"],
+            log_group=logs.LogGroup(self, "SiteFilesLogs", retention=logs.RetentionDays.TWO_WEEKS,
+                                    removal_policy=RemovalPolicy.DESTROY))
 
         # Alerts go to a topic with no subscribers; the owner adds an email with the command in docs/aws.md.
         topic = sns.Topic(self, "Alerts", display_name="Drishyam alerts")

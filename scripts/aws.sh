@@ -43,7 +43,6 @@ EOF
     commit=$(git rev-parse HEAD)$(git diff --quiet HEAD || echo -dirty)
     (cd infra && $CDK bootstrap "aws://$ACCOUNT/$AWS_REGION" &&
       $CDK deploy "$STACK" --require-approval never -c reserved_concurrency="$RESERVED" -c commit="$commit")
-    aws cloudfront create-invalidation --distribution-id "$(out DistributionId)" --paths '/*' >/dev/null
     echo "site:   $(out Url)"
     echo "alerts: aws sns subscribe --topic-arn $(out AlertTopicArn) --protocol email --notification-endpoint YOUR_EMAIL --profile $AWS_PROFILE --region us-east-1"
     ;;

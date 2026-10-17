@@ -6,8 +6,9 @@
 # Dependencies come from uv.lock (runtime only, plus uvicorn at its locked version, which the dev group
 # holds), as aarch64 wheels: the python3.12 runtime is Amazon Linux 2023 (glibc 2.34), and numpy 2.5.4
 # ships no manylinux2014 aarch64 wheel, so the target platform is manylinux_2_28. Then the app itself:
-# drishyam/, app.py, vercel.json (web.py copies its headers onto the static files), public/, the two
-# privacy models and run.sh. Fails if the result would pass Lambda's 250 MB unzipped limit.
+# drishyam/, app.py, the two privacy models and run.sh. public/ is not in it: CloudFront serves the
+# static site from S3 and sends only /api/* to the function. Fails if the result would pass Lambda's
+# 250 MB unzipped limit.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 OUT=build/lambda
@@ -20,7 +21,7 @@ uv export --frozen --all-groups --all-extras --no-hashes --no-emit-project --qui
 uv pip install --quiet --python-platform aarch64-manylinux_2_28 --python-version 3.12 --only-binary :all: \
   --target "$OUT" -r build/requirements.txt -c build/constraints.txt uvicorn
 
-cp -R drishyam app.py vercel.json public "$OUT/"
+cp -R drishyam app.py "$OUT/"
 cp models/face_detection_yunet_2023mar.onnx models/object_detection_nanodet_2022nov.onnx \
   models/LICENSE.yunet models/LICENSE.nanodet models/README.md "$OUT/models/"
 install -m 755 infra/run.sh "$OUT/run.sh"

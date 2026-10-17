@@ -20,6 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "infra"))
 from drishyam_stack import DrishyamStack
 
 ACCOUNT = "123456789012"
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def synth(tmp_path, **kw) -> dict:
@@ -45,15 +46,26 @@ def one(t: dict, kind: str) -> dict:
     return props
 
 
+def web_fn(t: dict) -> dict:  # the app; the stack's other functions are CDK's deploy-time custom resources
+    (props,) = [p for p in of_type(t, "AWS::Lambda::Function") if p.get("FunctionName") == "drishyam-web"]
+    return props
+
+
+def oac(t: dict, origin_type: str) -> dict:
+    (cfg,) = [p["OriginAccessControlConfig"] for p in of_type(t, "AWS::CloudFront::OriginAccessControl")
+              if p["OriginAccessControlConfig"]["OriginAccessControlOriginType"] == origin_type]
+    return cfg
+
+
 def test_function_is_arm64_streaming_behind_iam(template):
-    fn = one(template, "AWS::Lambda::Function")
+    fn = web_fn(template)
     assert fn["Architectures"] == ["arm64"] and fn["Runtime"] == "python3.12" and fn["Handler"] == "run.sh"
     assert fn["Layers"] == ["arn:aws:lambda:us-east-1:753240598075:layer:LambdaAdapterLayerArm64:30"]
     assert fn["ReservedConcurrentExecutions"] == 5 and fn["Timeout"] == 60
     assert fn["TracingConfig"] == {"Mode": "Active"}
     env = fn["Environment"]["Variables"]
     assert env["AWS_LAMBDA_EXEC_WRAPPER"] == "/opt/bootstrap" and env["AWS_LWA_INVOKE_MODE"] == "response_stream"
-    assert env["DRISHYAM_COMMIT"] == "abc123" and env["DRISHYAM_SERVE_STATIC"] == "1"
+    assert env["DRISHYAM_COMMIT"] == "abc123" and "DRISHYAM_SERVE_STATIC" not in env  # static files come from S3
     assert set(env) >= {"DRISHYAM_KILL_TABLE", "DRISHYAM_SIGNING_KEY_SECRET_ARN"}
     url = one(template, "AWS::Lambda::Url")
     assert url["AuthType"] == "AWS_IAM" and url["InvokeMode"] == "RESPONSE_STREAM"
@@ -66,17 +78,17 @@ def test_only_this_distribution_may_invoke_and_both_dual_auth_actions_are_grante
     for p in perms:
         assert p["Principal"] == "cloudfront.amazonaws.com"
         assert {"Ref": dist_id} in p["SourceArn"]["Fn::Join"][1]  # this distribution, not any distribution
-    oac = one(template, "AWS::CloudFront::OriginAccessControl")["OriginAccessControlConfig"]
-    assert (oac["OriginAccessControlOriginType"], oac["SigningBehavior"], oac["SigningProtocol"]) == (
-        "lambda", "always", "sigv4")
-    origin = one(template, "AWS::CloudFront::Distribution")["DistributionConfig"]["Origins"][0]
-    assert "OriginAccessControlId" in origin
+    assert (oac(template, "lambda")["SigningBehavior"], oac(template, "lambda")["SigningProtocol"]) == ("always", "sigv4")
+    assert all("OriginAccessControlId" in o
+               for o in one(template, "AWS::CloudFront::Distribution")["DistributionConfig"]["Origins"])
 
 
 def test_role_is_least_privilege(template):
-    role = one(template, "AWS::IAM::Role")
+    role_id = web_fn(template)["Role"]["Fn::GetAtt"][0]
+    role = template["Resources"][role_id]["Properties"]
     assert "ManagedPolicyArns" not in role and "Policies" not in role
-    statements = [s for p in of_type(template, "AWS::IAM::Policy") for s in p["PolicyDocument"]["Statement"]]
+    statements = [s for p in of_type(template, "AWS::IAM::Policy") if p["Roles"] == [{"Ref": role_id}]
+                  for s in p["PolicyDocument"]["Statement"]]
     grants = {}
     for s in statements:
         assert s["Effect"] == "Allow"
@@ -95,7 +107,7 @@ def test_kill_table_and_secret(template):
     assert table["TimeToLiveSpecification"] == {"AttributeName": "exp", "Enabled": True}
     gen = one(template, "AWS::SecretsManager::Secret")["GenerateSecretString"]
     assert gen["PasswordLength"] >= 32 and gen["ExcludePunctuation"] is True  # web.py needs >= 32 chars
-    assert one(template, "AWS::Logs::LogGroup")["RetentionInDays"] == 14
+    assert [g["RetentionInDays"] for g in of_type(template, "AWS::Logs::LogGroup")] == [14, 14]
 
 
 def test_waf_rate_limits_posts_per_ip(template):
@@ -119,7 +131,43 @@ def test_api_behaviour_is_uncached_and_forwards_the_body_hash(template):
     assert api["PathPattern"] == "/api/*" and "POST" in api["AllowedMethods"] and api["Compress"] is False
     assert api["CachePolicyId"] == "4135ea2d-6df8-44a3-9df3-4b5a84be39ad"  # Managed-CachingDisabled
     assert api["OriginRequestPolicyId"] == "b689b0a8-53d0-40ab-baf2-68738e2966ac"  # AllViewerExceptHostHeader
-    assert cfg["Origins"][0]["CustomOriginConfig"]["OriginReadTimeout"] == 60
+    (fn_origin,) = [o for o in cfg["Origins"] if "CustomOriginConfig" in o]
+    assert api["TargetOriginId"] == fn_origin["Id"] and fn_origin["CustomOriginConfig"]["OriginReadTimeout"] == 60
+
+
+def test_static_site_is_a_private_bucket_with_the_vercel_headers(template):
+    resources = template["Resources"]
+    dist_id = next(k for k, r in resources.items() if r["Type"] == "AWS::CloudFront::Distribution")
+    cfg = resources[dist_id]["Properties"]["DistributionConfig"]
+    (site_origin,) = [o for o in cfg["Origins"] if "S3OriginConfig" in o]
+    default = cfg["DefaultCacheBehavior"]
+    assert default["TargetOriginId"] == site_origin["Id"] and cfg["DefaultRootObject"] == "index.html"
+    assert oac(template, "s3")["SigningBehavior"] == "always"
+    assert set(one(template, "AWS::S3::Bucket")["PublicAccessBlockConfiguration"].values()) == {True}
+    (read,) = [s for s in one(template, "AWS::S3::BucketPolicy")["PolicyDocument"]["Statement"]
+               if s["Effect"] == "Allow" and "s3:GetObject" in s["Action"]]
+    assert read["Principal"] == {"Service": "cloudfront.amazonaws.com"}
+    assert {"Ref": dist_id} in read["Condition"]["StringEquals"]["AWS:SourceArn"]["Fn::Join"][1]
+
+    policy_id = next(k for k, r in resources.items() if r["Type"] == "AWS::CloudFront::ResponseHeadersPolicy")
+    assert default["ResponseHeadersPolicyId"] == {"Ref": policy_id}
+    policy = resources[policy_id]["Properties"]["ResponseHeadersPolicyConfig"]
+    sec, custom = policy["SecurityHeadersConfig"], policy["CustomHeadersConfig"]["Items"]
+    hsts = sec["StrictTransportSecurity"]
+    served = {"Content-Security-Policy": sec["ContentSecurityPolicy"]["ContentSecurityPolicy"],
+              "X-Frame-Options": sec["FrameOptions"]["FrameOption"],
+              "Referrer-Policy": sec["ReferrerPolicy"]["ReferrerPolicy"],
+              "Strict-Transport-Security": f"max-age={hsts['AccessControlMaxAgeSec']}"
+              + "; includeSubDomains" * hsts["IncludeSubdomains"] + "; preload" * hsts["Preload"],
+              **({"X-Content-Type-Options": "nosniff"} if "ContentTypeOptions" in sec else {}),
+              **{h["Header"]: h["Value"] for h in custom}}
+    vercel = {h["key"]: h["value"] for rule in json.loads((ROOT / "vercel.json").read_text())["headers"]
+              for h in rule["headers"]}
+    assert served == vercel  # the same headers as Vercel and local runs
+    assert all(v["Override"] for v in [*sec.values(), *custom])
+
+    deploy = one(template, "Custom::CDKBucketDeployment")
+    assert deploy["DistributionId"] == {"Ref": dist_id} and deploy["DistributionPaths"] == ["/*"]
 
 
 def test_alarms_budget_and_topic_without_subscribers(template):
@@ -143,6 +191,5 @@ def test_alarms_budget_and_topic_without_subscribers(template):
 
 
 def test_reservation_can_be_left_out_and_no_em_dashes(template, tmp_path):
-    assert "ReservedConcurrentExecutions" not in one(synth(tmp_path, reserved_concurrency=None),
-                                                     "AWS::Lambda::Function")
+    assert "ReservedConcurrentExecutions" not in web_fn(synth(tmp_path, reserved_concurrency=None))
     assert "—" not in json.dumps(template, ensure_ascii=False)  # repo rule for AWS names and descriptions
