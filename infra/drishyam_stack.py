@@ -172,6 +172,13 @@ class DrishyamStack(Stack):
                 conditions={"StringEquals": {"aws:SourceAccount": self.account}, "ArnLike": {"aws:SourceArn": source}}))
 
         five_min = Duration.minutes(5)
+        # Behind the Web Adapter a FastAPI 500 or a failed job (an {"type": "error"} event in a 200 stream) is
+        # a successful invocation, so the Errors alarm misses it. Both log at ERROR from the drishyam logger
+        # (web.py's format "%(levelname)s %(name)s %(message)s"); uvicorn logs an exception that escapes the
+        # app as "Exception in ASGI application".
+        app_errors = logs.MetricFilter(
+            self, "AppErrors", log_group=log_group, metric_namespace="Drishyam", metric_name="AppErrors",
+            filter_pattern=logs.FilterPattern.any_term("ERROR drishyam", "Exception in ASGI application"))
         for name, metric, threshold, op, text in (
             ("Errors", fn.metric_errors(period=five_min, statistic="Sum"), 1,
              cw.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD, "At least one failed invocation in 5 minutes"),
@@ -179,6 +186,8 @@ class DrishyamStack(Stack):
              cw.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD, "Requests refused at the concurrency cap"),
             ("DurationP95", fn.metric_duration(period=five_min, statistic="p95"), 45_000,
              cw.ComparisonOperator.GREATER_THAN_THRESHOLD, "p95 invocation time above 45 s (timeout is 60 s)"),
+            ("AppErrors", app_errors.metric(period=five_min, statistic="Sum"), 1,
+             cw.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD, "At least one app error or failed job in 5 minutes"),
         ):
             cw.Alarm(self, f"{name}Alarm", metric=metric, threshold=threshold, evaluation_periods=1,
                      comparison_operator=op, treat_missing_data=cw.TreatMissingData.NOT_BREACHING,

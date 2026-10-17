@@ -174,7 +174,10 @@ def test_alarms_budget_and_topic_without_subscribers(template):
     assert of_type(template, "AWS::SNS::Subscription") == []
     topic_id = next(k for k, r in template["Resources"].items() if r["Type"] == "AWS::SNS::Topic")
     alarms = {a["MetricName"]: a for a in of_type(template, "AWS::CloudWatch::Alarm")}
-    assert set(alarms) == {"Errors", "Throttles", "Duration"}
+    assert set(alarms) == {"Errors", "Throttles", "Duration", "AppErrors"}
+    app_errors = one(template, "AWS::Logs::MetricFilter")
+    assert app_errors["FilterPattern"] == '?"ERROR drishyam" ?"Exception in ASGI application"'
+    assert app_errors["MetricTransformations"][0]["MetricName"] == "AppErrors"
     assert alarms["Duration"]["ExtendedStatistic"] == "p95" and alarms["Duration"]["Threshold"] == 45_000
     assert all(a["AlarmActions"] == [{"Ref": topic_id}] for a in alarms.values())
     budget = one(template, "AWS::Budgets::Budget")
