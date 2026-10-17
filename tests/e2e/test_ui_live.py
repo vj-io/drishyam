@@ -1,6 +1,6 @@
 """End-to-end check of the real stack: the page, the FastAPI app and the agent, nothing mocked.
 
-Run: ~/.claude/brag-scaled-venv/bin/python tests/e2e/test_ui_live.py [BASE_URL]
+Run: make e2e   (or: .venv/bin/python tests/e2e/test_ui_live.py [BASE_URL]; needs playwright + chromium)
 Without BASE_URL it starts the app locally (uvicorn, production headers from vercel.json).
 With BASE_URL (e.g. the Vercel deployment) it runs the same read-only flows against it.
 Waits use locators and polling, never wait_for_function (blocked under the strict CSP).

@@ -233,7 +233,7 @@ export class Viewport {
     g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     this.grid(g);
     if (!this.img) {
-      label(g, 'NO PHOTO YET · PICK ONE ON THE LEFT', this.cw / 2, this.ch / 2, { font: `500 13px ${MONO}`, edge: C.line3 });
+      label(g, 'NO PHOTO YET · PICK ONE FIRST', this.cw / 2, this.ch / 2, { font: `500 13px ${MONO}`, edge: C.line3 });
       return;
     }
     const f = this.fit();

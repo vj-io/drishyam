@@ -29,6 +29,7 @@ class PeopleDominant(ValueError):
 
 class _Detectors:
     def __init__(self) -> None:
+        cv2.utils.logging.setLogLevel(cv2.utils.logging.LOG_LEVEL_ERROR)  # the new DNN engine warns about targets it ignores
         self.face = cv2.FaceDetectorYN.create(str(YUNET), "", (320, 320), 0.8, 0.3, 50)
         self.nano = cv2.dnn.readNet(str(NANODET))
 

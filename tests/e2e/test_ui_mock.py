@@ -1,6 +1,6 @@
 """Browser test for the Drishyam UI under the production CSP.
 
-Run:  ~/.claude/brag-scaled-venv/bin/python tests/e2e/test_ui_mock.py
+Run:  make e2e   (or: .venv/bin/python tests/e2e/test_ui_mock.py; needs playwright + chromium)
 
 Every expectation about the job (step count, findings, critical ids, planner events, causes, done status,
 unvisited regions, work-order id, budget numbers) is DERIVED from public/fixtures/job.ndjson at start-up,
@@ -31,9 +31,7 @@ from playwright.sync_api import expect, sync_playwright
 
 ROOT = Path(__file__).resolve().parents[2]
 PUBLIC = ROOT / "public"
-SHOTS = Path(os.environ.get(
-    "DRISHYAM_SHOTS",
-    "/private/tmp/claude-501/-Users-mac-Documents-Projects-opencv/0ed93332-e823-4881-ae9a-69d6f46d2a07/scratchpad/ui"))
+SHOTS = Path(os.environ.get("DRISHYAM_SHOTS", "/tmp/drishyam-e2e"))
 SHOTS.mkdir(parents=True, exist_ok=True)
 
 CSP = ("default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; font-src 'self'; "

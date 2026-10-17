@@ -311,8 +311,11 @@ async function loadSamples() {
       s.note ? h('span', { class: 'thumb__n' }, String(s.note)) : null,
       s.synthetic ? h('span', { class: 'tag' }, 'synthetic') : null);
     btn.addEventListener('click', async () => {
+      if (S.mode === 'running') { el.prep.textContent = 'A job is running. KILL it first to change the photo.'; return; }
+      el.look.disabled = true;  // the old photo must not run while the new one loads
+      el.prep.textContent = `Loading ${String(s.title ?? s.file)}…`;
       const res = await fetch(`samples/${s.file}`).catch(() => null);
-      if (!res?.ok) return;
+      if (!res?.ok) { el.prep.textContent = 'That sample could not be loaded.'; el.look.disabled = !S.image; return; }
       for (const b of $$('.thumb', el.gallery)) b.setAttribute('aria-pressed', String(b === btn));
       useImage(await res.blob(), String(s.title ?? s.file));
     });

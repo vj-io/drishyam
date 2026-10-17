@@ -1,7 +1,7 @@
 # Drishyam — submission report
 
 *Virtual-PTZ inspection of bridge photos with an agent that spends compute in
-proportion to risk.* Live demo: https://drishyam-seven.vercel.app · Code: https://github.com/vj-io/drishyam · Demo video (49 s): https://github.com/vj-io/drishyam/releases/download/v1.0.0/drishyam-demo.mp4
+proportion to risk.* Live demo: https://drishyam-seven.vercel.app · Code: https://github.com/vj-io/drishyam · Demo video (49 s): https://github.com/vj-io/drishyam/releases/latest/download/drishyam-demo.mp4
 
 ## 1. Problem
 

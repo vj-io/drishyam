@@ -10,7 +10,7 @@ the workload COOL accelerates on Graviton.
 **What COOL can buy end to end, measured.** An 8-image macro run on the local x86 laptop ([results/local-macos-x86/macro.json](results/local-macos-x86/macro.json)) puts 9 % of a job in KleidiCV-covered imgproc, 69 % in the classical segmenter (imgproc plus NumPy), 3 % in crack thinning, 8 % in decode and 12 % in Python. So if COOL makes the covered ops 1.8× faster, a whole job gets about 1.04× faster. The gaze path itself is cheap; most of the time is in segmentation, which is where a COOL or DNN speed-up would have to land.
 
 - **Live demo:** https://drishyam-seven.vercel.app (stock OpenCV 5 on Vercel, x86, *not COOL*)
-- **Demo video (49 s):** [drishyam-demo.mp4](https://github.com/vj-io/drishyam/releases/download/v1.0.0/drishyam-demo.mp4) — a real job on the live site: survey, zoom, a human-signed critical finding, a planner failure drill and KILL
+- **Demo video (49 s):** [drishyam-demo.mp4](https://github.com/vj-io/drishyam/releases/latest/download/drishyam-demo.mp4) — a real job on the live site: survey, zoom, a human-signed critical finding, a planner failure drill and KILL
 - **PRD:** [docs/PRD.md](docs/PRD.md) · **Requirement traceability:** [docs/requirements.md](docs/requirements.md) · **Security model:** [docs/security.md](docs/security.md) · **API:** [docs/api-contract.md](docs/api-contract.md) · **MCP:** [docs/mcp.md](docs/mcp.md)
 
 ## What it does
@@ -98,6 +98,8 @@ The images are procedural (`evals/synth.py`): 2048×1536 weathered concrete with
 | downscale | 0.48 | 0.57 | 0.22 | 0.44 | 0.66 |
 
 Full numbers: [public/results/summary.json](public/results/summary.json); failure gallery (12 real cases, 6 categories): [public/results/failures.json](public/results/failures.json), also on the live site.
+
+Drishyam's looking policy reads measured latency, so `make eval` on another machine moves recall by about ±0.01–0.02 and the drill counts by one or two; the committed numbers came from a 12-worker run on an 8-core Intel laptop.
 
 Everything above is measured, on a **labelled synthetic** dataset, with the
 **classical** segmenter (no learned weights). They show the looking policy, not

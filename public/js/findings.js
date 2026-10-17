@@ -97,6 +97,7 @@ export class Findings {
 
   addReview(card, f) {
     const name = h('input', { class: 'input', type: 'text', maxlength: '64', autocomplete: 'name', id: `rev-${f.id}`, placeholder: 'Your name' });
+    name.addEventListener('input', () => { err.textContent = ''; });  // err is declared just below; the listener runs later
     const approve = h('button', { class: 'btn btn--amber btn--sm', type: 'button' }, 'Approve');
     const reject = h('button', { class: 'btn btn--red btn--sm', type: 'button' }, 'Reject');
     const err = h('p', { class: 'finding__err', role: 'alert' });

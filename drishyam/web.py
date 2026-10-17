@@ -93,7 +93,7 @@ async def _api_headers(request: Request, call_next):
     return response
 
 
-@app.get("/api/health")
+@app.api_route("/api/health", methods=["GET", "HEAD"])  # HEAD: uptime monitors
 def health() -> dict:
     return {"ok": True, "version": __version__, "opencv": cv2.__version__,
             "build": "COOL" if cv2.__file__.startswith("/opt/cool") else "stock (not COOL)",
