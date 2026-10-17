@@ -1,0 +1,25 @@
+name: smoke
+# Manual for now: runs scripts/smoke.sh against a deployed URL. No AWS credentials, no secrets, no writes.
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: Base URL, e.g. the CloudFront URL that scripts/aws.sh deploy prints
+        required: true
+      function_url:
+        description: Optional raw Lambda Function URL; the smoke expects it to refuse direct calls (403)
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: scripts/smoke.sh "$URL"
+        env:
+          URL: ${{ inputs.url }}
+          FUNCTION_URL: ${{ inputs.function_url }}
