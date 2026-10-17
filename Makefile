@@ -35,7 +35,7 @@ eval-live:  ## the synthetic eval on measured wall time instead (load changes th
 	mkdir -p public/results/live && cp runs/eval-live/summary.json public/results/live/summary.json
 
 eval-model:  ## after scripts/install_model.sh: leakage check, then the ONNX on CODEBRIM and synth200 vs the classical runs
-	$(PY) -m evals.model_eval --onnx $(or $(ONNX),models/drishyam_dacl10k.onnx) --codebrim $(CODEBRIM) $(if $(DACL10K),--dacl10k $(DACL10K))
+	$(PY) -m evals.model_eval --publish --onnx $(or $(ONNX),models/drishyam_dacl10k.onnx) --codebrim $(CODEBRIM) $(if $(DACL10K),--dacl10k $(DACL10K))
 
 bench:  ## micro + macro + parity for one arm: make bench ARM=local
 	bash bench/run_all.sh $(ARM)

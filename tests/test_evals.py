@@ -327,6 +327,31 @@ def test_harness_refuses_to_publish_codebrim_crops(tmp_path):
         harness.run(tmp_path, n=1, out_dir=repo / "docs" / "codebrim", results_dir=tmp_path / "raw", workers=1)
     assert not (repo / "docs" / "codebrim").exists()
 
+def test_leakage_finds_a_resized_rotated_copy(tmp_path):
+    from evals import leakage
+
+    a, b = (synth.generate(s, 640, 480)[0] for s in (1, 2))
+    (tmp_path / "train").mkdir()
+    cv2.imwrite(str(tmp_path / "a.jpg"), a)
+    cv2.imwrite(str(tmp_path / "b.jpg"), b)
+    cv2.imwrite(str(tmp_path / "train" / "copy.jpg"), cv2.rotate(cv2.resize(a, (320, 240)), cv2.ROTATE_90_CLOCKWISE))
+    cv2.imwrite(str(tmp_path / "train" / "other.jpg"), synth.generate(3, 640, 480)[0])
+    rep = leakage.near_duplicates([tmp_path / "a.jpg", tmp_path / "b.jpg"], sorted((tmp_path / "train").iterdir()))
+    assert rep["eval_images"] == 2 and rep["train_images"] == 2 and rep["near_duplicates"] == 1
+    assert rep["pairs"][0][:2] == ["a.jpg", "copy.jpg"] and rep["pairs"][0][2] <= 4
+    out = tmp_path / "leak.json"
+    assert leakage.main(["--dacl10k", str(tmp_path / "absent"), "--out", str(out)]) == {"skipped": f"no dacl10k images under {tmp_path / 'absent'}"}
+    assert json.loads(out.read_text())["skipped"]
+
+
+def test_model_eval_refuses_a_mislabelled_arm():
+    from evals import model_eval
+
+    assert model_eval.check({"segmenter": "onnx:m.onnx"}, "onnx:m.onnx", "x") == {"segmenter": "onnx:m.onnx"}
+    with pytest.raises(SystemExit, match="scored with classical-v1, not onnx:m.onnx"):
+        model_eval.check({"segmenter": "classical-v1"}, "onnx:m.onnx", "runs/model-eval/onnx-synth")
+
+
 # ---------------------------------------------------------------- parity
 def test_parity_compare_saved_files(tmp_path):
     a = np.zeros((2, 8, 8), np.uint8)
