@@ -188,6 +188,6 @@ else echo "  ONNX=$DST scripts/aws.sh deploy"; fi
 echo "scripts/build_lambda.sh packages every models/*.onnx, and ONNX (ONNX_FP16) sets DRISHYAM_ONNX (DRISHYAM_ONNX_FP16)"
 echo "on the function; a deploy without them puts the classical engine back. Then expect"
 echo "\"segmenter\":\"onnx:drishyam_dacl10k.onnx\" from:"
-echo "  curl -s https://<cloudfront-domain>/api/health"
+echo "  curl -s https://d1xg58guluup8c.cloudfront.net/api/health"
 echo
 echo "To undo later: training/README.md, section 7 (not printed here, so pasting all of the above never runs it)."

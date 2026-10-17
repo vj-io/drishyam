@@ -85,7 +85,7 @@ curl (works in zsh and bash):
 
 ```
 h=$(shasum -a 256 < public/samples/bridge_03.jpg | cut -d' ' -f1)
-curl -N -H 'Content-Type: image/jpeg' -H "x-amz-content-sha256: ${h}" --data-binary @public/samples/bridge_03.jpg "https://<cloudfront-domain>/api/jobs?pixel_cap=0.3"
+curl -N -H 'Content-Type: image/jpeg' -H "x-amz-content-sha256: ${h}" --data-binary @public/samples/bridge_03.jpg "https://d1xg58guluup8c.cloudfront.net/api/jobs?pixel_cap=0.3"
 ```
 
 The alternative, a Function URL with `AuthType NONE`, needs no hash but lets anyone skip CloudFront and

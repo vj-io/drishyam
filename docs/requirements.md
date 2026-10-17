@@ -35,8 +35,8 @@ ready; needs the owner's AWS account) · **open**.
 | FR-20 | Evaluation: recall-vs-pixels and recall-vs-$ for downscale, tiling, Drishyam; agent metrics; failure gallery | `evals/harness.py`, `evals/failures.py` | `tests/test_evals.py` | done on synthetic-200 (held-out; Drishyam@30 % 0.48 recall at 0.25 of the pixels, 0.88× exhaustive tiling at 0.15× its pixels) and on 200 real CODEBRIM photos (`make eval-real`: 0.20 recall at 0.29 of the pixels, 0.97× tiling at 0.18× its pixels; every baseline and Drishyam from the 20 % cap up at 0.19–0.22; the classical segmenter is the limit) |
 | FR-21 | Ablations | `agent.JobConfig` switches `use_uncertainty`, `survey`, `verify`, `order="random"` (seeded), `governor`, and a fixed `t_hat_ms` cost table; harness flags | `test_agent::test_switch_use_uncertainty_drops_the_entropy_term`, `::test_switch_survey_off_skips_the_survey_look`, `::test_switch_verify_off_queues_no_verify_look`, `::test_switch_order_random_is_seeded`, `::test_switch_governor_off_keeps_only_kill_and_caps`, `::test_a_fixed_cost_table_makes_decisions_independent_of_load` | switches built and tested; the ablation runs are open |
 | FR-22 | Benchmark arms A/B/C, micro/macro/DNN, provenance, parity | `bench/` | `tests/test_evals.py` (parity) | done locally; arms on EC2 are AWS |
-| FR-23 | Free always-on mirror, labelled "not COOL" | The one AWS deployment (`infra/`, [aws.md](aws.md)); the page and `/api/health` say stock OpenCV, not COOL | `scripts/smoke.sh`, `tests/e2e/test_ui_live.py <url>` | AWS (one deployment instead of a free mirror, about 10 USD a month estimated; not deployed yet) |
-| FR-24 | IaC (CDK) | — | — | AWS |
+| FR-23 | Free always-on mirror, labelled "not COOL" | The one AWS deployment (`infra/`, [aws.md](aws.md)); the page and `/api/health` say stock OpenCV, not COOL | `scripts/smoke.sh`, `tests/e2e/test_ui_live.py <url>` | AWS (one deployment instead of a free mirror, about 10 USD a month estimated; deployed 2026-10-18, smoke passes) |
+| FR-24 | IaC (CDK) | `infra/` (one CDK Python stack), `scripts/aws.sh deploy` | `tests/test_infra.py` (synth) | done |
 | FR-25–27 | Stitcher mosaic, PaliGemma caption, COOL autotuner | — | — | P2, not started |
 
 Deferred (review item TECH-T8a, a stretch goal): dropping a crack finding whose thinned centreline fits one
@@ -54,5 +54,5 @@ before/after on `data/synth_dev` for it.
 | NFR-5 | Reproducibility: lock file, pinned OpenCV, seeds | `uv.lock`, `opencv-python-headless==5.0.0.93`, seeded synth + fake-clock tests | done |
 | NFR-6 | Datasets never committed; permissive deps | `scripts/get_data.sh`, `.gitignore`, `models/README.md`; deps and bundled models are permissive, except the optional dacl10k-trained segmenter, CC BY-NC 4.0 (non-commercial), once `scripts/install_model.sh` installs it | done |
 | NFR-7 | Same code on stock OpenCV 5, x86 and Arm | CI on `ubuntu-24.04` and `ubuntu-24.04-arm` | done |
-| NFR-8 | Free-tier observability | CloudWatch: one EMF line per job (`web._log_done`), dashboard, 4 alarms (`infra/`) | AWS (13 custom metrics, 3 over the free 10: about 0.90 USD a month estimated; not deployed yet) |
+| NFR-8 | Free-tier observability | CloudWatch: one EMF line per job (`web._log_done`), dashboard, 4 alarms (`infra/`) | AWS (13 custom metrics, 3 over the free 10: about 0.90 USD a month estimated; deployed 2026-10-18) |
 | NFR-9 | Honesty: pixels only, measured numbers, failure gallery | measurements are `*_px`; UI banner; `public/results/failures.json` | done |

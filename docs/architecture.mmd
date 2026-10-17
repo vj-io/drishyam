@@ -1,5 +1,4 @@
 %% Drishyam system architecture: the same content as docs/architecture.svg.
-%% Dashed boxes: the AWS path is planned, not deployed.
 %% cv2 names are the calls made in drishyam/imaging.py, privacy.py, segment.py, measure.py and agent.py.
 flowchart TB
     subgraph CLIENTS["1 · Clients"]
@@ -8,7 +7,7 @@ flowchart TB
         MCPC["MCP client, e.g. Claude Code, local<br/>drishyam mcp over stdio<br/>12 allow-listed tools: no approve, no shell"]
     end
 
-    subgraph AWS["2 · AWS path (planned, not deployed)"]
+    subgraph AWS["2 · AWS path (deployed, us-east-1)"]
         CF["CloudFront + Origin Access Control<br/>AWS WAF rate-based rules<br/>POST bodies carry x-amz-content-sha256"]
         FURL["Lambda Function URL<br/>AuthType AWS_IAM · InvokeMode RESPONSE_STREAM"]
         LAMBDA["Lambda arm64 (Graviton) · Python 3.12<br/>AWS Lambda Web Adapter → FastAPI web tier, web.py<br/>CSP · HMAC-SHA256 work-order token · per-job kill token"]
@@ -59,5 +58,3 @@ flowchart TB
     CV -->|"entropy, mask areas, IoU, sharpness, ms"| CORE
     CORE --> OUT
 
-    classDef planned stroke-dasharray: 6 4
-    class CF,FURL,LAMBDA,DDB,SM,CW,BUD planned

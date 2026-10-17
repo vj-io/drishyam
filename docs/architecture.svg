@@ -75,12 +75,12 @@
 <path class="edge " d="M490 248 L490 344"/>
 <rect class="lbg" x="496.0" y="279" width="186.2" height="16"/>
 <text x="500" y="290" class="el" xml:space="preserve">HTTPS · NDJSON streams back</text>
-<g class="planned">
+<g>
 <rect class="frame" x="60" y="300" width="880" height="470"/>
 <circle class="n" cx="82" cy="320" r="11"/>
 <text class="nt" x="82" y="324" text-anchor="middle">2</text>
 <text x="100" y="324" class="fl" xml:space="preserve">ENTRY · AWS PATH</text>
-<text x="252.24" y="324" class="fs" xml:space="preserve"><tspan class="rd">planned, not deployed</tspan></text>
+<text x="252.24" y="324" class="fs" xml:space="preserve">deployed 2026-10-18, smoke-tested</text>
 <g class="node" data-box="80 344 440 104">
 <rect class="box" x="80" y="344" width="440" height="104"/>
 <text x="90" y="364" class="h" xml:space="preserve">CLOUDFRONT DISTRIBUTION</text>
@@ -349,8 +349,6 @@
 <text x="1166" y="1488" class="fl" xml:space="preserve">SHEET A-1</text>
 <rect class="box" x="896" y="1513" width="22" height="12"/>
 <text x="926" y="1523" class="fs" xml:space="preserve">built and tested</text>
-<rect class="box" x="1084" y="1513" width="22" height="12" stroke-dasharray="8 5"/>
-<text x="1114" y="1523" class="fs" xml:space="preserve">planned, not deployed</text>
 <text x="896" y="1545" class="fs" xml:space="preserve"><tspan class="cv">cv2.call</tspan> OpenCV call · <tspan class="ca">cause</tspan> trace cause</text>
 <text x="896" y="1566" class="fs" xml:space="preserve"><tspan class="rd">red</tspan> human gate or kill · ★ OpenCV-5-only</text>
 <text x="896" y="1593" class="fs" xml:space="preserve">DRAWN 2026-10-18 · SCALE NTS · REV 7a93ec5</text>
