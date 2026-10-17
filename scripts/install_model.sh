@@ -7,9 +7,9 @@
 #    (FP16 against FP32 too), before touching the repo;
 # 2. copies them to models/drishyam_dacl10k.onnx and .fp16.onnx (and a metrics.json found beside best.onnx to
 #    models/drishyam_dacl10k.metrics.json), and records sizes, sha256, validation mIoU and the licence in
-#    models/README.md;
+#    models/README.md, and names their CC BY-NC 4.0 licence in README.md's Licence line;
 # 3. runs 3 sample images through `drishyam run` with DRISHYAM_ONNX set (runs/model-smoke/);
-# 4. runs `make eval` on --n images of data/synth200 twice, classical then this model, into runs/model-eval/
+# 4. runs evals.harness on --n images of data/synth200 twice, classical then this model, into runs/model-eval/
 #    (never public/results), and prints the before/after recall table. 200 is the published eval;
 # 5. prints the Vercel commands that would make the live site use the model. It does not run them.
 #
@@ -99,13 +99,26 @@ select it (`training/README.md`).
 {rows}
 {score}
 
-**Licence: CC BY-NC 4.0, non-commercial; not the permissive licences above and not the repo's MIT.** The weights are
-trained on dacl10k (Flotzinger et al., WACV 2024; CC BY-NC 4.0), so they carry its non-commercial terms and need its
-attribution. The ImageNet starting point (timm `mobilenetv3_large_100`) is Apache 2.0.
+**Licence: [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/), non-commercial; not the permissive licences
+above and not the repo's MIT.** The weights are adapted from (trained on) [dacl10k](https://github.com/phiyodr/dacl10k-toolkit)
+(Flotzinger et al., WACV 2024, [arXiv:2309.00460](https://arxiv.org/abs/2309.00460); CC BY-NC 4.0), so they carry its
+non-commercial terms and its attribution. No dacl10k images or labels are included. The ImageNet starting point (timm
+`mobilenetv3_large_100`) is Apache 2.0.
 """
 text = readme.read_text().split("\n" + head)[0].rstrip("\n")
+text = text.replace("# Bundled models (third-party, permissive licences)",
+                    "# Bundled models (third-party; permissive licences, except the CC BY-NC 4.0 `drishyam_dacl10k`)")
 readme.write_text(text + "\n\n" + section)
 print(f"models/README.md: {head[3:]} section written")
+top, old = Path("README.md"), "from OpenCV Zoo, see [models/README.md]"
+new = ("from OpenCV Zoo, and the `drishyam_dacl10k` segmenter, which is "
+       "[CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) (non-commercial; trained on "
+       "[dacl10k](https://github.com/phiyodr/dacl10k-toolkit)), see [models/README.md]")
+lic = top.read_text()
+if new not in lic:
+    assert old in lic, "README.md's Licence line changed: name the CC BY-NC 4.0 dacl10k weights there by hand"
+    top.write_text(lic.replace(old, new))
+print("README.md: Licence line names the CC BY-NC 4.0 weights")
 EOF
 export DRISHYAM_ONNX="$PWD/$DST"
 if [ -n "$FP16" ]; then export DRISHYAM_ONNX_FP16="$PWD/$DST16"; else unset DRISHYAM_ONNX_FP16; fi
@@ -126,8 +139,8 @@ if [ ! -f data/synth200/annotations.json ]; then  # build all 200 first: the har
 fi
 EVAL=runs/model-eval
 env -u DRISHYAM_ONNX -u DRISHYAM_ONNX_FP16 \
-  make eval PY="$PY" DATA=data/synth200 N="$N" OUT="$EVAL/classical" RAW="$EVAL/classical/raw"
-make eval PY="$PY" DATA=data/synth200 N="$N" OUT="$EVAL/onnx" RAW="$EVAL/onnx/raw"
+  "$PY" -m evals.harness --data data/synth200 --n "$N" --out "$EVAL/classical" --results-dir "$EVAL/classical/raw"
+"$PY" -m evals.harness --data data/synth200 --n "$N" --out "$EVAL/onnx" --results-dir "$EVAL/onnx/raw"
 "$PY" - "$EVAL/classical/summary.json" "$EVAL/onnx/summary.json" <<'EOF'
 import json, sys
 from evals.harness import BUDGETS, HEADLINE_BUDGET, TILE_LEVELS
@@ -137,11 +150,12 @@ assert after["segmenter"].startswith("onnx:"), f"the model run used {after['segm
 f = lambda v: "-" if v is None else f"{v:.3f}"
 d = lambda a, b: "" if None in (a, b) else f"{a - b:+.3f}"
 print(f"\nrecall on {after['dataset']}: {before['segmenter']} (before) -> {after['segmenter']} (after)")
-print(f"{'policy':<16}{'pixels':>8}{'before':>9}{'after':>9}{'change':>9}")
+print(f"{'policy':<16}{'px before':>10}{'px after':>10}{'before':>9}{'after':>9}{'change':>9}")
 names = ["downscale", *(f"tiling@L{lv}" for lv in TILE_LEVELS), *(f"drishyam@{c}" for c in BUDGETS)]
 points = [p for k in ("downscale", "tiling", "drishyam") for p in zip(before["policies"][k], after["policies"][k])]
 for name, (b, a) in zip(names, points, strict=True):
-    print(f"{name:<16}{a['pixels_frac']:>8.3f}{f(b['recall']):>9}{f(a['recall']):>9}{d(a['recall'], b['recall']):>9}")
+    print(f"{name:<16}{b['pixels_frac']:>10.3f}{a['pixels_frac']:>10.3f}{f(b['recall']):>9}{f(a['recall']):>9}"
+          f"{d(a['recall'], b['recall']):>9}")
 key = f"drishyam@{HEADLINE_BUDGET}"
 print(f"\nper class, {key}:")
 for c, b in before["per_class"][key].items():
@@ -151,15 +165,20 @@ print(f"\nheadline after: {after['headline']}")
 EOF
 
 echo "== 5/5 to make the live site use it (not run here; the weights are CC BY-NC 4.0, see models/README.md)"
-ADD="$DST models/README.md"
+ADD="$DST models/README.md README.md"
 [ -n "$FP16" ] && ADD="$ADD $DST16"
 [ -f models/drishyam_dacl10k.metrics.json ] && ADD="$ADD models/drishyam_dacl10k.metrics.json"
 echo "  git add $ADD"
 echo "  git commit -m \"models: dacl10k segmenter\""
 echo "  printf %s $DST | vercel env add DRISHYAM_ONNX production"
 if [ -n "$FP16" ]; then echo "  printf %s $DST16 | vercel env add DRISHYAM_ONNX_FP16 production"
-else echo "  vercel env rm DRISHYAM_ONNX_FP16 production   # only if an earlier install set it: that file is gone now"; fi
-echo "  vercel deploy --prod        # or push, if the project deploys from git"
-echo "  curl -s https://drishyam-seven.vercel.app/api/health    # expect \"segmenter\":\"onnx:drishyam_dacl10k.onnx\""
+else echo "Only if an earlier install set DRISHYAM_ONNX_FP16 (that file is gone now):"
+  echo "  vercel env rm DRISHYAM_ONNX_FP16 production"; fi
+echo "Deploy, or push if the project deploys from git:"
+echo "  vercel deploy --prod"
+echo "Then expect \"segmenter\":\"onnx:drishyam_dacl10k.onnx\" from:"
+echo "  curl -s https://drishyam-seven.vercel.app/api/health"
 echo "The paths are relative on purpose: a Vercel Python function runs from the project root, where models/ is bundled."
-echo "Undo: vercel env rm DRISHYAM_ONNX production${FP16:+ (and DRISHYAM_ONNX_FP16)}, then redeploy."
+echo "Undo, then redeploy:"
+echo "  vercel env rm DRISHYAM_ONNX production"
+if [ -n "$FP16" ]; then echo "  vercel env rm DRISHYAM_ONNX_FP16 production"; fi

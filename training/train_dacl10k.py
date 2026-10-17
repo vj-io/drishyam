@@ -419,6 +419,8 @@ if __name__ == "__main__":
                 z.write(src, name)
     print(f"{ZIP}: {', '.join(z.namelist())}, {ZIP.stat().st_size / 1e6:.1f} MB")
     print("parity ok" if PARITY_OK else "PARITY FAILED (table above): do not install these weights")
-    print("next, in the repo: scripts/install_model.sh best.onnx best_fp16.onnx  (after unzipping)")
+    print("next, on your machine in the repo, with the zip downloaded there:")
+    print("  unzip drishyam_dacl10k.zip -d /tmp/dacl-model")
+    print("  scripts/install_model.sh /tmp/dacl-model/best.onnx /tmp/dacl-model/best_fp16.onnx")
     if not NOTEBOOK and not PARITY_OK:
         sys.exit(1)

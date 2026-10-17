@@ -31,9 +31,10 @@ has to be pushed or uploaded first. It needs a Kaggle account with phone verific
    It loads both files on OpenCV 5 DNN `ENGINE_NEW` and through `OnnxSegmenter` (FP16 against FP32 too) before
    touching anything, copies them to `models/drishyam_dacl10k.onnx` and `.fp16.onnx` (and `metrics.json` to
    `models/drishyam_dacl10k.metrics.json`), writes their sha256, validation mIoU and **CC BY-NC 4.0** licence into
-   `models/README.md`, runs three `drishyam run` jobs with `DRISHYAM_ONNX` set, runs `make eval` on `data/synth200`
-   twice (classical, then the model) into `runs/model-eval/` (never `public/results`), prints the before/after
-   recall table, and prints the `git` and `vercel env add` commands that would put the model on the live site
+   `models/README.md` and the Licence line of `README.md`, runs three `drishyam run` jobs with `DRISHYAM_ONNX` set, runs
+   `evals.harness` on `data/synth200` twice (classical, then the model) into `runs/model-eval/` (never
+   `public/results`), prints the before/after recall table with each run's pixel fraction, and prints the `git` and
+   `vercel env add` commands that would put the model on the live site
    (it runs none of them). 200 images is the published eval; `--n 20` is a quicker look. The ONNX run is CPU-bound:
    on the 16-thread Intel Mac a 512 px look took 0.25 s and an image's policies about 46 s against 6 s classical
    (smoke model, 8 workers), so 200 images should take roughly 25 minutes, against 3 for the classical run.
@@ -208,7 +209,12 @@ Run it where torch and OpenCV 5 coexist (below), with the repo checked out (it i
 
 ```
 export DRISHYAM_ONNX=/path/to/drishyam_dacl10k.onnx
-export DRISHYAM_ONNX_FP16=/path/to/drishyam_dacl10k.fp16.onnx   # optional: the "fast" / FP16 path
+```
+
+Optional, for the "fast" / FP16 path:
+
+```
+export DRISHYAM_ONNX_FP16=/path/to/drishyam_dacl10k.fp16.onnx
 ```
 
 These map to `OnnxSegmenter(path, fp16_path)`. No `class_map` is needed because the ONNX already outputs the six classes.
@@ -240,7 +246,12 @@ uv pip install --python /tmp/torchenv/bin/python --no-deps opencv-python-headles
 /tmp/torchenv/bin/python training/train_dacl10k.py --synthetic --max-steps 3 --size 128 --batch-size 2 --out /tmp/run
 /tmp/torchenv/bin/python -m pytest tests/test_training.py
 scripts/install_model.sh /tmp/run/onnx/drishyam_dacl10k.onnx /tmp/run/onnx/drishyam_dacl10k.fp16.onnx --n 3
-git checkout models/README.md && rm models/drishyam_dacl10k.*   # undo: smoke weights are noise
+```
+
+Then undo the install (smoke weights are noise):
+
+```
+git checkout models/README.md README.md && rm models/drishyam_dacl10k.*
 ```
 
 The first command is the notebook's whole path (train, export into `/tmp/run/onnx`, parity on noise crops,
