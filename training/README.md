@@ -268,13 +268,17 @@ OpenCV with `--no-deps`:
 ```
 uv venv --python 3.12 /tmp/torchenv
 uv pip install --python /tmp/torchenv/bin/python torch==2.2.2 torchvision==0.17.2 --index-url https://download.pytorch.org/whl/cpu
-uv pip install --python /tmp/torchenv/bin/python "numpy<2" segmentation-models-pytorch timm onnx onnxslim onnxconverter-common pytest
+uv pip install --python /tmp/torchenv/bin/python "numpy<2" segmentation-models-pytorch==0.5.0 timm onnx==1.23.2 onnxslim==0.1.98 onnxconverter-common==1.16.0 pytest
 uv pip install --python /tmp/torchenv/bin/python --no-deps opencv-python-headless==5.0.0.93
 
 /tmp/torchenv/bin/python training/train_dacl10k.py --synthetic --max-steps 3 --size 128 --batch-size 2 --out /tmp/run
 /tmp/torchenv/bin/python -m pytest tests/test_training.py
 scripts/install_model.sh /tmp/run/drishyam_dacl10k.zip --n 3
 ```
+
+These are the notebook's pins. timm is left unpinned here because no timm version has been checked against torch
+2.2.2; on Kaggle torch, torchvision and timm are the image's own, and only torch and cv2 reach the log (the GPU line),
+not `metrics.json`.
 
 Then undo the install (smoke weights are noise):
 
