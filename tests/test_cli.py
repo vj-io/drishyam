@@ -268,3 +268,22 @@ def test_serve_and_mcp_commands_dispatch(monkeypatch):
     assert cli.main(["serve", "--port", "70000"]) == 1 and len(calls) == 1
     monkeypatch.setattr(mcp_server, "main", lambda: calls.append("mcp"))
     assert cli.main(["mcp"]) == 0 and calls[-1] == "mcp"
+
+
+def test_the_planner_env_var_reaches_the_job(tmp_path, monkeypatch):
+    """`drishyam run` builds its Job with planner.from_env(): set DRISHYAM_PLANNER_URL and the job consults it."""
+    made = []
+
+    class Spy(cli.Job):
+        def __init__(self, *a, **kw):
+            super().__init__(*a, **kw)
+            made.append(self)
+
+    monkeypatch.setattr(cli, "Job", Spy)
+    monkeypatch.setenv("DRISHYAM_PLANNER_URL", "http://127.0.0.1:9/v1")  # loopback, closed: never leaves the host
+    (tmp_path / "KILL").touch()  # halt before the first look, so nothing is sent to it
+    assert cli.main(["run", str(SAMPLE), "--pixel-cap", "0.05", "--out", str(tmp_path / "out")]) == 0
+    assert made[0].planner.url == "http://127.0.0.1:9/v1/chat/completions"
+    monkeypatch.delenv("DRISHYAM_PLANNER_URL")
+    assert cli.main(["run", str(SAMPLE), "--pixel-cap", "0.05", "--out", str(tmp_path / "out")]) == 0
+    assert made[1].planner is None
