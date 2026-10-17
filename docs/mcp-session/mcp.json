@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "drishyam": {
+      "command": "uv",
+      "args": ["run", "drishyam", "mcp"]
+    }
+  }
+}

@@ -19,16 +19,20 @@ npx @modelcontextprotocol/inspector uv run --directory /abs/path/to/drishyam dri
 | --- | --- |
 | `open_image(path)` | Starts a job on a JPEG/PNG under an allowed image root; people are blurred first. Returns the job id and caps. |
 | `overview(job)` | At most 20 ranked candidate boxes (L0 pixels) and a saliency heatmap PNG. |
-| `gaze(job, x, y, level, yaw=0, pitch=0)` | Virtual-PTZ look at an L0 pixel at pyramid level 0-3. Returns a gaze id, window, quality gate and a JPEG of the crop (at most 512 px). |
-| `enhance(job, gaze_id)` | CLAHE re-look. Replaces that gaze's crop; segment again afterwards. |
+| `gaze(job, x, y, level, yaw=0, pitch=0, why="")` | Virtual-PTZ look at an L0 pixel at pyramid level 0-3. Returns a gaze id, window, quality gate and a JPEG of the crop (at most 512 px). |
+| `enhance(job, gaze_id, why="")` | CLAHE re-look. Replaces that gaze's crop; segment again afterwards. |
 | `segment(job, gaze_id, model)` | Per-class areas, confidence, entropy, latency. `model` is `accurate` or `fast`. |
 | `measure(job, gaze_id, cls)` | Length, width, area, orientation of one class, in L0 pixels. |
-| `verify(job, gaze_id)` | Looks one level finer at the same centre, segments, returns the mask IoU against the coarser look (below 0.5 is disagreement). |
+| `verify(job, gaze_id, why="")` | Looks one level finer at the same centre, segments, returns the mask IoU against the coarser look (below 0.5 is disagreement). |
 | `runtime_stats(job)` | p50/p95 per op, CPU %, $ so far, budget against caps, what the governor changed. |
-| `set_budget(job, pixel_cap, usd_cap, seconds_cap)` | Lowers caps (0.02-1.0, 0.0001-0.05, 1-30). Raising one is refused. |
-| `log_finding(job, gaze_id, cls)` | Records a class that the last segmentation shows. Critical ones become `pending_review`. |
+| `set_budget(job, pixel_cap, usd_cap, seconds_cap, why="")` | Lowers caps (0.02-1.0, 0.0001-0.05, 1-30). Raising one is refused. |
+| `log_finding(job, gaze_id, cls, why="")` | Records a class that the last segmentation shows. Critical ones become `pending_review`. |
 | `request_human_review(job, finding_id, reason)` | Records the request in the trace. Changes no state. |
 | `draft_work_order(job)` | Writes `runs/<job>/work_order.json` and `crops/` and returns the order. |
+
+`why` (optional, at most 200 printable characters) is the client's reason for the call. It is stored as the
+trace record's `rationale`, and the server's instructions ask the client to cite the measured value behind it
+(say `entropy 0.71 > 0.5 on g2 at L2`), so the trace shows which measurement each call answered.
 
 There is no shell, no file-write and no approve/reject tool, and no OCR. `overview`, `gaze` and `enhance`
 return images (heatmap, crop) so a vision-capable client can look; text painted on a bridge is therefore
@@ -61,9 +65,42 @@ only accepts gazes with a critical finding.
 Every call appends one line to `runs/<job>/trace.jsonl`. Looks (`gaze`, `verify`) are `step` records with the
 shape in `api-contract.md` (`decision.args` holds the centre actually used, `window`, `quality`, `runtime`,
 `cause`, `pixels_used`). Other calls are `tool` records, refusals are `step` records with action `halt`, and
-failures are `error` records. `drishyam replay runs/<job>/trace.jsonl` prints the gaze path and checks it
+failures are `error` records. `rationale` is the client's `why`; when the governor changed a setting before a
+call, the record also carries `governor: {cause, rationale}`. The work order's `not_assessed` lists every gaze
+whose quality gate failed and that no `enhance` repaired. `drishyam replay runs/<job>/trace.jsonl` prints the gaze path and checks it
 against `work_order.json`. Calls rejected by schema validation (a level of 9, say) never reach the server code,
 so they leave no line.
+
+## The optional LLM planner (`drishyam run` and the web API)
+
+Over MCP the client model is the planner. `drishyam run` and the web API instead run the rule planner and can
+consult an LLM every fifth step through an allow-list validator with a 2 s timeout (`drishyam/planner.py`;
+threat model in [security.md](security.md)). It is off unless the server environment sets:
+
+| Variable | Meaning |
+| --- | --- |
+| `DRISHYAM_PLANNER_URL` | An OpenAI-compatible base URL (`.../v1`): `https://`, or plain `http://` to `127.0.0.1`, `::1` or `localhost` |
+| `DRISHYAM_PLANNER_MODEL` | Model name sent to it (default `qwen2.5-3b-instruct`) |
+| `DRISHYAM_PLANNER_KEY` | Bearer token, if the endpoint needs one |
+
+Each consultation is a `planner` event, and the step records `planner_status`. No LLM planner runs in the live
+demo: what it shows is the planner interface and the failure drills (`planner_timeout`, `planner_malformed`),
+whose planners are scripted to time out or answer junk.
+
+## Recording a session
+
+The command that records Claude Code driving these tools on a sample photo, from the repository root after
+`uv sync --extra mcp` ([mcp-session/mcp.json](mcp-session/mcp.json) starts `uv run drishyam mcp`;
+[mcp-session/prompt.txt](mcp-session/prompt.txt) asks for the coarse-to-fine flow, a `why` that cites the
+measured value on every call, and `request_human_review` for each critical finding and each disagreement):
+
+```bash
+mkdir -p runs
+claude -p "$(cat docs/mcp-session/prompt.txt)" --mcp-config docs/mcp-session/mcp.json --strict-mcp-config --tools "" --allowedTools mcp__drishyam --output-format stream-json --verbose > runs/mcp-session.jsonl
+```
+
+`--tools ""` leaves the model no built-in tool (no shell, no file access), only the twelve above. The job's own
+trace lands in `runs/<job>/trace.jsonl`. No recorded session is committed yet.
 
 ## Command line
 

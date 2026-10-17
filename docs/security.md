@@ -7,11 +7,12 @@ the control that stops it. Every control named here has a test in `tests/`, exce
 ## What an attacker controls
 
 - The bytes of an uploaded image, its declared `Content-Type` and `Content-Length`.
-- The query string (`pixel_cap`, `usd_cap`, `seconds_cap`, `chaos`).
+- The query string (`pixel_cap`, `usd_cap`, `seconds_cap`, `chaos`, `pace_ms`).
 - The `X-Drishyam-Replay` header (decisions to resume a killed job).
 - The review request body (`token`, `finding_id`, `decision`, `reviewer`).
 - Anything painted on the photographed structure (graffiti, signs, text).
-- For the MCP server: the arguments an LLM passes to each tool.
+- For the MCP server: the arguments an LLM passes to each tool, including the free-text `why` and `reason`
+  that end up in the trace.
 
 ## Threats and controls
 
@@ -20,18 +21,19 @@ the control that stops it. Every control named here has a test in `tests/`, exce
 | Decompression bomb (tiny file, huge canvas or deep pixels) | Width, height, bit depth and channels are read from the PNG IHDR / JPEG SOF header; refused above 25 MP or 100 MB of decoded pixels **before** any pixel is decoded; decoded size must match the header | `imaging.sniff_size`, `decode_image` | `test_imaging.py::test_rejects_non_images_and_bombs`, `::test_decoded_bytes_budget` |
 | Oversized body / slow memory exhaustion | Body is read in chunks and abandoned the moment it passes 4.4 MB; lying `Content-Length` is refused; Vercel also caps bodies at 4.5 MB | `web._read_capped` | `test_web.py::test_rejects_bad_uploads` |
 | Non-image or polyglot upload | Content-Type allow-list (JPEG, PNG) **and** magic-byte sniffing; OpenCV decodes only after both pass | `web.create_job`, `imaging.sniff_size` | `test_web.py::test_rejects_bad_uploads` |
-| Budget abuse (huge jobs) | Every cap range-checked server-side (pixels 2–100 %, $0.0001–0.05, 1–30 s); job halts inside one step of any cap; function `maxDuration` 60 s; Vercel WAF rate limit of 12 job starts per IP per minute | `web.create_job`, `governor.check`, `vercel.json`, Vercel firewall | `test_web.py::test_rejects_bad_params`, `test_agent.py::test_pixel_cap_is_never_exceeded` |
+| Budget abuse (huge jobs) | Every cap range-checked server-side (pixels 2–100 %, $0.0001–0.05, 1–30 s; `pace_ms` 0–1500 with at most 30 s of waiting per job); job halts inside one step of any cap; function `maxDuration` 60 s; Vercel WAF rate limit of 12 job starts per IP per minute | `web.create_job`, `governor.check`, `vercel.json`, Vercel firewall | `test_web.py::test_rejects_bad_params`, `::test_pace_ms_pauses_between_looks_but_not_the_job_clock`, `test_agent.py::test_pixel_cap_is_never_exceeded` |
 | Forged replay decisions | Replay is decoded from base64url JSON (16 KB max), then every entry is checked: action in the allow-list, integer coordinates inside the image, level 0–3, at most 200 | `web._parse_replay`, `agent.validate_replay` | `test_agent.py::test_replay_input_is_validated`, `test_web.py::test_replay_header_validation` |
 | Agent approving its own critical finding | The state machine only lets `actor="human"` leave `pending_review`; there is no agent code path, MCP tool or planner strategy that approves, rejects, closes or downgrades; new evidence can raise criticality, never lower it | `findings.decide`, `Finding.agent_update` | `test_findings.py::test_agent_cannot_decide_or_downgrade`, `test_agent.py::test_critical_finding_blocks_work_order_and_agent_cannot_close_it` |
-| Tampered or replayed work order | Work orders are HMAC-SHA256 signed with a 384-bit secret held only in a Vercel *sensitive* env var; constant-time comparison; 7-day expiry; a decided finding cannot be decided again | `findings.sign`, `verify`, `apply_review` | `test_findings.py::test_tampering_expiry_and_reviewer_validation`, `test_web.py::test_review_flow_and_tampering` |
+| Tampered or replayed work order | Work orders are HMAC-SHA256 signed with a secret of at least 32 characters (384 bits on the Vercel deployment) held only in a Vercel *sensitive* env var, or on AWS in a Secrets Manager secret read by ARN once per cold start and never logged; constant-time comparison; 7-day expiry; a decided finding cannot be decided again | `findings.sign`, `verify`, `apply_review`, `web._signing_key` | `test_findings.py::test_tampering_expiry_and_reviewer_validation`, `test_web.py::test_review_flow_and_tampering`, `::test_signing_key_from_secrets_manager` |
 | Prompt injection via text in the image | There is no OCR. The optional LLM planner receives a numeric digest only (it never sees pixels). The MCP server does return crops and the heatmap as images, so a vision-capable MCP client can see text painted on a structure: that client must treat image content as untrusted, and in any case it can only call the 12 allow-listed tools, none of which approves, writes files or runs commands. For the planner: (numbers, generated ids, fixed class and model names); its reply must be one allow-listed strategy with range-checked parameters or it is discarded; 2 s timeout; rule planner always decides on failure | `planner.validate`, `Job.digest` | `test_planner_governor.py::test_planner_sees_numbers_and_fixed_names_only`, `::test_validator_rejects`, `::test_20_timeouts_and_20_malformed_all_recover` |
 | Planner endpoint used for SSRF | Planner URL comes only from server env; must be `https://` or plain `http://` to an exact loopback host (`127.0.0.1`, `::1`, `localhost`; look-alikes such as `localhost.evil.com` are refused) | `planner.HttpPlanner` | `test_planner_governor.py::test_http_planner_url_policy`, `::test_http_planner_rejects_lookalike_loopback_hosts` |
 | Shell or file access from the agent | The agent has no shell tool and no file-write tool; MCP tools are a fixed allow-list; `open_image` resolves real paths under an allow-listed root only | `mcp_server.py` | `test_mcp.py` |
+| Text an MCP client writes into the trace (`why`, `reason`) | At most 200 characters, whitespace folded, printable only, else refused; stored as data in the record's `rationale` and never read back as an instruction by any code path | `mcp_server._call`, `request_human_review` | `test_mcp.py::test_why_is_optional_bounded_and_printable`, `::test_every_tool_on_a_bridge_photo` |
 | XSS in the UI | Strict CSP (`script-src 'self'`, no inline script or style, no `eval`); DOM built with `textContent`; base64 images checked against a strict alphabet before use | `vercel.json`, `public/js/*` | `tests/e2e` runs under the production CSP and fails on any violation |
 | Clickjacking, MIME sniffing, referrer leaks | `frame-ancestors 'none'`, `X-Frame-Options: DENY`, `nosniff`, `strict-origin-when-cross-origin`, HSTS with preload, COOP/CORP same-origin, Permissions-Policy denying camera, mic, geolocation, payment, USB | `vercel.json`, `web._api_headers` | `test_web.py::test_health_and_security_headers` |
 | Information leaks in errors | Generic 500 body, details only in server logs; FastAPI docs and OpenAPI schema disabled | `web._crash`, `FastAPI(docs_url=None, ...)` | `test_web.py::test_health_and_security_headers` |
 | Surveillance / personal data | Faces (YuNet) and people and vehicles (NanoDet) blurred before analysis, crops or display; images mostly filled by a person are refused; uploads are never stored by the web demo | `privacy.privacy_pass` | `test_web.py::test_people_dominant_image_refused`, `::test_privacy_blur_applies_before_analysis` |
-| Secrets in the repository | Signing key only in Vercel env (sensitive); `.env*` git-ignored; commits scanned for token patterns before every push | `.gitignore`, release checklist | — |
+| Secrets in the repository | Signing key only in Vercel env (sensitive) or AWS Secrets Manager; `.env*` git-ignored, `.env.example` holds names only; commits scanned for token patterns before every push | `.gitignore`, `.env.example`, release checklist | — |
 
 ## Known limits (stated, not hidden)
 
@@ -40,17 +42,27 @@ the control that stops it. Every control named here has a test in `tests/`, exce
   DynamoDB + SNS approval store is the AWS deployment path.
 - `/api/review` is not rate-limited by the WAF (the Hobby plan allows one rate
   limit rule, spent on job starts); it is cheap, size-capped and HMAC-gated.
-- The kill switch in the browser aborts the stream; the server notices the
-  disconnect and halts at its next step. The operator-wide switch is
-  `DRISHYAM_KILL_SWITCH=1` (env) or the `DRISHYAM_KILL_FILE` flag file.
+- KILL in the browser goes through `/api/kill`, which sets a shared flag (the
+  Vercel Runtime Cache, or the DynamoDB table `DRISHYAM_KILL_TABLE` names on AWS)
+  that the running job reads after every step; the governor then halts before the
+  next look. The flag is needed because neither Vercel nor a Lambda Function URL
+  passes the browser's disconnect through to the function, so an aborted stream
+  alone does not stop a job. The operator-wide switch is `DRISHYAM_KILL_SWITCH=1`
+  (env) or the `DRISHYAM_KILL_FILE` flag file.
 - Anyone holding a token can review it: there is no multi-tenant auth (a PRD
   non-goal).
-- `/api/kill` is not WAF-limited either: a caller can write junk cache keys
-  (5-minute TTL) but cannot stop another viewer's job without that job's
-  144-bit kill token.
+- `/api/kill` is not WAF-limited on Vercel either: a caller can write junk
+  flags (a 5-minute cache TTL; on AWS a small DynamoDB item with an `exp` TTL
+  attribute, which DynamoDB deletes lazily, usually within a few days) but cannot
+  stop another viewer's job without that job's 144-bit kill token, which is
+  hashed into the flag's key.
+- `pace_ms` lets a caller keep a function instance busy longer per job (at
+  most 30 s of waiting); the job-start rate limit bounds how many such jobs one
+  address can start.
 - The `chaos` drills are reachable by anyone on purpose (they are the failure
   demo for judges); each is bounded by the same caps as any job.
-- Deployed instances refuse to start without `DRISHYAM_SIGNING_KEY`, so tokens
-  never silently become per-instance.
+- Deployed instances (Vercel, or AWS Lambda) refuse to start without a signing
+  key (`DRISHYAM_SIGNING_KEY`, or `DRISHYAM_SIGNING_KEY_SECRET_ARN` on AWS), so
+  tokens never silently become per-instance.
 - Uploads are refused when their header implies more than 100 MB of decoded
   pixels (bit depth and channels count, not only width × height).
