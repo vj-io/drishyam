@@ -15,3 +15,6 @@ results/eval_*.json
 results/codebrim/
 results/*/parity.npz
 brag-output*/
+build/
+.venv-infra/
+cdk.out/
