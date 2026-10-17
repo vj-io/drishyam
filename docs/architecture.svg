@@ -1,0 +1,375 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1340 1640" width="1340" height="1640" role="img" aria-labelledby="t d">
+<title id="t">Drishyam system architecture</title>
+<desc id="d">Clients (browser UI, drishyam CLI, MCP client) reach one agent core: the browser through CloudFront with OAC and WAF, a Lambda Function URL and an arm64 Lambda running the FastAPI web tier (planned), or the live Vercel mirror; the CLI and MCP server run it locally. The agent core (policy, governor, planner with allow-list validator, human gate) drives the OpenCV 5 layer and emits an NDJSON trace and a signed work order. DynamoDB holds the kill flag, Secrets Manager the signing key, CloudWatch the metrics and alarms, AWS Budgets the spend alerts.</desc>
+<style>
+  .bg { fill: #072247; }
+  .sheet { fill: #0F3B73; stroke: #E8F1FF; stroke-width: 3; }
+  .inner { fill: none; stroke: #B8CDEC; stroke-width: 1; }
+  .frame { fill: none; stroke: #8EAEDB; stroke-width: 1.5; }
+  .box { fill: #0B3264; stroke: #E8F1FF; stroke-width: 2; }
+  .box.gate { stroke: #FF9A8A; }
+  .box.alt { stroke: #9CC8FF; stroke-dasharray: 6 4; }
+  .box.call { fill: #082A55; stroke: #FFC857; }
+  .mini { fill: #082A55; stroke: #B8CDEC; stroke-width: 1.5; }
+  .planned .box, .planned .frame { stroke-dasharray: 8 5; }
+  .tb { fill: #0B3264; stroke: #E8F1FF; stroke-width: 2; }
+  .tbl { stroke: #B8CDEC; stroke-width: 1; }
+  .band { stroke: #8EAEDB; stroke-width: 1; }
+  text { font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, 'DejaVu Sans Mono', monospace; font-size: 12px; fill: #E8F1FF; }
+  .h { font-weight: 700; font-size: 12px; letter-spacing: .06em; }
+  .fl { font-weight: 700; font-size: 12px; letter-spacing: .12em; }
+  .fs { font-size: 11px; fill: #B8CDEC; }
+  .sheet-title { font-family: 'Archivo Narrow', 'Arial Narrow', 'Roboto Condensed', Arial, sans-serif; font-weight: 700; font-size: 30px; letter-spacing: .02em; }
+  .tbig { font-family: 'Archivo Narrow', 'Arial Narrow', 'Roboto Condensed', Arial, sans-serif; font-weight: 700; font-size: 24px; }
+  .sub { fill: #B8CDEC; }
+  .small { font-size: 11px; }
+  .cv { fill: #FFC857; }
+  .rd { fill: #FF9A8A; }
+  .ca { fill: #9CC8FF; }
+  .n { fill: none; stroke: #FFC857; stroke-width: 2; }
+  .nt { fill: #FFC857; font-weight: 700; font-size: 12px; }
+  .edge { fill: none; stroke: #B8CDEC; stroke-width: 1.6; marker-end: url(#arr); }
+  .edge.alt { stroke: #9CC8FF; stroke-dasharray: 6 4; marker-end: url(#arr-sky); }
+  .edge.hot { stroke: #FFC857; stroke-width: 3; marker-end: url(#arr-amber); }
+  .edge.red { stroke: #FF9A8A; marker-end: url(#arr-red); }
+  .edge.plain { marker-end: none; }
+  .lbg { fill: #0F3B73; }
+  .el { font-size: 11px; fill: #9CC8FF; }
+  .el.hot { fill: #FFC857; font-weight: 700; }
+  .el.red { fill: #FF9A8A; }
+  .cross { fill: none; stroke: #E8F1FF; stroke-width: 1.5; }
+</style>
+<defs>
+  <pattern id="g8" width="8" height="8" patternUnits="userSpaceOnUse"><path d="M8 0H0V8" fill="none" stroke="#E8F1FF" stroke-opacity=".055" stroke-width="1"/></pattern>
+  <pattern id="g40" width="40" height="40" patternUnits="userSpaceOnUse"><rect width="40" height="40" fill="url(#g8)"/><path d="M40 0H0V40" fill="none" stroke="#E8F1FF" stroke-opacity=".12" stroke-width="1"/></pattern>
+  <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><path d="M0 1L10 5L0 9Z" fill="#B8CDEC"/></marker>
+  <marker id="arr-sky" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><path d="M0 1L10 5L0 9Z" fill="#9CC8FF"/></marker>
+  <marker id="arr-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 1L10 5L0 9Z" fill="#FFC857"/></marker>
+  <marker id="arr-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><path d="M0 1L10 5L0 9Z" fill="#FF9A8A"/></marker>
+</defs>
+<rect class="bg" width="1340" height="1640"/>
+<rect class="sheet" x="12" y="12" width="1316" height="1616"/>
+<rect x="13.5" y="13.5" width="1313" height="1613" fill="url(#g40)"/>
+<rect class="inner" x="18" y="18" width="1304" height="1604"/>
+<path class="cross" d="M17 26H35M26 17V35"/><circle class="cross" cx="26" cy="26" r="4.5"/>
+<path class="cross" d="M1305 26H1323M1314 17V35"/><circle class="cross" cx="1314" cy="26" r="4.5"/>
+<path class="cross" d="M17 1614H35M26 1605V1623"/><circle class="cross" cx="26" cy="1614" r="4.5"/>
+<path class="cross" d="M1305 1614H1323M1314 1605V1623"/><circle class="cross" cx="1314" cy="1614" r="4.5"/>
+<text x="60" y="74" class="sheet-title" xml:space="preserve">DRISHYAM · SYSTEM ARCHITECTURE</text>
+<text x="1280" y="56" class="fs" text-anchor="end" xml:space="preserve">FIG. A-1 · OpenCV 5 components, AWS services and agent components</text>
+<text x="1280" y="74" class="fs" text-anchor="end" xml:space="preserve">cv2 calls, modules and causes are real names in drishyam/ at 7a93ec5</text>
+<line class="tbl" x1="36" y1="92" x2="1304" y2="92"/>
+<rect class="frame" x="60" y="108" width="460" height="156"/>
+<circle class="n" cx="82" cy="128" r="11"/>
+<text class="nt" x="82" y="132" text-anchor="middle">1</text>
+<text x="100" y="132" class="fl" xml:space="preserve">CLIENT · BROWSER</text>
+<g class="node" data-box="80 144 420 104">
+<rect class="box" x="80" y="144" width="420" height="104"/>
+<text x="90" y="164" class="h" xml:space="preserve">BROWSER UI · public/index.html + app.js</text>
+<line class="band" x1="80" y1="174" x2="500" y2="174"/>
+<text x="90" y="188" xml:space="preserve">strict CSP: script-src 'self', no inline</text>
+<text x="90" y="204" xml:space="preserve">POST /api/jobs with the raw image body</text>
+<text x="90" y="220" xml:space="preserve">renders the NDJSON trace as it streams</text>
+<text x="90" y="236" xml:space="preserve">review findings, <tspan class="rd">KILL</tspan> a running job</text>
+</g>
+<rect class="frame" x="620" y="108" width="680" height="156"/>
+<circle class="n" cx="642" cy="128" r="11"/>
+<text class="nt" x="642" y="132" text-anchor="middle">2</text>
+<text x="660" y="132" class="fl" xml:space="preserve">ENTRY · VERCEL MIRROR</text>
+<text x="855.44" y="132" class="fs" xml:space="preserve">secondary path · live today</text>
+<g class="node" data-box="640 144 640 104">
+<rect class="box" x="640" y="144" width="640" height="104"/>
+<text x="650" y="164" class="h" xml:space="preserve">SAME APP ON VERCEL · drishyam-seven.vercel.app</text>
+<line class="band" x1="640" y1="174" x2="1280" y2="174"/>
+<text x="650" y="188" xml:space="preserve">app.py → drishyam/web.py on Vercel Python (x86, stock OpenCV 5)</text>
+<text x="650" y="204" xml:space="preserve">Vercel WAF rate limit: 12 job starts per IP per minute</text>
+<text x="650" y="220" xml:space="preserve"><tspan class="rd">KILL</tspan> channel: Vercel Runtime Cache (AsyncRuntimeCache, 300 s TTL)</text>
+<text x="650" y="236" xml:space="preserve">DRISHYAM_SIGNING_KEY in a sensitive env var</text>
+</g>
+<path class="edge " d="M500 196 L640 196"/>
+<rect class="lbg" x="546.2" y="177" width="47.6" height="16"/>
+<text x="570" y="188" class="el" text-anchor="middle" xml:space="preserve">mirror</text>
+<path class="edge " d="M490 248 L490 344"/>
+<rect class="lbg" x="496.0" y="279" width="186.2" height="16"/>
+<text x="500" y="290" class="el" xml:space="preserve">HTTPS · NDJSON streams back</text>
+<g class="planned">
+<rect class="frame" x="60" y="300" width="880" height="470"/>
+<circle class="n" cx="82" cy="320" r="11"/>
+<text class="nt" x="82" y="324" text-anchor="middle">2</text>
+<text x="100" y="324" class="fl" xml:space="preserve">ENTRY · AWS PATH</text>
+<text x="252.24" y="324" class="fs" xml:space="preserve">primary · <tspan class="rd">planned, not deployed</tspan></text>
+<g class="node" data-box="80 344 440 104">
+<rect class="box" x="80" y="344" width="440" height="104"/>
+<text x="90" y="364" class="h" xml:space="preserve">CLOUDFRONT DISTRIBUTION</text>
+<line class="band" x1="80" y1="374" x2="520" y2="374"/>
+<text x="90" y="388" xml:space="preserve">Origin Access Control (OAC) signs every</text>
+<text x="90" y="404" xml:space="preserve">origin request with SigV4</text>
+<text x="90" y="420" xml:space="preserve">AWS WAF web ACL: rate-based rules</text>
+<text x="90" y="436" xml:space="preserve">POST bodies carry x-amz-content-sha256</text>
+</g>
+<g class="node" data-box="80 476 440 72">
+<rect class="box" x="80" y="476" width="440" height="72"/>
+<text x="90" y="496" class="h" xml:space="preserve">LAMBDA FUNCTION URL</text>
+<line class="band" x1="80" y1="506" x2="520" y2="506"/>
+<text x="90" y="520" xml:space="preserve">AuthType AWS_IAM: only CloudFront invokes</text>
+<text x="90" y="536" xml:space="preserve">InvokeMode RESPONSE_STREAM</text>
+</g>
+<g class="node" data-box="80 576 440 168">
+<rect class="box" x="80" y="576" width="440" height="168"/>
+<text x="90" y="596" class="h" xml:space="preserve">LAMBDA · arm64 (Graviton) · Python 3.12</text>
+<line class="band" x1="80" y1="606" x2="520" y2="606"/>
+<text x="90" y="620" xml:space="preserve">AWS Lambda Web Adapter → FastAPI web tier</text>
+<text x="90" y="636" xml:space="preserve">drishyam/web.py:</text>
+<text x="90" y="652" xml:space="preserve">  POST /api/jobs → application/x-ndjson</text>
+<text x="90" y="668" xml:space="preserve">  POST /api/kill · POST /api/review</text>
+<text x="90" y="684" xml:space="preserve">CSP, nosniff, no-store on every /api/*</text>
+<text x="90" y="700" xml:space="preserve">upload ≤ 4.4 MB, sniffed, ≤ 25 MP pre-decode</text>
+<text x="90" y="716" xml:space="preserve">work order: HMAC-SHA256 token, 7-day expiry</text>
+<text x="90" y="732" xml:space="preserve">per-job random <tspan class="rd">kill token</tspan></text>
+</g>
+<g class="node" data-box="580 344 340 72">
+<rect class="box" x="580" y="344" width="340" height="72"/>
+<text x="590" y="364" class="h" xml:space="preserve">DYNAMODB · KILL-FLAG TABLE</text>
+<line class="band" x1="580" y1="374" x2="920" y2="374"/>
+<text x="590" y="388" xml:space="preserve">PutItem on POST /api/kill</text>
+<text x="590" y="404" xml:space="preserve">GetItem, ConsistentRead, before every step</text>
+</g>
+<g class="node" data-box="580 436 340 56">
+<rect class="box" x="580" y="436" width="340" height="56"/>
+<text x="590" y="456" class="h" xml:space="preserve">SECRETS MANAGER</text>
+<line class="band" x1="580" y1="466" x2="920" y2="466"/>
+<text x="590" y="480" xml:space="preserve">DRISHYAM_SIGNING_KEY (HMAC key)</text>
+</g>
+<g class="node" data-box="580 512 340 72">
+<rect class="box" x="580" y="512" width="340" height="72"/>
+<text x="590" y="532" class="h" xml:space="preserve">CLOUDWATCH</text>
+<line class="band" x1="580" y1="542" x2="920" y2="542"/>
+<text x="590" y="556" xml:space="preserve">EMF metrics: one log line per job</text>
+<text x="590" y="572" xml:space="preserve">dashboard; alarms → SNS email</text>
+</g>
+<g class="node" data-box="580 604 340 72">
+<rect class="box" x="580" y="604" width="340" height="72"/>
+<text x="590" y="624" class="h" xml:space="preserve">AWS BUDGETS</text>
+<line class="band" x1="580" y1="634" x2="920" y2="634"/>
+<text x="590" y="648" xml:space="preserve">account spend alerts</text>
+<text x="590" y="664" xml:space="preserve">account level, not on the request path</text>
+</g>
+</g>
+<path class="edge " d="M300 448 L300 476"/>
+<path class="edge " d="M300 548 L300 576"/>
+<rect class="lbg" x="306.0" y="455" width="80.6" height="16"/>
+<text x="310" y="466" class="el" xml:space="preserve">SigV4 (OAC)</text>
+<path class="edge plain" d="M520 600 L550 600 L550 380"/>
+<path class="edge " d="M550 380 L580 380"/>
+<path class="edge " d="M550 464 L580 464"/>
+<path class="edge " d="M550 548 L580 548"/>
+<rect class="frame" x="980" y="300" width="320" height="470"/>
+<circle class="n" cx="1002" cy="320" r="11"/>
+<text class="nt" x="1002" y="324" text-anchor="middle">1</text>
+<text x="1020" y="324" class="fl" xml:space="preserve">CLIENTS · LOCAL</text>
+<text x="1163.6" y="324" class="fs" xml:space="preserve">no network</text>
+<g class="node" data-box="1000 344 280 120">
+<rect class="box" x="1000" y="344" width="280" height="120"/>
+<text x="1010" y="364" class="h" xml:space="preserve">DRISHYAM CLI</text>
+<line class="band" x1="1000" y1="374" x2="1280" y2="374"/>
+<text x="1010" y="388" xml:space="preserve">run → Job.run() in-process</text>
+<text x="1010" y="404" xml:space="preserve">review → decide(actor='human')</text>
+<text x="1010" y="420" xml:space="preserve"><tspan class="rd">kill</tspan> → ~/.drishyam/KILL file</text>
+<text x="1010" y="436" xml:space="preserve">writes runs/&lt;job&gt;/trace.jsonl</text>
+<text x="1010" y="452" xml:space="preserve">and work_order.json</text>
+</g>
+<g class="node" data-box="1000 500 255 136">
+<rect class="box" x="1000" y="500" width="255" height="136"/>
+<text x="1010" y="520" class="h" xml:space="preserve">MCP CLIENT · e.g. Claude Code</text>
+<line class="band" x1="1000" y1="530" x2="1255" y2="530"/>
+<text x="1010" y="544" xml:space="preserve">drishyam mcp: stdio JSON-RPC</text>
+<text x="1010" y="560" xml:space="preserve">12 allow-listed tools: no</text>
+<text x="1010" y="576" xml:space="preserve">approve, no file write, no shell</text>
+<text x="1010" y="592" xml:space="preserve">the client's LLM picks each call</text>
+<text x="1010" y="608" xml:space="preserve">in place of the agent.py policy</text>
+<text x="1010" y="624" xml:space="preserve">governor check() before a call</text>
+</g>
+<path class="edge " d="M300 744 L300 810"/>
+<rect class="lbg" x="306.0" y="784" width="199.4" height="16"/>
+<text x="310" y="795" class="el" xml:space="preserve">Job(image, cfg, kill=…).run()</text>
+<path class="edge " d="M960 248 L960 810"/>
+<path class="edge " d="M1268 464 L1268 810"/>
+<path class="edge " d="M1127 636 L1127 810"/>
+<rect class="lbg" x="1133.0" y="713" width="74.0" height="16"/>
+<text x="1137" y="724" class="el" xml:space="preserve">tool calls</text>
+<rect class="frame" x="60" y="810" width="1240" height="190"/>
+<circle class="n" cx="82" cy="830" r="11"/>
+<text class="nt" x="82" y="834" text-anchor="middle">3</text>
+<text x="100" y="834" class="fl" xml:space="preserve">AGENT CORE · drishyam/</text>
+<text x="304.08" y="834" class="fs" xml:space="preserve">one codebase behind every client</text>
+<g class="node" data-box="80 846 285 136">
+<rect class="box" x="80" y="846" width="285" height="136"/>
+<text x="90" y="866" class="h" xml:space="preserve">AGENT.PY · POLICY (Job.run)</text>
+<line class="band" x1="80" y1="876" x2="365" y2="876"/>
+<text x="90" y="890" xml:space="preserve"><tspan class="ca">survey</tspan>: one coarse look first</text>
+<text x="90" y="906" xml:space="preserve"><tspan class="ca">best-score</tspan>: argmax p·s·(1+u)·a/t̂</text>
+<text x="90" y="922" xml:space="preserve"><tspan class="ca">entropy&gt;tau</tspan>, <tspan class="ca">area&lt;A_min</tspan> → escalate</text>
+<text x="90" y="938" xml:space="preserve"><tspan class="ca">verify-new-mask</tspan>, <tspan class="ca">iou&lt;0.5</tspan> → verify</text>
+<text x="90" y="954" xml:space="preserve"><tspan class="ca">stop-rule</tspan>: best &lt; ε·value/cost</text>
+<text x="90" y="970" xml:space="preserve">every step logs a cause + rationale</text>
+</g>
+<g class="node" data-box="385 846 285 136">
+<rect class="box" x="385" y="846" width="285" height="136"/>
+<text x="395" y="866" class="h" xml:space="preserve">GOVERNOR.PY · check() FIRST</text>
+<line class="band" x1="385" y1="876" x2="670" y2="876"/>
+<text x="395" y="890" xml:space="preserve"><tspan class="ca">kill-switch</tspan> → halt</text>
+<text x="395" y="906" xml:space="preserve"><tspan class="ca">cap-hit</tspan>: pixels, $, seconds → halt</text>
+<text x="395" y="922" xml:space="preserve"><tspan class="ca">p95&gt;SLA</tspan> → fast model, then coarser</text>
+<text x="395" y="938" xml:space="preserve"><tspan class="ca">warp-spike</tspan> → smaller gaze, batch</text>
+<text x="395" y="954" xml:space="preserve"><tspan class="ca">usd≥80%</tspan> → verify critical only</text>
+<text x="395" y="970" xml:space="preserve">every override writes its cause</text>
+</g>
+<g class="node" data-box="690 846 285 136">
+<rect class="box" x="690" y="846" width="285" height="136"/>
+<text x="700" y="866" class="h" xml:space="preserve">PLANNER.PY · OPTIONAL LLM</text>
+<line class="band" x1="690" y1="876" x2="975" y2="876"/>
+<text x="700" y="890" xml:space="preserve">sees Job.digest(): numbers only</text>
+<text x="700" y="906" xml:space="preserve">validate(): 6-strategy allow-list</text>
+<text x="700" y="922" xml:space="preserve">2 s timeout; bad reply → rejected</text>
+<text x="700" y="938" xml:space="preserve"><tspan class="ca">planner-fallback</tspan>: rule choice stands</text>
+<text x="700" y="954" xml:space="preserve">accepted → <tspan class="ca">planner:&lt;strategy&gt;</tspan></text>
+<text x="700" y="970" xml:space="preserve">HTTPS or loopback endpoint only</text>
+</g>
+<g class="node" data-box="995 846 285 136">
+<rect class="box gate" x="995" y="846" width="285" height="136"/>
+<text x="1005" y="866" class="h" xml:space="preserve">FINDINGS.PY · HUMAN GATE</text>
+<line class="band" x1="995" y1="876" x2="1280" y2="876"/>
+<text x="1005" y="890" xml:space="preserve">exposed_rebar, spalling ≥ 40 000 px²</text>
+<text x="1005" y="906" xml:space="preserve">→ <tspan class="rd">pending_review</tspan></text>
+<text x="1005" y="922" xml:space="preserve">decide(): only actor='human'</text>
+<text x="1005" y="938" xml:space="preserve">agent, planner, MCP: no path out</text>
+<text x="1005" y="954" xml:space="preserve">work order HMAC-SHA256 sign/verify</text>
+<text x="1005" y="970" xml:space="preserve">re-signed after each human review</text>
+</g>
+<path class="edge " d="M300 1000 L300 1050"/>
+<rect class="lbg" x="306.0" y="1019" width="305.0" height="16"/>
+<text x="310" y="1030" class="el" xml:space="preserve">calls gaze · quality · segment_view · measure</text>
+<path class="edge " d="M860 1050 L860 1000"/>
+<rect class="lbg" x="866.0" y="1019" width="318.2" height="16"/>
+<text x="870" y="1030" class="el" xml:space="preserve">returns entropy, mask areas, IoU, sharpness, ms</text>
+<rect class="frame" x="60" y="1050" width="1240" height="370"/>
+<circle class="n" cx="82" cy="1070" r="11"/>
+<text class="nt" x="82" y="1074" text-anchor="middle">4</text>
+<text x="100" y="1074" class="fl" xml:space="preserve">OPENCV 5 LAYER</text>
+<text x="234.95999999999998" y="1074" class="fs" xml:space="preserve">cv2 calls in imaging.py, privacy.py, segment.py, measure.py, agent.py</text>
+<text x="80" y="1094" class="fs" xml:space="preserve">a · once per job, in this order</text>
+<g class="node" data-box="80 1104 279 120">
+<rect class="box" x="80" y="1104" width="279" height="120"/>
+<text x="90" y="1124" class="h" xml:space="preserve">DECODE · imaging.decode_image</text>
+<line class="band" x1="80" y1="1134" x2="359" y2="1134"/>
+<text x="90" y="1148" xml:space="preserve">JPEG/PNG header sniffed first</text>
+<text x="90" y="1164" xml:space="preserve"><tspan class="cv">cv2.imdecode</tspan>: ≤ 25 MP, ≤ 100 MB</text>
+</g>
+<g class="node" data-box="387 1104 279 120">
+<rect class="box" x="387" y="1104" width="279" height="120"/>
+<text x="397" y="1124" class="h" xml:space="preserve">PRIVACY · privacy_pass</text>
+<line class="band" x1="387" y1="1134" x2="666" y2="1134"/>
+<text x="397" y="1148" xml:space="preserve"><tspan class="cv">cv2.FaceDetectorYN</tspan>: YuNet faces</text>
+<text x="397" y="1164" xml:space="preserve"><tspan class="cv">cv2.dnn.readNet</tspan>: NanoDet-Plus</text>
+<text x="397" y="1180" xml:space="preserve">people, vehicles; <tspan class="cv">cv2.dnn.NMSBoxes</tspan></text>
+<text x="397" y="1196" xml:space="preserve"><tspan class="cv">cv2.GaussianBlur</tspan> on every box</text>
+</g>
+<g class="node" data-box="694 1104 279 120">
+<rect class="box" x="694" y="1104" width="279" height="120"/>
+<text x="704" y="1124" class="h" xml:space="preserve">PYRAMID · build_pyramid</text>
+<line class="band" x1="694" y1="1134" x2="973" y2="1134"/>
+<text x="704" y="1148" xml:space="preserve"><tspan class="cv">cv2.pyrDown</tspan> × 4 → L0 … L4</text>
+<text x="704" y="1164" xml:space="preserve">L0 full resolution, L4 = 1/16</text>
+</g>
+<g class="node" data-box="1001 1104 279 120">
+<rect class="box" x="1001" y="1104" width="279" height="120"/>
+<text x="1011" y="1124" class="h" xml:space="preserve">SALIENCY @ L3 · saliency</text>
+<line class="band" x1="1001" y1="1134" x2="1280" y2="1134"/>
+<text x="1011" y="1148" xml:space="preserve"><tspan class="cv">cv2.createCLAHE</tspan>, <tspan class="cv">cv2.Sobel</tspan></text>
+<text x="1011" y="1164" xml:space="preserve"><tspan class="cv">cv2.morphologyEx</tspan> BLACKHAT</text>
+<text x="1011" y="1180" xml:space="preserve"><tspan class="cv">cv2.adaptiveThreshold</tspan>, <tspan class="cv">cv2.inRange</tspan></text>
+<text x="1011" y="1196" xml:space="preserve"><tspan class="cv">cv2.connectedComponentsWithStats</tspan></text>
+<text x="1011" y="1212" xml:space="preserve">→ ≤ 20 candidate windows</text>
+</g>
+<path class="edge " d="M359 1164 L387 1164"/>
+<path class="edge " d="M666 1164 L694 1164"/>
+<path class="edge " d="M973 1164 L1001 1164"/>
+<text x="80" y="1250" class="fs" xml:space="preserve">b · every look, chosen by the agent core</text>
+<g class="node" data-box="80 1260 279 120">
+<rect class="box" x="80" y="1260" width="279" height="120"/>
+<text x="90" y="1280" class="h" xml:space="preserve">VIRTUAL PTZ · imaging.gaze</text>
+<line class="band" x1="80" y1="1290" x2="359" y2="1290"/>
+<text x="90" y="1304" xml:space="preserve"><tspan class="cv">cv2.warpPerspective</tspan>: 512² view</text>
+<text x="90" y="1320" xml:space="preserve">pan, zoom = pyramid level,</text>
+<text x="90" y="1336" xml:space="preserve">yaw/pitch de-warp via the MCP tool</text>
+<text x="90" y="1352" xml:space="preserve"><tspan class="cv">cv2.perspectiveTransform</tspan> → L0 px</text>
+</g>
+<g class="node" data-box="387 1260 279 120">
+<rect class="box" x="387" y="1260" width="279" height="120"/>
+<text x="397" y="1280" class="h" xml:space="preserve">QUALITY GATE · quality</text>
+<line class="band" x1="387" y1="1290" x2="666" y2="1290"/>
+<text x="397" y="1304" xml:space="preserve"><tspan class="cv">cv2.Laplacian</tspan> var &lt; 12 → blur</text>
+<text x="397" y="1320" xml:space="preserve">glare &gt; 20 %, dark &gt; 50 %</text>
+<text x="397" y="1336" xml:space="preserve">→ view not trusted</text>
+<text x="397" y="1352" xml:space="preserve">MCP enhance: <tspan class="cv">cv2.createCLAHE</tspan> on L</text>
+</g>
+<g class="node" data-box="694 1260 279 120">
+<rect class="box call" x="694" y="1260" width="279" height="120"/>
+<text x="704" y="1280" class="h" xml:space="preserve">SEGMENT · segment.py ★</text>
+<line class="band" x1="694" y1="1290" x2="973" y2="1290"/>
+<text x="704" y="1304" xml:space="preserve"><tspan class="cv">cv2.dnn.readNetFromONNX</tspan>(path,</text>
+<text x="704" y="1320" xml:space="preserve">  engine=<tspan class="cv">cv2.dnn.ENGINE_NEW</tspan>)</text>
+<text x="704" y="1336" xml:space="preserve">dacl10k ONNX, dynamic H×W, opt-in</text>
+<text x="704" y="1352" xml:space="preserve">default: classical, no weights</text>
+<text x="704" y="1368" xml:space="preserve">→ class masks, areas, entropy</text>
+</g>
+<g class="node" data-box="1001 1260 279 120">
+<rect class="box" x="1001" y="1260" width="279" height="120"/>
+<text x="1011" y="1280" class="h" xml:space="preserve">MEASURE + VERIFY</text>
+<line class="band" x1="1001" y1="1290" x2="1280" y2="1290"/>
+<text x="1011" y="1304" xml:space="preserve">measure.py: <tspan class="cv">cv2.morphologyEx</tspan></text>
+<text x="1011" y="1320" xml:space="preserve">  HITMISS thin, <tspan class="cv">cv2.minAreaRect</tspan>,</text>
+<text x="1011" y="1336" xml:space="preserve">  <tspan class="cv">cv2.arcLength</tspan> → px length, width</text>
+<text x="1011" y="1352" xml:space="preserve">look_iou: <tspan class="cv">cv2.warpPerspective</tspan></text>
+<text x="1011" y="1368" xml:space="preserve">  + <tspan class="cv">cv2.dilate</tspan> → mask IoU</text>
+</g>
+<path class="edge " d="M359 1320 L387 1320"/>
+<path class="edge " d="M666 1320 L694 1320"/>
+<path class="edge " d="M973 1320 L1001 1320"/>
+<text x="80" y="1404" class="fs" xml:space="preserve">★ OpenCV-5-specific: the engine=<tspan class="cv">cv2.dnn.ENGINE_NEW</tspan> argument (segment.py:239). Every other call above also exists in OpenCV 4.x.</text>
+<path class="edge " d="M60 914 L40 914 L40 1540 L60 1540"/>
+<rect class="frame" x="60" y="1460" width="800" height="140"/>
+<circle class="n" cx="82" cy="1480" r="11"/>
+<text class="nt" x="82" y="1484" text-anchor="middle">5</text>
+<text x="100" y="1484" class="fl" xml:space="preserve">OUTPUTS</text>
+<text x="174.48" y="1484" class="fs" xml:space="preserve">yielded by Job.run(): streamed or written</text>
+<g class="node" data-box="80 1496 370 88">
+<rect class="box" x="80" y="1496" width="370" height="88"/>
+<text x="90" y="1516" class="h" xml:space="preserve">NDJSON TRACE</text>
+<line class="band" x1="80" y1="1526" x2="450" y2="1526"/>
+<text x="90" y="1540" xml:space="preserve">one line per step: decision, observation,</text>
+<text x="90" y="1556" xml:space="preserve">runtime p50/p95, cause, rationale</text>
+<text x="90" y="1572" xml:space="preserve">web: streamed · CLI/MCP: trace.jsonl</text>
+</g>
+<g class="node" data-box="470 1496 370 88">
+<rect class="box" x="470" y="1496" width="370" height="88"/>
+<text x="480" y="1516" class="h" xml:space="preserve">WORK ORDER · work_order.json</text>
+<line class="band" x1="470" y1="1526" x2="840" y2="1526"/>
+<text x="480" y="1540" xml:space="preserve">findings, gaze_path, approvals;</text>
+<text x="480" y="1556" xml:space="preserve">blocked while any is <tspan class="rd">pending_review</tspan></text>
+<text x="480" y="1572" xml:space="preserve">web: HMAC-SHA256 token, 7-day expiry</text>
+</g>
+<rect class="tb" x="880" y="1460" width="420" height="140"/>
+<line class="tbl" x1="880" y1="1504" x2="1300" y2="1504"/>
+<line class="tbl" x1="880" y1="1576" x2="1300" y2="1576"/>
+<line class="tbl" x1="1150" y1="1460" x2="1150" y2="1504"/>
+<text x="896" y="1492" class="tbig" xml:space="preserve">DRISHYAM</text>
+<text x="1166" y="1488" class="fl" xml:space="preserve">SHEET A-1</text>
+<rect class="box" x="896" y="1513" width="22" height="12"/>
+<text x="926" y="1523" class="fs" xml:space="preserve">built and tested</text>
+<rect class="box" x="1084" y="1513" width="22" height="12" stroke-dasharray="8 5"/>
+<text x="1114" y="1523" class="fs" xml:space="preserve">planned, not deployed</text>
+<text x="896" y="1545" class="fs" xml:space="preserve"><tspan class="cv">cv2.call</tspan> OpenCV call · <tspan class="ca">cause</tspan> trace cause</text>
+<text x="896" y="1566" class="fs" xml:space="preserve"><tspan class="rd">red</tspan> human gate or kill · ★ OpenCV-5-only</text>
+<text x="896" y="1593" class="fs" xml:space="preserve">DRAWN 2026-10-18 · SCALE NTS · REV 7a93ec5</text>
+</svg>
