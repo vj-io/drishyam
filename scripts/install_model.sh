@@ -8,9 +8,10 @@
 # The zip (the notebook's output, wherever the browser saved it) is unpacked into a fresh temporary folder.
 # 1. checks both files on OpenCV 5 DNN ENGINE_NEW (6-class output at 256 and 512) and through OnnxSegmenter
 #    (FP16 against FP32 too: over 5e-2, the FP16 file is dropped and FP32 installed alone), before touching the repo;
-# 2. copies them to models/drishyam_dacl10k.onnx and .fp16.onnx (and a metrics.json found beside best.onnx to
-#    models/drishyam_dacl10k.metrics.json), and records sizes, sha256, validation mIoU and the licence in
-#    models/README.md, and names their CC BY-NC 4.0 licence in README.md's Licence line;
+# 2. copies them to models/drishyam_dacl10k.onnx and .fp16.onnx (and the metrics.json and run_info.json found beside
+#    best.onnx to models/drishyam_dacl10k.metrics.json and .run_info.json), and records sizes, sha256, validation mIoU,
+#    the training run's package versions and source, and the licence in models/README.md, and names their
+#    CC BY-NC 4.0 licence in README.md's Licence line;
 # 3. runs 3 sample images through `drishyam run` with DRISHYAM_ONNX set (runs/model-smoke/);
 # 4. runs evals.model_eval on --n images of data/synth200: this model (fixed cost model, its own job_ops timing)
 #    against the classical engine, into runs/model-eval/ (never public/results; `make eval-model` adds the
@@ -92,6 +93,8 @@ cp "$MODEL" "$DST"
 if [ -n "$FP16" ]; then cp "$FP16" "$DST16"; else rm -f "$DST16"; fi
 METRICS="$(dirname "$MODEL")/metrics.json"
 if [ -f "$METRICS" ]; then cp "$METRICS" models/drishyam_dacl10k.metrics.json; else rm -f models/drishyam_dacl10k.metrics.json; fi
+RUNINFO="$(dirname "$MODEL")/run_info.json"
+if [ -f "$RUNINFO" ]; then cp "$RUNINFO" models/drishyam_dacl10k.run_info.json; else rm -f models/drishyam_dacl10k.run_info.json; fi
 "$PY" - <<'EOF'
 import datetime, hashlib, json
 from pathlib import Path
@@ -109,6 +112,16 @@ if mp.exists():
              f"**{b['val_miou5']:.3f}** ({merged}). Validation mIoU over the 19 dacl10k classes at that epoch: "
              f"{b['val_miou19']:.3f} (the paper's MobileNetV3 baseline: 0.320). Per-epoch numbers: "
              "`drishyam_dacl10k.metrics.json`.")
+rp = Path("models/drishyam_dacl10k.run_info.json")
+run = "No `run_info.json` came with the weights (notebooks built before it was added do not write one)."
+if rp.exists():
+    sessions = json.loads(rp.read_text())
+    last = sessions[-1]  # the session that exported the weights
+    v = ", ".join(f"{k} {val}" for k, val in last["versions"].items() if val)
+    src = f"git `{last['git_sha']}`" if last.get("git_sha") else "no git checkout (Kaggle)"
+    run = (f"Trained with Python {last['python']}, {v} ({len(sessions)} session(s); every one is in "
+           f"`drishyam_dacl10k.run_info.json`). Source: {src}; notebook sources sha256 `{last['source_sha256']}` "
+           "(`training/make_notebook.py`'s `source_sha256()` at the commit the notebook was built from).")
 section = f"""{head}
 
 Fine-tuned on dacl10k with `training/drishyam_dacl10k_kaggle.ipynb` (UNet, timm MobileNetV3-Large encoder) and installed
@@ -120,6 +133,8 @@ select it (`training/README.md`).
 | --- | --- | --- |
 {rows}
 {score}
+
+{run}
 
 **Licence: [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/), non-commercial; not the permissive licences
 above and not the repo's MIT.** The weights are adapted from (trained on) [dacl10k](https://github.com/phiyodr/dacl10k-toolkit)
@@ -163,7 +178,7 @@ fi
 
 echo "== 5/5 to make the live site use it (not run here; the weights are CC BY-NC 4.0, see models/README.md)"
 ADD="$DST models/README.md README.md"
-for f in "$DST16" models/drishyam_dacl10k.metrics.json; do  # written, or removed after an earlier commit
+for f in "$DST16" models/drishyam_dacl10k.metrics.json models/drishyam_dacl10k.run_info.json; do  # written, or removed after an earlier commit
   if [ -f "$f" ] || git ls-files --error-unmatch "$f" >/dev/null 2>&1; then ADD="$ADD $f"; fi
 done
 echo "  git add $ADD"

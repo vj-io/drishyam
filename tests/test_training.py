@@ -46,6 +46,7 @@ def test_kaggle_notebook_is_built_from_the_current_script():
     nb = json.loads((TRAINING / "drishyam_dacl10k_kaggle.ipynb").read_text())
     setup = next("".join(c["source"]) for c in nb["cells"] if "".join(c["source"]).startswith("# Setup"))
     assert nb["nbformat"] == 4 and all(repr(rel) in setup for rel in make_notebook.CARRIED)
+    assert f'SOURCE_SHA256 = "{make_notebook.source_sha256()}"' in setup  # what run_info.json records on Kaggle
 
 
 @pytest.fixture(scope="module")
@@ -160,8 +161,15 @@ def test_synthetic_smoke_writes_checkpoint_and_metrics(exported):
     assert ckpt.exists() and (ckpt.parent / "best.pt").exists()
     history = json.loads((ckpt.parent / "metrics.json").read_text())
     assert history[-1]["step"] == 3 and set(history[-1]["iou19"]) == set(TARGET_LIST)
+    (info,) = json.loads((ckpt.parent / "run_info.json").read_text())  # one session
+    sys.path.insert(0, str(TRAINING))
+    import make_notebook
+    import timm
     import torch
 
+    assert info["versions"]["torch"] == torch.__version__.split("+")[0] and info["versions"]["timm"] == timm.__version__
+    assert info["versions"]["cv2"] == cv2.__version__ and info["source_sha256"] == make_notebook.source_sha256()
+    assert info["git_sha"] is None or len(info["git_sha"]) == 40
     best = torch.load(ckpt.parent / "best.pt", map_location="cpu")  # chosen on Drishyam's five defects
     assert best["val_miou5"] == max(h["val_miou5"] for h in history) == best["best"]
 
