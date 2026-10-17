@@ -172,7 +172,8 @@ it changed, else `rule`. No LLM planner is configured on the live demo: there `p
 
 Sets a shared flag (TTL 5 min) that the running job reads after every step; the governor then
 halts before the next look with cause `kill-switch`. The flag lives in the regional Vercel Runtime
-Cache, or in the DynamoDB table `DRISHYAM_KILL_TABLE` names on AWS (see [aws.md](aws.md)); neither
+Cache, or on AWS in the DynamoDB table `DRISHYAM_KILL_TABLE` names (partition key `k`, a string; numeric
+TTL attribute `exp`, unix seconds); neither
 platform passes the browser's disconnect through to the function, so the flag is the only path.
 A wrong token is accepted and kills nothing (no oracle). Returns `{"ok": true, "job": "..."}`;
 400 on malformed ids.
@@ -199,7 +200,8 @@ A wrong token is accepted and kills nothing (no oracle). Returns `{"ok": true, "
 
 ### Downloaded work-order file
 
-The file the page saves keeps the signature with the order, so the copy can be checked later:
+Not built yet: the page still saves the bare work order (`work_order.json`, the object above). The
+planned file keeps the signature with the order, so the copy can be checked later:
 
 ```json
 {"work_order": { /* as above */ }, "token": "<signed work order>", "alg": "HMAC-SHA256", "exp": 1793000000}

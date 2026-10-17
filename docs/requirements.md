@@ -39,6 +39,10 @@ ready; needs the owner's AWS account) · **open**.
 | FR-24 | IaC (CDK) | — | — | AWS |
 | FR-25–27 | Stitcher mosaic, PaliGemma caption, COOL autotuner | — | — | P2, not started |
 
+Deferred (review item TECH-T8a, a stretch goal): dropping a crack finding whose thinned centreline fits one
+straight line (a `cv2.fitLine` residual rule against form joints and edges) is not built, so there is no
+before/after on `data/synth_dev` for it.
+
 ## Non-functional
 
 | ID | Area | Where | Status |
