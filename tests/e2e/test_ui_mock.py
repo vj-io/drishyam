@@ -11,7 +11,7 @@ Scenarios (a real Chromium, the document served with the production CSP header):
      review of every critical finding, replay slider, heatmap toggle, work-order download, screenshots.
   2. live-API path (no ?mock) against a local stand-in for /api/*: query string, X-Drishyam-Replay header,
      /api/review tokens, /api/kill {job, kill_token}, privacy.boxes blur, halt step.
-  3. mobile 375 px, 4. prefers-reduced-motion, 5. heading names, 6. pending states.
+  3. mobile 375 px, 4. prefers-reduced-motion, 5. heading names, 6. pending states, 7. a COOL file with missing fields.
 Any CSP violation, console error or page error fails the run. wait_for_function is avoided on purpose
 (it is blocked by a strict CSP): every wait uses locators or polls page.evaluate.
 """
@@ -86,6 +86,16 @@ SUMMARY = {
               {"op": "warpPerspective", "size": "4000x3000", "p50_ms": 9.2, "p95_ms": 11.8}],
     "provenance": {"cv2": "5.0.0", "machine": "test rig", "build": "stock"},
 }
+# the shape bench.compare_arms --summary writes; the numbers are made up for the test
+COOL = {"expected": {"op_level": [1.2, 1.8], "end_to_end": [1.2, 1.3]},
+        "end_to_end": {"cool_gain": 1.04, "hardware_gain": 1.1, "a_over_c": 1.144},
+        "op_level_geomean": {"cool_gain": 1.5, "hardware_gain": 1.2},
+        "parity_a_vs_b": {"crops": 24, "pixel_agreement": 0.9991, "worst_crop_agreement": 0.98},
+        "arms": {r: {"what": what, "instance_type": it, "cv2": "5.0.0", "cv2_from_opt_cool": r == "A", "images_per_s": ips,
+                     "usd_per_hour": usd, "usd_per_1k_images": round(usd / 3.6 / ips, 6), "covered_fraction": 0.093}
+                 for r, what, it, ips, usd in (("A", "COOL build, Graviton", "c8g.2xlarge", 2.6, 0.339),
+                                               ("B", "stock wheel, Graviton", "c8g.2xlarge", 2.5, 0.319),
+                                               ("C", "stock wheel, x86", "c7i.2xlarge", 2.27, 0.357))}}
 FAILURES = [{"image": "failures/f01.jpg", "category": "graffiti read as damage",
              "what_happened": "A spray-painted line was drafted as a crack.",
              "rule_that_would_catch_it": "reject masks with saturated paint hues"}]
@@ -95,6 +105,8 @@ DATA = {
     "/samples/bridge_01.jpg": ("image/jpeg", MOCK_JPG),
     "/samples/thumbs/bridge_01.jpg": ("image/jpeg", THUMB_BYTES),
     "/results/summary.json": ("application/json", json.dumps(SUMMARY).encode()),
+    "/results/codebrim/summary.json": ("application/json", json.dumps({**SUMMARY, "dataset": "CODEBRIM (test fixture)"}).encode()),
+    "/results/cool.json": ("application/json", json.dumps(COOL).encode()),
     "/results/failures.json": ("application/json", json.dumps(FAILURES).encode()),
     "/results/failures/f01.jpg": ("image/jpeg", MOCK_JPG),
 }
@@ -313,6 +325,9 @@ def test_desktop_mock(browser, base):
     expect(p.locator("#bench svg.chart")).to_be_visible()
     expect(p.locator("#bench .legend li")).to_have_count(3)
     expect(p.locator("#fail .fail")).to_have_count(1)
+    expect(p.locator("#bench-cool tbody tr")).to_have_count(3)                   # FIG. 4.3 from results/cool.json
+    expect(p.locator("#bench-cool .kv")).to_contain_text("PRD expects 1.2–1.3×")  # the expected range sits by the measured gain
+    expect(p.locator("#cool-status")).to_contain_text(f"ran at {COOL['end_to_end']['cool_gain']}×")  # the banner says what was measured
     p.keyboard.press("Tab")
     outline = p.evaluate("(() => { const s = getComputedStyle(document.activeElement); return s.outlineStyle + ' ' + s.outlineWidth; })()")
     assert outline.startswith("solid"), f"no visible keyboard focus: {outline}"
@@ -585,6 +600,8 @@ def test_pending_states(browser, base):
     p.goto(f"{base}/")
     expect(p.locator("#bench")).to_contain_text("benchmarks pending", timeout=T)
     expect(p.locator("#fail")).to_contain_text("failure gallery pending")
+    expect(p.locator("#bench-cool")).to_contain_text("COOL benchmark pending")
+    expect(p.locator("#cool-status")).to_contain_text("has not been done yet")
     expect(p.locator("#gallery-empty")).to_be_visible()
     expect(p.locator("#look")).to_be_disabled()
     expect(p.locator("#stat-recall .stat__v")).to_have_text("see benchmarks")
@@ -593,6 +610,23 @@ def test_pending_states(browser, base):
     s.check_clean()
     s.context.close()
     print("ok  pending states: friendly empty states, no errors")
+
+
+def test_cool_missing_fields(browser, base):
+    """A cool.json holding little more than the headline gain still draws FIG. 4.3 and the banner, with dashes."""
+    s = Session(browser, "cool-partial", viewport={"width": 375, "height": 812})
+    partial = {"end_to_end": {"cool_gain": 0.97}, "arms": {"A": {}, "B": None}}
+    s.context.route("**/results/cool.json", lambda r: r.fulfill(status=200, content_type="application/json", body=json.dumps(partial)))
+    p = s.page
+    p.goto(f"{base}/?mock=1")
+    expect(p.locator("#bench-cool tbody th")).to_have_text(["A"], timeout=T)  # the null arm is skipped
+    expect(p.locator("#bench-cool tbody td").first).to_have_text("–")
+    expect(p.locator("#bench-cool .kv__sub")).to_have_count(0)                # no expected range in the file, none shown
+    expect(p.locator("#cool-status")).to_have_text("The COOL/Graviton run has been measured (FIG. 4.3): a whole job ran at "
+                                                   "0.97× the speed of the stock wheel on the same instance type.")
+    s.check_clean()
+    s.context.close()
+    print("ok  COOL file with missing fields: dashes, no errors")
 
 
 def test_halt_governor_note_and_critical_trigger(browser, base):
@@ -636,6 +670,7 @@ if __name__ == "__main__":
             test_reduced_motion(browser, base)
             test_heading_names(browser, base)
             test_pending_states(browser, base)
+            test_cool_missing_fields(browser, base)
             test_halt_governor_note_and_critical_trigger(browser, base)
             browser.close()
     finally:

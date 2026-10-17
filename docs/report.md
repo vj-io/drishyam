@@ -148,12 +148,20 @@ Twelve real failures from the same run, two per category (FIG. 5 on the live sit
 The hot path uses only KleidiCV-accelerated ops (`pyrDown`, `warpPerspective`,
 `resize`, `GaussianBlur`, `Sobel`, `morphologyEx`, `medianBlur`, `cvtColor`,
 `inRange`, `dilate`/`erode`); no `filter2D`, no NumPy pixel loops on the gaze
-path. `bench/run_all.sh <arm>` runs the micro, macro and DNN workloads with a
-provenance block (OpenCV version, build-info hash, whether `cv2` loads from
+path. `bench/run_all.sh <arm>` runs the micro and macro benchmarks and a parity
+save with a provenance block (OpenCV version, build-info hash, whether `cv2` loads from
 `/opt/cool`) and `bench/parity.py` checks that two arms produce identical masks.
+The same code passes CI on GitHub's free arm64 runners.
+
 The three-arm run (COOL/c8g, stock/c8g, stock/c7i) needs the owner's AWS
-account; [bench/README.md](../bench/README.md) is the runbook. The same code
-passes CI on GitHub's free arm64 runners.
+account. [bench/aws_runbook.md](../bench/aws_runbook.md) is the copy-paste
+sequence. It sets up the budget and stop action, launches the three arms,
+which terminate themselves after 3 hours, runs them through SSM and copies the
+results back, for at most about $1 per arm. `python -m bench.compare_arms results/A
+results/B results/C` then writes `docs/cool_benchmark.md` (per-op
+and whole-job speed-ups, $/1k images, the Amdahl split, A-vs-B mask parity and
+provenance) next to the PRD's expected 1.2–1.8× op-level and 1.2–1.3× end-to-end
+range.
 
 **What COOL can buy end to end, measured.** An 8-image macro run on the local x86 laptop ([results/local-macos-x86/macro.json](../results/local-macos-x86/macro.json)) puts 9 % of a job in KleidiCV-covered imgproc, 69 % in the classical segmenter (imgproc plus NumPy), 3 % in crack thinning, 8 % in decode and 12 % in Python. So if COOL makes the covered ops 1.8× faster, a whole job gets about 1.04× faster. The gaze path itself is cheap; most of the time is in segmentation, which is where a COOL or DNN speed-up would have to land.
 
