@@ -602,7 +602,7 @@ def run(data_dir="data/synth200", n=200, out_dir="public/results", results_dir="
     records, label = load_records(data_dir, n, kind, seed, size)
     synthetic = label.startswith("synthetic")
     out, repo = Path(out_dir).resolve(), REPO
-    kept_local = [repo / "results" / "codebrim", repo / "runs"]  # git- and Vercel-ignored
+    kept_local = [repo / "results" / "codebrim", repo / "runs"]  # git-ignored, and outside public/, which is all the site serves
     if not synthetic and ("public" in out.parts or (
             out.is_relative_to(repo) and not any(out.is_relative_to(d) for d in kept_local))):
         # CODEBRIM licence, clause 4: the images and modified versions of them (the failure crops) are not redistributed

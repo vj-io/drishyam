@@ -5,7 +5,6 @@ __pycache__/
 .ruff_cache/
 data/
 runs/
-.vercel
 .env*
 !.env.example
 node_modules/

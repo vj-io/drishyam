@@ -1,7 +1,7 @@
 # Drishyam — submission report
 
 *Virtual-PTZ inspection of bridge photos with an agent that spends compute in
-proportion to risk.* Live demo: https://drishyam-seven.vercel.app · Code: https://github.com/vj-io/drishyam · Demo video (49 s): https://github.com/vj-io/drishyam/releases/latest/download/drishyam-demo.mp4
+proportion to risk.* Live demo: https://<cloudfront-domain> · Code: https://github.com/vj-io/drishyam · Demo video (49 s): https://github.com/vj-io/drishyam/releases/latest/download/drishyam-demo.mp4
 
 ## 1. Problem
 
@@ -83,7 +83,7 @@ Failure drills, each runnable from the UI (`chaos` toggles) and covered by tests
 | --- | --- |
 | 20 planner timeouts + 20 malformed planner replies | 40 / 40 recovered by the rule planner (`test_20_timeouts_and_20_malformed_all_recover`) |
 | Forced p95 spike on the segmenter | the next step's cause is `p95>SLA` and its model is `fast` (`test_forced_p95_spike_changes_next_steps_model`) |
-| KILL during a live job on Vercel | kill sent during step 3 → step 4 halted with cause `kill-switch` (verified on the production deployment) |
+| KILL during a live job | kill sent during step 3 → step 4 halted with cause `kill-switch` (`test_kill_endpoint_halts_a_running_job`, the live e2e run; on the deployed site, check 3 of `scripts/smoke.sh`) |
 | $ and pixel caps | the job halts inside one step with coverage and unvisited regions reported (`test_pixel_cap_is_never_exceeded`, `test_seconds_and_usd_caps_halt`) |
 | Agent tries to approve its own critical finding | `ForbiddenTransition` (`test_agent_cannot_decide_or_downgrade`) |
 
@@ -239,8 +239,9 @@ range.
 
 ## 7. Cost
 
-Spent so far: **$0.** Vercel Hobby (the live demo), GitHub Actions (CI on x86
-and arm64), local CPU for evaluation. The $ in the UI is *modelled* at the
+Spent so far: **$0.** GitHub Actions (CI on x86 and arm64), local CPU for
+evaluation. The AWS deployment of the live demo is estimated at about 10 USD a
+month, 8 of it the WAF ([aws.md](aws.md)). The $ in the UI is *modelled* at the
 c8g.2xlarge + COOL rate ($0.339/h) so the curves read as a buyer's cost.
 
 ## 8. Limits and next steps

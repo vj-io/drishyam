@@ -41,7 +41,7 @@ has to be pushed or uploaded first. It needs a Kaggle account with phone verific
    `models/README.md` and the Licence line of `README.md`, runs three `drishyam run` jobs with `DRISHYAM_ONNX` set, runs
    `evals.harness` on `data/synth200` twice (classical, then the model) into `runs/model-eval/` (never
    `public/results`), prints the before/after recall table with each run's pixel fraction, and prints the `git` and
-   `vercel env add` commands that would put the model on the live site
+   `scripts/aws.sh deploy` commands that would put the model on the live site
    (it runs none of them). 200 images is the published eval; `--n 20` is a quicker look. The ONNX run is CPU-bound:
    on the 16-thread Intel Mac a 512 px look took 0.25 s and an image's policies about 46 s against 6 s classical
    (smoke model, 8 workers), so 200 images should take roughly 25 minutes, against 3 for the classical run.
@@ -57,7 +57,7 @@ Edit `train_dacl10k.py`, never the notebook: `python training/make_notebook.py` 
 | `train_dacl10k.py` | Training script and the notebook's source (`# %%` cells): train, export, parity, zip; `--synthetic` smoke mode |
 | `make_notebook.py` | Builds `drishyam_dacl10k_kaggle.ipynb` from those cells, embedding the helper files; `--check` for staleness |
 | `drishyam_dacl10k_kaggle.ipynb` | The generated Kaggle notebook (do not edit by hand) |
-| `../scripts/install_model.sh` | The hand-back: checks, installs into `models/`, smoke jobs, before/after eval, Vercel commands |
+| `../scripts/install_model.sh` | The hand-back: checks, installs into `models/`, smoke jobs, before/after eval, deploy commands |
 | `export_onnx.py` | Checkpoint to FP32 and FP16 ONNX, opset 17, dynamic H x W, onnxslim, OpenCV DNN load check |
 | `parity.py` | FR-4 acceptance: 20 fixed crops, PyTorch vs `OnnxSegmenter` |
 | `../tests/test_training.py` | Class-map check always; loader, merge, 3-step train, export, DNN load and parity when torch is installed |
@@ -226,7 +226,7 @@ Run it where torch and OpenCV 5 coexist (below), with the repo checked out (it i
 
 ## 7. Point Drishyam at the model
 
-`scripts/install_model.sh` (step 6 above) does this and prints the Vercel side. By hand:
+`scripts/install_model.sh` (step 6 above) does this and prints the deploy command for the live site. By hand:
 
 ```
 export DRISHYAM_ONNX=/path/to/drishyam_dacl10k.onnx
@@ -241,16 +241,18 @@ export DRISHYAM_ONNX_FP16=/path/to/drishyam_dacl10k.fp16.onnx
 These map to `OnnxSegmenter(path, fp16_path)`. No `class_map` is needed because the ONNX already outputs the six classes.
 `drishyam.segment.default_segmenter` picks these variables up automatically.
 
-To take the model off the live site later, run each of these on its own, then redeploy:
+On the live site (AWS, `docs/aws.md`) the model is chosen at deploy time: `scripts/build_lambda.sh` packages
+every `models/*.onnx`, and `ONNX` (optionally `ONNX_FP16`) sets the function's `DRISHYAM_ONNX`
+(`DRISHYAM_ONNX_FP16`) to that file:
 
 ```
-vercel env rm DRISHYAM_ONNX production --yes
+ONNX=models/drishyam_dacl10k.onnx ONNX_FP16=models/drishyam_dacl10k.fp16.onnx scripts/aws.sh deploy
 ```
 
-and, only if FP16 was set:
+To take the model off the live site later, deploy again without them:
 
 ```
-vercel env rm DRISHYAM_ONNX_FP16 production --yes
+scripts/aws.sh deploy
 ```
 
 Publish to the Hugging Face Hub so the EC2 box can pull it (the weights inherit dacl10k's non-commercial licence, so say

@@ -1,24 +1,24 @@
 # Drishyam web API contract
 
-The browser UI (`public/`) talks to the Python function (`app.py` → `drishyam/web.py`) through
+The browser UI (`public/`) talks to the Python function (`drishyam/web.py`, on AWS Lambda) through
 four endpoints. Every response is JSON or NDJSON. All coordinates are **L0
 pixels** (full-resolution image), `[x, y, w, h]` boxes have their origin at the
 top-left. All measurements are pixels; there are no millimetres anywhere.
 
 Behind CloudFront with Origin Access Control (the AWS deployment), every `POST` must also carry
 `x-amz-content-sha256`: the hex SHA-256 of the exact request body. Lambda refuses unsigned payloads
-through OAC with a 403. On Vercel or locally the header is ignored.
+through OAC with a 403. Locally the header is ignored.
 
 ## `GET /api/health`
 
 ```json
 {"ok": true, "version": "1.0.2", "opencv": "5.0.0", "build": "stock (not COOL)", "segmenter": "classical-v1",
  "segmenter_licence": "MIT (no learned weights)", "max_upload_bytes": 4400000, "max_pixels": 25000000,
- "host": "vercel", "arch": "x86_64", "commit": "7a93ec5..."}
+ "host": "aws-lambda", "arch": "aarch64", "commit": "7a93ec5..."}
 ```
 
-`host` is `aws-lambda`, `vercel` or `local`; `arch` is `platform.machine()` (`x86_64`, `aarch64`,
-`arm64`); `commit` is `VERCEL_GIT_COMMIT_SHA` or `DRISHYAM_COMMIT` (an image build argument), else `null`.
+`host` is `aws-lambda` or `local`; `arch` is `platform.machine()` (`x86_64`, `aarch64`,
+`arm64`); `commit` is `DRISHYAM_COMMIT` (`scripts/aws.sh deploy` sets it to the git SHA it deployed), else `null`.
 `segmenter_licence` is `CC BY-NC 4.0, trained on dacl10k` when the dacl10k-trained ONNX model is loaded.
 
 ## `POST /api/jobs`
@@ -171,10 +171,10 @@ it changed, else `rule`. No LLM planner is configured on the live demo: there `p
 ```
 
 Sets a shared flag (TTL 5 min) that the running job reads after every step; the governor then
-halts before the next look with cause `kill-switch`. The flag lives in the regional Vercel Runtime
-Cache, or on AWS in the DynamoDB table `DRISHYAM_KILL_TABLE` names (partition key `k`, a string; numeric
-TTL attribute `exp`, unix seconds); neither
-platform passes the browser's disconnect through to the function, so the flag is the only path.
+halts before the next look with cause `kill-switch`. On AWS the flag lives in the DynamoDB table
+`DRISHYAM_KILL_TABLE` names (partition key `k`, a string; numeric TTL attribute `exp`, unix seconds), in
+a local run in the server process; a Lambda Function URL does not pass the browser's disconnect through
+to the function, so the flag is the only path.
 A wrong token is accepted and kills nothing (no oracle). Returns `{"ok": true, "job": "..."}`;
 400 on malformed ids.
 

@@ -1,8 +1,8 @@
 """End-to-end check of the real stack: the page, the FastAPI app and the agent, nothing mocked.
 
 Run: make e2e   (or: python tests/e2e/test_ui_live.py [BASE_URL]; needs playwright + chromium)
-Without BASE_URL it starts the app locally (uvicorn, production headers from vercel.json) on DRISHYAM_E2E_PORT
-(default: any free port). With BASE_URL (e.g. the Vercel deployment) it runs the same flows against it.
+Without BASE_URL it starts the app locally (uvicorn, production headers from infra/headers.json) on DRISHYAM_E2E_PORT
+(default: any free port). With BASE_URL (e.g. the CloudFront URL) it runs the same flows against it.
 Waits use locators and polling, never wait_for_function (blocked under the strict CSP).
 """
 

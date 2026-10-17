@@ -1,6 +1,6 @@
 # AWS deployment
 
-The same FastAPI app and static site that run on Vercel, deployed to AWS as one CDK (Python) stack in
+The web demo (the FastAPI app and the static site) runs on AWS only, as one CDK (Python) stack in
 `us-east-1`: the API on Lambda arm64 (Graviton) and the static site in a private S3 bucket, both reached
 only through CloudFront and AWS WAF.
 
@@ -36,12 +36,12 @@ flowchart LR
 
 | Part | What it does | Why |
 | --- | --- | --- |
-| Lambda `drishyam-web` | Python 3.12 zip on arm64, 3008 MB, 60 s timeout (the same ceiling as `vercel.json`), X-Ray active tracing, reserved concurrency 5 | Graviton is the target the CI's `ubuntu-24.04-arm` job already tests; 5 bounds the worst-case bill |
-| Lambda Web Adapter | Public layer `arn:aws:lambda:us-east-1:753240598075:layer:LambdaAdapterLayerArm64:30` (adapter 1.1.0, the version the [awslabs/aws-lambda-web-adapter README](https://github.com/awslabs/aws-lambda-web-adapter) lists; the layer's own description says `arm64: 1.1.0`). Handler `run.sh` starts `uvicorn app:app` on port 8080; `AWS_LAMBDA_EXEC_WRAPPER=/opt/bootstrap`, `AWS_LWA_INVOKE_MODE=response_stream` | The app runs unchanged; NDJSON events stream to the browser as they are produced |
+| Lambda `drishyam-web` | Python 3.12 zip on arm64, 3008 MB, 60 s timeout, X-Ray active tracing, reserved concurrency 5 | Graviton is the target the CI's `ubuntu-24.04-arm` job already tests; 5 bounds the worst-case bill |
+| Lambda Web Adapter | Public layer `arn:aws:lambda:us-east-1:753240598075:layer:LambdaAdapterLayerArm64:30` (adapter 1.1.0, the version the [awslabs/aws-lambda-web-adapter README](https://github.com/awslabs/aws-lambda-web-adapter) lists; the layer's own description says `arm64: 1.1.0`). Handler `run.sh` starts `uvicorn drishyam.web:app` on port 8080; `AWS_LAMBDA_EXEC_WRAPPER=/opt/bootstrap`, `AWS_LWA_INVOKE_MODE=response_stream` | The app runs unchanged; NDJSON events stream to the browser as they are produced |
 | Function URL | `AuthType AWS_IAM`, `InvokeMode RESPONSE_STREAM` | Nobody can call it without a SigV4 signature, so the WAF cannot be bypassed |
-| CloudFront | Two origins, each with Origin Access Control. `/api/*` goes to the Function URL: not cached, all methods, all viewer headers and the query string forwarded, no compression, 60 s read timeout. Everything else goes to the S3 bucket, cached (`CachingOptimized`), `/` serves `index.html`, with a response headers policy built from `vercel.json` (CSP, HSTS, `X-Frame-Options`, `Referrer-Policy`, `nosniff`, `Permissions-Policy`, COOP, CORP; `tests/test_infra.py` fails if it differs) | Lambda runs one request per environment, so a cold page load (about 30 files) through the function would hit the concurrency cap and get 429s; static invocations would also crowd out jobs and water down the Duration p95 alarm |
-| S3 bucket | Private (all public access blocked, TLS only, SSE-S3); only this distribution may read objects. CDK's `BucketDeployment` uploads `public/` on every deploy that changes it, deletes files no longer there and invalidates `/*`. `destroy` empties and deletes it | The static site off the function, with the same headers as on Vercel and in local runs |
-| AWS WAF | Web ACL (scope `CLOUDFRONT`, which must live in `us-east-1`). Rule `job-starts`: `POST /api/jobs`, 10 per IP per 120 s. Rule `kill-and-review`: `/api/kill` plus `/api/review`, 30 per IP per 60 s. Rule `all-requests`: every request, 300 per IP per 60 s (a page load is about 30). Paths are matched after URL decoding. Blocked requests get 403 | The Vercel firewall rule, now in code, the two endpoints it did not cover, and a ceiling on everything else, such as cache-busting `GET /api/health` floods. Trade-offs under Limits |
+| CloudFront | Two origins, each with Origin Access Control. `/api/*` goes to the Function URL: not cached, all methods, all viewer headers and the query string forwarded, no compression, 60 s read timeout. Everything else goes to the S3 bucket, cached (`CachingOptimized`), `/` serves `index.html`, with a response headers policy built from `infra/headers.json` (CSP, HSTS, `X-Frame-Options`, `Referrer-Policy`, `nosniff`, `Permissions-Policy`, COOP, CORP; `web.py` serves the same file's headers in local runs, and `tests/test_infra.py` fails if the policy differs from it) | Lambda runs one request per environment, so a cold page load (about 30 files) through the function would hit the concurrency cap and get 429s; static invocations would also crowd out jobs and water down the Duration p95 alarm |
+| S3 bucket | Private (all public access blocked, TLS only, SSE-S3); only this distribution may read objects. CDK's `BucketDeployment` uploads `public/` on every deploy that changes it, deletes files no longer there and invalidates `/*`. `destroy` empties and deletes it | The static site off the function, with the same headers as in local runs |
+| AWS WAF | Web ACL (scope `CLOUDFRONT`, which must live in `us-east-1`). Rule `job-starts`: `POST /api/jobs`, 10 per IP per 120 s. Rule `kill-and-review`: `/api/kill` plus `/api/review`, 30 per IP per 60 s. Rule `all-requests`: every request, 300 per IP per 60 s (a page load is about 30). Paths are matched after URL decoding. Blocked requests get 403 | A cap on job starts, the expensive call; one on the two other `POST` endpoints; and a ceiling on everything else, such as cache-busting `GET /api/health` floods. Trade-offs under Limits |
 | DynamoDB kill table | On demand, partition key `k` (string), TTL attribute `exp` | `/api/kill` lands in a different Lambda environment from the job it stops; an in-process flag cannot reach it |
 | Secrets Manager | A 64-character key generated by CloudFormation, never in the repo or the template | Every Lambda environment signs and verifies work orders with the same key |
 | CloudWatch | Log group (14-day retention); dashboard `Drishyam`; alarms on Errors (at least 1 in 5 min), Throttles (at least 1 in 5 min), Duration p95 (over 45 s) and AppErrors (at least 1 in 5 min). AppErrors is a metric filter on the log group for `ERROR drishyam` (an unhandled 500 or a failed job, which `web.py` logs from the `drishyam` logger) or uvicorn's `Exception in ASGI application` | Behind the Web Adapter a FastAPI 500, or a job that ends in an `{"type": "error"}` event inside a 200 stream, is a successful invocation, so the Errors alarm only sees timeouts, crashes and init failures |
@@ -85,7 +85,7 @@ curl (works in zsh and bash):
 
 ```
 h=$(shasum -a 256 < public/samples/bridge_03.jpg | cut -d' ' -f1)
-curl -N -H 'Content-Type: image/jpeg' -H "x-amz-content-sha256: ${h}" --data-binary @public/samples/bridge_03.jpg "https://YOUR_DISTRIBUTION.cloudfront.net/api/jobs?pixel_cap=0.3"
+curl -N -H 'Content-Type: image/jpeg' -H "x-amz-content-sha256: ${h}" --data-binary @public/samples/bridge_03.jpg "https://<cloudfront-domain>/api/jobs?pixel_cap=0.3"
 ```
 
 The alternative, a Function URL with `AuthType NONE`, needs no hash but lets anyone skip CloudFront and
@@ -150,10 +150,18 @@ are not exported, so anything an extra adds (for example `boto3`) comes from the
 ships its own copy. The python3.12
 runtime runs on Amazon Linux 2023 ([Lambda runtimes](https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html));
 `manylinux_2_28` rather than `manylinux2014` because numpy 2.5.4 publishes no `manylinux2014` aarch64
-wheel. The package then gets `drishyam/`, `app.py`, the two privacy models (YuNet, NanoDet) and
-`run.sh`; `public/` goes to the S3 bucket instead. Measured on 2026-10-18: 1,648 files, 159,782,570 bytes
-unzipped (Lambda's limit is 262,144,000), 62,787,989 bytes as a `zip -r` of the folder; CDK uploads it to
-S3, so the 50 MB direct-upload limit does not apply. The dacl10k model is not bundled: making it the live segmenter is an owner decision.
+wheel. The package then gets `drishyam/`, every `models/*.onnx` (the two privacy models, YuNet and
+NanoDet, and the dacl10k segmenter once `scripts/install_model.sh` has put it there) with the licences and
+`models/README.md`, and `run.sh`; `public/` goes to the S3 bucket instead. Measured on 2026-10-18: 1,504
+files, 158,912,690 bytes unzipped (Lambda's limit is 262,144,000, layers included), 62,539,742 bytes as a
+`zip -r` of the folder; with the dacl10k FP32 and FP16 files, 199,186,975 bytes unzipped and 99,697,441
+zipped. CDK uploads the zip to S3, so the 50 MB direct-upload limit does not apply.
+
+A packaged model is used only when the deploy names it: `ONNX=models/drishyam_dacl10k.onnx scripts/aws.sh
+deploy` (add `ONNX_FP16=models/drishyam_dacl10k.fp16.onnx` for the fast path) passes CDK context `onnx`
+(`onnx_fp16`), which sets the function's `DRISHYAM_ONNX` (`DRISHYAM_ONNX_FP16`) to that file under
+`/var/task`; `infra/app.py` refuses a path that is not in `build/lambda`. A deploy without `ONNX` runs the
+classical engine. Making the CC BY-NC 4.0 dacl10k model the live segmenter is an owner decision.
 
 ## Smoke
 

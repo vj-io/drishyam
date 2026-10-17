@@ -67,6 +67,7 @@ def test_function_is_arm64_streaming_behind_iam(template):
     assert env["AWS_LAMBDA_EXEC_WRAPPER"] == "/opt/bootstrap" and env["AWS_LWA_INVOKE_MODE"] == "response_stream"
     assert env["DRISHYAM_COMMIT"] == "abc123" and "DRISHYAM_SERVE_STATIC" not in env  # static files come from S3
     assert set(env) >= {"DRISHYAM_KILL_TABLE", "DRISHYAM_SIGNING_KEY_SECRET_ARN"}
+    assert "DRISHYAM_ONNX" not in env and "DRISHYAM_ONNX_FP16" not in env  # classical-v1 unless asked
     url = one(template, "AWS::Lambda::Url")
     assert url["AuthType"] == "AWS_IAM" and url["InvokeMode"] == "RESPONSE_STREAM"
 
@@ -138,7 +139,7 @@ def test_api_behaviour_is_uncached_and_forwards_the_body_hash(template):
     assert api["TargetOriginId"] == fn_origin["Id"] and fn_origin["CustomOriginConfig"]["OriginReadTimeout"] == 60
 
 
-def test_static_site_is_a_private_bucket_with_the_vercel_headers(template):
+def test_static_site_is_a_private_bucket_with_the_local_headers(template):
     resources = template["Resources"]
     dist_id = next(k for k, r in resources.items() if r["Type"] == "AWS::CloudFront::Distribution")
     cfg = resources[dist_id]["Properties"]["DistributionConfig"]
@@ -164,9 +165,8 @@ def test_static_site_is_a_private_bucket_with_the_vercel_headers(template):
               + "; includeSubDomains" * hsts["IncludeSubdomains"] + "; preload" * hsts["Preload"],
               **({"X-Content-Type-Options": "nosniff"} if "ContentTypeOptions" in sec else {}),
               **{h["Header"]: h["Value"] for h in custom}}
-    vercel = {h["key"]: h["value"] for rule in json.loads((ROOT / "vercel.json").read_text())["headers"]
-              for h in rule["headers"]}
-    assert served == vercel  # the same headers as Vercel and local runs
+    local = {h["key"]: h["value"] for h in json.loads((ROOT / "infra" / "headers.json").read_text())}
+    assert served == local  # the same headers as local runs (web.py serves public/ with this file)
     assert all(v["Override"] for v in [*sec.values(), *custom])
 
     deploy = one(template, "Custom::CDKBucketDeployment")
@@ -199,3 +199,14 @@ def test_alarms_budget_and_topic_without_subscribers(template):
 def test_reservation_can_be_left_out_and_no_em_dashes(template, tmp_path):
     assert "ReservedConcurrentExecutions" not in web_fn(synth(tmp_path, reserved_concurrency=None))
     assert "—" not in json.dumps(template, ensure_ascii=False)  # repo rule for AWS names and descriptions
+
+
+def test_onnx_context_sets_the_segmenter_env(tmp_path):
+    def env(sub, **kw):
+        (tmp_path / sub).mkdir()
+        return web_fn(synth(tmp_path / sub, **kw))["Environment"]["Variables"]
+
+    fp32 = env("a", onnx="models/drishyam_dacl10k.onnx")
+    assert fp32["DRISHYAM_ONNX"] == "/var/task/models/drishyam_dacl10k.onnx" and "DRISHYAM_ONNX_FP16" not in fp32
+    both = env("b", onnx="models/m.onnx", onnx_fp16="models/m.fp16.onnx")
+    assert (both["DRISHYAM_ONNX"], both["DRISHYAM_ONNX_FP16"]) == ("/var/task/models/m.onnx", "/var/task/models/m.fp16.onnx")

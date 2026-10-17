@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1340 1640" width="1340" height="1640" role="img" aria-labelledby="t d">
 <title id="t">Drishyam system architecture</title>
-<desc id="d">Clients (browser UI, drishyam CLI, MCP client) reach one agent core: the browser through CloudFront with OAC and WAF, a Lambda Function URL and an arm64 Lambda running the FastAPI web tier (planned), or the live Vercel mirror; the CLI and MCP server run it locally. The agent core (policy, governor, planner with allow-list validator, human gate) drives the OpenCV 5 layer and emits an NDJSON trace and a signed work order. DynamoDB holds the kill flag, Secrets Manager the signing key, CloudWatch the metrics and alarms, AWS Budgets the spend alerts.</desc>
+<desc id="d">Clients (browser UI, drishyam CLI, MCP client) reach one agent core: the browser through CloudFront with OAC and WAF, a Lambda Function URL and an arm64 Lambda running the FastAPI web tier (planned); the CLI and MCP server run it locally. The agent core (policy, governor, planner with allow-list validator, human gate) drives the OpenCV 5 layer and emits an NDJSON trace and a signed work order. DynamoDB holds the kill flag, Secrets Manager the signing key, CloudWatch the metrics and alarms, AWS Budgets the spend alerts.</desc>
 <style>
   .bg { fill: #072247; }
   .sheet { fill: #0F3B73; stroke: #E8F1FF; stroke-width: 3; }
@@ -72,23 +72,6 @@
 <text x="90" y="220" xml:space="preserve">renders the NDJSON trace as it streams</text>
 <text x="90" y="236" xml:space="preserve">review findings, <tspan class="rd">KILL</tspan> a running job</text>
 </g>
-<rect class="frame" x="620" y="108" width="680" height="156"/>
-<circle class="n" cx="642" cy="128" r="11"/>
-<text class="nt" x="642" y="132" text-anchor="middle">2</text>
-<text x="660" y="132" class="fl" xml:space="preserve">ENTRY · VERCEL MIRROR</text>
-<text x="855.44" y="132" class="fs" xml:space="preserve">secondary path · live today</text>
-<g class="node" data-box="640 144 640 104">
-<rect class="box" x="640" y="144" width="640" height="104"/>
-<text x="650" y="164" class="h" xml:space="preserve">SAME APP ON VERCEL · drishyam-seven.vercel.app</text>
-<line class="band" x1="640" y1="174" x2="1280" y2="174"/>
-<text x="650" y="188" xml:space="preserve">app.py → drishyam/web.py on Vercel Python (x86, stock OpenCV 5)</text>
-<text x="650" y="204" xml:space="preserve">Vercel WAF rate limit: 12 job starts per IP per minute</text>
-<text x="650" y="220" xml:space="preserve"><tspan class="rd">KILL</tspan> channel: Vercel Runtime Cache (AsyncRuntimeCache, 300 s TTL)</text>
-<text x="650" y="236" xml:space="preserve">DRISHYAM_SIGNING_KEY in a sensitive env var</text>
-</g>
-<path class="edge " d="M500 196 L640 196"/>
-<rect class="lbg" x="546.2" y="177" width="47.6" height="16"/>
-<text x="570" y="188" class="el" text-anchor="middle" xml:space="preserve">mirror</text>
 <path class="edge " d="M490 248 L490 344"/>
 <rect class="lbg" x="496.0" y="279" width="186.2" height="16"/>
 <text x="500" y="290" class="el" xml:space="preserve">HTTPS · NDJSON streams back</text>
@@ -97,7 +80,7 @@
 <circle class="n" cx="82" cy="320" r="11"/>
 <text class="nt" x="82" y="324" text-anchor="middle">2</text>
 <text x="100" y="324" class="fl" xml:space="preserve">ENTRY · AWS PATH</text>
-<text x="252.24" y="324" class="fs" xml:space="preserve">primary · <tspan class="rd">planned, not deployed</tspan></text>
+<text x="252.24" y="324" class="fs" xml:space="preserve"><tspan class="rd">planned, not deployed</tspan></text>
 <g class="node" data-box="80 344 440 104">
 <rect class="box" x="80" y="344" width="440" height="104"/>
 <text x="90" y="364" class="h" xml:space="preserve">CLOUDFRONT DISTRIBUTION</text>
@@ -192,7 +175,6 @@
 <path class="edge " d="M300 744 L300 810"/>
 <rect class="lbg" x="306.0" y="784" width="199.4" height="16"/>
 <text x="310" y="795" class="el" xml:space="preserve">Job(image, cfg, kill=…).run()</text>
-<path class="edge " d="M960 248 L960 810"/>
 <path class="edge " d="M1268 464 L1268 810"/>
 <path class="edge " d="M1127 636 L1127 810"/>
 <rect class="lbg" x="1133.0" y="713" width="74.0" height="16"/>

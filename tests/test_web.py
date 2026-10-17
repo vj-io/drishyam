@@ -217,10 +217,10 @@ class FakeTable:
         return {"Item": self.items[Key["k"]]} if Key["k"] in self.items else {}
 
 
-@pytest.mark.parametrize("store", ["runtime-cache", "dynamodb"])
+@pytest.mark.parametrize("store", ["in-process", "dynamodb"])
 def test_kill_endpoint_halts_a_running_job(photo, monkeypatch, store):
     """TestClient buffers whole streams, so the kill lands first; the job must halt after its first look.
-    With DRISHYAM_KILL_TABLE (AWS) the flag lives in DynamoDB instead of the Runtime Cache; same contract."""
+    With DRISHYAM_KILL_TABLE (AWS) the flag lives in DynamoDB instead of this process; same contract."""
     import time
 
     from drishyam import web
@@ -264,6 +264,21 @@ def test_a_failed_kill_store_read_ends_the_job_as_an_error_not_a_kill(photo, mon
         events = lines(post(photo, params="?pixel_cap=1"))
     assert events[-1]["type"] == "error" and not any(e["type"] == "done" for e in events)
     assert "failed" in caplog.text and "kill-switch" not in caplog.text
+
+
+def test_in_process_kill_flags_expire():
+    import asyncio
+
+    from drishyam import web
+
+    async def check():
+        kills = web.LocalKills()
+        await kills.set("a", 1, {"ttl": 300})
+        await kills.set("b", 1, {"ttl": 0})  # already expired: dropped by the next set
+        await kills.set("c", 1, {"ttl": 300})
+        return await kills.get("a"), await kills.get("b"), await kills.get("x"), set(kills.flags)
+
+    assert asyncio.run(check()) == (True, False, False, {"a", "c"})
 
 
 def test_dynamodb_kill_store_imports_boto3_only_when_selected(monkeypatch):
@@ -332,7 +347,7 @@ def test_signing_key_fails_closed_on_a_deployment(monkeypatch):
     from drishyam import web
 
     monkeypatch.delenv("DRISHYAM_SIGNING_KEY", raising=False)
-    monkeypatch.setenv("VERCEL_ENV", "production")
+    monkeypatch.setenv("AWS_LAMBDA_FUNCTION_NAME", "drishyam-web")
     with pytest.raises(RuntimeError, match="DRISHYAM_SIGNING_KEY"):
         web._signing_key()
     monkeypatch.setenv("DRISHYAM_SIGNING_KEY", "s" * 48)
@@ -344,5 +359,5 @@ ROOT = Path(__file__).resolve().parents[1]
 
 @pytest.mark.skipif(not (ROOT / "docs/agent-loop.svg").exists(), reason="docs/agent-loop.svg not on this branch")
 def test_site_agent_loop_is_the_docs_figure():
-    # Vercel serves only public/, so the site keeps its own copy of FIG. 3.0; it must not drift from the docs one.
+    # CloudFront serves only public/, so the site keeps its own copy of FIG. 3.0; it must not drift from the docs one.
     assert (ROOT / "public/docs/agent-loop.svg").read_bytes() == (ROOT / "docs/agent-loop.svg").read_bytes()

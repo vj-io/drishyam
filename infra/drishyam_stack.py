@@ -1,6 +1,6 @@
-"""The AWS copy of the web demo, as one stack (docs/aws.md).
+"""The web demo on AWS, as one stack (docs/aws.md).
 
-The same FastAPI app as on Vercel runs on Lambda arm64 (Python 3.12 zip plus the Lambda Web Adapter layer),
+The FastAPI app (drishyam/web.py) runs on Lambda arm64 (Python 3.12 zip plus the Lambda Web Adapter layer),
 streams NDJSON through a Function URL (RESPONSE_STREAM, AWS_IAM auth) and is reached only through
 CloudFront, which signs every origin request with Origin Access Control. CloudFront serves the static
 site (public/) from a private S3 bucket, also through OAC, so only /api/* reaches the function. A WAF web
@@ -64,7 +64,7 @@ def _rate_rule(name: str, priority: int, limit: int, scope: waf.CfnWebACL.Statem
 
 class DrishyamStack(Stack):
     def __init__(self, scope: Construct, cid: str, *, code: lambda_.Code, reserved_concurrency: int | None = 5,
-                 commit: str = "", **kwargs) -> None:
+                 commit: str = "", onnx: str = "", onnx_fp16: str = "", **kwargs) -> None:
         super().__init__(scope, cid, description="Drishyam bridge inspector on Lambda arm64 behind CloudFront and WAF",
                          **kwargs)
 
@@ -93,11 +93,15 @@ class DrishyamStack(Stack):
         }
         if commit:
             env["DRISHYAM_COMMIT"] = commit
+        # The segmenter: an ONNX file inside the package (models/...), which Lambda unpacks to /var/task.
+        for name, path in (("DRISHYAM_ONNX", onnx), ("DRISHYAM_ONNX_FP16", onnx_fp16)):
+            if path:
+                env[name] = f"/var/task/{path}"
         fn = lambda_.Function(
             self, "Web", function_name=FUNCTION_NAME, description="Drishyam FastAPI app behind the Lambda Web Adapter",
             runtime=lambda_.Runtime.PYTHON_3_12, architecture=lambda_.Architecture.ARM_64, handler="run.sh", code=code,
             layers=[lambda_.LayerVersion.from_layer_version_arn(self, "WebAdapter", LWA_LAYER.format(region=self.region))],
-            memory_size=3008, timeout=Duration.seconds(60),  # 60 s: the same ceiling as vercel.json maxDuration
+            memory_size=3008, timeout=Duration.seconds(60),  # 60 s: MAX_PACED_S and the 30 s seconds cap fit in it
             reserved_concurrent_executions=reserved_concurrency, role=role, log_group=log_group,
             tracing=lambda_.Tracing.ACTIVE, environment=env)
         url = fn.add_function_url(auth_type=lambda_.FunctionUrlAuthType.AWS_IAM,
@@ -124,16 +128,15 @@ class DrishyamStack(Stack):
             ])
 
         # The static site: a private bucket read only by this distribution (OAC), with the response headers
-        # of vercel.json, so CSP and HSTS are the same as on Vercel and in local runs.
+        # of infra/headers.json, so CSP and HSTS are the same as in local runs.
         site = s3.Bucket(self, "Site", block_public_access=s3.BlockPublicAccess.BLOCK_ALL, enforce_ssl=True,
                          encryption=s3.BucketEncryption.S3_MANAGED, removal_policy=RemovalPolicy.DESTROY,
                          auto_delete_objects=True)
-        headers = {h["key"]: h["value"] for rule in json.loads((ROOT / "vercel.json").read_text())["headers"]
-                   for h in rule["headers"]}
+        headers = {h["key"]: h["value"] for h in json.loads((ROOT / "infra" / "headers.json").read_text())}
         hsts = headers.pop("Strict-Transport-Security")
         headers.pop("X-Content-Type-Options")  # its only value is nosniff
         page_headers = cf.ResponseHeadersPolicy(
-            self, "PageHeaders", comment="Drishyam page headers, from vercel.json",
+            self, "PageHeaders", comment="Drishyam page headers, from infra/headers.json",
             security_headers_behavior=cf.ResponseSecurityHeadersBehavior(
                 content_security_policy=cf.ResponseHeadersContentSecurityPolicy(
                     content_security_policy=headers.pop("Content-Security-Policy"), override=True),
