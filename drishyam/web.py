@@ -1,4 +1,4 @@
-"""HTTP API for the browser UI (docs/api-contract.md). Deployed on Vercel via `app.py`, or on AWS Lambda.
+"""HTTP API for the browser UI (docs/api-contract.md). Deployed on AWS Lambda (infra/, docs/aws.md).
 
 Trust boundary: everything in a request is hostile until checked. Uploads are
 size-capped while streaming, sniffed by magic bytes and pixel-counted before
@@ -29,24 +29,22 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
-os.environ.setdefault("VERCEL_TELEMETRY_DISABLED", "1")  # the cache SDK phones home unless told not to
-from vercel.cache import AsyncRuntimeCache
-
 from . import __version__, findings, imaging, planner, privacy
 from .agent import Job, JobConfig
 from .segment import default_segmenter
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message)s")
 log = logging.getLogger("drishyam")
-MAX_UPLOAD_BYTES = 4_400_000  # Vercel caps function request bodies at 4.5 MB
+# A Lambda Function URL passes a binary body base64-encoded inside the 6 MB request payload: 4.4 MB is
+# 5.87 MB encoded, which leaves room for the headers.
+MAX_UPLOAD_BYTES = 4_400_000
 MAX_REPLAY_HEADER = 16_384
 MAX_REVIEW_BYTES = 100_000
 IMAGE_TYPES = {"image/jpeg", "image/png"}
 CHAOS = {"p95_spike", "planner_timeout", "planner_malformed"}
 ROOT = Path(__file__).resolve().parent.parent
 MAX_PACED_S = 25.0  # viewing pauses per job (pace_ms): with the 30 s seconds cap, still inside a 60 s function limit
-HOST = ("aws-lambda" if os.environ.get("AWS_LAMBDA_FUNCTION_NAME")
-        else "vercel" if os.environ.get("VERCEL") else "local")
+HOST = "aws-lambda" if os.environ.get("AWS_LAMBDA_FUNCTION_NAME") else "local"
 
 
 def _signing_key() -> bytes:
@@ -59,16 +57,32 @@ def _signing_key() -> bytes:
     if len(key) >= 32:
         return key.encode()
     # Deployed: per-instance keys would break review across instances.
-    if os.environ.get("VERCEL_ENV") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
+    if os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
         raise RuntimeError("a signing key (>= 32 chars) must be set on a deployment: "
                            "DRISHYAM_SIGNING_KEY, or DRISHYAM_SIGNING_KEY_SECRET_ARN on AWS")
     log.warning("DRISHYAM_SIGNING_KEY unset or short; using an ephemeral key (tokens die with this process)")
     return secrets.token_bytes(32)
 
 
+class LocalKills:
+    """Kill flags in this process's memory, with the same interface and TTL as DynamoKills. Correct only
+    because a local run is one uvicorn process, so /api/kill and the job it stops share this dict."""
+
+    def __init__(self) -> None:
+        self.flags: dict[str, float] = {}  # key -> expiry, unix seconds
+
+    async def get(self, key: str) -> bool:
+        return self.flags.get(key, 0) > time.time()
+
+    async def set(self, key: str, _value, options: dict) -> None:
+        now = time.time()
+        self.flags = {k: exp for k, exp in self.flags.items() if exp > now}  # drop expired flags
+        self.flags[key] = now + options["ttl"]
+
+
 class DynamoKills:
-    """Kill flags in a DynamoDB table (partition key `k`, numeric TTL attribute `exp`): the AWS twin of the
-    Runtime Cache. Reads are consistent, so a flag written by /api/kill on one instance is seen on the next step."""
+    """Kill flags in a DynamoDB table (partition key `k`, numeric TTL attribute `exp`). Reads are consistent,
+    so a flag written by /api/kill on one instance is seen on the job's next step on another."""
 
     def __init__(self, name: str, table=None) -> None:
         if table is None:
@@ -89,11 +103,9 @@ class DynamoKills:
 KEY = _signing_key()
 PLANNER = planner.from_env()  # None unless DRISHYAM_PLANNER_URL is set: then every job consults it
 # KILL must reach a job running in another function instance; the browser's aborted stream
-# does not (neither Vercel's proxy nor a Lambda Function URL passes the disconnect through).
-# A shared flag does: DynamoDB on AWS, else the regional Runtime Cache, which falls back to an
-# in-process dict when run locally.
-KILLS = DynamoKills(os.environ["DRISHYAM_KILL_TABLE"]) if os.environ.get("DRISHYAM_KILL_TABLE") else (
-    AsyncRuntimeCache(namespace="drishyam-kill"))
+# does not (a Lambda Function URL does not pass the disconnect through). A shared flag does:
+# DynamoDB on AWS. Without DRISHYAM_KILL_TABLE (local runs, tests) the flag lives in this process.
+KILLS = DynamoKills(os.environ["DRISHYAM_KILL_TABLE"]) if os.environ.get("DRISHYAM_KILL_TABLE") else LocalKills()
 KILL_TTL_S = 300
 
 
@@ -157,7 +169,7 @@ def health() -> dict:
             "segmenter": name, "segmenter_licence": licence,
             "max_upload_bytes": MAX_UPLOAD_BYTES, "max_pixels": imaging.MAX_PIXELS,
             "host": HOST, "arch": platform.machine(),
-            "commit": os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("DRISHYAM_COMMIT") or None}
+            "commit": os.environ.get("DRISHYAM_COMMIT") or None}
 
 
 async def _read_capped(request: Request, cap: int) -> bytes | None:
