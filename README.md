@@ -8,6 +8,7 @@ spends compute in proportion to risk. Every camera move is an OpenCV 5
 the workload COOL accelerates on Graviton.
 
 - **Live demo:** https://drishyam-seven.vercel.app (stock OpenCV 5 on Vercel, x86, *not COOL*)
+- **Demo video (49 s):** [drishyam-demo.mp4](https://github.com/vj-io/drishyam/releases/download/v1.0.0/drishyam-demo.mp4) — a real job on the live site: survey, zoom, a human-signed critical finding, a planner failure drill and KILL
 - **PRD:** [docs/PRD.md](docs/PRD.md) · **Requirement traceability:** [docs/requirements.md](docs/requirements.md) · **Security model:** [docs/security.md](docs/security.md) · **API:** [docs/api-contract.md](docs/api-contract.md) · **MCP:** [docs/mcp.md](docs/mcp.md)
 
 ## What it does
