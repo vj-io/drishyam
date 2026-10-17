@@ -1,0 +1,228 @@
+{
+ "arm": "local-macos-x86",
+ "config": {
+  "workers": 1,
+  "cv2_threads_per_worker": 1,
+  "planner": "rule"
+ },
+ "provenance": {
+  "cv2": "5.0.0",
+  "build_info_sha256": "fe5f9337dbc8663639ee7bcb2deb09359893fc8d2aa5b6a447cee2a0117d2ec7",
+  "cv2_file": "/Users/mac/Documents/Projects/opencv/.venv/lib/python3.13/site-packages/cv2/__init__.py",
+  "under_opt_cool": false,
+  "build": "stock (not COOL)",
+  "machine": "Darwin 25.6.0 x86_64",
+  "platform": "macOS-26.7.1-x86_64-i386-64bit-Mach-O",
+  "cpu": "Intel(R) Core(TM) i9-9880H CPU @ 2.30GHz",
+  "logical_cpus": 16,
+  "cv2_threads": 16,
+  "python": "3.13.16",
+  "numpy": "2.5.4",
+  "timestamp": "2026-10-17T09:43:13Z"
+ },
+ "summary": {
+  "dataset": "synthetic-8 (labelled synthetic)",
+  "images": 8,
+  "pixel_cap": 0.3,
+  "wall_s": 3.157,
+  "images_per_s": 2.5338,
+  "gazes_per_s": 7.6014,
+  "per_image_ms": {
+   "p50": 392.2,
+   "p95": 443.9,
+   "p99": 452.2
+  },
+  "mean_steps": 3.0,
+  "mean_pixels_frac": 0.2656,
+  "cpu_s": 3.1,
+  "cpu_pct_of_machine": 6.1,
+  "cpu_pct_per_worker_busy": 98.6,
+  "usd_per_hour": 0.339,
+  "usd_per_1k_images": 0.037164
+ },
+ "amdahl": {
+  "fraction": {
+   "kleidicv_covered_imgproc": 0.0934,
+   "segmentation": 0.6866,
+   "measure_thinning": 0.0252,
+   "decode": 0.078,
+   "python_overhead": 0.1168
+  },
+  "ms_per_image": {
+   "kleidicv_covered_imgproc": 36.69,
+   "segmentation": 269.72,
+   "measure_thinning": 9.91,
+   "decode": 30.63,
+   "python_overhead": 45.9
+  },
+  "end_to_end_speedup_if_covered_ops_get": {
+   "1.2x": 1.0158,
+   "1.5x": 1.0321,
+   "1.8x": 1.0433,
+   "3.0x": 1.0664
+  },
+  "note": "segmentation is the classical segmenter (imgproc plus NumPy), so only part of it is KleidiCV-covered; measure_thinning is drishyam.measure.measure (hit-or-miss thinning), timed by a shim here; python_overhead is whatever the job does outside every timed op. The covered fraction is a lower bound"
+ },
+ "per_image": [
+  {
+   "path": "s0001.jpg",
+   "t0": 26281.500526295,
+   "t1": 26281.89728743,
+   "wall_ms": 396.76113500172505,
+   "decode_ms": 32.39970100185019,
+   "job_ms": 364.36143399987486,
+   "steps": 3,
+   "pixels_frac": 0.2656,
+   "cpu_s": 0.3946980000000001,
+   "ops_ms": {
+    "pyrDown": 10.47411399849807,
+    "saliency": 4.196390000288375,
+    "warp": 7.314526999834925,
+    "quality": 11.368547999154544,
+    "segment": 279.68280499771936,
+    "measure": 10.498971005290514
+   },
+   "python_ms": 40.82607899908908
+  },
+  {
+   "path": "s0002.jpg",
+   "t0": 26281.900309651,
+   "t1": 26282.354608425,
+   "wall_ms": 454.29877400238183,
+   "decode_ms": 31.453242001589388,
+   "job_ms": 422.84553200079245,
+   "steps": 3,
+   "pixels_frac": 0.2656,
+   "cpu_s": 0.42144099999999995,
+   "ops_ms": {
+    "pyrDown": 39.00735800198163,
+    "saliency": 5.029255000408739,
+    "warp": 8.441301997663686,
+    "quality": 9.536688001389848,
+    "segment": 286.2381640006788,
+    "measure": 14.662977002444677
+   },
+   "python_ms": 59.92978799622506
+  },
+  {
+   "path": "s0003.jpg",
+   "t0": 26282.354728891,
+   "t1": 26282.741195612,
+   "wall_ms": 386.46672100003343,
+   "decode_ms": 31.382195997139206,
+   "job_ms": 355.0845250028942,
+   "steps": 3,
+   "pixels_frac": 0.2656,
+   "cpu_s": 0.38382400000000017,
+   "ops_ms": {
+    "pyrDown": 10.578720000921749,
+    "saliency": 3.810548998444574,
+    "warp": 7.600853998155799,
+    "quality": 8.597384003223851,
+    "segment": 269.21876600317773,
+    "measure": 10.690330000215909
+   },
+   "python_ms": 44.58792199875461
+  },
+  {
+   "path": "s0004.jpg",
+   "t0": 26282.743342955,
+   "t1": 26283.167847108,
+   "wall_ms": 424.5041530011804,
+   "decode_ms": 31.68715599895222,
+   "job_ms": 392.81699700222816,
+   "steps": 3,
+   "pixels_frac": 0.2656,
+   "cpu_s": 0.42190800000000017,
+   "ops_ms": {
+    "pyrDown": 10.739803001342807,
+    "saliency": 4.774735996761592,
+    "warp": 7.645460998901399,
+    "quality": 16.48632800061023,
+    "segment": 288.3818730042549,
+    "measure": 12.466639000194846
+   },
+   "python_ms": 52.322157000162406
+  },
+  {
+   "path": "s0005.jpg",
+   "t0": 26283.169986345,
+   "t1": 26283.569002272,
+   "wall_ms": 399.01592699970934,
+   "decode_ms": 30.693495999003062,
+   "job_ms": 368.3224310007063,
+   "steps": 3,
+   "pixels_frac": 0.2656,
+   "cpu_s": 0.39750700000000005,
+   "ops_ms": {
+    "pyrDown": 11.777152998547535,
+    "saliency": 3.57447799979127,
+    "warp": 7.21538200014038,
+    "quality": 8.90270300078555,
+    "segment": 269.6536230032507,
+    "measure": 17.65491799233132
+   },
+   "python_ms": 49.54417400585953
+  },
+  {
+   "path": "s0006.jpg",
+   "t0": 26283.571074624,
+   "t1": 26283.940512498,
+   "wall_ms": 369.43787400014116,
+   "decode_ms": 31.209704000502825,
+   "job_ms": 338.22816999963834,
+   "steps": 3,
+   "pixels_frac": 0.2656,
+   "cpu_s": 0.36872399999999983,
+   "ops_ms": {
+    "pyrDown": 10.24431000041659,
+    "saliency": 6.919227002072148,
+    "warp": 7.544729996880051,
+    "quality": 9.141118003753945,
+    "segment": 252.58242699783295,
+    "measure": 5.897120001463918
+   },
+   "python_ms": 45.899237997218734
+  },
+  {
+   "path": "s0007.jpg",
+   "t0": 26283.942223776,
+   "t1": 26284.266875853,
+   "wall_ms": 324.6520770007919,
+   "decode_ms": 27.483134999783942,
+   "job_ms": 297.16894200100796,
+   "steps": 3,
+   "pixels_frac": 0.2656,
+   "cpu_s": 0.3238289999999999,
+   "ops_ms": {
+    "pyrDown": 9.04323700160603,
+    "saliency": 3.300939999462571,
+    "warp": 6.888379997690208,
+    "quality": 11.953805998928146,
+    "segment": 235.3986910020467,
+    "measure": 0.0
+   },
+   "python_ms": 30.583888001274318
+  },
+  {
+   "path": "s0008.jpg",
+   "t0": 26284.270232836,
+   "t1": 26284.657848572,
+   "wall_ms": 387.6157359991339,
+   "decode_ms": 28.694005999568617,
+   "job_ms": 358.9217299995653,
+   "steps": 3,
+   "pixels_frac": 0.2656,
+   "cpu_s": 0.3860420000000002,
+   "ops_ms": {
+    "pyrDown": 9.385612000187393,
+    "saliency": 3.9427180017810315,
+    "warp": 7.113062998541864,
+    "quality": 10.943903998850146,
+    "segment": 276.59896300247055,
+    "measure": 7.401161001325818
+   },
+   "python_ms": 43.53630899640848
+  }
+ ]
+}

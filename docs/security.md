@@ -2,7 +2,7 @@
 
 Drishyam takes untrusted photos from anyone on the internet and drives an agent
 with them. This page lists what an attacker controls, what they could try, and
-the control that stops it. Every control named here has a test in `tests/`.
+the control that stops it. Every control named here has a test in `tests/`, except the Vercel WAF rate limit and the pre-push secret scan, which are configuration and process.
 
 ## What an attacker controls
 

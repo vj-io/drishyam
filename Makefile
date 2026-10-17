@@ -1,13 +1,17 @@
 PY ?= .venv/bin/python
 ARM ?= local
+DATA ?= data/synth200
 
-.PHONY: test eval bench data serve lint
+.PHONY: test e2e eval bench data serve lint
 
-test:
-	$(PY) -m pytest -q
+test:  ## unit, API, MCP, CLI and eval tests (same as CI)
+	$(PY) -m pytest -q --ignore=tests/e2e
 
-eval:  ## 200-image evaluation -> public/results (about 10-15 minutes)
-	$(PY) -m evals.harness --data data/synth200 --n 200 --out public/results
+e2e:  ## browser tests under the production CSP; needs Playwright (see README)
+	$(PY) tests/e2e/test_ui_mock.py && $(PY) tests/e2e/test_ui_live.py
+
+eval:  ## 200-image evaluation -> public/results (a few minutes); real data: make eval DATA=data/codebrim
+	$(PY) -m evals.harness --data $(DATA) --n 200 --out public/results
 
 bench:  ## micro + macro + parity for one arm: make bench ARM=local
 	bash bench/run_all.sh $(ARM)

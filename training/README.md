@@ -162,7 +162,7 @@ export DRISHYAM_ONNX_FP16=/path/to/drishyam_dacl10k.fp16.onnx   # optional: the 
 ```
 
 These map to `OnnxSegmenter(path, fp16_path)`. No `class_map` is needed because the ONNX already outputs the six classes.
-(The orchestrator wires the variables into the app; this README only documents them.)
+`drishyam.segment.default_segmenter` picks these variables up automatically.
 
 Publish to the Hugging Face Hub so the EC2 box can pull it (the weights inherit dacl10k's non-commercial licence, so say
 **CC BY-NC 4.0 (trained on dacl10k)** in the model card, with the `metrics.json` table):

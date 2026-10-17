@@ -55,5 +55,5 @@ echo "md5 verified: $md5"
 
 mkdir -p "$DEST"
 unzip -q -n "$ZIP" -d "$DEST"
-"$PYTHON" -m evals.codebrim --root "$DEST" --out data/eval200.txt
-echo "Done. Evaluate with: python -m evals.harness --data $DEST --n 200 --kind codebrim"
+"$PYTHON" -m evals.codebrim --root "$DEST" --out "$DEST/eval200.txt"
+echo "Done. Evaluate with: make eval DATA=$DEST"

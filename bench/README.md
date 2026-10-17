@@ -44,5 +44,5 @@ Run the arms on otherwise idle instances. Micro numbers are single-threaded by d
 ## Reading the numbers
 
 - Report what the JSON says. A micro speed-up on one op is not an end-to-end speed-up: use the Amdahl split in `macro.json` to see how much of a job those ops are.
-- On the local x86 machine the job spends about two thirds of its time in `drishyam.measure` (hit-or-miss thinning), a quarter in segmentation and under 3 % in the pyramid, saliency, warp and quality-gate ops (one cProfile run and four-image macro, `local`). If the same holds on Graviton, the end-to-end ceiling from accelerating the covered ops alone is about 1.03x, whatever the micro table shows.
+- On the local x86 machine (8-image macro, `results/local-macos-x86/macro.json`) a job spends 9 % of its time in KleidiCV-covered imgproc, 69 % in the classical segmenter, 3 % in crack thinning, 8 % in decode and 12 % in Python overhead. If the same holds on Graviton, accelerating the covered ops 1.8× makes a whole job about 1.04× faster, whatever the micro table shows.
 - Throughput is measured from the first job's start to the last job's end, so process start-up is excluded; `$/1k images` bills the whole instance, so a single worker on an 8-vCPU instance is the pessimistic figure and the `WORKERS` sweep is the realistic one.

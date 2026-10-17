@@ -1,11 +1,11 @@
 # Drishyam over MCP, and the command line
 
 `drishyam mcp` serves the inspector to an LLM client over stdio. The server is `drishyam/mcp_server.py`
-(mcp 2.x, `mcp.server.mcpserver.MCPServer`); install it with `pip install 'drishyam[mcp]'`.
+(mcp 2.x, `mcp.server.mcpserver.MCPServer`). From a clone of the repo, `uv sync --extra mcp`, then:
 
 ```bash
-claude mcp add drishyam -- drishyam mcp          # Claude Code
-npx @modelcontextprotocol/inspector drishyam mcp  # MCP Inspector: lists and calls every tool
+claude mcp add drishyam -- uv run --directory /abs/path/to/drishyam drishyam mcp          # Claude Code
+npx @modelcontextprotocol/inspector uv run --directory /abs/path/to/drishyam drishyam mcp  # MCP Inspector
 ```
 
 ## Tools (a fixed allow-list of twelve)

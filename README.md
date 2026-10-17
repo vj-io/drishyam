@@ -7,6 +7,8 @@ spends compute in proportion to risk. Every camera move is an OpenCV 5
 `pyrDown` / `warpPerspective` / `resize` call, so the agent's own actions are
 the workload COOL accelerates on Graviton.
 
+**What COOL can buy end to end, measured.** An 8-image macro run on the local x86 laptop ([results/local-macos-x86/macro.json](results/local-macos-x86/macro.json)) puts 9 % of a job in KleidiCV-covered imgproc, 69 % in the classical segmenter (imgproc plus NumPy), 3 % in crack thinning, 8 % in decode and 12 % in Python. So if COOL makes the covered ops 1.8× faster, a whole job gets about 1.04× faster. The gaze path itself is cheap; most of the time is in segmentation, which is where a COOL or DNN speed-up would have to land.
+
 - **Live demo:** https://drishyam-seven.vercel.app (stock OpenCV 5 on Vercel, x86, *not COOL*)
 - **Demo video (49 s):** [drishyam-demo.mp4](https://github.com/vj-io/drishyam/releases/download/v1.0.0/drishyam-demo.mp4) — a real job on the live site: survey, zoom, a human-signed critical finding, a planner failure drill and KILL
 - **PRD:** [docs/PRD.md](docs/PRD.md) · **Requirement traceability:** [docs/requirements.md](docs/requirements.md) · **Security model:** [docs/security.md](docs/security.md) · **API:** [docs/api-contract.md](docs/api-contract.md) · **MCP:** [docs/mcp.md](docs/mcp.md)
@@ -14,7 +16,7 @@ the workload COOL accelerates on Graviton.
 ## What it does
 
 ```mermaid
-flowchart LR
+flowchart TD
     U[photo up to 24 MP] --> P[privacy blur<br/>YuNet + NanoDet]
     P --> O[overview<br/>pyrDown L0-L4, saliency at L3]
     O --> C[≤20 ranked candidates,<br/>then one coarse survey look]
@@ -60,7 +62,7 @@ uv run drishyam review runs/<job>/work_order.json f1 approve --by "Your Name"
 uv run drishyam mcp  # MCP server over stdio: 12 allow-listed tools, no approve tool, no shell
 ```
 
-Tests: `make test` (unit, API, MCP, CLI) · `tests/e2e/test_ui_live.py` (real browser against the real stack) · CI runs on x86 and arm64.
+Tests: `make test` (unit, API, MCP, CLI, evals; same as CI) · browser e2e under the production CSP: `uv pip install playwright && .venv/bin/playwright install chromium && make e2e` · CI runs on x86 and arm64.
 
 ## Results
 
@@ -80,10 +82,14 @@ Measured on **200 held-out labelled synthetic images** (seed 7; policy changes w
 | **Drishyam**, cap 100 % | 0.47 | **0.54** | 0.000129 |
 
 - At a **30 % cap** Drishyam finds **0.48** of the defects using **0.25** of the image's pixels: **0.88×** exhaustive tiling's recall at **0.15×** its pixels, 0.97× a same-pixel downscale.
-- At a **50 % cap**: **0.53** at 0.37 of the pixels = **0.97×** tiling's recall at **0.22×** its pixels. Measured against tiling's real pixel spend, the PRD hypothesis (≥ 0.9× recall at ≤ 0.3× pixels) holds from the 50 % cap; at the 30 % cap it is just missed (0.88×).
-- Honest caveats: the best tiling grid (L1, 0.55 at 0.50) still beats Drishyam at equal pixels; the hysteresis segmenter shipped in this round lifted every baseline too (Drishyam/L0 at 30 %: 0.99× → 0.97× on dev).
-- Critical false-accept rate (critical prediction with no critical ground truth): Drishyam @30 % 0.52 vs exhaustive tiling 0.79 (the PRD asks for ≤ tiling).
-- Agent: 100 % of steps carry a cause; planner drills 38/40 recovered (2 malformed drills never fired because those jobs finished first); governor drills 10/10.
+- At a **50 % cap**: **0.53** at 0.37 of the pixels = **0.97×** tiling's recall at **0.22×** its pixels. **Verdict on the PRD hypothesis (≥ 0.9× tiling recall at ≤ 0.3 of the full-resolution pixels): not met** — at 0.25 of the pixels Drishyam reaches 0.88×. Measured against tiling's real pixel spend (1.67× the image, because tiles overlap), it reaches 0.97× at 0.22× from the 50 % cap.
+- Honest caveats: the best tiling grid (L1, 0.55 at 0.50) still beats Drishyam at equal pixels, and the hysteresis segmenter shipped with this policy lifted every baseline too, so it is not a Drishyam-only gain.
+- Critical false-accept rate (critical prediction with no critical ground truth): Drishyam @30 % 0.52 vs exhaustive tiling 0.79 (the PRD asks for ≤ tiling); a single downscale (0.49) and L2 tiling (0.42) are lower still.
+- Agent: 100 % of steps carry a cause; 38 of 38 planner drills that fired were recovered by the rule planner (2 of the 40 injected never fired because those jobs finished first); governor drills 10/10; escalation rate 17 %; at the 30 % cap, 3 looks and 0.27 of the pixels per image (p50 = p95). Human-approval latency is not measured (the web demo is stateless) and the FR-21 ablations were not run.
+
+The images are procedural (`evals/synth.py`): 2048×1536 weathered concrete with drawn cracks, spalls, efflorescence, exposed rebar and rust run-off, plus graffiti, formwork lines, water stains, blur and glare as distractors. The eight bundled samples in `public/samples/` come from the same generator. Measured on the real CODEBRIM set this would differ; that run is `make data && make eval DATA=data/codebrim`.
+
+![Recall against pixels processed](docs/recall_vs_pixels.png)
 
 | per-class recall | crack | spalling | efflorescence | exposed_rebar | corrosion |
 |---|---|---|---|---|---|
