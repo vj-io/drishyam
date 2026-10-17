@@ -311,7 +311,7 @@ function renderFailures(list, realList) {
   const root = $('#fail');
   const items = Array.isArray(list) ? list.filter((f) => f && f.category) : [];
   const real = Array.isArray(realList) ? realList.filter((f) => f && f.what_happened) : [];
-  if (!items.length && !real.length) return root.replaceChildren(pending('failure gallery', 'results/failures.json'));
+  if (!items.length) return root.replaceChildren(pending('failure gallery', 'results/failures.json'), real.length ? realFailures(real, 1) : '');
   const plates = [...Map.groupBy(items, (f) => String(f.category))];
   const n = plates.length + (real.length ? 1 : 0);
   const fig = root.closest('.win')?.querySelector('.win__fig');
