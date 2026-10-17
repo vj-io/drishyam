@@ -103,7 +103,11 @@ def run(base, server_log=None):
 
         # 2. KILL mid-run reaches the server: its log records the halt with cause kill-switch.
         # planner_timeout parks the job for 2 s at step 3, so the click lands while it is still running.
+        # A fresh page first: otherwise the previous job's trace lines satisfy the step-2 wait at once.
+        page.reload()
+        expect(page.locator("#gallery .thumb")).to_have_count(8, timeout=15000)
         p.pick("bridge_05.jpg")
+        expect(page.locator("#look")).to_be_enabled(timeout=15000)
         page.locator("label.toggle:has(input[value='planner_timeout'])").click()
         page.locator("#look").click()
         expect(page.locator("#trace .trace__line[data-step='2']")).to_be_visible(timeout=30000)
