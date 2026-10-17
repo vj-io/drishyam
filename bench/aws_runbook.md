@@ -159,7 +159,7 @@ aws budgets create-budget-action --account-id "$ACCT" --budget-name "$BUDGET" \
   --action-threshold ActionThresholdValue=100,ActionThresholdType=ABSOLUTE_VALUE \
   --definition "{\"SsmActionDefinition\": {\"ActionSubType\": \"STOP_EC2_INSTANCES\", \"Region\": \"$AWS_DEFAULT_REGION\",
                 \"InstanceIds\": [${IDS%,}]}}" \
-  --execution-role-arn "arn:aws:iam::$ACCT:role/drishyam-budget-action" --approval-model AUTOMATIC \
+  --execution-role-arn "arn:aws:iam::${ACCT}:role/drishyam-budget-action" --approval-model AUTOMATIC \
   --subscribers SubscriptionType=EMAIL,Address="$EMAIL"
 ```
 
