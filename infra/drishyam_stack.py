@@ -144,19 +144,18 @@ class DrishyamStack(Stack):
                      comparison_operator=op, treat_missing_data=cw.TreatMissingData.NOT_BREACHING,
                      alarm_description=text).add_alarm_action(cw_actions.SnsAction(topic))
 
-        def job_metric(name: str, stat: str, label: str) -> cw.MathExpression:
-            # One line per Status value (completed, halted, awaiting_review) without hard-coding them.
+        def job_metric(name: str, stat: str, prefix: str = "") -> cw.MathExpression:
+            # One line per Status value (completed, halted, awaiting_review), named by it, without hard-coding them.
             return cw.MathExpression(expression=f"SEARCH('{{Drishyam,Status}} MetricName=\"{name}\"', '{stat}', 300)",
-                                     label=label, period=five_min)
+                                     label=prefix + "${PROP('Dim.Status')}", period=five_min)
 
         dash = cw.Dashboard(self, "Dashboard", dashboard_name="Drishyam")
         dash.add_widgets(
-            cw.GraphWidget(title="Jobs by status", left=[job_metric("JobSeconds", "SampleCount", "jobs")]),
-            cw.GraphWidget(title="Job seconds (mean)", left=[job_metric("JobSeconds", "Average", "s")]),
-            cw.GraphWidget(title="Pixels used (fraction of full resolution)",
-                           left=[job_metric("PixelsFrac", "Average", "frac")]),
-            cw.GraphWidget(title="Steps and findings per job", left=[job_metric("Steps", "Average", "steps")],
-                           right=[job_metric("Findings", "Average", "findings")]))
+            cw.GraphWidget(title="Jobs by status", left=[job_metric("JobSeconds", "SampleCount")]),
+            cw.GraphWidget(title="Job seconds (mean)", left=[job_metric("JobSeconds", "Average")]),
+            cw.GraphWidget(title="Pixels used (fraction of full resolution)", left=[job_metric("PixelsFrac", "Average")]),
+            cw.GraphWidget(title="Steps and findings per job", left=[job_metric("Steps", "Average", "steps ")],
+                           right=[job_metric("Findings", "Average", "findings ")]))
         dash.add_widgets(
             cw.GraphWidget(title="Lambda invocations, errors, throttles",
                            left=[fn.metric_invocations(period=five_min, statistic="Sum"),
