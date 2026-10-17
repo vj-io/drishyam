@@ -110,7 +110,7 @@ Measured on **200 held-out labelled synthetic images** (seed 7; policy changes w
 - Critical false-accept rate (critical prediction with no critical ground truth): Drishyam @30 % 0.52 vs exhaustive tiling 0.79 (the PRD asks for ≤ tiling); a single downscale (0.49) and L2 tiling (0.42) are lower still.
 - Agent: 100 % of steps carry a cause; 38 of 38 planner drills that fired were recovered by the rule planner (2 of the 40 injected never fired because those jobs finished first); governor drills 10/10; escalation rate 17 %; at the 30 % cap, 3 looks and 0.27 of the pixels per image (p50 = p95). Human-approval latency is not measured (the web demo is stateless) and the FR-21 ablations were not run.
 
-The images are procedural (`evals/synth.py`): 2048×1536 weathered concrete with drawn cracks, spalls, efflorescence, exposed rebar and rust run-off, plus graffiti, formwork lines, water stains, blur and glare as distractors. The eight bundled samples in `public/samples/` come from the same generator. Measured on the real CODEBRIM set this would differ; that run is `make data && make eval DATA=data/codebrim`.
+The images are procedural (`evals/synth.py`): 2048×1536 weathered concrete with drawn cracks, spalls, efflorescence, exposed rebar and rust run-off, plus graffiti, formwork lines, water stains, blur and glare as distractors. The eight bundled samples in `public/samples/` come from the same generator. The same harness on real photos follows the synthetic results below.
 
 ![Recall against pixels processed](recall_vs_pixels.png)
 
@@ -120,13 +120,44 @@ The images are procedural (`evals/synth.py`): 2048×1536 weathered concrete with
 | tiling L0 | 0.47 | 0.70 | 0.25 | 0.52 | 0.75 |
 | downscale | 0.48 | 0.57 | 0.22 | 0.44 | 0.66 |
 
-Full numbers: [public/results/summary.json](../public/results/summary.json); failure gallery (12 real cases, 6 categories): [public/results/failures.json](../public/results/failures.json), also on the live site.
+Full numbers: [public/results/summary.json](../public/results/summary.json); failure gallery (12 measured cases from the synthetic run, 6 categories): [public/results/failures.json](../public/results/failures.json), also on the live site.
 
 On 200 labelled synthetic images, Drishyam at a 30% pixel cap found 0.48 of ground-truth boxes using 0.25 of the image's pixels, versus 0.55 for 20%-overlap 512-px tiling using 1.67: 0.88x its recall (0.75x with one-box-per-class boxes, 1.25x with as-specified mixed boxes) at 0.15x its pixels, which does not meet the 0.9x-at-0.3x hypothesis. It is 0.97x a single 1024-px downscale (0.50 at 0.25 of the pixels), 0.87x L1 tiling (0.55 at 0.50, the best grid) and 1.09x L2 tiling (0.44 at 0.06), and 0.93x L0 tiling when a match needs IoU >= 0.3 (no contains-the-centre clause).
 
-### Failure gallery
+### Real bridge photos (CODEBRIM)
 
-Twelve real failures from the same run, two per category (FIG. 5 on the live site):
+The same harness, segmenter and matching rule on **200 real inspection photos** from CODEBRIM: a seeded subset (seed 7) of the 1,052 annotated originals, mostly 4608×3456 px (2 to 24 MP), holding 1,685 ground-truth boxes and at least 175 in every class. `make data` downloads and checks the 8.3 GB archive, `make eval-real` runs it. The dataset's licence is non-commercial and bars sharing the photos, so only the numbers are published (the failure crops stay in the git-ignored `results/codebrim/`).
+
+| Policy | pixels processed (× image) | recall | recall, IoU ≥ 0.3 only | boxes per image |
+| --- | --- | --- | --- | --- |
+| downscale once (1024 px) | 0.07 | 0.20 | 0.08 | 184 |
+| tiling, L2 grid | 0.10 | 0.21 | 0.08 | 254 |
+| tiling, L1 grid | 0.42 | 0.22 | 0.08 | 930 |
+| tiling, L0 (exhaustive, 20 % overlap) | 1.62 | 0.21 | 0.06 | 3,144 |
+| **Drishyam**, cap 5 % | 0.04 | **0.11** | 0.04 | 94 |
+| **Drishyam**, cap 10 % | 0.09 | **0.13** | 0.05 | 264 |
+| **Drishyam**, cap 20 % | 0.19 | **0.19** | 0.07 | 606 |
+| **Drishyam**, cap 30 % | 0.29 | **0.20** | 0.09 | 929 |
+| **Drishyam**, cap 50 % | 0.42 | **0.22** | 0.09 | 1,355 |
+| **Drishyam**, cap 100 % | 0.44 | **0.22** | 0.09 | 1,347 |
+
+| per-class recall | crack | spalling | efflorescence | exposed_rebar | corrosion |
+|---|---|---|---|---|---|
+| Drishyam @30 % | 0.30 | 0.00 | 0.05 | 0.01 | 0.53 |
+| tiling L0 | 0.31 | 0.01 | 0.02 | 0.00 | 0.58 |
+| downscale | 0.29 | 0.01 | 0.06 | 0.00 | 0.55 |
+
+- **The PRD's hypothesis test (G1, defined on these photos) passes on paper and means little.** At a 30 % cap Drishyam reaches **0.97×** exhaustive tiling's recall at **0.18×** its pixels. But every policy finds about one defect box in five, a single 1024-px downscale matches Drishyam at a quarter of its pixels, and without the contains-the-centre clause recall is 0.06 to 0.09 for every policy.
+- **On real photos the segmenter, not where the agent looks, limits recall.** The classical engine was tuned on synthetic images. On real concrete it reports hundreds to thousands of boxes per image (929 for Drishyam at 30 %, 3,144 for L0 tiling), so part of the credit is chance centre hits, and 99 % of every policy's critical predictions match no critical ground truth. It finds cracks (0.30) and corrosion (0.53) and effectively misses spalling (0.00) and exposed rebar (0.01).
+- **The agent's control carries over.** 100 % of steps carry a cause; 40 of 40 planner drills and 10 of 10 governor drills recovered. The governor stepped in 91 times during the run: 77 times the p95 segmentation time of a 512 px look went over its 500 ms SLA, and 14 warp spikes (on the synthetic set: 0 and 1). At the 30 % cap a job takes 17 looks (p50; 26 at p95), against 3 on the smaller synthetic images.
+- **Failure cases** (8, kept local): cracks missed under the 30 % cap that the full budget finds, and exposed rebar or spalling reported as corrosion.
+- **Next:** the dacl10k-trained segmenter ([training/](../training/README.md), a Kaggle notebook) is what these numbers call for; after `scripts/install_model.sh`, `DRISHYAM_ONNX=models/drishyam_dacl10k.onnx make eval-real` repeats this comparison with it.
+
+Full numbers: [public/results/codebrim/summary.json](../public/results/codebrim/summary.json), also on the live site (FIG. 4.2). CODEBRIM: Mundt, Majumder, Murali, Panetsos and Ramesh, "Meta-learning Convolutional Neural Architectures for Multi-target Concrete Defect Classification with the COncrete DEfect BRidge IMage Dataset", CVPR 2019.
+
+### Failure gallery (synthetic set)
+
+Twelve measured failures from the synthetic run, two per category (FIG. 5 on the live site):
 
 | Plate | Category | What happened | Rule that would catch it |
 | --- | --- | --- | --- |
@@ -183,9 +214,10 @@ c8g.2xlarge + COOL rate ($0.339/h) so the curves read as a buyer's cost.
 
 ## 8. Limits and next steps
 
-- Numbers above come from a **synthetic** dataset and the **classical**
-  segmenter. Next: fine-tune the dacl10k model on Kaggle (`training/`), then
-  `make data && make eval` on 200 CODEBRIM originals.
+- The policy comparison holds on synthetic images, but on 200 real CODEBRIM
+  photos the **classical** segmenter caps every policy at about 0.2 recall.
+  Next: train the dacl10k model on Kaggle (`training/`), install it with
+  `scripts/install_model.sh`, and re-run `make eval-real` with `DRISHYAM_ONNX` set.
 - The COOL three-arm benchmark and the DynamoDB / SNS / CDK stack need AWS.
 - The web demo is stateless; the signed `work_order.json` is its audit trail.
 

@@ -130,7 +130,7 @@ function heroChips(sum) {
     el.classList.add('is-measured');
   };
   if (drishyam && tiling?.recall > 0) {
-    fill('stat-recall', drishyam.recall / tiling.recall, { decimals: 2, suffix: '× tiling' }, `recall at ${(drishyam.pixels_frac * 100).toFixed(0)}% of the pixels`);
+    fill('stat-recall', drishyam.recall / tiling.recall, { decimals: 2, suffix: '× tiling' }, `recall at ${(drishyam.pixels_frac * 100).toFixed(0)}% of the pixels, synthetic set`);
   }
   if (drishyam && num(drishyam.usd)) {
     fill('stat-cost', drishyam.usd, { decimals: 4, prefix: '$' }, num(tiling?.usd) ? `per image, vs $${tiling.usd} for tiling` : 'per image, modelled');
@@ -142,7 +142,7 @@ function heroChips(sum) {
   if (fired > 0) fill('stat-ops', ok, { decimals: 0, suffix: ` / ${fired}` }, `fired faults recovered; ${num(am.steps_with_cause_pct) ? Math.round(am.steps_with_cause_pct) : '–'} % of steps carry a cause`);
 }
 
-function renderBench(sum, id, file) {
+function renderBench(sum, id, file, note) {
   const root = $(`#${id}`);
   if (!sum?.policies) return root.replaceChildren(pending('benchmarks', file));
   const prov = Object.entries(sum.provenance ?? {});
@@ -150,6 +150,7 @@ function renderBench(sum, id, file) {
   NARROW.addEventListener('change', () => plot.firstElementChild.replaceWith(chart(sum.policies)));
   root.replaceChildren(h('div', { class: 'stack' },
     h('p', { class: 'dataset' }, h('span', { class: 'dataset__k' }, 'dataset'), h('b', {}, String(sum.dataset ?? 'unlabelled'))),
+    note?.(sum) ?? null,
     h('div', { class: 'bench' },
       plot,
       h('div', { class: 'stack' },
@@ -157,6 +158,16 @@ function renderBench(sum, id, file) {
         prov.length ? h('div', { class: 'prov' }, h('h4', { class: 'label' }, 'provenance'),
           h('dl', { class: 'kv' }, prov.map(([k, v]) => h('div', {}, h('dt', {}, k), h('dd', {}, String(v)))))) : null))));
   return true;
+}
+
+/** What the real-photo chart says on its own: every policy's recall is capped by the segmenter there. */
+function realNote(sum) {
+  const best = Math.max(...SERIES.flatMap(([key]) => points(sum.policies[key]).map((p) => p.recall)));
+  const strict = Object.values(sum.agent_metrics?.box_convention?.recall_iou_only?.components ?? {}).filter(num);
+  if (!Number.isFinite(best)) return null;
+  return h('p', { class: 'note' }, `The best recall of any policy on these photos is ${best.toFixed(2)}`,
+    strict.length ? ` (${Math.max(...strict).toFixed(2)} when a match needs IoU ≥ 0.3)` : '',
+    '. Here the classical segmenter, tuned on synthetic images, limits recall more than where the agent looks; a trained model is the next step.');
 }
 
 const times = (v) => (num(v) ? `${v}×` : '–');
@@ -234,7 +245,7 @@ export async function initResults() {
   const [sum, real, cool, fails] = await Promise.all(
     ['results/summary.json', 'results/codebrim/summary.json', 'results/cool.json', 'results/failures.json'].map(getJSON));
   if (renderBench(sum, 'bench', 'results/summary.json')) heroChips(sum);
-  renderBench(real, 'bench-real', 'results/codebrim/summary.json');
+  renderBench(real, 'bench-real', 'results/codebrim/summary.json', realNote);
   renderCool(cool);
   renderFailures(fails);
 }
