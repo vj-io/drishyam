@@ -30,7 +30,7 @@ from drishyam import imaging
 from drishyam.agent import PLANNER_MALFORMED_STEP, PLANNER_TIMEOUT_STEP, Job, JobConfig
 from drishyam.findings import SPALL_CRITICAL_AREA_PX, is_critical
 from drishyam.governor import USD_PER_HOUR
-from drishyam.segment import DEFECTS, default_segmenter, restrict
+from drishyam.segment import DEFECTS, ClassicalSegmenter, default_segmenter, restrict
 from evals import codebrim, synth
 
 CLASSES = DEFECTS  # crack, spalling, efflorescence, exposed_rebar, corrosion
@@ -433,16 +433,21 @@ def run(data_dir="data/synth200", n=200, out_dir="public/results", results_dir="
         raise SystemExit(f"refusing to write CODEBRIM image crops under {out_dir}: run `make eval-real`, which keeps them in "
                          "results/codebrim and publishes only summary.json")
     log(f"{len(records)} images, {workers} worker(s); policies: downscale, tiling L2/L1/L0, drishyam {BUDGETS}")
+    seg_name = default_segmenter().name
     cache = Path(results_dir) / "eval_per_image.json"
     if reuse and cache.exists():  # re-score and re-draw from the last run's predictions and traces
         saved = json.loads(cache.read_text())
         assert saved["ids"] == [r["id"] for r in records], "cached run is for a different image list"
+        cached = saved.get("segmenter", ClassicalSegmenter.name)  # caches from before the field are all classical
+        if cached != seg_name:  # the fault drills below re-run, so they must use the cached run's segmenter too
+            raise SystemExit(f"{cache} holds {cached} predictions, but this process segments with {seg_name}: "
+                             "set or unset DRISHYAM_ONNX as for that run")
         results = saved["results"]
         log(f"reusing {cache}")
     else:
         results = pool_map(eval_image, records, workers, log, "eval")
         cache.parent.mkdir(parents=True, exist_ok=True)
-        cache.write_text(json.dumps({"ids": [r["id"] for r in records], "results": results},
+        cache.write_text(json.dumps({"ids": [r["id"] for r in records], "segmenter": seg_name, "results": results},
                                     default=lambda o: o.item() if hasattr(o, "item") else str(o)))
 
     keys = ["downscale", *(f"tiling@L{lv}" for lv in TILE_LEVELS), *(f"drishyam@{c}" for c in BUDGETS)]
@@ -488,7 +493,7 @@ def run(data_dir="data/synth200", n=200, out_dir="public/results", results_dir="
     summary = {
         "dataset": label,
         "n_images": len(records),
-        "segmenter": default_segmenter().name,
+        "segmenter": seg_name,
         "policies": {
             "downscale": [point(metrics["downscale"])],
             "tiling": [point(metrics[f"tiling@L{lv}"]) for lv in TILE_LEVELS],
