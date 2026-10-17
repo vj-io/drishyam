@@ -114,13 +114,16 @@ Severity classes: `crack`, `spalling`, `efflorescence`, `exposed_rebar`,
 
 `verify_iou` is the mask IoU of the latest cross-level check of the finding (a finer look
 against the coarser look before it) and `verified` is `verify_iou >= 0.5`; both are `null`
-when no check compared two looks of it. `verified: false` means unconfirmed: the looks disagreed.
+when no check compared two looks of it. A check whose mask is a class the finding absorbed (rust on
+its bars, a crack in a spall's rim) is a check of that finding, and repeats its finding event. `verified: false` means unconfirmed: the looks disagreed.
 
 A `review_request` asks a person to look; it changes no state (only a critical finding is
 `pending_review`). `reason` is one of:
 
 - `"<class> is critical"`: a new critical finding;
-- `"iou 0.19 < 0.5 between L3 and L2"`: a critical finding whose finer look disagrees with the coarser one;
+- `"iou 0.19 < 0.5 between L3 and L2"`: a look that logged a critical finding disagrees with the coarser one;
+  it names the compared finding when that one is critical (it then has `verified: false`), else the look's
+  first critical finding;
 - `"unconfirmed: iou 0.07 < 0.5 between L1 and L0"`: a disagreement no further look will settle (no finer
   level, or the region's one extra look is spent); the finding has `verified: false`;
 - `"ambiguous: crack 5232 px (>= A_min 64) is mostly inside spalling f2; recorded as spalling only"`: two classes

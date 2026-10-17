@@ -84,8 +84,12 @@ class Finding:
             self.critical_step, self.critical_area_px = self.step, self.measure.get("area_px", 0)
             self.critical_rule = critical_rule(self.cls, self.critical_area_px)
         if self.verify_iou is not None:
-            self.verify_iou = float(self.verify_iou)
-            self.verified = self.verify_iou >= IOU_AGREE
+            self.set_verify(self.verify_iou)
+
+    def set_verify(self, iou: float) -> None:
+        """The latest cross-level check of this defect: `verified` is False when the two looks disagreed."""
+        self.verify_iou = float(iou)
+        self.verified = self.verify_iou >= IOU_AGREE
 
     def agent_update(self, *, confidence: float, measure: dict, box: list[int], step: int, level: int,
                      crop_jpeg_b64: str | None = None, verify_iou: float | None = None) -> None:
@@ -105,8 +109,7 @@ class Finding:
             if crop_jpeg_b64:
                 self.crop_jpeg_b64 = crop_jpeg_b64
         if verify_iou is not None:
-            self.verify_iou = float(verify_iou)
-            self.verified = self.verify_iou >= IOU_AGREE
+            self.set_verify(verify_iou)
         if not self.critical and is_critical(self.cls, measure.get("area_px", 0)):
             self.critical, self.state = True, "pending_review"
             self.critical_step, self.critical_area_px = step, measure.get("area_px", 0)

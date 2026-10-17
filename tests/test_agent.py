@@ -393,6 +393,35 @@ def test_a_failed_verification_is_unconfirmed_and_sent_to_a_human(scene):
     assert all(f.verify_iou is None and f.verified is None for f in job.findings if f not in checked)
 
 
+def test_a_check_of_an_absorbed_class_counts_for_the_finding_that_absorbed_it():
+    """bridge_03: a look's best mask can be a class absorbed into another finding (rust on exposed bars, a crack in
+    a spall's rim). Its IoU is evidence about that finding: the finding carries it, and the disagreement review
+    names it, so the review and the finding's `verified` never contradict each other."""
+    from pathlib import Path
+
+    img = cv2.imread(str(Path(__file__).resolve().parent.parent / "public" / "samples" / "bridge_03.jpg"))
+    job, events = run(img)
+    ids = {f.id: f for f in job.findings}
+
+    def after(s):  # the finding and review events that follow a step record
+        rest = events[events.index(s) + 1:]
+        return rest[:next(i for i, e in enumerate(rest) if e["type"] not in ("finding", "review_request"))]
+
+    disagreements = [(e, s) for s in steps(events) if s.get("verify") for e in after(s)
+                     if e["type"] == "review_request" and f"iou {s['verify']['iou']:g} < 0.5" in e["reason"]]
+    assert {e["reason"].startswith("unconfirmed: ") for e, _ in disagreements} == {True, False}
+    for e, s in disagreements:
+        f = ids[e["finding_id"]]
+        assert f.verified is False and f.verify_iou == pytest.approx(s["verify"]["iou"])
+    # the L0 verify whose only confident classes were absorbed (bridge_03 step 4) still reaches a human
+    s = next(s for s in steps(events) if s["decision"]["action"] == "verify" and s["decision"]["args"]["level"] == 0
+             and s["verify"]["iou"] < 0.5)
+    (fe,) = [e["finding"] for e in after(s) if e["type"] == "finding"]
+    assert fe["verified"] is False and fe["verify_iou"] == pytest.approx(s["verify"]["iou"])
+    assert any(e["type"] == "review_request" and e["finding_id"] == fe["id"] and e["reason"].startswith("unconfirmed: ")
+               for e in after(s))
+
+
 def test_review_on_ambiguity_when_a_class_is_absorbed_by_another(scene):
     """Two classes clear A_min on one spot and the agent keeps the dominant one: a human is asked, once."""
     job, events = run(scene, pixel_cap=1.0)

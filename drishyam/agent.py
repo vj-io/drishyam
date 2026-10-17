@@ -211,6 +211,8 @@ class Job:
         # One physical defect, one finding: rust on exposed bars is the bar, a spall's rim is the spall.
         if dom := next((f for f in self.findings if f.cls in DOMINATED_BY.get(cls, ()) and _inside(box, f.box) >= 0.5),
                        None):
+            if verify_iou is not None:  # the check was of this defect, seen as the class it absorbed
+                dom.set_verify(verify_iou)
             return dom, "absorbed"
         same = [f for f in self.findings if f.cls == cls and (f.region == r.id or imaging.box_iou(f.box, box) > 0.3)]
         if same:
@@ -386,7 +388,10 @@ class Job:
                 for c in present:
                     # The IoU compares this look's `best` mask with the last look's: it is evidence about that finding.
                     f, kind = self._log_finding(r, c, seg, crop, to_l0, level, iou if c == best else None)
+                    checked = f if c == best else checked
                     if kind == "absorbed":
+                        if c == best and iou is not None:  # the absorbing finding now carries this look's check
+                            new_events.append({"type": "finding", "finding": f.to_dict()})
                         # Review on ambiguity: two classes clear A_min on one spot and the agent kept one of them.
                         if (f.id, c) not in asked:
                             asked.add((f.id, c))
@@ -394,7 +399,6 @@ class Job:
                                 f"ambiguous: {c} {seg.areas[c]} px (>= A_min {cfg.a_min}) is mostly inside {f.cls} {f.id}; "
                                 f"recorded as {f.cls} only")})
                         continue
-                    checked = f if c == best else checked
                     new_events.append({"type": "finding", "finding": f.to_dict()})
                     if f.critical:
                         critical = critical or f
@@ -403,7 +407,7 @@ class Job:
                                                "reason": f"{c} is critical"})
                 disagree = f"iou {iou:g} < {IOU_AGREE} between L{prev_level} and L{level}" if iou is not None else ""
                 if iou is not None and iou < IOU_AGREE and critical:
-                    f = critical
+                    f = checked if checked and checked.critical else critical  # the finding whose mask was compared
                     new_events.append({"type": "review_request", "finding_id": f.id, "reason": disagree})
                     r.done = True
                 elif iou is not None and iou < IOU_AGREE and not r.extra_used and level > 0 and cfg.verify:
