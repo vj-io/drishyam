@@ -7,7 +7,7 @@ import pytest
 from drishyam import imaging
 from drishyam.segment import CLASSES, ClassicalSegmenter, OnnxSegmenter, finish, mask_iou, segment_view
 
-from .conftest import add_crack, add_rebar_spall, concrete
+from .conftest import add_crack, add_rebar_spall, concrete, threaded_mismatches
 
 SEG = ClassicalSegmenter()
 
@@ -120,3 +120,12 @@ def test_onnx_engine_new_dynamic_hw(tiny_onnx, shape):
 def test_onnx_class_map_merges_channels(tiny_onnx):
     seg = OnnxSegmenter(tiny_onnx, class_map=[0, 0, 1, 1, 2, 2]).predict(concrete(128, 128, 18))
     assert np.allclose(seg.probs[3:], 0) and np.allclose(seg.probs.sum(axis=0), 1, atol=1e-4)
+
+
+@pytest.mark.parametrize("engine", ["classical", "onnx"])
+def test_a_shared_segmenter_gives_each_thread_its_own_result(engine, request):
+    """default_segmenter() is one instance per process and the web app runs concurrent jobs' steps in
+    a threadpool, so no call may see another thread's crop (CLAHE buffers, a net's set input)."""
+    seg = SEG if engine == "classical" else OnnxSegmenter(request.getfixturevalue("tiny_onnx"), input_size=128)
+    crops = [add_crack(concrete(256, 256, 30), (10, 60), n=80), concrete(256, 256, 31)]
+    assert threaded_mismatches(lambda c: seg.predict(c).probs.tobytes(), crops) == []

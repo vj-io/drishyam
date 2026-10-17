@@ -8,6 +8,7 @@ inspects structures, not people: an image mostly filled by a person is refused.
 
 from __future__ import annotations
 
+import threading
 from pathlib import Path
 
 import cv2
@@ -32,11 +33,15 @@ class _Detectors:
         cv2.utils.logging.setLogLevel(cv2.utils.logging.LOG_LEVEL_ERROR)  # the new DNN engine warns about targets it ignores
         self.face = cv2.FaceDetectorYN.create(str(YUNET), "", (320, 320), 0.8, 0.3, 50)
         self.nano = cv2.dnn.readNet(str(NANODET))
+        # Both keep per-call state (YuNet its input size, the Net its input) and concurrent uploads
+        # share this instance. ponytail: one lock for both; one each if faces and objects must overlap.
+        self.lock = threading.Lock()
 
     def faces(self, img: np.ndarray) -> list[list[int]]:
         h, w = img.shape[:2]
-        self.face.setInputSize((w, h))
-        _, out = self.face.detect(img)
+        with self.lock:
+            self.face.setInputSize((w, h))
+            _, out = self.face.detect(img)
         return [] if out is None else [[int(v) for v in f[:4]] for f in out]
 
     def objects(self, img: np.ndarray, threshold: float = 0.45) -> list[tuple[int, list[int]]]:
@@ -46,8 +51,9 @@ class _Detectors:
         canvas = np.zeros((NANO_SIZE, NANO_SIZE, 3), np.float32)
         canvas[: round(h * k), : round(w * k)] = cv2.resize(img, (round(w * k), round(h * k)))
         canvas = (canvas - (103.53, 116.28, 123.675)) / (57.375, 57.12, 58.395)
-        self.nano.setInput(cv2.dnn.blobFromImage(canvas.astype(np.float32)))
-        outs = self.nano.forward(self.nano.getUnconnectedOutLayersNames())
+        with self.lock:
+            self.nano.setInput(cv2.dnn.blobFromImage(canvas.astype(np.float32)))
+            outs = self.nano.forward(self.nano.getUnconnectedOutLayersNames())
         # Output order differs between DNN engines, so pair heads by shape: 80 class scores
         # and 4 x 8 distance bins per anchor, one grid per stride.
         by_size = lambda last: sorted((o.reshape(-1, last) for o in outs if o.shape[-1] == last), key=len)
