@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import functools
 import os
+import threading
 import time
 from dataclasses import dataclass
 
@@ -147,15 +148,13 @@ class ClassicalSegmenter:
     name = "classical-v1"
     gain = 9.0
 
-    def __init__(self) -> None:
-        self.clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-
     def evidence(self, crop: np.ndarray) -> np.ndarray:
         """Five 0-1 maps. Thresholds are relative to the crop's own texture, so a rough
         but healthy surface does not read as damage."""
         h, w = crop.shape[:2]
         gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
-        g = cv2.GaussianBlur(self.clahe.apply(gray), (3, 3), 0)
+        # A CLAHE per call: it keeps working buffers, and default_segmenter() is shared by request threads.
+        g = cv2.GaussianBlur(cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8)).apply(gray), (3, 3), 0)
         k = max(7, (min(h, w) // 34) | 1)
         bh = cv2.morphologyEx(g, cv2.MORPH_BLACKHAT, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k)))
         bh = bh.astype(np.float32)
@@ -230,6 +229,9 @@ class OnnxSegmenter:
         self.class_map = class_map
         self.mean = np.array(mean, np.float32).reshape(3, 1, 1)
         self.std = np.array(std, np.float32).reshape(3, 1, 1)
+        # A Net holds its input between setInput and forward, and default_segmenter() is shared by
+        # request threads. ponytail: one lock for both nets; a lock per net if fp16 and accurate must overlap.
+        self.lock = threading.Lock()
 
     @staticmethod
     def _load(path: str):
@@ -242,8 +244,9 @@ class OnnxSegmenter:
         rgb = cv2.cvtColor(cv2.resize(crop, (size, size), interpolation=cv2.INTER_AREA), cv2.COLOR_BGR2RGB)
         blob = ((rgb.astype(np.float32).transpose(2, 0, 1) / 255.0 - self.mean) / self.std)[None]
         net = self.nets["fp16" if model in ("fp16", "fast") else "accurate"]
-        net.setInput(np.ascontiguousarray(blob, np.float32))
-        logits = np.asarray(net.forward())[0].astype(np.float32)
+        with self.lock:
+            net.setInput(np.ascontiguousarray(blob, np.float32))
+            logits = np.asarray(net.forward())[0].astype(np.float32)
         probs = _softmax(logits)
         if self.class_map is not None:
             merged = np.zeros((len(CLASSES), *probs.shape[1:]), np.float32)

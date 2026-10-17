@@ -1,3 +1,5 @@
+import threading
+
 import cv2
 import numpy as np
 import pytest
@@ -50,6 +52,31 @@ def add_rebar_spall(img, center, r=150):
         y = cy + k * r // 4
         cv2.line(img, (cx - r // 2, y), (cx + r // 2, y), (35, 75, 150), 14, cv2.LINE_AA)
     return img
+
+
+def threaded_mismatches(fn, inputs, threads=8, rounds=6) -> list[str]:
+    """Calls of `fn` from `threads` threads at once (a barrier per round), each on a different one
+    of `inputs` than its neighbour, whose result is not the single-threaded one. [] when `fn` is
+    safe to share between request threads."""
+    ref = [fn(x) for x in inputs]
+    barrier, bad = threading.Barrier(threads), []
+
+    def work(t):
+        for r in range(rounds):
+            k = (t + r) % len(inputs)
+            barrier.wait()
+            try:
+                if fn(inputs[k]) != ref[k]:
+                    bad.append(f"thread {t} round {r}: wrong result")
+            except Exception as exc:  # noqa: BLE001 -- a raise under contention is a mismatch; a dead thread hangs the barrier
+                bad.append(f"thread {t} round {r}: {exc!r:.120}")
+
+    pool = [threading.Thread(target=work, args=(t,)) for t in range(threads)]
+    for th in pool:
+        th.start()
+    for th in pool:
+        th.join()
+    return bad
 
 
 @pytest.fixture

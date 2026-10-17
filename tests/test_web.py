@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from drishyam import findings
 from drishyam.web import KEY, MAX_UPLOAD_BYTES, app
 
-from .conftest import add_rebar_spall, concrete
+from .conftest import add_crack, add_rebar_spall, concrete, threaded_mismatches
 
 client = TestClient(app)
 
@@ -133,6 +133,16 @@ def test_privacy_blur_applies_before_analysis(monkeypatch):
     privacy.blur_boxes(blurred, [[100, 100, 200, 200]])
     assert blurred[100:300, 100:300].std() < img[100:300, 100:300].std() / 5
     assert np.array_equal(blurred[400:], img[400:])
+
+
+def test_privacy_detectors_give_each_thread_its_own_result():
+    """Concurrent uploads share one detectors(); YuNet's input size and NanoDet's input are per-call
+    state. The low NanoDet threshold makes both results non-empty and distinct."""
+    from drishyam import privacy
+
+    det = privacy.detectors()
+    imgs = [concrete(240, 320, 2), add_crack(concrete(320, 240, 3), (10, 60), n=80)]
+    assert threaded_mismatches(lambda x: (det.faces(x), det.objects(x, 0.01)), imgs) == []
 
 
 def test_kill_endpoint_halts_a_running_job(photo, monkeypatch):

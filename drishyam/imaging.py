@@ -104,13 +104,16 @@ def _norm(x: np.ndarray) -> np.ndarray:
     return np.clip(x / hi, 0, 1) if hi > 1e-6 else np.zeros_like(x, np.float32)
 
 
-_CLAHE = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+def _clahe():
+    """A new CLAHE per call: the object keeps its working buffers, so one shared by concurrent
+    requests (web.py runs them in a threadpool) mixes their images. Creating one costs microseconds."""
+    return cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
 
 
 def saliency(img: np.ndarray) -> np.ndarray:
     """0-1 prior of 'something worth a closer look', built from imgproc ops only."""
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    eq = cv2.GaussianBlur(_CLAHE.apply(gray), (3, 3), 0)
+    eq = cv2.GaussianBlur(_clahe().apply(gray), (3, 3), 0)
     gx = cv2.Sobel(eq, cv2.CV_32F, 1, 0, ksize=3)
     gy = cv2.Sobel(eq, cv2.CV_32F, 0, 1, ksize=3)
     edges = _norm(cv2.magnitude(gx, gy))
@@ -263,7 +266,7 @@ def quality(crop: np.ndarray) -> dict:
 def enhance(crop: np.ndarray) -> np.ndarray:
     """CLAHE on the lightness channel: a cheaper second look before zooming further."""
     lab = cv2.cvtColor(crop, cv2.COLOR_BGR2LAB)
-    lab[..., 0] = _CLAHE.apply(lab[..., 0])
+    lab[..., 0] = _clahe().apply(lab[..., 0])
     return cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
 
 
