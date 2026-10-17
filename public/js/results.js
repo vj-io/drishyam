@@ -8,6 +8,8 @@ const SERIES = [
   ['tiling', 'exhaustive tiling', 'tiling', 'diamond'],
   ['drishyam', 'Drishyam', 'drishyam', 'circle'],
 ];
+// The trained segmenter's Drishyam curve (evals.model_eval --publish), drawn only once its summary is published.
+const MODEL = ['model', 'Drishyam, dacl10k model', 'model', 'circle'];
 
 const pending = (what, file, by = 'the evaluation harness') => h('div', { class: 'pending' },
   h('p', { class: 'pending__title' }, `${what} pending`),
@@ -33,19 +35,19 @@ function marker(kind, x, y, cls) {
 
 const NARROW = matchMedia('(max-width: 640px)');
 
-function chart(policies) {
+function chart(policies, series = SERIES, iou = false) {
   // Phones get a smaller sheet, so the lettering is drawn at a legible size instead of shrinking with the chart.
   const [W, H, L, R, T, B] = NARROW.matches ? [360, 300, 54, 14, 14, 50] : [640, 380, 58, 20, 18, 58];
   const PW = W - L - R;
   // Overlapping tiles can process more than 100% of the pixels. Then the x axis is broken after 75% (a drafting
   // break mark), so the range where the policies actually differ gets most of the width.
-  const xmax = Math.max(1, ...SERIES.flatMap(([key]) => points(policies[key]).map((p) => p.pixels_frac)));
+  const xmax = Math.max(1, ...series.flatMap(([key]) => points(policies[key]).map((p) => p.pixels_frac)));
   const BRK = 0.75;
   const broken = xmax > 1;
   const X = (v) => (!broken ? L + (v / xmax) * PW
     : v <= BRK ? L + (v / BRK) * PW * 0.8 : L + PW * 0.9 + ((v - BRK) / (xmax - BRK)) * PW * 0.1);
   const Y = (v) => T + (1 - v) * (H - T - B);
-  const root = svg('svg', { viewBox: `0 0 ${W} ${H}`, class: 'chart', role: 'img', 'aria-label': `Line chart of recall against the fraction of full-resolution pixels processed, for three policies${broken ? `; the pixel axis is broken between 75% and ${Math.round(xmax * 100)}%` : ''}. A data table follows.` });
+  const root = svg('svg', { viewBox: `0 0 ${W} ${H}`, class: 'chart', role: 'img', 'aria-label': `Line chart of recall against the fraction of full-resolution pixels processed, for ${series.length} policies${broken ? `; the pixel axis is broken between 75% and ${Math.round(xmax * 100)}%` : ''}. A data table follows.` });
   for (let i = 0; i <= 5; i++) {
     const v = i / 5;
     root.append(
@@ -68,7 +70,7 @@ function chart(policies) {
     svg('text', { class: 'chart__title', transform: `translate(${NARROW.matches ? 12 : 14} ${(T + H - B) / 2}) rotate(-90)`, 'text-anchor': 'middle' }, 'defect recall'));
   const plot = svg('g', { class: 'chart__plot' });
   root.append(plot);
-  for (const [key, name, cls, kind] of SERIES) {
+  for (const [key, name, cls, kind] of series) {
     const pts = points(policies[key]);
     if (pts.length > 1) {
       const d = pts.map((p, i) => `${i ? 'L' : 'M'}${X(p.pixels_frac)} ${Y(p.recall)}`).join(' ');
@@ -80,6 +82,12 @@ function chart(policies) {
       // 95 % bootstrap interval as a capped bar, and the policy's chance level as a dotted tick under it
       if (ci) plot.append(svg('path', { class: `mk mk--${cls}`, opacity: 0.55, d: `M${x} ${Y(ci[0])}V${Y(ci[1])}M${x - 4} ${Y(ci[0])}h8M${x - 4} ${Y(ci[1])}h8` }));
       if (num(p.chance_recall)) plot.append(svg('path', { class: `mk mk--${cls}`, 'stroke-dasharray': '2 3', d: `M${x - 9} ${Y(p.chance_recall)}h18` }));
+      // IoU-only recall (no contains-the-centre clause) as a cross, where the two matching rules are co-primary
+      if (iou && num(p.recall_iou_only)) {
+        const y = Y(p.recall_iou_only);
+        plot.append(svg('path', { class: `mk mk--${cls}`, d: `M${x - 5} ${y - 5}l10 10M${x - 5} ${y + 5}l10 -10` },
+          svg('title', {}, `${name}, IoU-only: recall ${p.recall_iou_only.toFixed(2)}`)));
+      }
       const m = marker(kind, x, Y(p.recall), cls);
       m.append(svg('title', {}, `${name}: ${(p.pixels_frac * 100).toFixed(1)}% of pixels, recall ${p.recall.toFixed(2)}${ci ? ` (95% CI ${ci[0].toFixed(2)}–${ci[1].toFixed(2)})` : ''}${num(p.chance_recall) ? `, chance ${p.chance_recall.toFixed(2)}` : ''}${num(p.usd) ? `, $${p.usd}/image` : ''}`));
       plot.append(m);
@@ -107,20 +115,21 @@ function callout(x, y, lines, W, bottom) {
       lines.map((t, i) => svg('tspan', { x: nx, dy: i ? '1.3em' : 0 }, t))));
 }
 
-const legend = () => h('ul', { class: 'legend' }, SERIES.map(([, name, cls]) => h('li', {}, h('i', { class: `sw sw--${cls}` }), name)));
+const legend = (series) => h('ul', { class: 'legend' }, series.map(([, name, cls]) => h('li', {}, h('i', { class: `sw sw--${cls}` }), name)));
 
-/** What the bars and dotted ticks mean, when the file has them. */
-const marks = (policies) => (SERIES.some(([key]) => points(policies[key]).some((p) => interval(p.recall_ci)))
-  ? h('p', { class: 'note' }, 'Bars: 95 % interval (bootstrap over images). Dotted ticks: chance, the same policy’s boxes moved to random places in the photo.')
+/** What the bars, dotted ticks and crosses mean, when the file has them. */
+const marks = (policies, series, iou) => (series.some(([key]) => points(policies[key]).some((p) => interval(p.recall_ci)))
+  ? h('p', { class: 'note' }, 'Bars: 95 % interval (bootstrap over images). Dotted ticks: chance, the same policy’s boxes moved to random places in the photo.',
+    iou ? ' Crosses: recall when a match needs IoU ≥ 0.3 (no contains-the-centre clause).' : '')
   : null);
 
-function dataTable(policies) {
+function dataTable(policies, series) {
   const ci = (r) => (interval(r) ? `${r[0].toFixed(2)}–${r[1].toFixed(2)}` : '–');
-  const rows = SERIES.flatMap(([key, name]) => points(policies[key]).map((p) => h('tr', {},
+  const rows = series.flatMap(([key, name]) => points(policies[key]).map((p) => h('tr', {},
     h('th', { scope: 'row' }, name),
     [`${(p.pixels_frac * 100).toFixed(1)}%`, p.recall.toFixed(2), ci(p.recall_ci), dec(p.recall_iou_only), dec(p.chance_recall),
-      dec(p.precision, 3), dec(p.fp_per_image, 1), dec(p.boxes_per_image, 1), num(p.usd) ? `$${p.usd}` : '–'].map((v) => h('td', {}, v)))));
-  const cols = ['policy', 'pixels', 'recall', '95 % CI', 'IoU-only recall', 'chance recall', 'precision', 'false boxes / image', 'boxes / image', '$ / image'];
+      dec(p.precision, 3), dec(p.fp_per_image, 1), dec(p.boxes_per_image, 1), dec(p.hits_per_matched_gt), num(p.usd) ? `$${p.usd}` : '–'].map((v) => h('td', {}, v)))));
+  const cols = ['policy', 'pixels', 'recall', '95 % CI', 'IoU-only recall', 'chance recall', 'precision', 'false boxes / image', 'boxes / image', 'hits per matched box', '$ / image'];
   return h('details', { class: 'data' }, h('summary', {}, 'Chart data as a table'),
     h('div', { class: 'table-wrap', tabindex: '0', role: 'region', 'aria-label': 'Chart data' },
       h('table', { class: 'tbl tbl--tight' }, h('thead', {}, h('tr', {}, cols.map((t) => h('th', { scope: 'col' }, t)))), h('tbody', {}, rows))));
@@ -173,8 +182,10 @@ function heroChips(sum, real) {
   if (rd && rt?.recall > 0) {
     const all = [...points(real.policies.downscale), ...points(real.policies.tiling), rd].map((p) => p.recall);
     const [lo, hi] = [Math.min(...all), Math.max(...all)];
+    const strict = num(rd.recall_iou_only) && rt.recall_iou_only > 0 ? rd.recall_iou_only / rt.recall_iou_only : null;
+    const sci = interval(real.headline_stats?.recall_ratio_iou_only_vs_tiling_ci);
     fill('stat-real', 'real photos (CODEBRIM)', rd.recall / rt.recall, { decimals: 2, suffix: '× tiling' },
-      `recall at ${(rd.pixels_frac / rt.pixels_frac).toFixed(2)}× its pixels; ${hi - lo <= 0.05 ? `every policy about ${((lo + hi) / 2).toFixed(1)}` : `policies ${lo.toFixed(2)}–${hi.toFixed(2)}`}${num(rd.chance_recall) ? ` (its boxes at random places: ${rd.chance_recall.toFixed(2)})` : ''}, limited by the segmenter`);
+      `recall at ${(rd.pixels_frac / rt.pixels_frac).toFixed(2)}× its pixels${strict ? ` (${strict.toFixed(2)}× with IoU-only matching${sci ? `, 95 % CI ${sci[0].toFixed(2)}–${sci[1].toFixed(2)}` : ''})` : ''}; ${hi - lo <= 0.05 ? `every policy about ${((lo + hi) / 2).toFixed(1)}` : `policies ${lo.toFixed(2)}–${hi.toFixed(2)}`}${num(rd.chance_recall) ? ` (its boxes at random places: ${rd.chance_recall.toFixed(2)})` : ''}, limited by the segmenter`);
   }
   // The uncapped run: where the stop rule (value per ms) ended the job by itself.
   const am = sum.agent_metrics ?? {};
@@ -196,12 +207,16 @@ function heroChips(sum, real) {
   }
 }
 
-function renderBench(sum, id, file, note) {
+function renderBench(sum, id, file, note, model, iou = false) {
   const root = $(`#${id}`);
   if (!sum?.policies) return root.replaceChildren(pending('benchmarks', file));
   const prov = Object.entries(sum.provenance ?? {});
-  const plot = h('div', {}, chart(sum.policies), legend(), marks(sum.policies), dataTable(sum.policies));
-  NARROW.addEventListener('change', () => plot.firstElementChild.replaceWith(chart(sum.policies)));
+  const withModel = points(model?.policies?.drishyam).length > 0;
+  const series = withModel ? [...SERIES, MODEL] : SERIES;
+  const policies = withModel ? { ...sum.policies, model: model.policies.drishyam } : sum.policies;
+  const plot = h('div', {}, chart(policies, series, iou), legend(series), marks(policies, series, iou), dataTable(policies, series),
+    withModel ? h('p', { class: 'note' }, `Dashed red: Drishyam with the trained segmenter (${String(model.segmenter ?? 'ONNX')}) on the same images; the other lines use the classical one.`) : null);
+  NARROW.addEventListener('change', () => plot.firstElementChild.replaceWith(chart(policies, series, iou)));
   root.replaceChildren(h('div', { class: 'stack' },
     h('p', { class: 'dataset' }, h('span', { class: 'dataset__k' }, 'dataset'), h('b', {}, String(sum.dataset ?? 'unlabelled'))),
     note?.(sum) ?? null,
@@ -349,11 +364,12 @@ function realFailures(real, n) {
 }
 
 export async function initResults() {
-  const [sum, real, cool, fails, realFails, large, live] = await Promise.all(
+  const [sum, real, cool, fails, realFails, large, live, synthModel, realModel] = await Promise.all(
     ['results/summary.json', 'results/codebrim/summary.json', 'results/cool.json', 'results/failures.json',
-      'results/codebrim/failures_text.json', 'results/large/summary.json', 'results/live/summary.json'].map(getJSON));
-  if (renderBench(sum, 'bench', 'results/summary.json', () => synthNotes(large, live))) heroChips(sum, real);
-  renderBench(real, 'bench-real', 'results/codebrim/summary.json', realNote);
+      'results/codebrim/failures_text.json', 'results/large/summary.json', 'results/live/summary.json',
+      'results/synth_dacl10k/summary.json', 'results/codebrim_dacl10k/summary.json'].map(getJSON));
+  if (renderBench(sum, 'bench', 'results/summary.json', () => synthNotes(large, live), synthModel)) heroChips(sum, real);
+  renderBench(real, 'bench-real', 'results/codebrim/summary.json', realNote, realModel, true);
   renderCool(cool);
   renderFailures(fails, realFails);
 }
