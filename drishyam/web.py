@@ -1,4 +1,4 @@
-"""HTTP API for the browser UI (docs/api-contract.md). Deployed on Vercel via `app.py`.
+"""HTTP API for the browser UI (docs/api-contract.md). Deployed on Vercel via `app.py`, or on AWS Lambda.
 
 Trust boundary: everything in a request is hostile until checked. Uploads are
 size-capped while streaming, sniffed by magic bytes and pixel-counted before
@@ -8,14 +8,17 @@ re-validated; review tokens are HMAC-verified. Errors never echo internals.
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import binascii
 import hashlib
 import json
 import logging
 import os
+import platform
 import secrets
 import threading
+import time
 from pathlib import Path
 from typing import Literal
 
@@ -29,7 +32,7 @@ from starlette.concurrency import run_in_threadpool
 os.environ.setdefault("VERCEL_TELEMETRY_DISABLED", "1")  # the cache SDK phones home unless told not to
 from vercel.cache import AsyncRuntimeCache
 
-from . import __version__, findings, imaging, privacy
+from . import __version__, findings, imaging, planner, privacy
 from .agent import Job, JobConfig
 from .segment import default_segmenter
 
@@ -41,28 +44,78 @@ MAX_REVIEW_BYTES = 100_000
 IMAGE_TYPES = {"image/jpeg", "image/png"}
 CHAOS = {"p95_spike", "planner_timeout", "planner_malformed"}
 ROOT = Path(__file__).resolve().parent.parent
+MAX_PACED_S = 30.0  # total viewing pauses per job (pace_ms), so a paced job still ends inside the 60 s function limit
+HOST = ("aws-lambda" if os.environ.get("AWS_LAMBDA_FUNCTION_NAME")
+        else "vercel" if os.environ.get("VERCEL") else "local")
 
 
 def _signing_key() -> bytes:
-    key = os.environ.get("DRISHYAM_SIGNING_KEY", "")
+    if arn := os.environ.get("DRISHYAM_SIGNING_KEY_SECRET_ARN"):  # AWS: read once per cold start, never logged
+        import boto3  # the AWS path only (extra "aws"; the Lambda Python runtime ships it too)
+
+        key = boto3.client("secretsmanager").get_secret_value(SecretId=arn)["SecretString"]
+    else:
+        key = os.environ.get("DRISHYAM_SIGNING_KEY", "")
     if len(key) >= 32:
         return key.encode()
-    if os.environ.get("VERCEL_ENV"):  # deployed: per-instance keys would break review across instances
-        raise RuntimeError("DRISHYAM_SIGNING_KEY must be set (>= 32 chars) on a deployment")
+    # Deployed: per-instance keys would break review across instances.
+    if os.environ.get("VERCEL_ENV") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
+        raise RuntimeError("a signing key (>= 32 chars) must be set on a deployment: "
+                           "DRISHYAM_SIGNING_KEY, or DRISHYAM_SIGNING_KEY_SECRET_ARN on AWS")
     log.warning("DRISHYAM_SIGNING_KEY unset or short; using an ephemeral key (tokens die with this process)")
     return secrets.token_bytes(32)
 
 
+class DynamoKills:
+    """Kill flags in a DynamoDB table (partition key `k`, numeric TTL attribute `exp`): the AWS twin of the
+    Runtime Cache. Reads are consistent, so a flag written by /api/kill on one instance is seen on the next step."""
+
+    def __init__(self, name: str, table=None) -> None:
+        if table is None:
+            import boto3  # the AWS path only
+
+            table = boto3.resource("dynamodb").Table(name)
+        self.table = table
+
+    async def get(self, key: str) -> bool:
+        r = await run_in_threadpool(self.table.get_item, Key={"k": key}, ConsistentRead=True)
+        return "Item" in r
+
+    async def set(self, key: str, _value, options: dict) -> None:
+        item = {"k": key, "exp": int(time.time()) + options["ttl"]}
+        await run_in_threadpool(self.table.put_item, Item=item)
+
+
 KEY = _signing_key()
+PLANNER = planner.from_env()  # None unless DRISHYAM_PLANNER_URL is set: then every job consults it
 # KILL must reach a job running in another function instance; the browser's aborted stream
-# does not (Vercel's proxy keeps the function side open). The regional Runtime Cache does,
-# and falls back to an in-process dict when run locally.
-KILLS = AsyncRuntimeCache(namespace="drishyam-kill")
+# does not (neither Vercel's proxy nor a Lambda Function URL passes the disconnect through).
+# A shared flag does: DynamoDB on AWS, else the regional Runtime Cache, which falls back to an
+# in-process dict when run locally.
+KILLS = DynamoKills(os.environ["DRISHYAM_KILL_TABLE"]) if os.environ.get("DRISHYAM_KILL_TABLE") else (
+    AsyncRuntimeCache(namespace="drishyam-kill"))
 KILL_TTL_S = 300
 
 
 def _kill_key(job_id: str, kill_token: str) -> str:
     return f"{job_id}-{hashlib.sha256(kill_token.encode()).hexdigest()[:32]}"
+
+
+def _log_done(job_id: str, ev: dict) -> None:
+    """One line per finished job: a CloudWatch EMF record on Lambda (metrics without an API call), else plain."""
+    s = ev["summary"]
+    if HOST != "aws-lambda":
+        log.info("job %s %s cause=%s steps=%s px=%.3f s=%.2f", job_id, ev["status"], ev["cause"],
+                 s["steps"], s["pixels_frac"], s["seconds"])
+        return
+    metrics = [{"Name": "JobSeconds", "Unit": "Seconds"}, {"Name": "PixelsFrac", "Unit": "None"},
+               {"Name": "Steps", "Unit": "Count"}, {"Name": "Findings", "Unit": "Count"}]
+    print(json.dumps({
+        "_aws": {"Timestamp": int(time.time() * 1000),
+                 "CloudWatchMetrics": [{"Namespace": "Drishyam", "Dimensions": [["Status"]], "Metrics": metrics}]},
+        "Status": ev["status"], "JobSeconds": s["seconds"], "PixelsFrac": s["pixels_frac"], "Steps": s["steps"],
+        "Findings": s["findings"], "job": job_id, "cause": ev["cause"],
+    }, separators=(",", ":")), flush=True)
 
 app = FastAPI(title="Drishyam", docs_url=None, redoc_url=None, openapi_url=None)
 
@@ -95,9 +148,16 @@ async def _api_headers(request: Request, call_next):
 
 @app.api_route("/api/health", methods=["GET", "HEAD"])  # HEAD: uptime monitors
 def health() -> dict:
+    name = default_segmenter().name
+    # scripts/install_model.sh installs the dacl10k-trained weights under that name; no other model ships here.
+    licence = ("MIT (no learned weights)" if name == "classical-v1" else
+               "CC BY-NC 4.0, trained on dacl10k" if "dacl10k" in name else "unknown: not a model this repo ships")
     return {"ok": True, "version": __version__, "opencv": cv2.__version__,
             "build": "COOL" if cv2.__file__.startswith("/opt/cool") else "stock (not COOL)",
-            "segmenter": default_segmenter().name, "max_upload_bytes": MAX_UPLOAD_BYTES, "max_pixels": imaging.MAX_PIXELS}
+            "segmenter": name, "segmenter_licence": licence,
+            "max_upload_bytes": MAX_UPLOAD_BYTES, "max_pixels": imaging.MAX_PIXELS,
+            "host": HOST, "arch": platform.machine(),
+            "commit": os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("DRISHYAM_COMMIT") or None}
 
 
 async def _read_capped(request: Request, cap: int) -> bytes | None:
@@ -132,6 +192,7 @@ async def create_job(
     usd_cap: float = Query(0.05, ge=0.0001, le=0.05),
     seconds_cap: float = Query(20.0, ge=1.0, le=30.0),
     chaos: str = Query("", max_length=64),
+    pace_ms: int = Query(0, ge=0, le=1500),
 ):
     kind = request.headers.get("content-type", "").split(";")[0].strip().lower()
     if kind not in IMAGE_TYPES:
@@ -155,9 +216,11 @@ async def create_job(
         return error(422, str(exc))
 
     stop = threading.Event()
+    paused = [0.0]  # seconds spent in viewing pauses: the job's clock leaves them out of its seconds and $
     cfg = JobConfig(pixel_cap=pixel_cap, usd_cap=usd_cap, seconds_cap=seconds_cap, chaos=drills)
     try:
-        job = Job(img, cfg, kill=stop.is_set, replay=replay)
+        job = Job(img, cfg, kill=stop.is_set, replay=replay, planner=PLANNER,
+                  clock=lambda: time.perf_counter() - paused[0])
     except ValueError as exc:
         return error(422, str(exc))
 
@@ -167,21 +230,33 @@ async def create_job(
     async def events():
         it = job.run()
         finished = False
+
+        def line(ev: dict) -> str:
+            nonlocal finished
+            if ev["type"] == "job":
+                ev["privacy"] = priv
+                ev["kill_token"] = kill_token
+            elif ev["type"] == "done":
+                ev["token"] = findings.sign(ev["work_order"], KEY)
+                finished = True
+                _log_done(job.id, ev)
+            return json.dumps(ev, separators=(",", ":")) + "\n"
+
         try:
             while (ev := await run_in_threadpool(next, it, None)) is not None:
-                if ev["type"] == "job":
-                    ev["privacy"] = priv
-                    ev["kill_token"] = kill_token
-                elif ev["type"] == "done":
-                    ev["token"] = findings.sign(ev["work_order"], KEY)
-                yield json.dumps(ev, separators=(",", ":")) + "\n"
+                yield line(ev)
+                if ev["type"] != "step":
+                    continue
+                if ev["decision"]["action"] != "halt":
+                    for _ in range(job.followups):  # this look's findings: no computing, so they arrive with it
+                        yield line(await run_in_threadpool(next, it))
+                    if pace_ms and paused[0] < MAX_PACED_S:  # paced for viewing; the wait is not the job's time
+                        t0 = time.perf_counter()
+                        await asyncio.sleep(pace_ms / 1000)
+                        paused[0] += time.perf_counter() - t0
                 # The viewer pressed KILL: the governor halts the job before its next look.
-                if ev["type"] == "step" and (await request.is_disconnected() or await KILLS.get(kill_key)):
+                if await request.is_disconnected() or await KILLS.get(kill_key):
                     stop.set()
-                if ev["type"] == "done":
-                    finished = True
-                    log.info("job %s %s cause=%s steps=%s px=%.3f s=%.2f", job.id, ev["status"], ev["cause"],
-                             ev["summary"]["steps"], ev["summary"]["pixels_frac"], ev["summary"]["seconds"])
         except Exception:
             log.exception("job %s failed", job.id)
             yield json.dumps({"type": "error", "message": "the job failed; it has been logged"}) + "\n"

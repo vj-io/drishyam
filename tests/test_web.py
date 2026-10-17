@@ -7,6 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from drishyam import findings
+from drishyam.governor import USD_PER_HOUR
 from drishyam.web import KEY, MAX_UPLOAD_BYTES, app
 
 from .conftest import add_crack, add_rebar_spall, concrete, threaded_mismatches
@@ -32,10 +33,26 @@ def lines(resp):
 
 
 def test_health_and_security_headers():
+    import platform
+
     r = client.get("/api/health")
     assert r.status_code == 200 and r.json()["ok"] and r.json()["opencv"].startswith("5.")
+    h = r.json()
+    assert h["host"] == "local" and h["arch"] == platform.machine() and "commit" in h
+    assert h["segmenter"] == "classical-v1" and h["segmenter_licence"] == "MIT (no learned weights)"
     assert r.headers["cache-control"] == "no-store" and r.headers["x-content-type-options"] == "nosniff"
     assert client.get("/docs").status_code == 404 and client.get("/openapi.json").status_code == 404
+
+
+def test_health_names_the_dacl10k_licence(monkeypatch):
+    import types
+
+    from drishyam import web
+
+    monkeypatch.setattr(web, "default_segmenter", lambda: types.SimpleNamespace(name="onnx:drishyam_dacl10k.onnx"))
+    monkeypatch.setenv("DRISHYAM_COMMIT", "abc1234")
+    h = client.get("/api/health").json()
+    assert h["segmenter_licence"] == "CC BY-NC 4.0, trained on dacl10k" and h["commit"] == "abc1234"
 
 
 def test_job_streams_contract_events(photo):
@@ -86,8 +103,46 @@ def test_chaos_drills_over_http(photo, monkeypatch):
     # without eps = 0 neither the spike (injected on look 4) nor the malformed planner (step 6) would fire.
     monkeypatch.setattr(web, "JobConfig", functools.partial(agent.JobConfig, eps=0.0))
     ev = lines(post(photo, params="?pixel_cap=1&chaos=p95_spike,planner_malformed"))
-    assert any(e.get("cause") == "p95>SLA" for e in ev)
+    assert any(e.get("governor", {}).get("cause") == "p95>SLA" for e in ev)
     assert any(e["type"] == "planner" and e["status"] == "rejected" for e in ev)
+    assert any(e.get("planner_status", {}).get("status") == "rejected" for e in ev)
+
+
+def test_jobs_consult_the_configured_planner(photo, monkeypatch):
+    import functools
+
+    from drishyam import agent, web
+
+    asked = []
+
+    def planner(digest):
+        asked.append(digest["step"])
+        return '{"strategy": "continue", "params": {}, "rationale": "numbers look fine"}'
+
+    monkeypatch.setattr(web, "PLANNER", planner)  # what planner.from_env() builds when DRISHYAM_PLANNER_URL is set
+    monkeypatch.setattr(web, "JobConfig", functools.partial(agent.JobConfig, eps=0.0))
+    ev = lines(post(photo, params="?pixel_cap=1"))
+    assert asked and asked[0] == 5
+    assert any(e["type"] == "planner" and e["status"] == "accepted" for e in ev)
+    step5 = next(e for e in ev if e["type"] == "step" and e["step"] == 5)
+    assert step5["planner_status"] == {"status": "accepted", "reason": "", "strategy": "continue"}
+    assert step5["planner"] == "rule"  # "continue" leaves the rule planner's look in place
+
+
+def test_pace_ms_pauses_between_looks_but_not_the_job_clock(photo):
+    import time
+
+    assert post(photo, params="?pace_ms=1501").status_code == 422
+    assert post(photo, params="?pace_ms=-1").status_code == 422
+    t0 = time.perf_counter()
+    ev = lines(post(photo, params="?pixel_cap=0.3&pace_ms=300"))
+    wall = time.perf_counter() - t0
+    looks = sum(e["type"] == "step" and e["decision"]["action"] != "halt" for e in ev)
+    done = ev[-1]
+    assert done["type"] == "done" and looks >= 2
+    assert wall >= 0.3 * looks  # it did wait after every look
+    assert done["summary"]["seconds"] < wall - 0.25 * looks  # and the wait is not in seconds, or in $
+    assert done["summary"]["usd"] < (wall - 0.25 * looks) * USD_PER_HOUR / 3600
 
 
 def test_review_flow_and_tampering(photo):
@@ -145,10 +200,33 @@ def test_privacy_detectors_give_each_thread_its_own_result():
     assert threaded_mismatches(lambda x: (det.faces(x), det.objects(x, 0.01)), imgs) == []
 
 
-def test_kill_endpoint_halts_a_running_job(photo, monkeypatch):
-    """TestClient buffers whole streams, so the kill lands first; the job must halt after its first look."""
+class FakeTable:
+    """The two DynamoDB Table calls the AWS kill store makes, recorded."""
+
+    def __init__(self):
+        self.items, self.calls = {}, []
+
+    def put_item(self, Item):
+        self.calls.append(("put", Item))
+        self.items[Item["k"]] = Item
+        return {}
+
+    def get_item(self, Key, ConsistentRead=False):
+        self.calls.append(("get", Key, ConsistentRead))
+        return {"Item": self.items[Key["k"]]} if Key["k"] in self.items else {}
+
+
+@pytest.mark.parametrize("store", ["runtime-cache", "dynamodb"])
+def test_kill_endpoint_halts_a_running_job(photo, monkeypatch, store):
+    """TestClient buffers whole streams, so the kill lands first; the job must halt after its first look.
+    With DRISHYAM_KILL_TABLE (AWS) the flag lives in DynamoDB instead of the Runtime Cache; same contract."""
+    import time
+
     from drishyam import web
 
+    table = FakeTable()
+    if store == "dynamodb":
+        monkeypatch.setattr(web, "KILLS", web.DynamoKills("drishyam-kill", table=table))
     token = "K" * 24
     monkeypatch.setattr(web.secrets, "token_urlsafe", lambda n: token)
     monkeypatch.setattr(web.secrets, "token_hex", lambda n: "abc123")  # job id j_abc123
@@ -162,6 +240,74 @@ def test_kill_endpoint_halts_a_running_job(photo, monkeypatch):
     assert events[-1]["cause"] == "kill-switch" and events[-1]["status"] == "halted" and len(looks) == 1
     assert client.post("/api/kill", json={"job": "j_zzzzzz", "kill_token": "a" * 24}).status_code == 400
     assert client.post("/api/kill", json={"job": "j_abcdef", "kill_token": "short"}).status_code == 400
+    if store == "dynamodb":
+        puts = [c[1] for c in table.calls if c[0] == "put"]
+        gets = [c for c in table.calls if c[0] == "get"]
+        assert len(puts) == 2 and all(set(p) == {"k", "exp"} and p["exp"] > time.time() + 250 for p in puts)
+        assert gets and all(consistent for _, _, consistent in gets)  # one consistent read per step
+        assert all(p["k"].startswith("j_abc123-") and token not in p["k"] for p in puts)  # the token is hashed
+
+
+def test_dynamodb_kill_store_imports_boto3_only_when_selected(monkeypatch):
+    import sys
+    import types
+
+    from drishyam import web
+
+    made = []
+    fake = types.SimpleNamespace(resource=lambda name: types.SimpleNamespace(
+        Table=lambda table: made.append((name, table)) or FakeTable()))
+    monkeypatch.setitem(sys.modules, "boto3", fake)
+    web.DynamoKills("drishyam-kill")
+    assert made == [("dynamodb", "drishyam-kill")]
+
+
+def test_signing_key_from_secrets_manager(monkeypatch, caplog):
+    import sys
+    import types
+
+    from drishyam import web
+
+    secret = {"SecretString": "q" * 64}
+    asked = []
+
+    def client(name):
+        def get_secret_value(SecretId):
+            asked.append((name, SecretId))
+            return secret
+
+        return types.SimpleNamespace(get_secret_value=get_secret_value)
+
+    monkeypatch.setitem(sys.modules, "boto3", types.SimpleNamespace(client=client))
+    monkeypatch.delenv("DRISHYAM_SIGNING_KEY", raising=False)
+    monkeypatch.setenv("AWS_LAMBDA_FUNCTION_NAME", "drishyam")
+    arn = "arn:aws:secretsmanager:us-east-1:111111111111:secret:drishyam-signing-key"
+    monkeypatch.setenv("DRISHYAM_SIGNING_KEY_SECRET_ARN", arn)
+    assert web._signing_key() == b"q" * 64 and asked == [("secretsmanager", arn)]
+    secret["SecretString"] = "short"
+    with pytest.raises(RuntimeError, match="SECRET_ARN"):
+        web._signing_key()
+    monkeypatch.delenv("DRISHYAM_SIGNING_KEY_SECRET_ARN")
+    with pytest.raises(RuntimeError, match="DRISHYAM_SIGNING_KEY"):  # Lambda without any key refuses to start
+        web._signing_key()
+    assert "q" * 64 not in caplog.text
+
+
+def test_one_emf_line_per_job_on_lambda(photo, monkeypatch, capsys):
+    from drishyam import web
+
+    monkeypatch.setattr(web, "HOST", "aws-lambda")
+    done = lines(post(photo, params="?pixel_cap=0.2"))[-1]
+    emf = [json.loads(x) for x in capsys.readouterr().out.splitlines() if x.startswith('{"_aws"')]
+    assert len(emf) == 1
+    (m,) = emf
+    (spec,) = m["_aws"]["CloudWatchMetrics"]
+    assert spec["Namespace"] == "Drishyam" and spec["Dimensions"] == [["Status"]]
+    assert [x["Name"] for x in spec["Metrics"]] == ["JobSeconds", "PixelsFrac", "Steps", "Findings"]
+    s = done["summary"]
+    assert (m["Status"], m["JobSeconds"], m["PixelsFrac"], m["Steps"], m["Findings"]) == (
+        done["status"], s["seconds"], s["pixels_frac"], s["steps"], s["findings"])
+    assert isinstance(m["_aws"]["Timestamp"], int)
 
 
 def test_signing_key_fails_closed_on_a_deployment(monkeypatch):
