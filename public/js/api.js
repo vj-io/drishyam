@@ -23,6 +23,16 @@ export const health = () => (MOCK
 
 const b64url = (s) => btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
+/** Hex SHA-256 of the exact body bytes: CloudFront OAC in front of a Lambda Function URL requires it on every POST. */
+async function sha256(body) {
+  const bytes = typeof body === 'string' ? new TextEncoder().encode(body) : await body.arrayBuffer();
+  return [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+const post = async (url, body, headers, extra = {}) => fetch(url, {
+  method: 'POST', body, ...extra, headers: { ...headers, 'x-amz-content-sha256': await sha256(body) },
+});
+
 async function* ndjson(body) {
   const reader = body.getReader();
   const dec = new TextDecoder();
@@ -41,12 +51,12 @@ async function* ndjson(body) {
   if ((buf += dec.decode()).trim()) yield JSON.parse(buf);
 }
 
-/** Async generator of job events. `replay` is a list of [action, x, y, level] to resume from. */
+/** Async generator of job events. `replay` is a list of [action, x, y, level] to resume from; `params` may carry pace_ms. */
 export async function* streamJob({ blob, params, replay, signal }) {
   if (MOCK) return yield* mockStream(replay?.length ?? 0, signal);
   const headers = { 'Content-Type': blob.type || 'image/jpeg' };
   if (replay?.length) headers['X-Drishyam-Replay'] = b64url(JSON.stringify(replay.slice(0, 200)));
-  const res = await fetch(`/api/jobs?${new URLSearchParams(params)}`, { method: 'POST', headers, body: blob, signal });
+  const res = await post(`/api/jobs?${new URLSearchParams(params)}`, blob, headers, { signal });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(`${res.status}: ${body.error ?? 'the server refused the job'}`);
@@ -62,7 +72,7 @@ const REVIEW_ERRORS = {
 
 export async function postReview(body) {
   if (MOCK) return mockReview(body);
-  const res = await fetch('/api/review', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const res = await post('/api/review', JSON.stringify(body), { 'Content-Type': 'application/json' });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(`${res.status}: ${REVIEW_ERRORS[res.status] ?? data.error ?? 'review failed'}`);
   return data;
@@ -72,8 +82,7 @@ export async function postReview(body) {
 export async function postKill(job, killToken) {
   if (MOCK || !job || !killToken) return;
   try {
-    await fetch('/api/kill', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ job, kill_token: killToken }), keepalive: true });
+    await post('/api/kill', JSON.stringify({ job, kill_token: killToken }), { 'Content-Type': 'application/json' }, { keepalive: true });
   } catch { /* the stream is already aborted client-side; the server stops at its cap regardless */ }
 }
 
