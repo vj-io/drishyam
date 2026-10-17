@@ -13,3 +13,6 @@ test-results
 .claude
 brag-output
 results/codebrim
+build
+.venv-infra
+infra
