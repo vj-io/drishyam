@@ -987,6 +987,7 @@ def test_planner_status_shows_the_fallback_chip(browser, base):
     p.locator(".thumb").click()
     expect(p.locator("#look")).to_be_enabled(timeout=T)
     p.click("#look")
+    p.click("#skip")
     expect(p.locator("#job-pill")).to_have_text(re.compile(DONE_LABEL, re.IGNORECASE), timeout=T)
     for n in fell:
         expect(p.locator(f"#trace .trace__line[data-step='{n}'] .chip--gov", has_text="planner-fallback")).to_have_count(1)
