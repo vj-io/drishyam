@@ -522,6 +522,8 @@ input:checked + .switch__ui::after { transform: translateX(22px); background: va
 .dataset { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin: 0; padding: 8px 14px; border: 2px solid var(--line); font: 500 14px/1.3 var(--f-mono); }
 .dataset__k { color: var(--amber); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .14em; }
 .dataset b { font-weight: 500; }
+.win__cite { padding: 0 16px 14px; }
+#benchmarks > .win + .win { margin-top: 22px; }
 .bench { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 26px; align-items: start; }
 .chart { display: block; width: 100%; height: auto; border: 2px solid var(--line-3); background: var(--deep); }
 .chart__grid { stroke: rgba(232, 241, 255, .1); stroke-width: 1; }

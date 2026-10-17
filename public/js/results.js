@@ -142,12 +142,12 @@ function heroChips(sum) {
   if (fired > 0) fill('stat-ops', ok, { decimals: 0, suffix: ` / ${fired}` }, `fired faults recovered; ${num(am.steps_with_cause_pct) ? Math.round(am.steps_with_cause_pct) : '–'} % of steps carry a cause`);
 }
 
-function renderBench(sum) {
-  const root = $('#bench');
-  if (!sum?.policies) return root.replaceChildren(pending('benchmarks', 'results/summary.json'));
+function renderBench(sum, id, file) {
+  const root = $(`#${id}`);
+  if (!sum?.policies) return root.replaceChildren(pending('benchmarks', file));
   const prov = Object.entries(sum.provenance ?? {});
   const plot = h('div', {}, chart(sum.policies), legend(), dataTable(sum.policies));
-  NARROW.onchange = () => plot.firstElementChild.replaceWith(chart(sum.policies));
+  NARROW.addEventListener('change', () => plot.firstElementChild.replaceWith(chart(sum.policies)));
   root.replaceChildren(h('div', { class: 'stack' },
     h('p', { class: 'dataset' }, h('span', { class: 'dataset__k' }, 'dataset'), h('b', {}, String(sum.dataset ?? 'unlabelled'))),
     h('div', { class: 'bench' },
@@ -156,7 +156,7 @@ function renderBench(sum) {
         Array.isArray(sum.micro) && sum.micro.length ? microTable(sum.micro) : null,
         prov.length ? h('div', { class: 'prov' }, h('h4', { class: 'label' }, 'provenance'),
           h('dl', { class: 'kv' }, prov.map(([k, v]) => h('div', {}, h('dt', {}, k), h('dd', {}, String(v)))))) : null))));
-  heroChips(sum);
+  return true;
 }
 
 function failureImage(path) {
@@ -190,7 +190,9 @@ function renderFailures(list) {
 }
 
 export async function initResults() {
-  const [sum, fails] = await Promise.all([getJSON('results/summary.json'), getJSON('results/failures.json')]);
-  renderBench(sum);
+  const [sum, real, fails] = await Promise.all(
+    ['results/summary.json', 'results/codebrim/summary.json', 'results/failures.json'].map(getJSON));
+  if (renderBench(sum, 'bench', 'results/summary.json')) heroChips(sum);
+  renderBench(real, 'bench-real', 'results/codebrim/summary.json');
   renderFailures(fails);
 }
