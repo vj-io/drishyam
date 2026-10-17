@@ -1,8 +1,9 @@
 """Synthesises the AWS stack (infra/) and checks what an auditor would ask about: who may invoke the
 function, what the function may do, how requests are throttled and what stops the spend.
 
-The project environment has no CDK, so this file skips there. Run it with:
-    uv run --with-requirements infra/requirements.txt pytest -q tests/test_infra.py
+The project environment has no CDK, so this file skips there. Run it with (python -m, so pytest runs
+under the interpreter that sees the CDK overlay; CI runs the same command):
+    uv run --with-requirements infra/requirements.txt python -m pytest -q tests/test_infra.py
 """
 
 import json

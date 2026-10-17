@@ -110,8 +110,9 @@ the link in the confirmation email (`deploy` prints the same command with the to
 aws sns subscribe --topic-arn "$(aws cloudformation describe-stacks --stack-name Drishyam --query "Stacks[0].Outputs[?OutputKey=='AlertTopicArn'].OutputValue" --output text --profile drishyam --region us-east-1)" --protocol email --notification-endpoint you@example.com --profile drishyam --region us-east-1
 ```
 
-Run the synth tests with `uv run --with-requirements infra/requirements.txt pytest -q tests/test_infra.py`
-(the project environment has no CDK, so plain `pytest` skips them).
+Run the synth tests with `uv run --with-requirements infra/requirements.txt python -m pytest -q tests/test_infra.py`
+(the project environment has no CDK, so plain `pytest` skips them, and `python -m` makes pytest run on
+the interpreter that sees the CDK). CI runs the same command on its x86 job and fails if CDK is missing.
 
 ## Packaging
 

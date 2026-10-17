@@ -21,3 +21,9 @@ jobs:
       - run: uv run ruff check drishyam app.py tests evals training
       - run: uv run python -c "import cv2, platform; print(cv2.__version__, platform.machine())"
       - run: uv run pytest -q --ignore=tests/e2e
+      # The CDK synth tests (IAM, Dual Auth, WAF, budget), which the step above skips for want of CDK.
+      # The import check makes a missing CDK a failure here, not a skip.
+      - if: matrix.os == 'ubuntu-24.04'
+        run: |
+          uv run --with-requirements infra/requirements.txt python -c "import aws_cdk"
+          uv run --with-requirements infra/requirements.txt python -m pytest -q tests/test_infra.py
