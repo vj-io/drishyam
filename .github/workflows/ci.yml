@@ -21,3 +21,13 @@ jobs:
       - run: uv run ruff check drishyam app.py tests evals training
       - run: uv run python -c "import cv2, platform; print(cv2.__version__, platform.machine())"
       - run: uv run pytest -q --ignore=tests/e2e
+
+  e2e-mock:  # the page in a real Chromium under the production CSP, against fixtures and a stand-in API
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv run --no-project --with playwright==1.63.0 playwright install --with-deps chromium
+      - run: uv run --no-project --with playwright==1.63.0 python tests/e2e/test_ui_mock.py
+        env:
+          DRISHYAM_SHOTS: ${{ runner.temp }}/e2e-shots
