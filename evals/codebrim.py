@@ -1,10 +1,10 @@
 """CODEBRIM (Mundt et al., CVPR 2019) original-image loader and the seeded 200-image eval subset.
 
-The original-image release is Pascal-VOC-style XML: one `<object>` per defect box, carrying one 0/1 flag
-element per label (Background, Crack, Spallation, Efflorescence, ExposedBars, CorrosionStain). A box can
-carry several flags; it becomes one ground-truth entry per flag, so a spall with exposed bars is scored as
-a spalling box and an exposed_rebar box (the same convention `evals.synth` uses). Written from the dataset's
-documented format and unit-tested on an inline sample; not yet run against the real 8.3 GB download.
+The original-image release is Pascal-VOC-style XML: one `<object>` per defect box, whose `<Defect>` element
+holds one 0/1 flag per label (Background, Crack, Spallation, Efflorescence, ExposedBars, CorrosionStain). A box
+can carry several flags; it becomes one ground-truth entry per flag, so a spall with exposed bars is scored as
+a spalling box and an exposed_rebar box (the same convention `evals.synth` uses). The zip also carries macOS
+`__MACOSX/._*` resource forks named like the real files; they are skipped.
 
     python -m evals.codebrim --root data/codebrim --out data/eval200.txt
 """
@@ -40,7 +40,7 @@ def parse_xml(text: str) -> dict:
             continue
         x0, y0, x1, y1 = (round(float(bb.findtext(k, "0"))) for k in ("xmin", "ymin", "xmax", "ymax"))
         box = [x0, y0, max(1, x1 - x0), max(1, y1 - y0)]
-        flagged = {FLAG_TO_CLASS[_key(c.tag)] for c in obj
+        flagged = {FLAG_TO_CLASS[_key(c.tag)] for c in obj.iter()  # flags sit in <Defect>, not on <object>
                    if _key(c.tag) in FLAG_TO_CLASS and (c.text or "").strip() in ("1", "1.0", "true", "True")}
         if not flagged and _key(obj.findtext("name", "")) in FLAG_TO_CLASS:  # plain VOC style: <name>Crack</name>
             flagged = {FLAG_TO_CLASS[_key(obj.findtext("name", ""))]}
@@ -54,9 +54,12 @@ def parse_xml(text: str) -> dict:
 def load(root) -> list[dict]:
     """Every annotated original image under `root`, as harness records (id, path, width, height, boxes)."""
     root = Path(root)
-    images = {p.name: p for p in root.rglob("*") if p.suffix.lower() in IMAGE_SUFFIXES}
+    def real(p):  # not a macOS resource fork (__MACOSX/._name)
+        return not p.name.startswith("._") and "__MACOSX" not in p.parts
+
+    images = {p.name: p for p in root.rglob("*") if p.suffix.lower() in IMAGE_SUFFIXES and real(p)}
     records = []
-    for xml in sorted(root.rglob("*.xml")):
+    for xml in sorted(p for p in root.rglob("*.xml") if real(p)):
         try:
             a = parse_xml(xml.read_text())
         except ET.ParseError:

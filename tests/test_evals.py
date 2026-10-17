@@ -186,15 +186,15 @@ XML = """<annotation>
   <filename>image_0000001.jpg</filename>
   <size><width>6000</width><height>4000</height><depth>3</depth></size>
   <object><name>defect</name><bndbox><xmin>100</xmin><ymin>200</ymin><xmax>400</xmax><ymax>260</ymax></bndbox>
-    <Background>0</Background><Crack>1</Crack><Spallation>0</Spallation><Efflorescence>0</Efflorescence>
-    <ExposedBars>0</ExposedBars><CorrosionStain>0</CorrosionStain></object>
+    <Defect><Background>0</Background><Crack>1</Crack><Spallation>0</Spallation><Efflorescence>0</Efflorescence>
+    <ExposedBars>0</ExposedBars><CorrosionStain>0</CorrosionStain></Defect></object>
   <object><name>defect</name><bndbox><xmin>1000</xmin><ymin>1000</ymin><xmax>1500</xmax><ymax>1800</ymax></bndbox>
-    <Background>0</Background><Crack>0</Crack><Spallation>1</Spallation><Efflorescence>0</Efflorescence>
-    <ExposedBars>1</ExposedBars><CorrosionStain>1</CorrosionStain></object>
+    <Defect><Background>0</Background><Crack>0</Crack><Spallation>1</Spallation><Efflorescence>0</Efflorescence>
+    <ExposedBars>1</ExposedBars><CorrosionStain>1</CorrosionStain></Defect></object>
   <object><name>defect</name><bndbox><xmin>5</xmin><ymin>5</ymin><xmax>50</xmax><ymax>50</ymax></bndbox>
-    <Background>1</Background><Crack>0</Crack><Spallation>0</Spallation><Efflorescence>0</Efflorescence>
-    <ExposedBars>0</ExposedBars><CorrosionStain>0</CorrosionStain></object>
-</annotation>"""
+    <Defect><Background>1</Background><Crack>0</Crack><Spallation>0</Spallation><Efflorescence>0</Efflorescence>
+    <ExposedBars>0</ExposedBars><CorrosionStain>0</CorrosionStain></Defect></object>
+</annotation>"""  # the real release's layout: the flags sit in <Defect>
 
 
 def test_codebrim_xml_parsing_maps_flags_to_our_classes():
@@ -216,7 +216,11 @@ def test_codebrim_load_and_seeded_selection(tmp_path):
         (tmp_path / "images" / f"image_{i:07d}.jpg").write_bytes(b"x")
         (tmp_path / "annotations" / f"image_{i:07d}.xml").write_text(
             f"<annotation><filename>image_{i:07d}.jpg</filename><size><width>10</width><height>10</height></size>"
-            f"<object><bndbox><xmin>1</xmin><ymin>1</ymin><xmax>5</xmax><ymax>5</ymax></bndbox>{body}</object></annotation>")
+            f"<object><bndbox><xmin>1</xmin><ymin>1</ymin><xmax>5</xmax><ymax>5</ymax></bndbox>"
+            f"<Defect>{body}</Defect></object></annotation>")
+    fork = tmp_path / "__MACOSX" / "annotations"  # the zip ships binary macOS resource forks named like the XML
+    fork.mkdir(parents=True)
+    (fork / "._image_0000000.xml").write_bytes(b"\x00\x05\x16\x07\xff\xfe")
     records = codebrim.load(tmp_path)
     assert len(records) == 30 and records[0]["id"] == "image_0000000"
     subset, short = codebrim.select_eval(records, n=12, seed=7, min_per_class=3)
@@ -228,6 +232,16 @@ def test_codebrim_load_and_seeded_selection(tmp_path):
     codebrim.write_list(subset, out)
     assert [r["id"] for r in codebrim.load_eval(tmp_path, out)] == [r["id"] for r in subset]
 
+
+
+def test_harness_refuses_to_publish_codebrim_crops(tmp_path):
+    """CODEBRIM's licence bars redistributing its images, so the gallery crops must never land under public/."""
+    (tmp_path / "images").mkdir()
+    (tmp_path / "images" / "image_0000001.jpg").write_bytes(b"x")
+    (tmp_path / "image_0000001.xml").write_text(XML)
+    (tmp_path / "eval200.txt").write_text("image_0000001.jpg\n")
+    with pytest.raises(SystemExit, match="refusing"):
+        harness.run(tmp_path, n=1, out_dir=tmp_path / "public" / "results", results_dir=tmp_path / "raw", workers=1)
 
 # ---------------------------------------------------------------- parity
 def test_parity_compare_saved_files(tmp_path):

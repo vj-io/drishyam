@@ -427,6 +427,10 @@ def run(data_dir="data/synth200", n=200, out_dir="public/results", results_dir="
     t_start = time.time()
     workers = max(1, min(8, (mp.cpu_count() or 2) // 2)) if workers is None else workers
     records, label = load_records(data_dir, n, kind)
+    if not label.startswith("synthetic") and "public" in Path(out_dir).resolve().parts:
+        # CODEBRIM licence, clause 4: the images and modified versions of them (the failure crops) are not redistributed
+        raise SystemExit(f"refusing to write CODEBRIM image crops under {out_dir}: run `make eval-real`, which keeps them in "
+                         "results/codebrim and publishes only summary.json")
     log(f"{len(records)} images, {workers} worker(s); policies: downscale, tiling L2/L1/L0, drishyam {BUDGETS}")
     cache = Path(results_dir) / "eval_per_image.json"
     if reuse and cache.exists():  # re-score and re-draw from the last run's predictions and traces
