@@ -65,6 +65,11 @@ def test_a_border_crack_is_not_mirrored_outside_the_image():
     assert np.count_nonzero(raw.mask("crack") & ~valid) > 1000  # the mirrored twin is there to be found
     seg = segment_view(SEG, crop, "accurate", valid)
     assert seg.areas["crack"] > 500 and not np.any(seg.labels[~valid])
+    masked = raw.probs * valid
+    masked[0] += ~valid
+    full = finish(masked, 0.0, "accurate")  # the shortcut in `restrict` must equal a full re-finish
+    assert np.array_equal(seg.labels, full.labels) and (seg.areas, seg.confidence, seg.entropy) == (
+        full.areas, full.confidence, full.entropy)
     ys, xs = np.nonzero(seg.mask("crack"))
     x, y = imaging.map_points(to_l0, np.stack([xs, ys], 1)).T
     assert x.min() >= 0 and y.min() >= 0 and x.max() < 800 and y.max() < 600

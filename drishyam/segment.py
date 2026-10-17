@@ -76,43 +76,59 @@ def _softmax(logits: np.ndarray) -> np.ndarray:
     return e / e.sum(axis=0, keepdims=True)
 
 
-def finish(probs: np.ndarray, t0: float, model: str) -> Segmentation:
-    """Labels, areas, confidences and entropy from a (C, H, W) probability stack."""
-    labels = probs.argmax(axis=0).astype(np.uint8)
+def _clean(labels: np.ndarray, probs: np.ndarray, ids) -> tuple[dict[str, int], dict[str, float]]:
+    """Drop specks of the classes `ids` from `labels` (in place); their areas and mean confidences."""
     areas, conf = {}, {}
-    for ci, name in enumerate(DEFECTS, start=1):
+    for ci in ids:
         m = (labels == ci).astype(np.uint8)
-        n, lab, stats, _ = cv2.connectedComponentsWithStats(m, connectivity=8)
-        small = [i for i in range(1, n) if stats[i, cv2.CC_STAT_AREA] < MIN_BLOB_PX]
-        if small:
-            drop = np.isin(lab, small)
+        _, lab, stats, _ = cv2.connectedComponentsWithStats(m, connectivity=8)
+        small = stats[:, cv2.CC_STAT_AREA] < MIN_BLOB_PX
+        small[0] = False
+        if small.any():
+            drop = small[lab]
             labels[drop] = 0
             m[drop] = 0
         a = int(np.count_nonzero(m))
-        areas[name] = a
-        conf[name] = round(float(probs[ci][m > 0].mean()), 4) if a else 0.0
-    # Uncertainty = binary entropy of "is this damage", averaged where damage is plausible.
-    # 1.0 is a coin flip; a crisp mask scores ~0.2 (its anti-aliased rim).
+        areas[CLASSES[ci]] = a
+        conf[CLASSES[ci]] = round(float(probs[ci][m > 0].mean()), 4) if a else 0.0
+    return areas, conf
+
+
+def _entropy(probs: np.ndarray) -> float:
+    """Uncertainty = binary entropy of "is this damage", averaged where damage is plausible.
+    1.0 is a coin flip; a crisp mask scores ~0.2 (its anti-aliased rim)."""
     p_def = 1.0 - probs[0]
     defect_like = p_def > 1.0 - DEFECT_PX_BG_MAX
-    if np.count_nonzero(defect_like) >= ENTROPY_MIN_PX:
-        q = np.clip(p_def[defect_like], 1e-6, 1 - 1e-6)
-        ent = float((-(q * np.log2(q) + (1 - q) * np.log2(1 - q))).mean())
-    else:
-        ent = 0.0
-    return Segmentation(probs, labels, round(ent, 4), areas, conf, (time.perf_counter() - t0) * 1000, model)
+    if np.count_nonzero(defect_like) < ENTROPY_MIN_PX:
+        return 0.0
+    q = np.clip(p_def[defect_like], 1e-6, 1 - 1e-6)
+    return round(float((-(q * np.log2(q) + (1 - q) * np.log2(1 - q))).mean()), 4)
+
+
+def finish(probs: np.ndarray, t0: float, model: str) -> Segmentation:
+    """Labels, areas, confidences and entropy from a (C, H, W) probability stack."""
+    labels = probs.argmax(axis=0).astype(np.uint8)
+    areas, conf = _clean(labels, probs, range(1, len(CLASSES)))
+    return Segmentation(probs, labels, _entropy(probs), areas, conf, (time.perf_counter() - t0) * 1000, model)
 
 
 def restrict(seg: Segmentation, valid: np.ndarray) -> Segmentation:
     """`seg` with background forced wherever `valid` is False (crop pixels that are not the image, see
     `imaging.footprint`), so labels, areas, confidence, entropy and everything built on them see no
-    mirrored defect."""
+    mirrored defect. Equal to `finish` on the masked probabilities, at a third of its cost: inside `valid`
+    the argmax is unchanged, so only classes labelled outside it need their specks re-checked."""
     if valid.all():
         return seg
-    probs = seg.probs.copy()
-    probs[:, ~valid] = 0.0
-    probs[0, ~valid] = 1.0
-    return finish(probs, time.perf_counter() - seg.latency_ms / 1000, seg.model)
+    t0 = time.perf_counter()
+    probs = seg.probs * valid
+    probs[0] += ~valid
+    labels = np.where(valid, seg.labels, 0).astype(np.uint8)
+    areas, conf = dict(seg.areas), dict(seg.confidence)
+    a, c = _clean(labels, probs, [int(ci) for ci in np.unique(seg.labels[~valid]) if ci])
+    areas.update(a)
+    conf.update(c)
+    return Segmentation(probs, labels, _entropy(probs), areas, conf,
+                        seg.latency_ms + (time.perf_counter() - t0) * 1000, seg.model)
 
 
 def segment_view(segmenter, crop: np.ndarray, model: str, valid: np.ndarray) -> Segmentation:
