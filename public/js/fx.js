@@ -1,8 +1,5 @@
-// Dopamine: count-up numbers, sparkle bursts, confetti, governor pop-ups, optional WebAudio blips.
+// Drafting-room feedback: count-ups, re-stamped marks, governor revision notes, optional pencil and ruler sounds.
 import { h } from './dom.js';
-
-const PALETTE = ['var(--pink)', 'var(--lime)', 'var(--cobalt)', '#fff', 'var(--chrome-2)'];
-const rand = (a, b) => a + Math.random() * (b - a);
 
 export const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -27,51 +24,20 @@ export function countUp(el, to, { decimals = 0, prefix = '', suffix = '', ms = 6
   el._raf = requestAnimationFrame(tick);
 }
 
-function spawn(cls, vars, x, y) {
-  const layer = document.getElementById('fx');
-  const el = h('span', { class: cls });
-  el.style.left = `${x}px`;
-  el.style.top = `${y}px`;
-  for (const [k, v] of Object.entries(vars)) el.style.setProperty(k, v);
-  el.addEventListener('animationend', () => el.remove(), { once: true });
-  layer.append(el);
+/** Restart a one-shot CSS animation class: a stamp landing again, a dimension line re-extending. */
+export function replay(el, cls) {
+  el.classList.remove(cls);
+  void el.offsetWidth;
+  el.classList.add(cls);
 }
 
-/** Four-point sparkles flying out of a viewport coordinate. */
-export function burst(x, y, n = 12) {
-  if (reduced()) return;
-  for (let i = 0; i < n; i++) {
-    const a = (i / n) * Math.PI * 2 + rand(-0.2, 0.2);
-    const d = rand(36, 96);
-    spawn('burst', {
-      '--dx': `${Math.cos(a) * d}px`, '--dy': `${Math.sin(a) * d}px`, '--s': rand(0.7, 1.5),
-      '--c': PALETTE[i % PALETTE.length], '--r': `${rand(-90, 90)}deg`,
-    }, x, y);
-  }
-}
-
-export function burstAt(el, n) {
-  const r = el.getBoundingClientRect();
-  burst(r.left + r.width / 2, r.top + Math.min(r.height / 2, 80), n);
-}
-
-export function confetti(n = 80) {
-  if (reduced()) return;
-  for (let i = 0; i < n; i++) {
-    spawn('confetti', {
-      '--x': `${rand(-30, 30)}vw`, '--r': `${rand(360, 1080)}deg`, '--d': `${rand(1.6, 3.2)}s`,
-      '--c': PALETTE[i % PALETTE.length], '--w': `${rand(6, 12)}px`,
-    }, rand(10, window.innerWidth - 10), -16);
-  }
-}
-
-/** Little desktop pop-up window that closes itself. */
-export function popup(title, cause, message) {
+/** A governor override, filed as numbered revision note `n` that closes itself. */
+export function popup(n, cause, message) {
   const host = document.getElementById('toasts');
   while (host.children.length >= 4) host.firstElementChild.remove();
   const close = h('button', { class: 'win__x', type: 'button', 'aria-label': 'Close notification' }, 'X');
   const el = h('div', { class: 'win win--toast' },
-    h('div', { class: 'win__bar' }, h('i', { class: 'win__orb' }), h('span', { class: 'win__title' }, title), close),
+    h('div', { class: 'win__bar' }, h('span', { class: 'rev', 'aria-hidden': 'true' }, String(n)), h('span', { class: 'win__title' }, `Revision ${n}`), close),
     h('div', { class: 'win__body' }, h('span', { class: 'chip chip--gov' }, cause), h('p', {}, message)));
   const bye = () => {
     el.classList.add('is-closing');
@@ -83,6 +49,7 @@ export function popup(title, cause, message) {
 }
 
 let ctx = null;
+let grain = null;
 export const sound = {
   on: false,
   toggle() {
@@ -93,22 +60,52 @@ export const sound = {
     }
     return this.on;
   },
-  pop() { this.notes([[740, 0], [1110, 0.06]], 0.1); },
-  chime() { this.notes([[1047, 0], [1319, 0.14], [1568, 0.28], [2093, 0.42]], 0.32); },
-  notes(list, len) {
+  /** Pencil on paper: band-passed noise whose centre wanders like a stroke. */
+  scratch(len = 0.2) {
     if (!this.on || !ctx) return;
-    for (const [freq, at] of list) {
-      const t = ctx.currentTime + at;
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.value = freq;
-      gain.gain.setValueAtTime(0.0001, t);
-      gain.gain.exponentialRampToValueAtTime(0.09, t + 0.015);
-      gain.gain.exponentialRampToValueAtTime(0.0001, t + len);
-      osc.connect(gain).connect(ctx.destination);
-      osc.start(t);
-      osc.stop(t + len + 0.02);
+    if (!grain) {
+      grain = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+      const d = grain.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
     }
+    const t = ctx.currentTime;
+    const src = ctx.createBufferSource();
+    src.buffer = grain;
+    const band = ctx.createBiquadFilter();
+    band.type = 'bandpass';
+    band.Q.value = 1.4;
+    band.frequency.setValueAtTime(2400, t);
+    band.frequency.linearRampToValueAtTime(4300, t + len * 0.45);
+    band.frequency.linearRampToValueAtTime(2900, t + len);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(0.07, t + 0.025);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + len);
+    src.connect(band).connect(gain).connect(ctx.destination);
+    src.start(t, Math.random() * 0.5, len + 0.05);
+  },
+  /** A ruler set down: a bright tick over a short wooden knock. */
+  click() {
+    this.tone(2600, 0, 0.025, 0.05, 'square');
+    this.tone(420, 0, 0.07, 0.08, 'triangle');
+  },
+  /** A rubber stamp: a low thump with a little paper noise. */
+  stamp() {
+    this.tone(120, 0, 0.18, 0.16, 'sine');
+    this.scratch(0.07);
+  },
+  tone(freq, at, len, peak, type) {
+    if (!this.on || !ctx) return;
+    const t = ctx.currentTime + at;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(peak, t + 0.004);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + len);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(t);
+    osc.stop(t + len + 0.02);
   },
 };

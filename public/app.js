@@ -5,16 +5,17 @@ import { prepareImage } from './js/prep.js';
 import { Viewport, pointOf } from './js/viewport.js';
 import { Budget, Trace, renderStepDetail, isGovernor } from './js/panels.js';
 import { Findings } from './js/findings.js';
-import { burstAt, confetti, countUp, popup, reduced, sound } from './js/fx.js';
+import { countUp, popup, reduced, replay, sound } from './js/fx.js';
 import { initResults } from './js/results.js';
 
 const el = {
   pill: $('#job-pill'), text: $('#job-text'), count: $('#job-steps'), kill: $('#kill'), resume: $('#resume'), sound: $('#sound'),
   look: $('#look'), file: $('#file'), drop: $('#drop'), prep: $('#prep'), gallery: $('#gallery'), galleryEmpty: $('#gallery-empty'),
   slider: $('#replay'), sliderOut: $('#replay-out'), play: $('#play'), heat: $('#heat'), detail: $('#step-detail'), done: $('#done'),
+  tbSheet: $('#tb-sheet'), tbScale: $('#tb-scale'), tbChecked: $('#tb-checked'),
 };
 
-const S = { image: null, ctl: null, mode: 'idle', job: null, overview: null, steps: [], done: null, token: null, order: null, ui: null, timer: 0 };
+const S = { image: null, ctl: null, mode: 'idle', job: null, overview: null, steps: [], done: null, token: null, order: null, ui: null, timer: 0, rev: 0 };
 
 const viewport = new Viewport($('#stage'), (k) => goto(k));
 const budget = new Budget($('.win--budget'));
@@ -57,6 +58,9 @@ function goto(k, animate = false) {
   el.slider.value = k;
   el.sliderOut.textContent = `step ${k} / ${S.steps.length}`;
   trace.mark(step?.step);
+  el.tbSheet.textContent = `${k} of ${S.steps.length}`;
+  const level = S.steps.slice(0, k).reverse().find((s) => num(s.decision?.args?.level))?.decision.args.level;  // a halt keeps the last look's scale
+  el.tbScale.textContent = num(level) ? `L${level} · 1:${2 ** level}` : 'overview';
   renderStepDetail(el.detail, step);
   budget.show(step
     ? { pixels: step.pixels_frac ?? 0, usd: step.usd_used ?? 0, seconds: step.seconds_used ?? 0 }
@@ -79,7 +83,8 @@ function togglePlay() {
 
 function clearJob() {
   stopPlay();
-  Object.assign(S, { job: null, overview: null, done: null, token: null, order: null, ui: null });
+  Object.assign(S, { job: null, overview: null, done: null, token: null, order: null, ui: null, rev: 0 });
+  el.tbChecked.textContent = 'human reviewer';
   viewport.reset(null);
   S.steps = viewport.steps;
   trace.clear();
@@ -135,8 +140,9 @@ function addStep(step) {
   if (follow) goto(S.steps.length, true);
   else el.sliderOut.textContent = `step ${viewport.cursor} / ${S.steps.length}`;
   for (const cause of [step.governor?.cause, step.cause]) {  // a halt record may carry the governor's last override
-    if (isGovernor(cause)) popup('governor.exe', cause, GOVERNOR_TEXT[cause](step));
+    if (isGovernor(cause)) popup(++S.rev, cause, GOVERNOR_TEXT[cause](step));
   }
+  sound.scratch();
 }
 
 // ---- work order / done state --------------------------------------------------
@@ -157,7 +163,7 @@ function buildDone() {
   const cover = h('div', { class: 'meter__fill' });
   const coverNum = h('b', { class: 'meter__val' }, '0 %');
   const privacy = S.job?.privacy;
-  const download = h('button', { class: 'btn btn--cobalt', type: 'button' }, 'Download work_order.json');
+  const download = h('button', { class: 'btn', type: 'button' }, 'Download work_order.json');
   download.addEventListener('click', downloadOrder);
   el.done.replaceChildren(h('div', { class: 'stack' },
     h('div', { class: 'done__head' }, pill, h('span', { class: 'note' }, `stopped by ${cause}`)),
@@ -180,8 +186,14 @@ function buildDone() {
 function updateDone() {
   const pending = S.order.findings.filter((f) => f.critical && f.state === 'pending_review').length;
   const status = displayStatus();
-  S.ui.pill.className = `pill pill--${status}`;
-  S.ui.pill.textContent = status.replace('_', ' ');
+  const label = status.replace('_', ' ');
+  S.ui.pill.className = `pill pill--stamp pill--${status}`;
+  if (S.ui.pill.textContent !== label) {
+    S.ui.pill.textContent = label;
+    replay(S.ui.pill, 'is-stamped');
+  }
+  const signers = [...new Set((S.order.approvals ?? []).map((a) => a.reviewer).filter(Boolean))];
+  el.tbChecked.textContent = signers.length ? signers.join(', ') : 'human reviewer';
   S.ui.orderState.textContent = `work order ${S.order.id} is ${S.order.status}${pending ? `: ${pending} critical finding(s) wait for a human` : ''}`;
   countUp(S.ui.pending, pending);
   setMode('done', el.text.textContent);
@@ -204,13 +216,8 @@ function finish(ev) {
   setMode('done', `${sm.steps} steps · ${(sm.pixels_frac * 100).toFixed(1)} % of pixels · ${sm.seconds} s · coverage ${Math.round(ev.coverage * 100)} %`);
   findings.setReady();
   buildDone();
-  const win = el.done.closest('.win');
-  win.classList.remove('flash');
-  void win.offsetWidth;
-  win.classList.add('flash');
-  if (ev.status !== 'halted') confetti();
-  burstAt(win, 18);
-  sound.chime();
+  replay(el.tbSheet, 'is-stamped');  // the sheet number stamps in: this run is on file
+  sound.stamp();
 }
 
 async function review(id, decision, reviewer) {
@@ -323,7 +330,7 @@ el.sound.addEventListener('click', () => {
   const on = sound.toggle();
   el.sound.setAttribute('aria-pressed', String(on));
   el.sound.textContent = `Sound: ${on ? 'on' : 'off'}`;
-  if (on) sound.pop();
+  if (on) sound.click();
 });
 el.file.addEventListener('change', () => {
   pickFile(el.file.files[0]);

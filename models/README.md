@@ -7,4 +7,4 @@
 
 Both are used only by `drishyam/privacy.py` to blur faces, people and vehicles
 before an image is analysed or displayed. Fonts in `public/fonts/` are SIL OFL 1.1
-(`public/fonts/OFL.txt`).
+(`public/fonts/OFL-plex.txt`, `public/fonts/OFL-archivo.txt`).

@@ -5,100 +5,170 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Drishyam · virtual-PTZ bridge inspector</title>
 <meta name="description" content="Drishyam looks where it matters, zooms until it is sure, and asks a human before anything critical. An OpenCV agentic-vision inspector for bridge photos.">
-<meta name="theme-color" content="#BFE6FF">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23FF4FD8' stroke='%232440FF' stroke-width='3'/%3E%3Ccircle cx='11' cy='10' r='4' fill='white' opacity='.85'/%3E%3C/svg%3E">
-<link rel="preload" href="fonts/BricolageGrotesque-800.woff2" as="font" type="font/woff2" crossorigin>
+<meta name="theme-color" content="#0F3B73">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230F3B73'/%3E%3Cpath d='M4 4h24v24H4z' fill='none' stroke='%23E8F1FF' stroke-width='2.5'/%3E%3Cpath d='M16 7v18M7 16h18' stroke='%23E8F1FF' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='5' fill='none' stroke='%23FFC857' stroke-width='2.5'/%3E%3C/svg%3E">
+<link rel="preload" href="fonts/ArchivoNarrow-700.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/IBMPlexMono-400.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="styles.css">
 <script type="module" src="app.js"></script>
 </head>
 <body>
 
-<div class="bg" aria-hidden="true">
-  <i class="orb orb--pink bg-orb bg-orb--1"></i>
-  <i class="orb orb--lime bg-orb bg-orb--2"></i>
-  <i class="orb orb--cobalt bg-orb bg-orb--3"></i>
-  <i class="orb orb--chrome bg-orb bg-orb--4"></i>
-  <i class="orb orb--pink bg-orb bg-orb--5"></i>
-  <i class="orb orb--lime bg-orb bg-orb--6"></i>
-  <i class="spark bg-spark bg-spark--1"></i>
-  <i class="spark spark--pink bg-spark bg-spark--2"></i>
-  <i class="spark spark--lime bg-spark bg-spark--3"></i>
-  <i class="spark bg-spark bg-spark--4"></i>
-  <i class="spark spark--cobalt bg-spark bg-spark--5"></i>
-  <i class="spark spark--pink bg-spark bg-spark--6"></i>
-</div>
-<div id="fx" class="fx" aria-hidden="true"></div>
 <div id="toasts" class="toasts" role="status" aria-live="polite"></div>
 
 <a class="skip" href="#app">Skip to the app</a>
 
-<header class="hero">
-  <div class="hero__inner">
+<header class="sheet sheet--hero">
+  <div class="strip" aria-hidden="true">
+    <span class="strip__a">Drishyam // virtual-PTZ inspection agent</span>
+    <span class="strip__b">OpenCV agentic vision</span>
+    <span class="strip__no pop">Sheet <b>1</b> of 5</span>
+  </div>
+  <ol class="zones" aria-hidden="true"><li>1</li><li>2</li><li>3</li><li>4</li><li>5</li><li>6</li><li>7</li><li>8</li></ol>
+
+  <div class="hero">
     <div class="hero__main">
-      <p class="eyebrow">OpenCV agentic vision <span class="eyebrow__dot"></span> virtual PTZ for bridge photos</p>
-      <h1 class="chrome-text wordmark" data-text="DRISHYAM"><span>DRISHYAM</span></h1>
-      <p class="hero__pitch">looks where it matters <b>·</b> zooms until it&rsquo;s sure <b>·</b> asks a human before anything critical</p>
+      <p class="eyebrow"><span class="eyebrow__fig">FIG. 0</span> OpenCV agentic vision &middot; virtual PTZ for bridge photos</p>
+      <h1 class="wordmark">DRISHYAM</h1>
+      <div class="dim dim--word" aria-hidden="true"><span>one photo &middot; many looks &middot; one human</span></div>
+      <ol class="claims" aria-label="What it does">
+        <li>looks where it matters</li>
+        <li>zooms until it&rsquo;s sure</li>
+        <li>asks a human before anything critical</li>
+      </ol>
       <ul class="stats">
-        <li class="stat" id="stat-recall"><span class="stat__k">recall vs tiling</span><b class="stat__v">see benchmarks</b><span class="stat__s">a hypothesis until it is measured</span></li>
-        <li class="stat" id="stat-cost"><span class="stat__k">$ per image</span><b class="stat__v">see benchmarks</b><span class="stat__s">wall time &times; $0.339/h</span></li>
-        <li class="stat" id="stat-ops"><span class="stat__k">failure drills survived</span><b class="stat__v">see benchmarks</b><span class="stat__s">planner and governor faults</span></li>
+        <li class="stat" id="stat-recall"><span class="stat__k">recall vs tiling</span><i class="stat__dim" aria-hidden="true"></i><b class="stat__v">see benchmarks</b><span class="stat__s">a hypothesis until it is measured</span></li>
+        <li class="stat" id="stat-cost"><span class="stat__k">$ per image</span><i class="stat__dim" aria-hidden="true"></i><b class="stat__v">see benchmarks</b><span class="stat__s">wall time &times; $0.339/h</span></li>
+        <li class="stat" id="stat-ops"><span class="stat__k">failure drills survived</span><i class="stat__dim" aria-hidden="true"></i><b class="stat__v">see benchmarks</b><span class="stat__s">planner and governor faults</span></li>
       </ul>
-      <a class="btn btn--lime btn--xl" href="#app">Run an inspection</a>
+      <a class="btn btn--amber btn--xl" href="#app">Run an inspection</a>
     </div>
 
-    <div class="art" aria-hidden="true">
-      <div class="win art__w art__w--scan">
-        <div class="win__bar"><i class="win__orb"></i><span class="win__title">scan.exe</span><span class="win__ctrls"><span>_</span><span>&#9633;</span><span>X</span></span></div>
-        <div class="win__body"><p class="art__line">reading overview&hellip;</p><div class="dl"><div class="dl__fill"></div></div><p class="art__pct"></p></div>
-      </div>
-      <div class="win art__w art__w--gaze">
-        <div class="win__bar"><i class="win__orb"></i><span class="win__title">gaze.exe</span><span class="win__ctrls"><span>_</span><span>&#9633;</span><span>X</span></span></div>
-        <div class="win__body">
-          <div class="gz">
-            <i class="gz__dot gz__dot--1">1</i><i class="gz__dot gz__dot--2">2</i><i class="gz__dot gz__dot--3">3</i><i class="gz__dot gz__dot--4">4</i>
-            <i class="gz__orb"><i class="orb orb--pink"></i></i>
-          </div>
-        </div>
-      </div>
-      <div class="win art__w art__w--find">
-        <div class="win__bar"><i class="win__orb"></i><span class="win__title">finding.dll</span><span class="win__ctrls"><span>_</span><span>&#9633;</span><span>X</span></span></div>
-        <div class="win__body"><span class="badge">NEEDS A HUMAN</span><p class="art__line">exposed_rebar &middot; 310 px</p></div>
-      </div>
-      <i class="spark spark--lime art__spark art__spark--1"></i>
-      <i class="spark spark--pink art__spark art__spark--2"></i>
-      <i class="spark art__spark art__spark--3"></i>
+    <div class="hero__side">
+    <figure class="art" aria-hidden="true">
+      <svg class="art__svg" viewBox="0 0 600 430" fill="none">
+        <defs>
+          <marker id="ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 1L8 4L0 7Z" class="mk-fill"/></marker>
+          <pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path d="M0 0V8" class="hatch"/></pattern>
+        </defs>
+        <text class="t-fig" x="20" y="16">FIG. 1</text>
+        <text class="t-cap" x="72" y="16">ONE PHOTO, THREE LOOKS, ONE HUMAN</text>
+
+        <!-- the photo and the bridge in it -->
+        <path class="d s3 at0" pathLength="1" d="M20 60H420V360H20Z"/>
+        <path class="d s2 at1" pathLength="1" d="M20 118H420M20 130H420M20 150H420"/>
+        <path class="d s1 at1" pathLength="1" d="M45 118V130M75 118V130M105 118V130M135 118V130M165 118V130M195 118V130M225 118V130M255 118V130M285 118V130M315 118V130M345 118V130M375 118V130M405 118V130"/>
+        <path class="d s2 at2" pathLength="1" d="M100 150L110 164H140L150 150M110 164V330M140 164V330"/>
+        <path class="d s2 at2" pathLength="1" d="M280 150L290 164H320L330 150M290 164V330M320 164V330"/>
+        <path class="d s2 at3" pathLength="1" d="M20 330H420"/>
+        <rect class="fill-hatch at3 fade" x="20" y="331" width="400" height="28"/>
+        <path class="d s15 at3" pathLength="1" d="M303 176L299 190L306 203L301 219L308 236"/>
+        <path class="d s15 at3" pathLength="1" d="M294 252L302 248L314 251L318 262L315 276L304 282L295 276L292 264Z"/>
+
+        <!-- dimension 1:4 over the whole photo -->
+        <g class="dm dm--x at4">
+          <path class="ext" d="M20 34V56M420 34V56"/>
+          <path class="dimln" d="M24 42H416" marker-start="url(#ah)" marker-end="url(#ah)"/>
+          <rect class="lblbg" x="196" y="34" width="48" height="16"/>
+          <text class="t-dim" x="220" y="46" text-anchor="middle">1:4</text>
+        </g>
+
+        <!-- L1 window and its 1:2 dimension -->
+        <path class="d s3 at5 win1" pathLength="1" d="M245 168H365V288H245Z"/>
+        <g class="dm dm--y at6">
+          <path class="ext" d="M226 168H242M226 288H242"/>
+          <path class="dimln" d="M232 172V284" marker-start="url(#ah)" marker-end="url(#ah)"/>
+          <rect class="lblbg" x="222" y="219" width="20" height="18"/>
+          <text class="t-dim" x="232" y="231" text-anchor="middle" transform="rotate(-90 232 228)">1:2</text>
+        </g>
+
+        <!-- L0 window and its 1:1 dimension -->
+        <path class="d s3 at7 win0" pathLength="1" d="M276 230H336V290H276Z"/>
+        <g class="dm dm--x at8">
+          <path class="ext" d="M276 294V312M336 294V312"/>
+          <path class="dimln" d="M280 304H332" marker-start="url(#ah)" marker-end="url(#ah)"/>
+          <rect class="lblbg" x="292" y="296" width="28" height="16"/>
+          <text class="t-dim" x="306" y="308" text-anchor="middle">1:1</text>
+        </g>
+
+        <!-- exposed rebar inside the spall -->
+        <path class="d s3 amber at9" pathLength="1" d="M297 262H314M298 269H313"/>
+
+        <!-- numbered leaders and callouts -->
+        <g class="co at4">
+          <path class="lead" d="M400 76H452"/><circle class="dot" cx="400" cy="76" r="3.5"/>
+          <circle class="num" cx="466" cy="76" r="13"/><text class="t-num" x="466" y="81" text-anchor="middle">1</text>
+          <text class="t-co" x="486" y="73">SURVEY</text><text class="t-sub" x="486" y="89">L2 &#183; WHOLE PHOTO</text>
+        </g>
+        <g class="co at6">
+          <path class="lead" d="M365 178L384 160H452"/><circle class="dot" cx="365" cy="178" r="3.5"/>
+          <circle class="num" cx="466" cy="160" r="13"/><text class="t-num" x="466" y="165" text-anchor="middle">2</text>
+          <text class="t-co" x="486" y="157">ESCALATE</text><text class="t-sub" x="486" y="173">L1 &#183; UNSURE, ZOOM</text>
+        </g>
+        <g class="co at8">
+          <path class="lead" d="M336 240L360 230H452"/><circle class="dot" cx="336" cy="240" r="3.5"/>
+          <circle class="num" cx="466" cy="230" r="13"/><text class="t-num" x="466" y="235" text-anchor="middle">3</text>
+          <text class="t-co" x="486" y="227">VERIFY</text><text class="t-sub" x="486" y="243">L0 &#183; RE-SEGMENT</text>
+        </g>
+        <g class="co co--amber at9">
+          <path class="lead" d="M314 266L382 318H452"/><circle class="dot" cx="314" cy="266" r="3.5"/>
+          <circle class="num" cx="466" cy="318" r="13"/><text class="t-num" x="466" y="323" text-anchor="middle">4</text>
+          <text class="t-co" x="486" y="315">EXPOSED REBAR</text><text class="t-sub" x="486" y="331">NEEDS A HUMAN</text>
+        </g>
+
+        <text class="t-note" x="20" y="392">PIXELS, NOT MILLIMETRES. EVERY LOOK HAS A CAUSE.</text>
+        <path class="ext" d="M20 404H580"/>
+      </svg>
+    </figure>
+    <dl class="tblock" aria-hidden="true">
+      <div class="tblock__title"><dt>Title</dt><dd>Drishyam &mdash; virtual-PTZ bridge inspector</dd></div>
+      <div><dt>Drawn by</dt><dd>agent</dd></div>
+      <div><dt>Checked by</dt><dd>human reviewer</dd></div>
+      <div><dt>Scale</dt><dd>pyramid L4 &rarr; L0</dd></div>
+      <div><dt>Sheet</dt><dd class="tblock__sheet">1 of 5</dd></div>
+    </dl>
     </div>
   </div>
 </header>
 
-<div class="marquee" aria-hidden="true">
-  <div class="marquee__track">
-    <span>&#10022; look where it matters &#10022; zoom until it&rsquo;s sure &#10022; ask a human first &#10022; pixels, not millimetres &#10022; every move has a cause &#10022;</span>
-    <span>&#10022; look where it matters &#10022; zoom until it&rsquo;s sure &#10022; ask a human first &#10022; pixels, not millimetres &#10022; every move has a cause &#10022;</span>
-  </div>
+<div class="notes" aria-hidden="true">
+  <b>General notes</b>
+  <span>1. Look where it matters</span>
+  <span>2. Zoom until it&rsquo;s sure</span>
+  <span>3. Ask a human first</span>
+  <span>4. Pixels, not millimetres</span>
+  <span>5. Every move has a cause</span>
 </div>
 
 <main>
-<section id="app" class="section" aria-labelledby="h-app">
-  <h2 id="h-app" class="chrome-text stretch" data-text="INSPECT"><span>INSPECT</span></h2>
+<section id="app" class="sheet" aria-labelledby="h-app">
+  <div class="strip" aria-hidden="true">
+    <span class="strip__a">Drishyam // inspection run</span>
+    <span class="strip__b">live: every look is chosen from what OpenCV just measured</span>
+    <span class="strip__no pop">Sheet <b>2</b> of 5</span>
+  </div>
+  <div class="sheet__head">
+    <span class="sheet__fig" aria-hidden="true">FIG. 2</span>
+    <h2 id="h-app" class="sheet__title">INSPECT</h2>
+  </div>
   <div class="desktop">
 
     <div class="taskbar" id="taskbar">
-      <div class="taskbar__id"><i class="win__orb"></i><span>drishyam.job</span></div>
+      <div class="taskbar__id"><span class="taskbar__mark" aria-hidden="true"></span><span>job</span></div>
       <p class="taskbar__status"><span id="job-pill" class="pill pill--idle">ready</span><span id="job-text">Pick a photo, set a budget, hit LOOK.</span><span id="job-steps" class="taskbar__steps" aria-hidden="true"></span></p>
       <div class="taskbar__actions">
-        <button class="btn btn--pink btn--kill" id="kill" type="button" hidden>KILL</button>
-        <button class="btn btn--cobalt" id="resume" type="button" hidden>Resume</button>
-        <button class="btn btn--chrome btn--sm" id="sound" type="button" aria-pressed="false">Sound: off</button>
+        <button class="btn btn--red btn--kill" id="kill" type="button" hidden>KILL</button>
+        <button class="btn" id="resume" type="button" hidden>Resume</button>
+        <button class="btn btn--sm" id="sound" type="button" aria-pressed="false">Sound: off</button>
       </div>
     </div>
 
     <div class="col col--left">
       <section class="win pop win--load" aria-labelledby="t-load">
-        <div class="win__bar"><i class="win__orb"></i><h3 class="win__title" id="t-load">load_image.exe</h3><span class="win__ctrls" aria-hidden="true"><span>_</span><span>&#9633;</span><span>X</span></span></div>
+        <div class="win__bar"><span class="win__fig" aria-hidden="true">FIG. 2.1</span><h3 class="win__title" id="t-load">Input &middot; photo and budget</h3></div>
         <div class="win__body stack">
           <div>
-            <h4 class="label">1 &middot; pick a photo</h4>
+            <h4 class="label"><span class="label__n">1</span> pick a photo</h4>
             <ul class="gallery" id="gallery" aria-label="Sample photos"></ul>
             <p class="note" id="gallery-empty" hidden>No sample photos are bundled here yet. Drop your own JPEG or PNG below.</p>
             <label class="drop" id="drop">
@@ -110,7 +180,7 @@
           </div>
 
           <fieldset class="group">
-            <legend class="label">2 &middot; set the budget</legend>
+            <legend class="label"><span class="label__n">2</span> set the budget</legend>
             <div class="field">
               <label for="cap-px">Pixel cap <small>(share of full-res pixels)</small></label>
               <output class="field__out" id="cap-px-out" for="cap-px">30 %</output>
@@ -131,18 +201,18 @@
           </fieldset>
 
           <fieldset class="group">
-            <legend class="label">3 &middot; chaos drills <small>(optional)</small></legend>
+            <legend class="label"><span class="label__n">3</span> chaos drills <small>(optional)</small></legend>
             <label class="toggle"><input class="vh" type="checkbox" name="chaos" value="p95_spike"><span class="toggle__ui"></span><span class="toggle__txt"><b>p95_spike</b> Fakes a slow segmenter so the governor must switch models.</span></label>
             <label class="toggle"><input class="vh" type="checkbox" name="chaos" value="planner_timeout"><span class="toggle__ui"></span><span class="toggle__txt"><b>planner_timeout</b> The planner never answers; the rule planner takes over.</span></label>
             <label class="toggle"><input class="vh" type="checkbox" name="chaos" value="planner_malformed"><span class="toggle__ui"></span><span class="toggle__txt"><b>planner_malformed</b> The planner sends junk; the validator must reject it.</span></label>
           </fieldset>
 
-          <button class="btn btn--lime btn--look" id="look" type="button" disabled>LOOK</button>
+          <button class="btn btn--amber btn--look" id="look" type="button" disabled>LOOK</button>
         </div>
       </section>
 
       <section class="win pop win--budget" aria-labelledby="t-budget">
-        <div class="win__bar"><i class="win__orb"></i><h3 class="win__title" id="t-budget">budget.sys</h3><span class="win__ctrls" aria-hidden="true"><span>_</span><span>&#9633;</span><span>X</span></span></div>
+        <div class="win__bar"><span class="win__fig" aria-hidden="true">FIG. 2.2</span><h3 class="win__title" id="t-budget">Budget</h3></div>
         <div class="win__body stack">
           <div class="meter" data-meter="pixels">
             <div class="meter__head"><span>pixels</span><span><b class="meter__val" data-value="0">0 %</b> <small class="meter__cap">of cap &mdash;</small></span></div>
@@ -168,16 +238,17 @@
 
     <div class="col col--right">
       <section class="win pop win--view" aria-labelledby="t-view">
-        <div class="win__bar"><i class="win__orb"></i><h3 class="win__title" id="t-view">viewport.exe</h3><span class="win__ctrls" aria-hidden="true"><span>_</span><span>&#9633;</span><span>X</span></span></div>
+        <div class="win__bar"><span class="win__fig" aria-hidden="true">FIG. 2.3</span><h3 class="win__title" id="t-view">Viewport &middot; gaze path</h3></div>
         <div class="win__body stack">
           <div class="vtools">
             <label class="switch"><input class="vh" type="checkbox" id="heat" checked><span class="switch__ui"></span>saliency heatmap</label>
             <span class="ramp" aria-hidden="true"><i>low</i><b></b><i>high</i></span>
             <span class="key" aria-hidden="true"><b class="key__box"></b> candidate region</span>
+            <span class="key" aria-hidden="true"><b class="key__num">n</b> gaze step</span>
           </div>
           <div class="stage"><canvas id="stage" role="img" aria-label="Photo viewport. Load a photo and press LOOK."></canvas></div>
           <div class="replay">
-            <button class="btn btn--chrome btn--sm" id="play" type="button" disabled>Play</button>
+            <button class="btn btn--sm" id="play" type="button" disabled>Play</button>
             <label class="vh" for="replay">Replay step</label>
             <input type="range" id="replay" min="0" max="0" value="0" disabled>
             <output class="replay__out" id="replay-out" for="replay">step 0 / 0</output>
@@ -187,7 +258,7 @@
       </section>
 
       <section class="win pop win--trace" aria-labelledby="t-trace">
-        <div class="win__bar"><i class="win__orb"></i><h3 class="win__title" id="t-trace">trace.log</h3><span class="win__ctrls" aria-hidden="true"><span>_</span><span>&#9633;</span><span>X</span></span></div>
+        <div class="win__bar"><span class="win__fig" aria-hidden="true">FIG. 2.4</span><h3 class="win__title" id="t-trace">Trace &middot; every move and its cause</h3></div>
         <div class="win__body win__body--dark">
           <p class="trace__empty" id="trace-empty">waiting for the first move&hellip; every step lands here with the reason it was taken.</p>
           <ol class="trace" id="trace" role="log" aria-label="Agent trace" aria-live="off"></ol>
@@ -196,7 +267,7 @@
     </div>
 
     <section class="win pop win--findings" aria-labelledby="t-find">
-      <div class="win__bar"><i class="win__orb"></i><h3 class="win__title" id="t-find">findings.queue</h3><span class="win__ctrls" aria-hidden="true"><span>_</span><span>&#9633;</span><span>X</span></span></div>
+      <div class="win__bar"><span class="win__fig" aria-hidden="true">FIG. 2.5</span><h3 class="win__title" id="t-find">Findings &middot; evidence first</h3></div>
       <div class="win__body stack">
         <p class="banner"><b>AI-assisted, not an inspection.</b> Measurements are image pixels, not millimetres.</p>
         <p class="note" id="findings-empty">No findings yet. Evidence (crop and pixel measurements) always comes first; confidence last.</p>
@@ -205,34 +276,50 @@
     </section>
 
     <section class="win pop win--order" aria-labelledby="t-order">
-      <div class="win__bar"><i class="win__orb"></i><h3 class="win__title" id="t-order">work_order.exe</h3><span class="win__ctrls" aria-hidden="true"><span>_</span><span>&#9633;</span><span>X</span></span></div>
-      <div class="win__body" id="done"><p class="note">No job has finished yet. Status, coverage and the work order download appear here.</p></div>
+      <div class="win__bar"><span class="win__fig" aria-hidden="true">FIG. 2.6</span><h3 class="win__title" id="t-order">Title block &middot; work order</h3></div>
+      <div class="win__body stack">
+        <dl class="tblock tblock--live" aria-label="Drawing status">
+          <div><dt>Drawn by</dt><dd>agent</dd></div>
+          <div><dt>Checked by</dt><dd id="tb-checked">human reviewer</dd></div>
+          <div><dt>Sheet</dt><dd class="tblock__sheet" id="tb-sheet">0 of 0</dd></div>
+          <div><dt>Scale</dt><dd id="tb-scale">overview</dd></div>
+        </dl>
+        <div id="done"><p class="note">No job has finished yet. Status, coverage and the work order download appear here.</p></div>
+      </div>
     </section>
 
   </div>
 </section>
 
-<section id="how" class="section" aria-labelledby="h-how">
-  <h2 id="h-how" class="chrome-text stretch" data-text="HOW IT WORKS"><span>HOW IT WORKS</span></h2>
+<section id="how" class="sheet" aria-labelledby="h-how">
+  <div class="strip" aria-hidden="true">
+    <span class="strip__a">Drishyam // method</span>
+    <span class="strip__b">one score, five rules, one governor</span>
+    <span class="strip__no pop">Sheet <b>3</b> of 5</span>
+  </div>
+  <div class="sheet__head">
+    <span class="sheet__fig" aria-hidden="true">FIG. 3</span>
+    <h2 id="h-how" class="sheet__title">HOW IT WORKS</h2>
+  </div>
   <div class="grid-how">
 
     <section class="win pop" aria-labelledby="t-score">
-      <div class="win__bar"><i class="win__orb"></i><h3 class="win__title" id="t-score">score.exe</h3><span class="win__ctrls" aria-hidden="true"><span>_</span><span>&#9633;</span><span>X</span></span></div>
+      <div class="win__bar"><span class="win__fig" aria-hidden="true">FIG. 3.1</span><h3 class="win__title" id="t-score">Score</h3></div>
       <div class="win__body stack">
         <p>Every candidate region gets one number: value per millisecond. The agent looks at the biggest one next.</p>
-        <p class="formula" aria-label="score of r equals p times s times one plus u times a divided by t-hat">score(r) = <b>p</b> &middot; <b>s</b> &middot; (1 + <b>u</b>) &middot; <b>a</b> / <b>t&#770;</b></p>
+        <p class="formula" aria-label="score of r equals p times s times one plus u times a divided by t-hat">score(r) = <b data-n="1">p</b> &middot; <b data-n="2">s</b> &middot; (1 + <b data-n="3">u</b>) &middot; <b data-n="4">a</b> / <b data-n="5">t&#770;</b></p>
         <dl class="terms">
-          <div><dt>p</dt><dd>saliency prior from the overview, 0&ndash;1. How likely is something here?</dd></div>
-          <div><dt>s</dt><dd>class severity weight. Exposed rebar 3.0, spalling 2.0, crack 1.5, corrosion 1.0, efflorescence 0.5.</dd></div>
-          <div><dt>u</dt><dd>segmenter entropy at the last level that saw the region, 0 if unseen. How unsure are we?</dd></div>
-          <div><dt>a</dt><dd>fraction of the region not yet seen at the target level. Don&rsquo;t look twice.</dd></div>
-          <div><dt>t&#770;</dt><dd>predicted milliseconds for the planned ops, from the live p95. What does looking cost?</dd></div>
+          <div><dt data-n="1">p</dt><dd>saliency prior from the overview, 0&ndash;1. How likely is something here?</dd></div>
+          <div><dt data-n="2">s</dt><dd>class severity weight. Exposed rebar 3.0, spalling 2.0, crack 1.5, corrosion 1.0, efflorescence 0.5.</dd></div>
+          <div><dt data-n="3">u</dt><dd>segmenter entropy at the last level that saw the region, 0 if unseen. How unsure are we?</dd></div>
+          <div><dt data-n="4">a</dt><dd>fraction of the region not yet seen at the target level. Don&rsquo;t look twice.</dd></div>
+          <div><dt data-n="5">t&#770;</dt><dd>predicted milliseconds for the planned ops, from the live p95. What does looking cost?</dd></div>
         </dl>
       </div>
     </section>
 
     <section class="win pop" aria-labelledby="t-rules">
-      <div class="win__bar"><i class="win__orb"></i><h3 class="win__title" id="t-rules">five_rules.txt</h3><span class="win__ctrls" aria-hidden="true"><span>_</span><span>&#9633;</span><span>X</span></span></div>
+      <div class="win__bar"><span class="win__fig" aria-hidden="true">FIG. 3.2</span><h3 class="win__title" id="t-rules">Five rules</h3></div>
       <div class="win__body">
         <ol class="rules">
           <li><b>Next gaze.</b> Take the highest score. Ties go to the larger unseen share, then top-left first, so a run is deterministic.</li>
@@ -245,7 +332,7 @@
     </section>
 
     <section class="win pop win--wide" aria-labelledby="t-gov">
-      <div class="win__bar"><i class="win__orb"></i><h3 class="win__title" id="t-gov">governor.tbl</h3><span class="win__ctrls" aria-hidden="true"><span>_</span><span>&#9633;</span><span>X</span></span></div>
+      <div class="win__bar"><span class="win__fig" aria-hidden="true">FIG. 3.3</span><h3 class="win__title" id="t-gov">Governor schedule</h3></div>
       <div class="win__body">
         <div class="table-wrap" tabindex="0" role="region" aria-label="Governor table">
           <table class="tbl tbl--rows">
@@ -264,7 +351,7 @@
     </section>
 
     <section class="win pop win--wide" aria-labelledby="t-auto">
-      <div class="win__bar"><i class="win__orb"></i><h3 class="win__title" id="t-auto">autonomy.tbl</h3><span class="win__ctrls" aria-hidden="true"><span>_</span><span>&#9633;</span><span>X</span></span></div>
+      <div class="win__bar"><span class="win__fig" aria-hidden="true">FIG. 3.4</span><h3 class="win__title" id="t-auto">Autonomy schedule</h3></div>
       <div class="win__body">
         <div class="table-wrap" tabindex="0" role="region" aria-label="Autonomy table">
           <table class="tbl tbl--auto">
@@ -282,28 +369,59 @@
     </section>
 
   </div>
+  <dl class="tblock tblock--mini" aria-hidden="true">
+    <div><dt>Drawn by</dt><dd>agent</dd></div>
+    <div><dt>Checked by</dt><dd>human reviewer</dd></div>
+    <div><dt>Sheet</dt><dd class="tblock__sheet">3 of 5</dd></div>
+  </dl>
 </section>
 
-<section id="benchmarks" class="section" aria-labelledby="h-bench">
-  <h2 id="h-bench" class="chrome-text stretch" data-text="BENCHMARKS"><span>BENCHMARKS</span></h2>
+<section id="benchmarks" class="sheet" aria-labelledby="h-bench">
+  <div class="strip" aria-hidden="true">
+    <span class="strip__a">Drishyam // measured</span>
+    <span class="strip__b">recall against pixels processed</span>
+    <span class="strip__no pop">Sheet <b>4</b> of 5</span>
+  </div>
+  <div class="sheet__head">
+    <span class="sheet__fig" aria-hidden="true">FIG. 4</span>
+    <h2 id="h-bench" class="sheet__title">BENCHMARKS</h2>
+  </div>
   <section class="win pop" aria-labelledby="t-bench">
-    <div class="win__bar"><i class="win__orb"></i><h3 class="win__title" id="t-bench">recall_vs_pixels.exe</h3><span class="win__ctrls" aria-hidden="true"><span>_</span><span>&#9633;</span><span>X</span></span></div>
+    <div class="win__bar"><span class="win__fig" aria-hidden="true">FIG. 4.1</span><h3 class="win__title" id="t-bench">Recall vs pixels</h3></div>
     <div class="win__body" id="bench"><p class="note">Loading benchmarks&hellip;</p></div>
   </section>
+  <dl class="tblock tblock--mini" aria-hidden="true">
+    <div><dt>Drawn by</dt><dd>eval harness</dd></div>
+    <div><dt>Units</dt><dd>pixels, $, ms</dd></div>
+    <div><dt>Sheet</dt><dd class="tblock__sheet">4 of 5</dd></div>
+  </dl>
 </section>
 
-<section id="failures" class="section" aria-labelledby="h-fail">
-  <h2 id="h-fail" class="chrome-text stretch" data-text="FAILURES"><span>FAILURES</span></h2>
+<section id="failures" class="sheet" aria-labelledby="h-fail">
+  <div class="strip" aria-hidden="true">
+    <span class="strip__a">Drishyam // where it was wrong</span>
+    <span class="strip__b">kept in the open on purpose</span>
+    <span class="strip__no pop">Sheet <b>5</b> of 5</span>
+  </div>
+  <div class="sheet__head">
+    <span class="sheet__fig" aria-hidden="true">FIG. 5</span>
+    <h2 id="h-fail" class="sheet__title">FAILURES</h2>
+  </div>
   <section class="win pop" aria-labelledby="t-fail">
-    <div class="win__bar"><i class="win__orb"></i><h3 class="win__title" id="t-fail">failure_gallery.exe</h3><span class="win__ctrls" aria-hidden="true"><span>_</span><span>&#9633;</span><span>X</span></span></div>
+    <div class="win__bar"><span class="win__fig" aria-hidden="true">FIG. 5.1</span><h3 class="win__title" id="t-fail">Failure plates</h3></div>
     <div class="win__body" id="fail"><p class="note">Loading failure gallery&hellip;</p></div>
   </section>
+  <dl class="tblock tblock--mini" aria-hidden="true">
+    <div><dt>Drawn by</dt><dd>eval harness</dd></div>
+    <div><dt>Checked by</dt><dd>human reviewer</dd></div>
+    <div><dt>Sheet</dt><dd class="tblock__sheet">5 of 5</dd></div>
+  </dl>
 </section>
 </main>
 
 <footer class="footer">
-  <div class="win pop">
-    <div class="win__bar"><i class="win__orb"></i><span class="win__title">about.txt</span><span class="win__ctrls" aria-hidden="true"><span>_</span><span>&#9633;</span><span>X</span></span></div>
+  <div class="win">
+    <div class="win__bar"><span class="win__fig" aria-hidden="true">END</span><span class="win__title">About this drawing set</span></div>
     <div class="win__body stack">
       <p class="banner banner--honest"><b>Live demo: stock OpenCV 5 on Vercel (x86) &mdash; not COOL.</b> The COOL/Graviton build runs the same code from /opt/cool.</p>
       <nav aria-label="Project links">

@@ -1,6 +1,7 @@
-// findings.queue cards. Evidence first (crop, px measurements), confidence last; critical ones wait for a human.
+// Finding cards, drawn as detail callouts. Evidence first (crop, px measurements), confidence last;
+// critical ones wait for a human, whose decision lands on the card as a rubber stamp.
 import { h, dataUrl, num } from './dom.js';
-import { burstAt, sound } from './fx.js';
+import { countUp, replay, sound } from './fx.js';
 
 const PRINTABLE = /^[^\x00-\x1f\x7f]{1,64}$/;
 const STATE = { draft: 'draft', pending_review: 'needs review', approved: 'approved', rejected: 'rejected' };
@@ -35,8 +36,7 @@ export class Findings {
     this.empty.hidden = true;
     this.list.append(card);
     this.sync1(card);
-    burstAt(card, 14);
-    sound.pop();
+    sound.click();
   }
 
   update(card, f) {
@@ -48,12 +48,20 @@ export class Findings {
     card.parts = parts;
     this.restyle(card, f);
     this.sync1(card);
-    burstAt(card, 6);
+    replay(card, 'is-revised');
   }
 
   restyle(card, f) {
     card.finding = f;
     card.className = `finding finding--${f.cls}${f.critical ? ' finding--critical' : ''}`;
+  }
+
+  /** The finding's length as a dimension line under its crop; the number counts up to the measured value. */
+  dim(m) {
+    if (!num(m.length_px)) return null;
+    const v = h('span', { class: 'dim__v' });
+    countUp(v, m.length_px, { decimals: 1, suffix: ' px' });
+    return h('div', { class: 'dim finding__dim', 'aria-hidden': 'true' }, v);
   }
 
   parts(f) {
@@ -72,7 +80,9 @@ export class Findings {
         h('span', { class: 'finding__where' }, `found at step ${f.step}${refined}, L${f.level}`),
         state),
       body: h('div', { class: 'finding__body' },
-        crop ? h('img', { class: 'finding__crop', src: crop, alt: `Crop of the ${f.cls} finding`, width: 128, height: 128 }) : h('div', { class: 'finding__crop finding__crop--none' }, 'no crop'),
+        h('figure', { class: 'finding__fig' },
+          crop ? h('img', { class: 'finding__crop', src: crop, alt: `Crop of the ${f.cls} finding`, width: 128, height: 128 }) : h('div', { class: 'finding__crop finding__crop--none' }, 'no crop'),
+          this.dim(m)),
         h('dl', { class: 'kv kv--px' },
           h('div', {}, h('dt', {}, 'length'), h('dd', {}, `${px(m.length_px, 1)} px`)),
           h('div', {}, h('dt', {}, 'width'), h('dd', {}, `${px(m.width_px, 1)} px`)),
@@ -85,8 +95,8 @@ export class Findings {
 
   addReview(card, f) {
     const name = h('input', { class: 'input', type: 'text', maxlength: '64', autocomplete: 'name', id: `rev-${f.id}`, placeholder: 'Your name' });
-    const approve = h('button', { class: 'btn btn--lime btn--sm', type: 'button' }, 'Approve');
-    const reject = h('button', { class: 'btn btn--pink btn--sm', type: 'button' }, 'Reject');
+    const approve = h('button', { class: 'btn btn--amber btn--sm', type: 'button' }, 'Approve');
+    const reject = h('button', { class: 'btn btn--red btn--sm', type: 'button' }, 'Reject');
     const err = h('p', { class: 'finding__err', role: 'alert' });
     const hint = h('p', { class: 'note' }, 'Waiting for the job to finish before a decision can be signed.');
     const box = h('div', { class: 'review' },
@@ -133,6 +143,15 @@ export class Findings {
     r.box.classList.toggle('review--done', !open);
   }
 
+  /** A human's decision lands on the card as a rubber stamp (decorative: the state chip and note carry the text). */
+  stamp(card, state, approval) {
+    if (state !== 'approved' && state !== 'rejected') return;
+    card.querySelector('.stamp')?.remove();
+    card.append(h('span', { class: `stamp stamp--${state}`, 'aria-hidden': 'true' }, state,
+      approval ? h('small', {}, `${approval.reviewer} · ${String(approval.at ?? '').slice(0, 10)}`) : null));
+    sound.stamp();
+  }
+
   /** Called when the `done` event arrives: reviews may now be signed with its token. */
   setReady() {
     this.ready = true;
@@ -151,8 +170,7 @@ export class Findings {
         const a = (order.approvals ?? []).find((x) => x.finding_id === wf.id);
         card.note = a ? `${wf.state} by ${a.reviewer} at ${a.at}` : wf.state;
         this.sync1(card);
-        burstAt(card, wf.state === 'approved' ? 22 : 10);
-        sound.pop();
+        this.stamp(card, wf.state, a);
       }
     }
   }

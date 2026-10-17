@@ -1,4 +1,4 @@
-// budget.sys meters, trace.log lines and the step detail card.
+// Budget ruler meters, trace schedule lines and the step detail card.
 import { $, $$, h, dataUrl, num } from './dom.js';
 import { countUp } from './fx.js';
 
@@ -7,9 +7,9 @@ export const isGovernor = (cause) => GOVERNOR.has(cause);
 
 const CHIP = {
   'best-score': 'look', 'entropy>tau': 'unsure', 'area<A_min': 'unsure', 'iou<0.5': 'unsure',
-  'verify-new-mask': 'verify', replay: 'chrome', survey: 'look',
+  'verify-new-mask': 'verify', replay: 'plain', survey: 'look',
 };
-const chip = (cause) => h('span', { class: `chip chip--${GOVERNOR.has(cause) ? 'gov' : CHIP[cause] ?? 'chrome'}` }, cause);
+const chip = (cause) => h('span', { class: `chip chip--${GOVERNOR.has(cause) ? 'gov' : CHIP[cause] ?? 'plain'}` }, cause);
 
 const ms = (v) => (num(v) ? `${v}` : '–');
 const pair = (rt, op) => `${ms(rt?.p50_ms?.[op])} / ${ms(rt?.p95_ms?.[op])} ms`;

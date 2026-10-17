@@ -557,17 +557,17 @@ def test_reduced_motion(browser, base):
     p = s.page
     p.goto(f"{base}/?mock=1")
     expect(p.locator("#look")).to_be_enabled(timeout=T)
-    assert p.evaluate("getComputedStyle(document.querySelector('.bg-orb')).animationName") == "none"
-    assert p.evaluate("getComputedStyle(document.querySelector('.art__w')).animationName") == "none"
+    assert p.evaluate("getComputedStyle(document.querySelector('.art .d')).animationName") == "none"      # hero lines do not draw themselves
+    assert p.evaluate("getComputedStyle(document.querySelector('.art .co')).animationName") == "none"     # callouts do not snap in
     assert p.evaluate("getComputedStyle(document.querySelector('.pop')).opacity") == "1"   # no hidden-until-scrolled state
     p.click("#look")
     expect(p.locator("#job-pill")).to_have_text(re.compile(DONE_LABEL, re.IGNORECASE), timeout=T)
     expect(p.locator(".finding")).to_have_count(len(FINDINGS))
-    assert p.locator("#fx > *").count() == 0, "no bursts or confetti under prefers-reduced-motion"
+    assert p.evaluate("getComputedStyle(document.querySelector('.finding')).animationName") == "none", "finding cards appear without drawing in"
     expect(p.locator("[data-meter=pixels] .meter__val")).to_have_text(f"{STEPS[-1]['pixels_frac'] * 100:.1f} %")   # counts land without animating
     s.check_clean()
     s.context.close()
-    print("ok  prefers-reduced-motion: no bursts, no hidden windows, numbers still land")
+    print("ok  prefers-reduced-motion: nothing draws in, no hidden windows, numbers still land")
 
 
 def test_heading_names(browser, base):
