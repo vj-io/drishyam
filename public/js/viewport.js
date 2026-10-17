@@ -14,6 +14,26 @@ const around = (x, y, r) => ({ x: x - r, y: y - r, w: 2 * r, h: 2 * r });
 const hit = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 const overlap = (a, b) => Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)) * Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
 
+/** The 512 px, 20 %-overlap L0 tiles exhaustive tiling would read (evals/harness.py slice_boxes, after SAHI). */
+export function tileBoxes(W, H, size = 512, overlap = 0.2) {
+  const ov = Math.trunc(overlap * size);
+  const starts = (n) => {
+    const out = [];
+    for (let lo = 0, hi = 0; hi < n; lo = hi - ov) {
+      hi = lo + size;
+      out.push(Math.max(0, Math.min(n, hi) - size));
+    }
+    return out;
+  };
+  return starts(H).flatMap((y) => starts(W).map((x) => [x, y, Math.min(size, W), Math.min(size, H)]));
+}
+
+/** A look window [x, y, w, h] in L0 px, cut to the photo: a coarse look can reach past its edges. */
+const clip = ([x, y, w, h], W, H) => {
+  const x0 = Math.max(0, x), y0 = Math.max(0, y);
+  return [x0, y0, Math.max(0, Math.min(W, x + w) - x0), Math.max(0, Math.min(H, y + h) - y0)];
+};
+
 export const pointOf = (step) => {
   const a = step.decision?.args;
   return num(a?.x) && num(a?.y) ? { x: a.x, y: a.y } : null;
@@ -91,6 +111,8 @@ export class Viewport {
     this.heat = null;
     this.mask = null;
     this.showHeat = true;
+    this.showTiles = false;
+    this.focusBox = null;  // a finding or candidate the viewer asked to see: [x, y, w, h] in L0 px
     this.cands = [];
     this.steps = [];
     this.cursor = 0;
@@ -117,7 +139,7 @@ export class Viewport {
   }
 
   reset(job) {
-    Object.assign(this, { job, heat: null, cands: [], steps: [], cursor: 0, anim: null });
+    Object.assign(this, { job, heat: null, cands: [], steps: [], cursor: 0, anim: null, focusBox: null, showTiles: false });
     this.rebuildPrivacy();
     this.draw();
   }
@@ -134,9 +156,21 @@ export class Viewport {
     this.draw();
   }
 
+  setTiles(on) {
+    this.showTiles = on;
+    this.draw();
+  }
+
+  /** Outline one L0 box (a finding, or a region it never zoomed into) until the next step is picked. */
+  highlight(box) {
+    this.focusBox = Array.isArray(box) && box.length === 4 && box.every(num) ? box : null;
+    this.draw();
+  }
+
   /** Show the first k steps; `animate` draws the newest look: path, leader, callout and window dimensions. */
   setCursor(k, animate = false) {
     this.cursor = k;
+    this.focusBox = null;
     const step = this.steps[k - 1];
     if (animate && step && (pointOf(step) || step.window?.length === 4) && !reduced()) {
       this.anim = { k, t0: performance.now(), dur: 950 };
@@ -255,14 +289,41 @@ export class Viewport {
     const seen = new Set(shown.map((s) => s.region));
     const boxes = this.cands.filter((c) => Array.isArray(c.box) && c.box.length === 4 && c.box.every(num));
     this.occ = [];
+    if (this.showTiles) this.drawTiles(g, X, Y, f);
     this.drawCandidates(g, X, Y, f, boxes, seen);
     const current = shown[shown.length - 1];
-    const win = current?.window?.length === 4 ? current : null;
+    let win = current?.window?.length === 4 && current.window.every(num) ? clip(current.window, f.W, f.H) : null;
+    const prev = shown.slice(0, -1).reverse().find((s) => s.window?.length === 4 && s.window.every(num));
+    if (win && prev && t < 1) {  // the look window slides from the last look to this one
+      const from = clip(prev.window, f.W, f.H);
+      const k = ease(phase(t, 0, 0.4));
+      win = win.map((v, i) => lerp(from[i], v, k));
+    }
     if (win) this.drawWindow(g, X, Y, f, win);
     const co = this.drawPath(g, X, Y, shown, t);
-    if (win) this.drawDims(g, X, Y, win, t);  // measured values and the callout stay readable over the path
+    if (win) this.drawDims(g, X, Y, win, current.decision?.args?.level, t);  // measured values and the callout stay readable over the path
     if (co && !this.narrow) this.callout(g, ...co);
     this.drawTags(g, X, Y, f, boxes, seen);
+    if (this.focusBox) this.drawFocus(g, X, Y, f, this.focusBox);
+  }
+
+  /** The tiles a full tiling scan would read, faint, so the agent's few looks can be compared with them. */
+  drawTiles(g, X, Y, f) {
+    g.save();
+    g.strokeStyle = 'rgba(232,241,255,.42)';
+    g.lineWidth = 1;
+    for (const [x, y, w, h] of tileBoxes(f.W, f.H)) g.strokeRect(X(x) + 0.5, Y(y) + 0.5, w * f.s - 1, h * f.s - 1);
+    g.restore();
+  }
+
+  drawFocus(g, X, Y, f, [x, y, w, h]) {
+    g.save();
+    g.strokeStyle = C.amber;
+    g.lineWidth = 4;
+    g.setLineDash([]);
+    g.strokeRect(X(x) - 3, Y(y) - 3, w * f.s + 6, h * f.s + 6);
+    g.restore();
+    label(g, 'HERE', Math.min(Math.max(X(x) + 24, 28), this.cw - 28), Math.max(Y(y) - 14, 12), { bg: C.amber, fg: C.ink, edge: null });
   }
 
   /** Candidate regions as dashed boxes, stopped at the photo's frame like any line on a drawing. */
@@ -309,8 +370,7 @@ export class Viewport {
     g.restore();
   }
 
-  drawWindow(g, X, Y, f, step) {
-    const [wx, wy, ww, wh] = step.window;
+  drawWindow(g, X, Y, f, [wx, wy, ww, wh]) {
     const x = X(wx), y = Y(wy), w = ww * f.s, h = wh * f.s;
     g.save();
     g.save();
@@ -340,14 +400,12 @@ export class Viewport {
   }
 
   /** Dimension arrows that extend to the window's L0 size while the number counts up, plus the level tag. */
-  drawDims(g, X, Y, step, t) {
-    const [wx, wy, ww, wh] = step.window;
+  drawDims(g, X, Y, [wx, wy, ww, wh], level, t) {
     const x = X(wx), y = Y(wy), w = ww * (X(1) - X(0)), h = wh * (Y(1) - Y(0));
     g.save();
     const d = ease(phase(t, 0.12, 0.85));
     this.dimH(g, x, x + w, y, y + h, ww, d);
     if (!this.narrow) this.dimV(g, y, y + h, x, x + w, wh, d);
-    const level = step.decision?.args?.level;
     if (num(level)) {
       const text = `L${level} · 1:${2 ** level}`;
       g.font = `700 11.5px ${MONO}`;

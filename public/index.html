@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Drishyam · virtual-PTZ bridge inspector</title>
-<meta name="description" content="Drishyam looks where it matters, zooms until it is sure, and asks a human before anything critical. An OpenCV agentic-vision inspector for bridge photos.">
+<title>Drishyam · bridge-photo inspection agent</title>
+<meta name="description" content="For bridge inspectors reviewing high-resolution photos: Drishyam finds cracks, spalling and exposed rebar by zooming in only where it needs to, and hands every critical finding to a human. An OpenCV agentic-vision demo.">
 <meta name="theme-color" content="#0F3B73">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230F3B73'/%3E%3Cpath d='M4 4h24v24H4z' fill='none' stroke='%23E8F1FF' stroke-width='2.5'/%3E%3Cpath d='M16 7v18M7 16h18' stroke='%23E8F1FF' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='5' fill='none' stroke='%23FFC857' stroke-width='2.5'/%3E%3C/svg%3E">
 <link rel="preload" href="fonts/ArchivoNarrow-700.woff2" as="font" type="font/woff2" crossorigin>
@@ -14,34 +14,68 @@
 </head>
 <body>
 
-<div id="toasts" class="toasts" role="status" aria-live="polite"></div>
+<a class="skip" href="#demo">Skip to the demo</a>
 
-<a class="skip" href="#app">Skip to the app</a>
+<header class="nav" id="nav">
+  <div class="nav__in">
+    <a class="nav__brand" href="#top"><span class="nav__mark" aria-hidden="true"></span><b>Drishyam</b><span class="nav__tag">bridge-photo inspector</span></a>
+    <nav class="nav__links" aria-label="Sections">
+      <a href="#demo">Demo</a>
+      <a href="#how">How it works</a>
+      <a href="#benchmarks">Results</a>
+      <a href="#docs">Docs</a>
+    </nav>
+    <div class="nav__end">
+      <a class="nav__gh" href="https://github.com/vj-io/drishyam" rel="noopener noreferrer">GitHub</a>
+      <a class="btn btn--amber btn--sm nav__cta" href="#demo">Try the demo</a>
+      <details class="nav__menu" id="nav-menu">
+        <summary>Menu</summary>
+        <nav class="nav__drop" aria-label="Sections (menu)">
+          <a href="#demo">Demo</a>
+          <a href="#how">How it works</a>
+          <a href="#benchmarks">Results</a>
+          <a href="#safety">Safety</a>
+          <a href="#faq">Questions</a>
+          <a href="#docs">Docs</a>
+          <a href="https://github.com/vj-io/drishyam" rel="noopener noreferrer">GitHub</a>
+        </nav>
+      </details>
+    </div>
+  </div>
+</header>
 
-<header class="sheet sheet--hero">
+<main id="main">
+<section class="sheet sheet--hero" id="top" aria-labelledby="h-top">
   <div class="strip" aria-hidden="true">
     <span class="strip__a">Drishyam // virtual-PTZ inspection agent</span>
     <span class="strip__b">OpenCV agentic vision</span>
-    <span class="strip__no pop">Sheet <b>1</b> of 5</span>
+    <span class="strip__no pop">Sheet <b>1</b> of 7</span>
   </div>
   <ol class="zones" aria-hidden="true"><li>1</li><li>2</li><li>3</li><li>4</li><li>5</li><li>6</li><li>7</li><li>8</li></ol>
 
   <div class="hero">
     <div class="hero__main">
-      <p class="eyebrow"><span class="eyebrow__fig">FIG. 0</span> OpenCV agentic vision &middot; virtual PTZ for bridge photos</p>
-      <h1 class="wordmark">DRISHYAM</h1>
+      <p class="eyebrow"><span class="eyebrow__fig">FIG. 0</span> OpenCV agentic vision for bridge inspection</p>
+      <h1 class="wordmark" id="h-top">DRISHYAM</h1>
       <div class="dim dim--word" aria-hidden="true"><span>one photo &middot; many looks &middot; one human</span></div>
-      <ol class="claims" aria-label="What it does">
-        <li>looks where it matters</li>
-        <li>zooms until it&rsquo;s sure</li>
-        <li>asks a human before anything critical</li>
+      <p class="lede">For bridge inspectors reviewing high-resolution photos: it finds cracks, spalling and exposed rebar by zooming in only where it needs to, and hands every critical finding to a human to sign off.</p>
+      <p class="gloss">It works like a PTZ camera (pan-tilt-zoom), done in software: it pans and zooms across one big photo instead of moving a real camera.</p>
+      <div class="cta">
+        <button class="btn btn--amber btn--xl" id="guided" type="button"><span>Watch it inspect a bridge <span class="cta__time">(about 45 s)</span></span></button>
+        <a class="btn" id="own" href="#step-photo">Try your own photo</a>
+        <a class="cta__link" href="https://github.com/vj-io/drishyam/releases/latest/download/drishyam-demo.mp4" rel="noopener noreferrer">Download the video (MP4)</a>
+      </div>
+      <ol class="claims" aria-label="How to use it">
+        <li>Pick a photo</li>
+        <li>Watch the agent look, zoom and double-check</li>
+        <li>Sign off what it flags</li>
       </ol>
-      <ul class="stats">
-        <li class="stat" id="stat-recall"><span class="stat__k">recall vs tiling</span><i class="stat__dim" aria-hidden="true"></i><b class="stat__v">see benchmarks</b><span class="stat__s">a hypothesis until it is measured</span></li>
-        <li class="stat" id="stat-cost"><span class="stat__k">$ per image</span><i class="stat__dim" aria-hidden="true"></i><b class="stat__v">see benchmarks</b><span class="stat__s">wall time &times; $0.339/h</span></li>
+      <ul class="stats" aria-label="Measured so far">
+        <li class="stat" id="stat-recall"><span class="stat__k">defects found vs checking every tile</span><i class="stat__dim" aria-hidden="true"></i><b class="stat__v">see benchmarks</b><span class="stat__s">a hypothesis until it is measured</span></li>
+        <li class="stat" id="stat-cost"><span class="stat__k">$ per image (modelled)</span><i class="stat__dim" aria-hidden="true"></i><b class="stat__v">see benchmarks</b><span class="stat__s">wall time &times; $0.339/h, not billed</span></li>
         <li class="stat" id="stat-ops"><span class="stat__k">failure drills survived</span><i class="stat__dim" aria-hidden="true"></i><b class="stat__v">see benchmarks</b><span class="stat__s">planner and governor faults</span></li>
+        <li class="stat" id="stat-real"></li>
       </ul>
-      <a class="btn btn--amber btn--xl" href="#app">Run an inspection</a>
     </div>
 
     <div class="hero__side">
@@ -131,11 +165,11 @@
       <div><dt>Drawn by</dt><dd>agent</dd></div>
       <div><dt>Checked by</dt><dd>human reviewer</dd></div>
       <div><dt>Scale</dt><dd>pyramid L4 &rarr; L0</dd></div>
-      <div><dt>Sheet</dt><dd class="tblock__sheet">1 of 5</dd></div>
+      <div><dt>Sheet</dt><dd class="tblock__sheet">1 of 7</dd></div>
     </dl>
     </div>
   </div>
-</header>
+</section>
 
 <div class="notes" aria-hidden="true">
   <b>General notes</b>
@@ -146,143 +180,205 @@
   <span>5. Every move has a cause</span>
 </div>
 
-<main>
-<section id="app" class="sheet" aria-labelledby="h-app">
+<section id="demo" class="sheet" aria-labelledby="h-demo">
   <div class="strip" aria-hidden="true">
     <span class="strip__a">Drishyam // inspection run</span>
     <span class="strip__b">live: every look is chosen from what OpenCV just measured</span>
-    <span class="strip__no pop">Sheet <b>2</b> of 5</span>
+    <span class="strip__no pop">Sheet <b>2</b> of 7</span>
   </div>
   <div class="sheet__head">
     <span class="sheet__fig" aria-hidden="true">FIG. 2</span>
-    <h2 id="h-app" class="sheet__title">INSPECT</h2>
+    <h2 id="h-demo" class="sheet__title">DEMO</h2>
+    <p class="sheet__sub">Four steps: choose a photo, watch the agent, read why it did each thing, then sign off what it flagged.</p>
   </div>
-  <div class="desktop">
+  <div class="app">
 
     <div class="taskbar" id="taskbar">
       <div class="taskbar__id"><span class="taskbar__mark" aria-hidden="true"></span><span>job</span></div>
-      <p class="taskbar__status" aria-live="polite"><span id="job-pill" class="pill pill--idle">ready</span><span id="job-text">Pick a photo, set a budget, hit LOOK.</span><span id="job-steps" class="taskbar__steps" aria-hidden="true"></span></p>
+      <p class="taskbar__status" aria-live="polite"><span id="job-pill" class="pill pill--idle">ready</span><span id="job-text">Pick a photo, then press Run.</span><span id="job-steps" class="taskbar__steps" aria-hidden="true"></span></p>
       <div class="taskbar__actions">
+        <a class="btn btn--sm" id="recorded" href="?mock=1#demo" hidden>Watch a recorded run</a>
+        <button class="btn btn--amber btn--sm" id="run-bar" type="button" disabled>Run</button>
+        <button class="btn btn--sm" id="skip" type="button" hidden>Skip to end</button>
         <button class="btn btn--red btn--kill" id="kill" type="button" hidden>KILL</button>
         <button class="btn" id="resume" type="button" hidden>Resume</button>
         <button class="btn btn--sm" id="sound" type="button" aria-pressed="false">Sound: off</button>
       </div>
+      <div id="toasts" class="toasts" role="status" aria-live="polite"></div>
     </div>
 
-    <div class="col col--left">
-      <section class="win pop win--load" aria-labelledby="t-load">
-        <div class="win__bar"><span class="win__fig" aria-hidden="true">FIG. 2.1</span><h3 class="win__title" id="t-load">Input &middot; photo and budget</h3></div>
-        <div class="win__body stack">
-          <div>
-            <h4 class="label"><span class="label__n">1</span> pick a photo</h4>
+    <section class="win pop win--load step" id="step-photo" aria-labelledby="t-load">
+      <div class="win__bar"><span class="step__n" aria-hidden="true">1</span><h3 class="win__title" id="t-load">Choose a photo</h3><span class="state" id="state-1" data-state="waiting">Waiting</span><span class="win__fig" aria-hidden="true">FIG. 2.1</span></div>
+      <div class="win__body stack">
+        <p class="say" id="say-1">Loading the sample photos&hellip;</p>
+        <h4 class="label">Run it yourself <small>any sample or your own photo, an optional budget and drills, then Run the agent</small></h4>
+        <div class="pick">
+          <div class="pick__samples">
             <ul class="gallery" id="gallery" aria-label="Sample photos"></ul>
-            <p class="note" id="gallery-empty" hidden>No sample photos are bundled here yet. Drop your own JPEG or PNG below.</p>
+            <p class="note" id="gallery-empty" hidden>No sample photos are bundled here yet. Drop your own JPEG or PNG.</p>
+          </div>
+          <div class="pick__own">
             <label class="drop" id="drop">
               <input class="vh" type="file" id="file" accept="image/jpeg,image/png">
-              <span class="drop__big">Drop a JPEG or PNG</span>
-              <span class="drop__small">or click to browse &middot; large files are shrunk in your browser first</span>
+              <span class="drop__big">Use your own photo</span>
+              <span class="drop__small">drop a JPEG or PNG here, or click to browse. Large files are shrunk in your browser first.</span>
             </label>
             <p class="note" id="prep" role="status"></p>
           </div>
-
-          <fieldset class="group">
-            <legend class="label"><span class="label__n">2</span> set the budget</legend>
-            <div class="field">
-              <label for="cap-px">Pixel cap <small>(share of full-res pixels)</small></label>
-              <output class="field__out" id="cap-px-out" for="cap-px">30 %</output>
-              <input type="range" id="cap-px" min="2" max="100" step="1" value="30">
-            </div>
-            <fieldset class="presets">
-              <legend>$ cap</legend>
-              <label class="preset"><input class="vh" type="radio" name="usd" value="0.0001"><span>$0.0001</span></label>
-              <label class="preset"><input class="vh" type="radio" name="usd" value="0.001"><span>$0.001</span></label>
-              <label class="preset"><input class="vh" type="radio" name="usd" value="0.01"><span>$0.01</span></label>
-              <label class="preset"><input class="vh" type="radio" name="usd" value="0.05" checked><span>$0.05</span></label>
-            </fieldset>
-            <div class="field">
-              <label for="cap-sec">Seconds cap</label>
-              <output class="field__out" id="cap-sec-out" for="cap-sec">20 s</output>
-              <input type="range" id="cap-sec" min="1" max="30" step="1" value="20">
-            </div>
-          </fieldset>
-
-          <fieldset class="group">
-            <legend class="label"><span class="label__n">3</span> chaos drills <small>(optional)</small></legend>
-            <label class="toggle"><input class="vh" type="checkbox" name="chaos" value="p95_spike"><span class="toggle__ui"></span><span class="toggle__txt"><b>p95_spike</b> Fakes a slow segmenter so the governor must switch models.</span></label>
-            <label class="toggle"><input class="vh" type="checkbox" name="chaos" value="planner_timeout"><span class="toggle__ui"></span><span class="toggle__txt"><b>planner_timeout</b> The planner never answers; the rule planner takes over.</span></label>
-            <label class="toggle"><input class="vh" type="checkbox" name="chaos" value="planner_malformed"><span class="toggle__ui"></span><span class="toggle__txt"><b>planner_malformed</b> The planner sends junk; the validator must reject it.</span></label>
-          </fieldset>
-
-          <button class="btn btn--amber btn--look" id="look" type="button" disabled>LOOK</button>
         </div>
-      </section>
 
-      <section class="win pop win--budget" aria-labelledby="t-budget">
-        <div class="win__bar"><span class="win__fig" aria-hidden="true">FIG. 2.2</span><h3 class="win__title" id="t-budget">Budget</h3></div>
-        <div class="win__body stack">
-          <div class="meter" data-meter="pixels">
-            <div class="meter__head"><span>pixels</span><span><b class="meter__val" data-value="0">0 %</b> <small class="meter__cap">of cap &mdash;</small></span></div>
-            <div class="meter__track" role="progressbar" aria-label="Pixels used, as a share of the cap" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="meter__fill"></div></div>
+        <details class="adv" id="advanced">
+          <summary>Advanced: budget and failure drills <small>(optional)</small></summary>
+          <div class="adv__body">
+            <fieldset class="group">
+              <legend class="label">Budget: how much the agent may spend</legend>
+              <div class="field">
+                <label for="cap-px">Pixel cap <small>(share of the full-resolution pixels it may look at)</small></label>
+                <output class="field__out" id="cap-px-out" for="cap-px">30 %</output>
+                <input type="range" id="cap-px" min="2" max="100" step="1" value="30">
+              </div>
+              <fieldset class="presets">
+                <legend>$ cap <small>(modelled, not billed)</small></legend>
+                <label class="preset"><input class="vh" type="radio" name="usd" value="0.0001"><span>$0.0001</span></label>
+                <label class="preset"><input class="vh" type="radio" name="usd" value="0.001"><span>$0.001</span></label>
+                <label class="preset"><input class="vh" type="radio" name="usd" value="0.01"><span>$0.01</span></label>
+                <label class="preset"><input class="vh" type="radio" name="usd" value="0.05" checked><span>$0.05</span></label>
+              </fieldset>
+              <div class="field">
+                <label for="cap-sec">Seconds cap</label>
+                <output class="field__out" id="cap-sec-out" for="cap-sec">20 s</output>
+                <input type="range" id="cap-sec" min="1" max="30" step="1" value="20">
+              </div>
+            </fieldset>
+
+            <fieldset class="group">
+              <legend class="label">Failure drills: break something on purpose</legend>
+              <label class="toggle"><input class="vh" type="checkbox" name="chaos" value="p95_spike"><span class="toggle__ui"></span><span class="toggle__txt"><b>p95_spike</b> Fakes a slow segmenter, so the governor (the budget-and-speed watchdog) must switch to the fast model.</span></label>
+              <label class="toggle"><input class="vh" type="checkbox" name="chaos" value="planner_timeout"><span class="toggle__ui"></span><span class="toggle__txt"><b>planner_timeout</b> The optional planner never answers; the built-in rule planner takes over.</span></label>
+              <label class="toggle"><input class="vh" type="checkbox" name="chaos" value="planner_malformed"><span class="toggle__ui"></span><span class="toggle__txt"><b>planner_malformed</b> The planner sends junk (a shell command); the allow-list validator must reject it.</span></label>
+            </fieldset>
+
+            <div class="budget" id="budget" aria-label="Budget used so far">
+              <h4 class="label">Budget used so far</h4>
+              <div class="meter" data-meter="pixels">
+                <div class="meter__head"><span>pixels</span><span><b class="meter__val" data-value="0">0 %</b> <small class="meter__cap">of cap &mdash;</small></span></div>
+                <div class="meter__track" role="progressbar" aria-label="Pixels used, as a share of the cap" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="meter__fill"></div></div>
+              </div>
+              <div class="meter" data-meter="usd">
+                <div class="meter__head"><span>$ used</span><span><b class="meter__val" data-value="0">$0</b> <small class="meter__cap">of cap &mdash;</small></span></div>
+                <div class="meter__track" role="progressbar" aria-label="Dollars used, as a share of the cap" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="meter__fill"></div></div>
+              </div>
+              <div class="meter" data-meter="seconds">
+                <div class="meter__head"><span>seconds</span><span><b class="meter__val" data-value="0">0 s</b> <small class="meter__cap">of cap &mdash;</small></span></div>
+                <div class="meter__track" role="progressbar" aria-label="Seconds used, as a share of the cap" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="meter__fill"></div></div>
+              </div>
+              <p class="note">$ is modelled from wall time at $0.339/h, not billed.</p>
+              <dl class="ops" id="ops" aria-label="Per-op latency">
+                <div><dt>warp p50 / p95</dt><dd data-op="warp">&mdash;</dd></div>
+                <div><dt>segment p50 / p95</dt><dd data-op="segment">&mdash;</dd></div>
+                <div><dt>model</dt><dd data-op="model">&mdash;</dd></div>
+              </dl>
+            </div>
           </div>
-          <div class="meter" data-meter="usd">
-            <div class="meter__head"><span>$ used</span><span><b class="meter__val" data-value="0">$0</b> <small class="meter__cap">of cap &mdash;</small></span></div>
-            <div class="meter__track" role="progressbar" aria-label="Dollars used, as a share of the cap" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="meter__fill"></div></div>
+        </details>
+      </div>
+    </section>
+
+    <div class="col col--main">
+      <section class="win pop win--view step" id="step-watch" aria-labelledby="t-view">
+        <div class="win__bar"><span class="step__n" aria-hidden="true">2</span><h3 class="win__title" id="t-view">Watch the agent</h3><span class="state" id="state-2" data-state="waiting">Waiting</span><span class="win__fig" aria-hidden="true">FIG. 2.3</span></div>
+        <div class="win__body stack stack--tight">
+          <div class="vtools">
+            <button class="btn btn--amber btn--look" id="look" type="button" disabled>Run the agent</button>
+            <label class="switch"><input class="vh" type="checkbox" id="heat" checked><span class="switch__ui"></span>heatmap</label>
+            <label class="switch"><input class="vh" type="checkbox" id="tiles" disabled><span class="switch__ui"></span>compare with tiling</label>
+            <details class="key" id="key">
+              <summary>What am I looking at?</summary>
+              <dl class="key__list">
+                <div><dt><b class="key__win"></b></dt><dd>The look the agent is taking now. The numbers on its edges are its size in full-resolution pixels.</dd></div>
+                <div><dt><b class="key__cross"></b> <b class="key__num">n</b></dt><dd>Where it looked, and the step number. The newest step is filled amber.</dd></div>
+                <div><dt><b class="key__ring key__ring--gaze"></b><b class="key__ring key__ring--zoom"></b><b class="key__ring key__ring--verify"></b></dt><dd>Ring colour: white = a new look, blue = zoom in, amber = double-check.</dd></div>
+                <div><dt><b class="key__box key__box--seen"></b><b class="key__box"></b></dt><dd>Candidate regions from the first overview: amber = inspected, grey = not looked at yet.</dd></div>
+                <div><dt><b class="key__tag">L3 &middot; 1:8</b></dt><dd>Pyramid level: the photo at 1/8 size. L0 is full resolution; each level up halves it.</dd></div>
+                <div><dt><span class="ramp"><b></b></span></dt><dd>Heatmap: where OpenCV&rsquo;s saliency map thinks damage is likely (blue low, amber high).</dd></div>
+                <div><dt><b class="key__tile"></b></dt><dd>With &ldquo;compare with tiling&rdquo; on: the 512 px tiles a full tiling scan would check at full resolution.</dd></div>
+              </dl>
+            </details>
           </div>
-          <div class="meter" data-meter="seconds">
-            <div class="meter__head"><span>seconds</span><span><b class="meter__val" data-value="0">0 s</b> <small class="meter__cap">of cap &mdash;</small></span></div>
-            <div class="meter__track" role="progressbar" aria-label="Seconds used, as a share of the cap" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="meter__fill"></div></div>
+          <div class="stage"><canvas id="stage" role="img" aria-label="Photo viewport. Load a photo and press Run."></canvas><img class="pip" id="pip" alt="" aria-hidden="true" hidden></div>
+          <p class="note" id="tiles-note" hidden></p>
+          <div class="narrator" aria-live="polite" aria-atomic="true">
+            <span class="narrator__tag" aria-hidden="true">NOTE</span>
+            <p class="narrator__text" id="narrator">Press Run and the agent&rsquo;s reasoning appears here, one decision at a time, in plain words.</p>
+            <p class="narrator__sub" id="narrator-sub"></p>
           </div>
-          <p class="note">$ modelled at c8g.2xlarge + COOL fee ($0.339/h)</p>
-          <dl class="ops" id="ops" aria-label="Per-op latency">
-            <div><dt>warp p50 / p95</dt><dd data-op="warp">&mdash;</dd></div>
-            <div><dt>segment p50 / p95</dt><dd data-op="segment">&mdash;</dd></div>
-            <div><dt>model</dt><dd data-op="model">&mdash;</dd></div>
-          </dl>
         </div>
       </section>
     </div>
 
-    <div class="col col--right">
-      <section class="win pop win--view" aria-labelledby="t-view">
-        <div class="win__bar"><span class="win__fig" aria-hidden="true">FIG. 2.3</span><h3 class="win__title" id="t-view">Viewport &middot; gaze path</h3></div>
-        <div class="win__body stack">
-          <div class="vtools">
-            <label class="switch"><input class="vh" type="checkbox" id="heat" checked><span class="switch__ui"></span>saliency heatmap</label>
-            <span class="ramp" aria-hidden="true"><i>low</i><b></b><i>high</i></span>
-            <span class="key" aria-hidden="true"><b class="key__box"></b> candidate region</span>
-            <span class="key" aria-hidden="true"><b class="key__num">n</b> gaze step</span>
-          </div>
-          <div class="stage"><canvas id="stage" role="img" aria-label="Photo viewport. Load a photo and press LOOK."></canvas></div>
+    <div class="col col--side">
+      <section class="win pop win--cam" aria-labelledby="t-cam">
+        <div class="win__bar"><span class="win__fig" aria-hidden="true">FIG. 2.3b</span><h3 class="win__title" id="t-cam">Camera: what the agent sees</h3></div>
+        <div class="win__body stack stack--tight">
           <div class="replay">
             <button class="btn btn--sm" id="play" type="button" disabled>Play</button>
             <label class="vh" for="replay">Replay step</label>
             <input type="range" id="replay" min="0" max="0" value="0" disabled>
             <output class="replay__out" id="replay-out" for="replay">step 0 / 0</output>
           </div>
-          <div class="detail" id="step-detail" aria-live="polite"></div>
+          <div class="cam">
+            <figure class="cam__fig">
+              <img class="cam__img" id="cam-img" alt="" width="160" height="160" hidden>
+              <ol class="stages" id="stages" aria-label="Before the first look">
+                <li data-stage="photo">photo received</li>
+                <li data-stage="privacy">privacy blur</li>
+                <li data-stage="pyramid">pyramid L0&ndash;L4</li>
+                <li data-stage="saliency">saliency map</li>
+                <li data-stage="regions">candidate regions</li>
+              </ol>
+              <figcaption class="cam__cap" id="cam-cap">No look yet.</figcaption>
+            </figure>
+            <div class="detail" id="step-detail"></div>
+          </div>
         </div>
       </section>
 
-      <section class="win pop win--trace" aria-labelledby="t-trace">
-        <div class="win__bar"><span class="win__fig" aria-hidden="true">FIG. 2.4</span><h3 class="win__title" id="t-trace">Trace &middot; every move and its cause</h3></div>
+      <section class="win pop win--trace step" id="step-why" aria-labelledby="t-trace">
+        <div class="win__bar"><span class="step__n" aria-hidden="true">3</span><h3 class="win__title" id="t-trace">What it decided and why</h3><span class="state" id="state-3" data-state="waiting">Waiting</span><span class="win__fig" aria-hidden="true">FIG. 2.4</span></div>
         <div class="win__body win__body--dark">
-          <p class="trace__empty" id="trace-empty">waiting for the first move&hellip; every step lands here with the reason it was taken.</p>
+          <p class="say say--dark">One line per decision: <i>because</i> is what caused it, <i>saw</i> is what that look measured.</p>
+          <p class="trace__empty" id="trace-empty">Nothing yet. The first decision lands here as soon as the run starts.</p>
           <ol class="trace" id="trace" role="log" aria-label="Agent trace" aria-live="off"></ol>
+          <details class="words">
+            <summary>Words used here</summary>
+            <dl>
+              <div><dt>entropy</dt><dd>how unsure the segmenter is about a look: 0 = sure, 1 = guessing. Above 0.5 it zooms in.</dd></div>
+              <div><dt>iou</dt><dd>how much two looks&rsquo; damage masks overlap: 1 = the same, 0 = no overlap. Under 0.5 the looks disagree.</dd></div>
+              <div><dt>L0&ndash;L4</dt><dd>pyramid level: L0 is full resolution, L1 half size, L2 a quarter, and so on.</dd></div>
+              <div><dt>governor</dt><dd>the budget-and-speed watchdog. It runs before every look and may switch model, shrink the view or halt.</dd></div>
+              <div><dt>stop rule</dt><dd>stop when the next look is worth less than it would cost.</dd></div>
+              <div><dt>cap-hit</dt><dd>a budget cap (pixels, $, seconds or steps) was reached, so it stopped.</dd></div>
+              <div><dt>kill switch</dt><dd>your KILL button: it halts before the next look and keeps the state for Resume.</dd></div>
+              <div><dt>planner</dt><dd>an optional language-model planner. Its plans must pass an allow-list; if it fails, the built-in rule planner decides.</dd></div>
+            </dl>
+          </details>
         </div>
       </section>
     </div>
 
-    <section class="win pop win--findings" aria-labelledby="t-find">
-      <div class="win__bar"><span class="win__fig" aria-hidden="true">FIG. 2.5</span><h3 class="win__title" id="t-find">Findings &middot; evidence first</h3></div>
+    <section class="win pop win--findings step" id="step-review" aria-labelledby="t-find">
+      <div class="win__bar"><span class="step__n" aria-hidden="true">4</span><h3 class="win__title" id="t-find">Review and sign off</h3><span class="state" id="state-4" data-state="waiting">Waiting</span><span class="win__fig" aria-hidden="true">FIG. 2.5</span></div>
       <div class="win__body stack">
+        <p class="say" id="say-4">Nothing to sign yet. When a run ends, anything critical waits here for a person. The agent cannot approve it.</p>
+        <div class="recap" id="recap" hidden></div>
         <p class="banner"><b>AI-assisted, not an inspection.</b> Measurements are image pixels, not millimetres.</p>
-        <p class="note" id="findings-empty">No findings yet. Evidence (crop and pixel measurements) always comes first; confidence last.</p>
-        <div class="cards" id="findings"></div>
+        <p class="note" id="findings-empty">No findings yet. Each finding shows its evidence first (the crop and pixel measurements), its confidence last.</p>
+        <div class="fgroups" id="findings"></div>
       </div>
     </section>
 
     <section class="win pop win--order" aria-labelledby="t-order">
-      <div class="win__bar"><span class="win__fig" aria-hidden="true">FIG. 2.6</span><h3 class="win__title" id="t-order">Title block &middot; work order</h3></div>
+      <div class="win__bar"><span class="win__fig" aria-hidden="true">FIG. 2.6</span><h3 class="win__title" id="t-order">Work order</h3></div>
       <div class="win__body stack">
         <dl class="tblock tblock--live" aria-label="Drawing status">
           <div><dt>Drawn by</dt><dd>agent</dd></div>
@@ -290,7 +386,7 @@
           <div><dt>Step</dt><dd class="tblock__sheet" id="tb-sheet">0 of 0</dd></div>
           <div><dt>Scale</dt><dd id="tb-scale">overview</dd></div>
         </dl>
-        <div id="done"><p class="note">No job has finished yet. Status, coverage and the work order download appear here.</p></div>
+        <div id="done"><p class="note">No job has finished yet. Its status, coverage and the signed work order appear here.</p></div>
       </div>
     </section>
 
@@ -301,16 +397,22 @@
   <div class="strip" aria-hidden="true">
     <span class="strip__a">Drishyam // method</span>
     <span class="strip__b">one score, five rules, one governor</span>
-    <span class="strip__no pop">Sheet <b>3</b> of 5</span>
+    <span class="strip__no pop">Sheet <b>3</b> of 7</span>
   </div>
   <div class="sheet__head">
     <span class="sheet__fig" aria-hidden="true">FIG. 3</span>
     <h2 id="h-how" class="sheet__title">HOW IT WORKS</h2>
+    <p class="sheet__sub">In one sentence: it looks at the whole photo small, picks the spot most worth a closer look, zooms in when unsure, double-checks what it finds, and stops when the next look is not worth its cost. A watchdog (the governor) enforces the budget, and a person signs off anything critical.</p>
   </div>
   <div class="grid-how">
 
+    <figure class="win pop win--wide win--loop" id="loop">
+      <div class="win__bar"><span class="win__fig" aria-hidden="true">FIG. 3.0</span><h3 class="win__title">The agent loop: perception, decision, action, human</h3></div>
+      <div class="win__body"><img class="loop__img" src="docs/agent-loop.svg" width="1340" height="1236" loading="lazy" alt="The agent loop: OpenCV perception, the decision rules and planner, the action, and the human sign-off."></div>
+    </figure>
+
     <section class="win pop" aria-labelledby="t-score">
-      <div class="win__bar"><span class="win__fig" aria-hidden="true">FIG. 3.1</span><h3 class="win__title" id="t-score">Score</h3></div>
+      <div class="win__bar"><span class="win__fig" aria-hidden="true">FIG. 3.1</span><h3 class="win__title" id="t-score">Score: where to look next</h3></div>
       <div class="win__body stack">
         <p>Every candidate region gets one number: value per millisecond. The agent looks at the biggest one next.</p>
         <p class="formula" aria-label="score of r equals p times s times one plus u times a divided by t-hat">score(r) = <b data-n="1">p</b> &middot; <b data-n="2">s</b> &middot; (1 + <b data-n="3">u</b>) &middot; <b data-n="4">a</b> / <b data-n="5">t&#770;</b></p>
@@ -328,11 +430,11 @@
       <div class="win__bar"><span class="win__fig" aria-hidden="true">FIG. 3.2</span><h3 class="win__title" id="t-rules">Five rules</h3></div>
       <div class="win__body">
         <ol class="rules">
-          <li><b>Next gaze.</b> Take the highest score. Ties go to the larger unseen share, then top-left first, so a run is deterministic.</li>
-          <li><b>Escalate.</b> Zoom one level finer on the same centre when entropy &gt; &tau; (0.5) or the mask is under 64 px, down to L0.</li>
-          <li><b>Verify.</b> When a mask appears at a new level, re-segment and record the IoU. Under 0.5 means one more gaze, or a human for a critical class.</li>
-          <li><b>Stop.</b> When the best remaining score falls below &lambda; = &epsilon; &times; (value so far &divide; cost so far), or any cap is hit.</li>
-          <li><b>Governor.</b> Runs before every step and may override the model, level or batch size. Every override writes a cause into the trace.</li>
+          <li><b>Next gaze.</b> Take the highest score. Ties go to the larger unseen share, then top-left first. That is deterministic for the same timings; live latency changes t&#770;, so two runs can differ.</li>
+          <li><b>Escalate (zoom in).</b> Zoom one pyramid level finer (2&times;) on the same centre when entropy &gt; &tau; (0.5), meaning the segmenter is unsure, or the mask is under 64 px, down to L0 (full resolution).</li>
+          <li><b>Verify (double-check).</b> When a mask appears at a new level, re-segment one level finer and record the IoU (how much the two masks overlap). Under 0.5 means one more look, or a human for a critical class.</li>
+          <li><b>Stop.</b> When the best remaining score falls below &lambda; = &epsilon; &times; (value so far &divide; cost so far), that is, when the next look is worth less than it costs, or any cap is hit.</li>
+          <li><b>Governor.</b> The budget-and-speed watchdog runs before every step and may override the model, level or view size. Every override writes a cause into the trace.</li>
         </ol>
       </div>
     </section>
@@ -344,30 +446,12 @@
           <table class="tbl tbl--rows">
             <thead><tr><th scope="col">Signal</th><th scope="col">Action</th><th scope="col">Trace cause</th></tr></thead>
             <tbody>
-              <tr><td data-label="Signal">p95(segment) &gt; SLA (500 ms)</td><td data-label="Action">Switch to the fast model, then one coarser level</td><td data-label="Trace cause"><span class="chip chip--gov">p95&gt;SLA</span></td></tr>
-              <tr><td data-label="Signal">p95(warp) &gt; 2&times; its running median</td><td data-label="Action">Shrink the gaze size, batch remaining candidates</td><td data-label="Trace cause"><span class="chip chip--gov">warp-spike</span></td></tr>
-              <tr><td data-label="Signal">$ spent &ge; 80% of the cap</td><td data-label="Action">Verify only candidates with a critical class</td><td data-label="Trace cause"><span class="chip chip--gov">usd&ge;80%</span></td></tr>
-              <tr><td data-label="Signal">Pixels or $ at 100% of the cap, or seconds exceeded</td><td data-label="Action">Halt; report coverage and the unvisited regions</td><td data-label="Trace cause"><span class="chip chip--gov">cap-hit</span></td></tr>
-              <tr><td data-label="Signal">Kill switch set</td><td data-label="Action">Halt immediately, state preserved for resume</td><td data-label="Trace cause"><span class="chip chip--gov">kill-switch</span></td></tr>
+              <tr><td data-label="Signal">p95(segment) &gt; SLA (500 ms): the segmenter got slow</td><td data-label="Action">Switch to the fast model, then one coarser level</td><td data-label="Trace cause"><span class="chip chip--gov">p95&gt;SLA</span></td></tr>
+              <tr><td data-label="Signal">p95(warp) &gt; 2&times; its running median: cutting out views got slow</td><td data-label="Action">Shrink the view, batch the remaining candidates</td><td data-label="Trace cause"><span class="chip chip--gov">warp-spike</span></td></tr>
+              <tr><td data-label="Signal">$ spent &ge; 80% of the cap</td><td data-label="Action">Double-check only candidates with a critical class</td><td data-label="Trace cause"><span class="chip chip--gov">usd&ge;80%</span></td></tr>
+              <tr><td data-label="Signal">Pixels or $ at 100% of the cap, or seconds exceeded</td><td data-label="Action">Halt (budget spent); report coverage and the unvisited regions</td><td data-label="Trace cause"><span class="chip chip--gov">cap-hit</span></td></tr>
+              <tr><td data-label="Signal">Kill switch set (you pressed KILL)</td><td data-label="Action">Halt before the next look, state preserved for resume</td><td data-label="Trace cause"><span class="chip chip--gov">kill-switch</span></td></tr>
               <tr><td data-label="Signal">Planner times out or sends invalid JSON</td><td data-label="Action">The rule planner&rsquo;s choice stands</td><td data-label="Trace cause"><span class="chip chip--gov">planner-fallback</span></td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-
-    <section class="win pop win--wide" aria-labelledby="t-auto">
-      <div class="win__bar"><span class="win__fig" aria-hidden="true">FIG. 3.4</span><h3 class="win__title" id="t-auto">Autonomy schedule</h3></div>
-      <div class="win__body">
-        <div class="table-wrap" tabindex="0" role="region" aria-label="Autonomy table">
-          <table class="tbl tbl--auto">
-            <thead><tr><th scope="col" class="th--ok">The agent may</th><th scope="col" class="th--human">Only a human may</th><th scope="col" class="th--never">Never</th></tr></thead>
-            <tbody>
-              <tr>
-                <td data-label="The agent may">Look, zoom, re-run, switch model, change level, batch, draft work orders, request review.</td>
-                <td data-label="Only a human may">Approve, reject, close or downgrade a critical finding (exposed rebar; spalling above the area threshold). Raise a job cap.</td>
-                <td data-label="Never">Run shell commands, call tools outside the MCP allow-list, output millimetres or safety ratings, act on text read from images.</td>
-              </tr>
             </tbody>
           </table>
         </div>
@@ -378,7 +462,7 @@
   <dl class="tblock tblock--mini" aria-hidden="true">
     <div><dt>Drawn by</dt><dd>agent</dd></div>
     <div><dt>Checked by</dt><dd>human reviewer</dd></div>
-    <div><dt>Sheet</dt><dd class="tblock__sheet">3 of 5</dd></div>
+    <div><dt>Sheet</dt><dd class="tblock__sheet">3 of 7</dd></div>
   </dl>
 </section>
 
@@ -386,11 +470,12 @@
   <div class="strip" aria-hidden="true">
     <span class="strip__a">Drishyam // measured</span>
     <span class="strip__b">recall against pixels processed</span>
-    <span class="strip__no pop">Sheet <b>4</b> of 5</span>
+    <span class="strip__no pop">Sheet <b>4</b> of 7</span>
   </div>
   <div class="sheet__head">
     <span class="sheet__fig" aria-hidden="true">FIG. 4</span>
     <h2 id="h-bench" class="sheet__title">BENCHMARKS</h2>
+    <p class="sheet__sub">How much damage each approach finds (recall) against how many pixels it had to process. Higher and further left is better.</p>
   </div>
   <section class="win pop" aria-labelledby="t-bench">
     <div class="win__bar"><span class="win__fig" aria-hidden="true">FIG. 4.1</span><h3 class="win__title" id="t-bench">Recall vs pixels: synthetic test set</h3></div>
@@ -409,7 +494,7 @@
   <dl class="tblock tblock--mini" aria-hidden="true">
     <div><dt>Drawn by</dt><dd>eval harness</dd></div>
     <div><dt>Units</dt><dd>pixels, $, ms</dd></div>
-    <div><dt>Sheet</dt><dd class="tblock__sheet">4 of 5</dd></div>
+    <div><dt>Sheet</dt><dd class="tblock__sheet">4 of 7</dd></div>
   </dl>
 </section>
 
@@ -417,7 +502,7 @@
   <div class="strip" aria-hidden="true">
     <span class="strip__a">Drishyam // where it was wrong</span>
     <span class="strip__b">kept in the open on purpose</span>
-    <span class="strip__no pop">Sheet <b>5</b> of 5</span>
+    <span class="strip__no pop">Sheet <b>5</b> of 7</span>
   </div>
   <div class="sheet__head">
     <span class="sheet__fig" aria-hidden="true">FIG. 5</span>
@@ -430,23 +515,107 @@
   <dl class="tblock tblock--mini" aria-hidden="true">
     <div><dt>Drawn by</dt><dd>eval harness</dd></div>
     <div><dt>Checked by</dt><dd>human reviewer</dd></div>
-    <div><dt>Sheet</dt><dd class="tblock__sheet">5 of 5</dd></div>
+    <div><dt>Sheet</dt><dd class="tblock__sheet">5 of 7</dd></div>
+  </dl>
+</section>
+
+<section id="safety" class="sheet" aria-labelledby="h-safety">
+  <div class="strip" aria-hidden="true">
+    <span class="strip__a">Drishyam // human control</span>
+    <span class="strip__b">what the agent may not do on its own</span>
+    <span class="strip__no pop">Sheet <b>6</b> of 7</span>
+  </div>
+  <div class="sheet__head">
+    <span class="sheet__fig" aria-hidden="true">FIG. 6</span>
+    <h2 id="h-safety" class="sheet__title">SAFETY AND HUMAN CONTROL</h2>
+  </div>
+  <div class="grid-how">
+    <section class="win pop win--wide" aria-labelledby="t-guard">
+      <div class="win__bar"><span class="win__fig" aria-hidden="true">FIG. 6.1</span><h3 class="win__title" id="t-guard">Five protections, all in the demo above</h3></div>
+      <div class="win__body">
+        <ol class="guards">
+          <li><b>Human sign-off.</b> Exposed rebar, and spalling of 40,000 px&sup2; or more, are critical. Only a person can approve, reject, close or downgrade them; the work order stays blocked until they do.</li>
+          <li><b>KILL.</b> The KILL button tells the server to halt before the next look. The trace records the cause <i>kill-switch</i> and the state is kept, so Resume replays the looks made so far.</li>
+          <li><b>Failure drills.</b> Three switches break things on purpose: a slow segmenter (the governor switches to the fast model), a planner that never answers (the rule planner takes over) and a planner that sends a shell command (the allow-list validator rejects it).</li>
+          <li><b>Privacy blur.</b> Faces, people and vehicles are found with OpenCV DNN models and blurred before any look is taken. A photo in which one person fills more than a quarter of the frame is refused: this inspects structures, not people.</li>
+          <li><b>Signed work orders.</b> The work order is signed with HMAC-SHA256 and every sign-off returns a new signature, so an edited order no longer verifies. The download includes the signature.</li>
+        </ol>
+      </div>
+    </section>
+    <section class="win pop win--wide" aria-labelledby="t-auto">
+      <div class="win__bar"><span class="win__fig" aria-hidden="true">FIG. 6.2</span><h3 class="win__title" id="t-auto">Autonomy schedule</h3></div>
+      <div class="win__body">
+        <div class="table-wrap" tabindex="0" role="region" aria-label="Autonomy table">
+          <table class="tbl tbl--auto">
+            <thead><tr><th scope="col" class="th--ok">The agent may</th><th scope="col" class="th--human">Only a human may</th><th scope="col" class="th--never">Never</th></tr></thead>
+            <tbody>
+              <tr>
+                <td data-label="The agent may">Look, zoom, re-run, switch model, change level, batch, draft work orders, request review.</td>
+                <td data-label="Only a human may">Approve, reject, close or downgrade a critical finding (exposed rebar; spalling above the area threshold). Raise a job cap.</td>
+                <td data-label="Never">Run shell commands, call tools outside the MCP allow-list, output millimetres or safety ratings, act on text read from images.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </div>
+  <dl class="tblock tblock--mini" aria-hidden="true">
+    <div><dt>Drawn by</dt><dd>agent</dd></div>
+    <div><dt>Checked by</dt><dd>human reviewer</dd></div>
+    <div><dt>Sheet</dt><dd class="tblock__sheet">6 of 7</dd></div>
+  </dl>
+</section>
+
+<section id="faq" class="sheet" aria-labelledby="h-faq">
+  <div class="strip" aria-hidden="true">
+    <span class="strip__a">Drishyam // questions</span>
+    <span class="strip__b">short answers</span>
+    <span class="strip__no pop">Sheet <b>7</b> of 7</span>
+  </div>
+  <div class="sheet__head">
+    <span class="sheet__fig" aria-hidden="true">FIG. 7</span>
+    <h2 id="h-faq" class="sheet__title">QUESTIONS</h2>
+  </div>
+  <dl class="faq">
+    <div class="faq__item">
+      <dt>Is this live or recorded?</dt>
+      <dd>Live. The photo goes to the API and every look is computed on the spot with stock OpenCV 5. The page then shows the decisions at reading speed; the agent itself is much faster, and the status bar says how long it really took. <a href="?mock=1#demo">Watch a recorded run</a> replays a saved job instead, and is labelled recorded.</dd>
+    </div>
+    <div class="faq__item">
+      <dt>What is OpenCV doing here?</dt>
+      <dd>Everything the agent perceives: the image pyramid (<code>pyrDown</code>), the saliency map that picks the candidate regions, the warp that cuts out each look (<code>warpPerspective</code>), the sharpness check (<code>Laplacian</code>), the segmenter that labels damage, and the face and person detectors for the privacy blur (OpenCV DNN). Every decision is made from those numbers.</dd>
+    </div>
+    <div class="faq__item">
+      <dt>Why not just tile the photo?</dt>
+      <dd>Tiling checks every 512 px tile at full resolution: 48 tiles for a 3000 &times; 2250 photo (turn on &ldquo;compare with tiling&rdquo; after a run to see them). The agent looks at the photo small first and zooms only where something might be, so it processes far fewer pixels. Whether it finds as much is measured in <a href="#benchmarks">Benchmarks</a>: on the synthetic set it finds a little less than tiling, and one downscaled pass does about as well.</dd>
+    </div>
+    <div class="faq__item">
+      <dt>What does it cost?</dt>
+      <dd>The $ figures are modelled from wall time at $0.339/h, not billed. A run of a few seconds comes to a small fraction of a cent.</dd>
+    </div>
+    <div class="faq__item">
+      <dt>What are the limits?</dt>
+      <dd>It measures image pixels, not millimetres, because a photo has no scale reference. It is AI-assisted, not an inspection. The sample photos are synthetic; on real CODEBRIM photos the classical segmenter limits recall for every approach (FIG. 4.2). Uploads are capped at 4.4 MB, and bigger photos are shrunk in your browser first.</dd>
+    </div>
   </dl>
 </section>
 </main>
 
-<footer class="footer">
+<footer class="footer" id="docs" aria-labelledby="h-docs">
   <div class="win">
-    <div class="win__bar"><span class="win__fig" aria-hidden="true">END</span><span class="win__title">About this drawing set</span></div>
+    <div class="win__bar"><span class="win__fig" aria-hidden="true">END</span><h2 class="win__title" id="h-docs">Docs and links</h2></div>
     <div class="win__body stack">
-      <p class="banner banner--honest"><b>Live demo: stock OpenCV 5 on Vercel (x86) &mdash; not COOL.</b> <span id="cool-status">The same code is meant to run from <code>/opt/cool</code> on COOL/Graviton; that run needs an AWS account and has not been done yet.</span></p>
+      <p class="banner banner--honest"><b id="live-where">Live demo: stock OpenCV 5 on Vercel (x86) &mdash; not COOL.</b> <span id="cool-status">The same code is meant to run from <code>/opt/cool</code> on COOL/Graviton; that run needs an AWS account and has not been done yet.</span></p>
       <nav aria-label="Project links">
         <ul class="links">
           <li><a href="https://github.com/vj-io/drishyam" rel="noopener noreferrer">GitHub repo</a></li>
           <li><a href="https://github.com/vj-io/drishyam/blob/main/docs/report.md" rel="noopener noreferrer">Report</a></li>
           <li><a href="https://github.com/vj-io/drishyam/blob/main/docs/PRD.md" rel="noopener noreferrer">PRD</a></li>
+          <li><a href="https://github.com/vj-io/drishyam/blob/main/docs/api-contract.md" rel="noopener noreferrer">API contract</a></li>
           <li><a href="https://github.com/vj-io/drishyam/blob/main/docs/mcp.md" rel="noopener noreferrer">MCP usage</a></li>
-          <li><a href="https://github.com/vj-io/drishyam/releases/latest/download/drishyam-demo.mp4" rel="noopener noreferrer">Demo video (49 s)</a></li>
+          <li><a href="https://github.com/vj-io/drishyam/releases/latest/download/drishyam-demo.mp4" rel="noopener noreferrer">Demo video (MP4 download)</a></li>
+          <li><a href="?mock=1#demo">Recorded run</a></li>
         </ul>
       </nav>
       <p class="note" id="api-status" role="status">Checking the API&hellip;</p>

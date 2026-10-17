@@ -1,5 +1,5 @@
-// Finding cards, drawn as detail callouts. Evidence first (crop, px measurements), confidence last;
-// critical ones wait for a human, whose decision lands on the card as a rubber stamp.
+// Finding cards, drawn as detail callouts and grouped by the region they were found in. Evidence first (crop, px
+// measurements), confidence last; critical ones wait for a human, whose decision lands on the card as a rubber stamp.
 import { h, dataUrl, num } from './dom.js';
 import { countUp, replay, sound } from './fx.js';
 
@@ -8,21 +8,48 @@ const STATE = { draft: 'draft', pending_review: 'needs review', approved: 'appro
 const ISO_UTC = /^(\d{4}-\d\d-\d\d)T(\d\d:\d\d)(:\d\d(\.\d+)?)?Z$/;
 const when = (at) => String(at ?? '').replace(ISO_UTC, '$1 $2 UTC');  // 2026-10-17T06:36:31Z -> 2026-10-17 06:36 UTC
 const px = (v, d = 0) => (num(v) ? `${v.toLocaleString('en-US', { maximumFractionDigits: d })}` : '–');
+// Until the server sends `critical_rule`, the two rules drishyam/findings.py enforces, in words.
+const RULE = { exposed_rebar: 'exposed rebar is always critical', spalling: 'spalling of 40,000 px² or more is critical' };
+export const ruleOf = (f) => f.critical_rule ?? RULE[f.cls] ?? null;
+const regionName = (r) => (r === 's0' ? 'Whole photo (survey look)' : `Region ${r}`);
 
 export class Findings {
-  constructor(list, empty, onReview) {
-    this.list = list;
-    this.empty = empty;
-    this.onReview = onReview;
+  /** `onShow(f)` points the photo at a finding; `history(region)` says which levels that region was looked at. */
+  constructor(list, empty, onReview, onShow, history) {
+    Object.assign(this, { list, empty, onReview, onShow, history });
     this.ready = false;
     this.cards = new Map();
+    this.groups = new Map();
+    this.reasons = new Map();
   }
 
   clear() {
     this.list.replaceChildren();
     this.cards.clear();
+    this.groups.clear();
+    this.reasons.clear();
     this.empty.hidden = false;
     this.ready = false;
+  }
+
+  group(region) {
+    let g = this.groups.get(region);
+    if (!g) {
+      const hist = h('span', { class: 'fgroup__hist' });
+      const cards = h('div', { class: 'cards' });
+      const sec = h('section', { class: 'fgroup', 'data-region': region },
+        h('header', { class: 'fgroup__head' }, h('h4', { class: 'fgroup__t' }, regionName(region)), hist), cards);
+      g = { sec, cards, hist };
+      this.groups.set(region, g);
+      this.list.append(sec);
+    }
+    g.hist.textContent = this.history(region);
+    return g;
+  }
+
+  /** Re-read every region's level history (after a new step). */
+  refresh() {
+    for (const [region, g] of this.groups) g.hist.textContent = this.history(region);
   }
 
   /** A finding event may repeat for the same id (re-measured at a finer level): update that card in place. */
@@ -30,15 +57,16 @@ export class Findings {
     const known = this.cards.get(f.id);
     if (known) return this.update(known, f);
     const parts = this.parts(f);
-    const card = h('article', { 'data-id': f.id }, parts.head, parts.body, parts.conf);
+    const card = h('article', { 'data-id': f.id, tabindex: '-1' }, parts.head, parts.body, parts.conf);
     card.parts = parts;
     this.restyle(card, f);
     if (f.critical) this.addReview(card, f);
     this.cards.set(f.id, card);
     this.empty.hidden = true;
-    this.list.append(card);
+    this.group(f.region ?? '–').cards.append(card);
     this.sync1(card);
     sound.click();
+    return true;
   }
 
   update(card, f) {
@@ -51,11 +79,32 @@ export class Findings {
     this.restyle(card, f);
     this.sync1(card);
     replay(card, 'is-revised');
+    return false;
   }
 
   restyle(card, f) {
     card.finding = f;
     card.className = `finding finding--${f.cls}${f.critical ? ' finding--critical' : ''}`;
+  }
+
+  /** Why a review request was raised for finding `id` (shown on its card above the sign-off). */
+  addReason(id, reason) {
+    const list = this.reasons.get(id) ?? [];
+    if (!list.includes(reason)) list.push(reason);
+    this.reasons.set(id, list);
+    const card = this.cards.get(id);
+    if (card?.review) card.review.why.replaceChildren(...this.why(card.finding));
+  }
+
+  why(f) {
+    const extra = (this.reasons.get(f.id) ?? []).filter((r) => !r.endsWith(' is critical'));
+    return [
+      h('b', {}, 'Why you: '),
+      [ruleOf(f), ...extra.map((r) => (/^iou /.test(r) ? `two looks disagree (${r})` : r))].filter(Boolean).join('; '),
+      num(f.verify_iou) ? `. Verify overlap ${f.verify_iou.toFixed(2)}` : '',
+      f.unconfirmed ? '. Not confirmed at a finer level' : '',
+      '.',
+    ];
   }
 
   /** The finding's length as a dimension line under its crop; the number counts up to the measured value. */
@@ -75,6 +124,8 @@ export class Findings {
     const trigger = f.critical && num(f.critical_step)
       ? h('div', { class: 'finding__trigger' }, h('dt', {}, 'critical at'), h('dd', {}, `step ${f.critical_step}, ${px(f.critical_area_px)} px²`))
       : null;
+    const show = h('button', { class: 'btn btn--sm finding__show', type: 'button' }, 'Show on photo');
+    show.addEventListener('click', () => this.onShow(f));
     return {
       state,
       head: h('header', { class: 'finding__head' },
@@ -91,7 +142,9 @@ export class Findings {
           h('div', {}, h('dt', {}, 'area'), h('dd', {}, `${px(m.area_px)} px²`)),
           h('div', {}, h('dt', {}, 'orientation'), h('dd', {}, `${px(m.orientation_deg, 0)}°`)),
           trigger)),
-      conf: h('p', { class: 'finding__conf' }, 'confidence ', h('b', {}, num(f.confidence) ? `${Math.round(f.confidence * 100)} %` : '–')),
+      conf: h('div', { class: 'finding__foot' },
+        h('p', { class: 'finding__conf' }, 'confidence ', h('b', {}, num(f.confidence) ? `${Math.round(f.confidence * 100)} %` : '–')),
+        show),
     };
   }
 
@@ -102,8 +155,11 @@ export class Findings {
     const reject = h('button', { class: 'btn btn--red btn--sm', type: 'button' }, 'Reject');
     const err = h('p', { class: 'finding__err', role: 'alert' });
     const hint = h('p', { class: 'note' }, 'Waiting for the job to finish before a decision can be signed.');
+    const why = h('p', { class: 'review__why' }, ...this.why(f));
     const box = h('div', { class: 'review' },
       h('span', { class: 'badge' }, 'NEEDS A HUMAN'),
+      why,
+      h('p', { class: 'review__only' }, 'The agent cannot approve this. Only you can.'),
       h('label', { class: 'review__label', for: name.id }, 'Reviewer'),
       name,
       h('div', { class: 'review__btns' }, approve, reject),
@@ -128,7 +184,7 @@ export class Findings {
     };
     approve.addEventListener('click', () => submit('approve'));
     reject.addEventListener('click', () => submit('reject'));
-    card.review = { box, approve, reject, name, hint };
+    card.review = { box, approve, reject, name, hint, why };
     card.append(box);
   }
 
@@ -144,6 +200,16 @@ export class Findings {
     r.hint.textContent = open ? 'Waiting for the job to finish before a decision can be signed.' : card.note ?? f.state;
     r.hint.hidden = open && this.ready;
     r.box.classList.toggle('review--done', !open);
+  }
+
+  /** Scroll to a finding's card and flash it; `edit` also puts the cursor in its reviewer field. */
+  focus(id, edit = false) {
+    const card = this.cards.get(id);
+    if (!card) return;
+    const field = edit && card.review && !card.review.name.disabled ? card.review.name : card;
+    card.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    field.focus({ preventScroll: true });
+    replay(card, 'is-flash');
   }
 
   /** A human's decision lands on the card as a rubber stamp (decorative: the state chip and note carry the text). */

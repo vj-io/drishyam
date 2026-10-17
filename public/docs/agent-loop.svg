@@ -1,0 +1,273 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1340 1236" width="1340" height="1236" role="img" aria-labelledby="t d">
+<title id="t">Drishyam agent loop</title>
+<desc id="d">Perception (OpenCV measurements), decision (rule policy with trace causes, optional LLM planner behind an allow-list validator with rule fallback, MCP client as an alternative decision-maker, governor), action (look, log finding, halt) and the human gate. The amber edge is a measured step: entropy 0.80 &gt; tau 0.5 at step 3 made step 4 an escalation one level finer.</desc>
+<style>
+  .bg { fill: #072247; }
+  .sheet { fill: #0F3B73; stroke: #E8F1FF; stroke-width: 3; }
+  .inner { fill: none; stroke: #B8CDEC; stroke-width: 1; }
+  .frame { fill: none; stroke: #8EAEDB; stroke-width: 1.5; }
+  .box { fill: #0B3264; stroke: #E8F1FF; stroke-width: 2; }
+  .box.gate { stroke: #FF9A8A; }
+  .box.alt { stroke: #9CC8FF; stroke-dasharray: 6 4; }
+  .box.call { fill: #082A55; stroke: #FFC857; }
+  .mini { fill: #082A55; stroke: #B8CDEC; stroke-width: 1.5; }
+  .planned .box, .planned .frame { stroke-dasharray: 8 5; }
+  .tb { fill: #0B3264; stroke: #E8F1FF; stroke-width: 2; }
+  .tbl { stroke: #B8CDEC; stroke-width: 1; }
+  .band { stroke: #8EAEDB; stroke-width: 1; }
+  text { font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, 'DejaVu Sans Mono', monospace; font-size: 12px; fill: #E8F1FF; }
+  .h { font-weight: 700; font-size: 12px; letter-spacing: .06em; }
+  .fl { font-weight: 700; font-size: 12px; letter-spacing: .12em; }
+  .fs { font-size: 11px; fill: #B8CDEC; }
+  .sheet-title { font-family: 'Archivo Narrow', 'Arial Narrow', 'Roboto Condensed', Arial, sans-serif; font-weight: 700; font-size: 30px; letter-spacing: .02em; }
+  .tbig { font-family: 'Archivo Narrow', 'Arial Narrow', 'Roboto Condensed', Arial, sans-serif; font-weight: 700; font-size: 24px; }
+  .sub { fill: #B8CDEC; }
+  .small { font-size: 11px; }
+  .cv { fill: #FFC857; }
+  .rd { fill: #FF9A8A; }
+  .ca { fill: #9CC8FF; }
+  .n { fill: none; stroke: #FFC857; stroke-width: 2; }
+  .nt { fill: #FFC857; font-weight: 700; font-size: 12px; }
+  .edge { fill: none; stroke: #B8CDEC; stroke-width: 1.6; marker-end: url(#arr); }
+  .edge.alt { stroke: #9CC8FF; stroke-dasharray: 6 4; marker-end: url(#arr-sky); }
+  .edge.hot { stroke: #FFC857; stroke-width: 3; marker-end: url(#arr-amber); }
+  .edge.red { stroke: #FF9A8A; marker-end: url(#arr-red); }
+  .edge.plain { marker-end: none; }
+  .lbg { fill: #0F3B73; }
+  .el { font-size: 11px; fill: #9CC8FF; }
+  .el.hot { fill: #FFC857; font-weight: 700; }
+  .el.red { fill: #FF9A8A; }
+  .cross { fill: none; stroke: #E8F1FF; stroke-width: 1.5; }
+</style>
+<defs>
+  <pattern id="g8" width="8" height="8" patternUnits="userSpaceOnUse"><path d="M8 0H0V8" fill="none" stroke="#E8F1FF" stroke-opacity=".055" stroke-width="1"/></pattern>
+  <pattern id="g40" width="40" height="40" patternUnits="userSpaceOnUse"><rect width="40" height="40" fill="url(#g8)"/><path d="M40 0H0V40" fill="none" stroke="#E8F1FF" stroke-opacity=".12" stroke-width="1"/></pattern>
+  <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><path d="M0 1L10 5L0 9Z" fill="#B8CDEC"/></marker>
+  <marker id="arr-sky" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><path d="M0 1L10 5L0 9Z" fill="#9CC8FF"/></marker>
+  <marker id="arr-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 1L10 5L0 9Z" fill="#FFC857"/></marker>
+  <marker id="arr-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><path d="M0 1L10 5L0 9Z" fill="#FF9A8A"/></marker>
+</defs>
+<rect class="bg" width="1340" height="1236"/>
+<rect class="sheet" x="12" y="12" width="1316" height="1212"/>
+<rect x="13.5" y="13.5" width="1313" height="1209" fill="url(#g40)"/>
+<rect class="inner" x="18" y="18" width="1304" height="1200"/>
+<path class="cross" d="M17 26H35M26 17V35"/><circle class="cross" cx="26" cy="26" r="4.5"/>
+<path class="cross" d="M1305 26H1323M1314 17V35"/><circle class="cross" cx="1314" cy="26" r="4.5"/>
+<path class="cross" d="M17 1210H35M26 1201V1219"/><circle class="cross" cx="26" cy="1210" r="4.5"/>
+<path class="cross" d="M1305 1210H1323M1314 1201V1219"/><circle class="cross" cx="1314" cy="1210" r="4.5"/>
+<text x="60" y="74" class="sheet-title" xml:space="preserve">DRISHYAM · AGENT LOOP</text>
+<text x="1280" y="56" class="fs" text-anchor="end" xml:space="preserve">FIG. A-2 · perception → decision → action, and the human gate</text>
+<text x="1280" y="74" class="fs" text-anchor="end" xml:space="preserve">cause names are the literal trace strings in drishyam/agent.py and governor.py</text>
+<line class="tbl" x1="36" y1="92" x2="1304" y2="92"/>
+<rect class="frame" x="60" y="112" width="380" height="736"/>
+<circle class="n" cx="82" cy="132" r="11"/>
+<text class="nt" x="82" y="136" text-anchor="middle">1</text>
+<text x="100" y="136" class="fl" xml:space="preserve">PERCEPTION</text>
+<text x="200.39999999999998" y="136" class="fs" xml:space="preserve">OpenCV measures</text>
+<circle class="n" cx="92" cy="158" r="10"/>
+<text class="nt" x="92" y="162" text-anchor="middle">C</text>
+<text x="110" y="162" class="fs" xml:space="preserve">the crop of each look, from ACTION</text>
+<g class="node" data-box="80 180 340 72">
+<rect class="box" x="80" y="180" width="340" height="72"/>
+<text x="90" y="200" class="h" xml:space="preserve">OVERVIEW · once per job</text>
+<line class="band" x1="80" y1="210" x2="420" y2="210"/>
+<text x="90" y="224" xml:space="preserve"><tspan class="cv">cv2.pyrDown</tspan> L0–L4; saliency at L3</text>
+<text x="90" y="240" xml:space="preserve">≤ 20 candidate windows, prior p each</text>
+</g>
+<g class="node" data-box="80 276 340 72">
+<rect class="box" x="80" y="276" width="340" height="72"/>
+<text x="90" y="296" class="h" xml:space="preserve">QUALITY GATE · imaging.quality</text>
+<line class="band" x1="80" y1="306" x2="420" y2="306"/>
+<text x="90" y="320" xml:space="preserve"><tspan class="cv">cv2.Laplacian</tspan> variance: blur if &lt; 12</text>
+<text x="90" y="336" xml:space="preserve">glare &gt; 20 %, dark &gt; 50 % → not trusted</text>
+</g>
+<g class="node" data-box="80 372 340 88">
+<rect class="box" x="80" y="372" width="340" height="88"/>
+<text x="90" y="392" class="h" xml:space="preserve">SEGMENT · segment_view</text>
+<line class="band" x1="80" y1="402" x2="420" y2="402"/>
+<text x="90" y="416" xml:space="preserve">per-class masks and areas (px)</text>
+<text x="90" y="432" xml:space="preserve">entropy u over defect-like pixels</text>
+<text x="90" y="448" xml:space="preserve">classical, or ONNX on <tspan class="cv">cv2.dnn.ENGINE_NEW</tspan></text>
+</g>
+<g class="node" data-box="80 484 340 72">
+<rect class="box" x="80" y="484" width="340" height="72"/>
+<text x="90" y="504" class="h" xml:space="preserve">VERIFY · look_iou</text>
+<line class="band" x1="80" y1="514" x2="420" y2="514"/>
+<text x="90" y="528" xml:space="preserve"><tspan class="cv">cv2.warpPerspective</tspan> last mask → IoU</text>
+<text x="90" y="544" xml:space="preserve">against the same region's coarser look</text>
+</g>
+<g class="node" data-box="80 736 340 72">
+<rect class="box" x="80" y="736" width="340" height="72"/>
+<text x="90" y="756" class="h" xml:space="preserve">RUNTIME STATS · governor.RuntimeStats</text>
+<line class="band" x1="80" y1="766" x2="420" y2="766"/>
+<text x="90" y="780" xml:space="preserve">p95 ms per op: warp, segment</text>
+<text x="90" y="796" xml:space="preserve">$, pixels and seconds used</text>
+</g>
+<rect class="frame" x="480" y="112" width="420" height="736"/>
+<circle class="n" cx="502" cy="132" r="11"/>
+<text class="nt" x="502" y="136" text-anchor="middle">2</text>
+<text x="520" y="136" class="fl" xml:space="preserve">DECISION</text>
+<text x="603.12" y="136" class="fs" xml:space="preserve">every step records a cause</text>
+<g class="node" data-box="500 180 380 104">
+<rect class="box alt" x="500" y="180" width="380" height="104"/>
+<text x="510" y="200" class="h" xml:space="preserve">MCP CLIENT · ALTERNATIVE DECISION-MAKER</text>
+<line class="band" x1="500" y1="210" x2="880" y2="210"/>
+<text x="510" y="224" xml:space="preserve">an LLM client picks every tool call itself,</text>
+<text x="510" y="240" xml:space="preserve">in place of the rule policy below</text>
+<text x="510" y="256" xml:space="preserve">governor check() still runs before each call</text>
+<text x="510" y="272" xml:space="preserve">no approve tool: it cannot clear a review</text>
+</g>
+<g class="node" data-box="500 356 380 184">
+<rect class="box" x="500" y="356" width="380" height="184"/>
+<text x="510" y="376" class="h" xml:space="preserve">RULE POLICY · agent.py Job.run</text>
+<line class="band" x1="500" y1="386" x2="880" y2="386"/>
+<text x="510" y="400" xml:space="preserve"><tspan class="ca">survey</tspan>          → gaze: one coarse look first</text>
+<text x="510" y="416" xml:space="preserve"><tspan class="ca">best-score</tspan>      → gaze argmax p·s·(1+u)·a/t̂</text>
+<text x="510" y="432" xml:space="preserve"><tspan class="ca">entropy&gt;tau</tspan>     → escalate one level finer</text>
+<text x="510" y="448" xml:space="preserve"><tspan class="ca">area&lt;A_min</tspan>      → escalate one level finer</text>
+<text x="510" y="464" xml:space="preserve">                → mask ≥ A_min: log findings</text>
+<text x="510" y="480" xml:space="preserve"><tspan class="ca">verify-new-mask</tspan> → verify one level finer</text>
+<text x="510" y="496" xml:space="preserve"><tspan class="ca">iou&lt;0.5</tspan>         → verify again, or review</text>
+<text x="510" y="512" xml:space="preserve"><tspan class="ca">stop-rule</tspan>       → halt: best &lt; ε·value/cost</text>
+<text x="510" y="528" xml:space="preserve"><tspan class="ca">exhausted</tspan>       → halt: no candidate left</text>
+</g>
+<g class="node" data-box="500 564 380 132">
+<rect class="box" x="500" y="564" width="380" height="132"/>
+<text x="510" y="584" class="h" xml:space="preserve">PLANNER · optional LLM, every 5 steps</text>
+<line class="band" x1="500" y1="594" x2="880" y2="594"/>
+<rect class="mini" x="510" y="604" width="100" height="44"/>
+<text x="518" y="622" class="small" xml:space="preserve">LLM planner</text>
+<text x="518" y="638" class="small sub" xml:space="preserve">digest only</text>
+<path class="edge " d="M610 626 L640 626"/>
+<rect class="mini" x="640" y="604" width="100" height="44"/>
+<text x="648" y="622" class="small" xml:space="preserve">validate()</text>
+<text x="648" y="638" class="small sub" xml:space="preserve">allow-list</text>
+<path class="edge " d="M740 626 L770 626"/>
+<rect class="mini" x="770" y="604" width="100" height="44"/>
+<text x="778" y="622" class="small" xml:space="preserve">rule policy</text>
+<text x="778" y="638" class="small sub" xml:space="preserve">fallback</text>
+<text x="510" y="670" xml:space="preserve">accepted → cause <tspan class="ca">planner:&lt;strategy&gt;</tspan></text>
+<text x="510" y="686" xml:space="preserve">rejected or timeout → <tspan class="ca">planner-fallback</tspan></text>
+</g>
+<path class="edge " d="M690 564 L690 540"/>
+<g class="node" data-box="500 720 380 104">
+<rect class="box" x="500" y="720" width="380" height="104"/>
+<text x="510" y="740" class="h" xml:space="preserve">GOVERNOR · check() before every step</text>
+<line class="band" x1="500" y1="750" x2="880" y2="750"/>
+<text x="510" y="764" xml:space="preserve"><tspan class="ca">kill-switch</tspan>, <tspan class="ca">cap-hit</tspan> → halt</text>
+<text x="510" y="780" xml:space="preserve"><tspan class="ca">p95&gt;SLA</tspan> → fast model, then a coarser level</text>
+<text x="510" y="796" xml:space="preserve"><tspan class="ca">warp-spike</tspan> → smaller gaze, batch the rest</text>
+<text x="510" y="812" xml:space="preserve"><tspan class="ca">usd≥80%</tspan> → verify critical classes only</text>
+</g>
+<rect class="frame" x="940" y="112" width="360" height="736"/>
+<circle class="n" cx="962" cy="132" r="11"/>
+<text class="nt" x="962" y="136" text-anchor="middle">3</text>
+<text x="980" y="136" class="fl" xml:space="preserve">ACTION</text>
+<text x="1045.84" y="136" class="fs" xml:space="preserve">camera moves and records</text>
+<g class="node" data-box="960 180 320 120">
+<rect class="box" x="960" y="180" width="320" height="120"/>
+<text x="970" y="200" class="h" xml:space="preserve">LOOK · imaging.gaze</text>
+<line class="band" x1="960" y1="210" x2="1280" y2="210"/>
+<text x="970" y="224" xml:space="preserve"><tspan class="cv">cv2.warpPerspective</tspan>: 512² at (x, y, L)</text>
+<text x="970" y="240" xml:space="preserve">gaze: L from survey or best-score</text>
+<text x="970" y="256" xml:space="preserve">escalate, verify: L-1, centred on</text>
+<text x="970" y="272" xml:space="preserve">what the last look measured</text>
+<text x="970" y="288" xml:space="preserve">its crop →     in PERCEPTION</text>
+</g>
+<circle class="n" cx="1063.6" cy="284" r="10"/>
+<text class="nt" x="1063.6" y="288" text-anchor="middle">C</text>
+<g class="node" data-box="960 324 320 88">
+<rect class="box call" x="960" y="324" width="320" height="88"/>
+<text x="970" y="344" class="h" xml:space="preserve">QUALIFYING STEP · measured trace</text>
+<line class="band" x1="960" y1="354" x2="1280" y2="354"/>
+<text x="970" y="368" xml:space="preserve">step 3  gaze      L1  entropy 0.80</text>
+<text x="970" y="384" xml:space="preserve">step 4  escalate  L0  <tspan class="ca">entropy&gt;tau</tspan></text>
+<text x="970" y="400" xml:space="preserve">"entropy 0.80 &gt; 0.5 at L1"</text>
+</g>
+<g class="node" data-box="960 436 280 88">
+<rect class="box" x="960" y="436" width="280" height="88"/>
+<text x="970" y="456" class="h" xml:space="preserve">LOG FINDING</text>
+<line class="band" x1="960" y1="466" x2="1240" y2="466"/>
+<text x="970" y="480" xml:space="preserve">measure.py: px length, width, area</text>
+<text x="970" y="496" xml:space="preserve">class, confidence, box, steps[]</text>
+<text x="970" y="512" xml:space="preserve">critical → <tspan class="rd">review_request</tspan></text>
+</g>
+<g class="node" data-box="960 720 280 104">
+<rect class="box" x="960" y="720" width="280" height="104"/>
+<text x="970" y="740" class="h" xml:space="preserve">HALT → WORK ORDER</text>
+<line class="band" x1="960" y1="750" x2="1240" y2="750"/>
+<text x="970" y="764" xml:space="preserve">coverage + unvisited regions</text>
+<text x="970" y="780" xml:space="preserve">the halt line carries the cause</text>
+<text x="970" y="796" xml:space="preserve">status: completed, halted or</text>
+<text x="970" y="812" xml:space="preserve">awaiting_review</text>
+</g>
+<path class="edge plain" d="M420 216H460M420 312H460M420 520H460M460 216V422A6 6 0 0 1 460 434V520"/>
+<path class="edge " d="M460 372 L500 372"/>
+<path class="edge " d="M420 772 L500 772"/>
+<path class="edge hot" d="M420 428 L500 428"/>
+<path class="edge alt" d="M880 232 L960 232"/>
+<path class="edge hot" d="M880 428 L915 428 L915 280 L960 280"/>
+<path d="M960 368H917" fill="none" stroke="#FFC857" stroke-width="1.5" stroke-dasharray="3 3"/>
+<path class="edge " d="M880 460 L960 460"/>
+<path class="edge " d="M880 508 L905 508 L905 744 L960 744"/>
+<path class="edge " d="M880 772 L960 772"/>
+<rect class="frame" x="60" y="880" width="1240" height="208"/>
+<circle class="n" cx="82" cy="900" r="11"/>
+<text class="nt" x="82" y="904" text-anchor="middle">4</text>
+<text x="100" y="904" class="fl" xml:space="preserve">HUMAN</text>
+<text x="157.2" y="904" class="fs" xml:space="preserve">the only path out of pending_review</text>
+<g class="node" data-box="80 916 360 136">
+<rect class="box gate" x="80" y="916" width="360" height="136"/>
+<text x="90" y="936" class="h" xml:space="preserve">NO OTHER PATH</text>
+<line class="band" x1="80" y1="946" x2="440" y2="946"/>
+<text x="90" y="960" xml:space="preserve">the agent, the planner and MCP</text>
+<text x="90" y="976" xml:space="preserve">cannot approve, reject, close or</text>
+<text x="90" y="992" xml:space="preserve">downgrade a critical finding:</text>
+<text x="90" y="1008" xml:space="preserve">findings.decide raises</text>
+<text x="90" y="1024" xml:space="preserve">ForbiddenTransition unless</text>
+<text x="90" y="1040" xml:space="preserve">actor='human'</text>
+</g>
+<g class="node" data-box="500 916 380 136">
+<rect class="box gate" x="500" y="916" width="380" height="136"/>
+<text x="510" y="936" class="h" xml:space="preserve">INSPECTOR (a person)</text>
+<line class="band" x1="500" y1="946" x2="880" y2="946"/>
+<text x="510" y="960" xml:space="preserve">sees the crop and px measurements first</text>
+<text x="510" y="976" xml:space="preserve">approve / reject: web review or</text>
+<text x="510" y="992" xml:space="preserve">drishyam review → decide(actor='human')</text>
+<text x="510" y="1008" xml:space="preserve"><tspan class="rd">KILL</tspan>: UI button or drishyam kill</text>
+<text x="510" y="1024" xml:space="preserve">→ <tspan class="ca">kill-switch</tspan> before the next look</text>
+<text x="510" y="1040" xml:space="preserve">(evidence before any confidence score)</text>
+</g>
+<g class="node" data-box="960 916 280 72">
+<rect class="box" x="960" y="916" width="280" height="72"/>
+<text x="970" y="936" class="h" xml:space="preserve">WORK ORDER</text>
+<line class="band" x1="960" y1="946" x2="1240" y2="946"/>
+<text x="970" y="960" xml:space="preserve">blocked → ready when none pending</text>
+<text x="970" y="976" xml:space="preserve">re-signed (HMAC) after each review</text>
+</g>
+<g class="node" data-box="960 1004 280 72">
+<rect class="box gate" x="960" y="1004" width="280" height="72"/>
+<text x="970" y="1024" class="h" xml:space="preserve">PENDING_REVIEW</text>
+<line class="band" x1="960" y1="1034" x2="1240" y2="1034"/>
+<text x="970" y="1048" xml:space="preserve">exposed_rebar; spalling ≥ 40 000 px²</text>
+<text x="970" y="1064" xml:space="preserve">the work order stays blocked</text>
+</g>
+<path class="edge red" d="M1240 480 L1265 480 L1265 1040 L1240 1040"/>
+<rect class="lbg" x="1159.6" y="857" width="100.4" height="16"/>
+<text x="1256" y="868" class="el red" text-anchor="end" xml:space="preserve">review_request</text>
+<path class="edge " d="M1100 824 L1100 916"/>
+<path class="edge red" d="M960 1040 L880 1040"/>
+<rect class="lbg" x="896.2" y="1021" width="47.6" height="16"/>
+<text x="920" y="1032" class="el red" text-anchor="middle" xml:space="preserve">review</text>
+<path class="edge " d="M880 952 L960 952"/>
+<rect class="lbg" x="896.2" y="933" width="47.6" height="16"/>
+<text x="920" y="944" class="el" text-anchor="middle" xml:space="preserve">decide</text>
+<path class="edge red" d="M690 916 L690 824"/>
+<rect class="lbg" x="696.0" y="857" width="34.4" height="16"/>
+<text x="700" y="868" class="el red" xml:space="preserve">KILL</text>
+<text x="60" y="1120" class="fs" xml:space="preserve">Amber edge and callout: one deterministic run of tests/test_agent.py::test_opencv_output_changes_the_next_tool_call (conftest scene, FakeClock, pixel_cap=1.0).</text>
+<text x="60" y="1138" class="fs" xml:space="preserve">That test asserts the first such follow-up (step 2, verify-new-mask, L2 → L1) is one level finer, inside the previous look's window, on the same region;</text>
+<text x="60" y="1156" class="fs" xml:space="preserve">steps 4, 8 and 10 of the same run are entropy&gt;tau escalations. A planner event's status is accepted, rejected or fallback; a failed proposal's step cause is planner-fallback.</text>
+<text x="60" y="1196" class="fs" xml:space="preserve"><tspan class="cv">cv2.call</tspan> OpenCV call · <tspan class="ca">cause</tspan> trace cause · amber: the measured qualifying edge · dashed sky: alternative driver · red: human gate, kill</text>
+<text x="1280" y="1196" class="fs" text-anchor="end" xml:space="preserve">SHEET A-2 · DRAWN 2026-10-18 · SCALE NTS</text>
+</svg>
