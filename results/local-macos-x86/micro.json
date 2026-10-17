@@ -418,5 +418,240 @@
    "p99_ms": 55.901,
    "mean_ms": 44.81
   }
- ]
+ ],
+ "job_ops": {
+  "segmenter": "classical-v1",
+  "provenance": {
+   "cv2": "5.0.0",
+   "build_info_sha256": "fe5f9337dbc8663639ee7bcb2deb09359893fc8d2aa5b6a447cee2a0117d2ec7",
+   "cv2_file": "/Users/mac/Documents/Projects/opencv/.claude/worktrees/wf_06edc486-c71-3/.venv/lib/python3.13/site-packages/cv2/__init__.py",
+   "under_opt_cool": false,
+   "build": "stock (not COOL)",
+   "machine": "Darwin 25.6.0 x86_64",
+   "platform": "macOS-26.7.1-x86_64-i386-64bit-Mach-O",
+   "cpu": "Intel(R) Core(TM) i9-9880H CPU @ 2.30GHz",
+   "logical_cpus": 16,
+   "cv2_threads": 16,
+   "python": "3.13.16",
+   "numpy": "2.5.4",
+   "timestamp": "2026-10-17T20:19:11Z",
+   "load_avg": [
+    23.82,
+    19.13,
+    15.69
+   ]
+  },
+  "results": [
+   {
+    "op": "pyrDown",
+    "size": "1024x768",
+    "n": 50,
+    "min_ms": 2.067,
+    "p50_ms": 2.442,
+    "p95_ms": 2.92,
+    "p99_ms": 3.035,
+    "mean_ms": 2.463
+   },
+   {
+    "op": "saliency",
+    "size": "1024x768",
+    "n": 50,
+    "min_ms": 1.224,
+    "p50_ms": 1.347,
+    "p95_ms": 1.883,
+    "p99_ms": 2.15,
+    "mean_ms": 1.404
+   },
+   {
+    "op": "warp",
+    "size": "1024x768",
+    "n": 50,
+    "min_ms": 1.615,
+    "p50_ms": 1.679,
+    "p95_ms": 2.479,
+    "p99_ms": 2.884,
+    "mean_ms": 1.828
+   },
+   {
+    "op": "quality",
+    "size": "1024x768",
+    "n": 50,
+    "min_ms": 0.96,
+    "p50_ms": 1.345,
+    "p95_ms": 3.451,
+    "p99_ms": 4.145,
+    "mean_ms": 1.61
+   },
+   {
+    "op": "segment:accurate",
+    "size": "1024x768",
+    "n": 50,
+    "min_ms": 85.074,
+    "p50_ms": 99.529,
+    "p95_ms": 121.121,
+    "p99_ms": 135.453,
+    "mean_ms": 102.495
+   },
+   {
+    "op": "segment:fast",
+    "size": "1024x768",
+    "n": 50,
+    "min_ms": 39.309,
+    "p50_ms": 51.214,
+    "p95_ms": 60.764,
+    "p99_ms": 65.018,
+    "mean_ms": 51.468
+   },
+   {
+    "op": "downscale",
+    "size": "1024x768",
+    "n": 50,
+    "min_ms": 0.243,
+    "p50_ms": 0.387,
+    "p95_ms": 1.187,
+    "p99_ms": 2.738,
+    "mean_ms": 0.546
+   },
+   {
+    "op": "pyrDown",
+    "size": "2048x1536",
+    "n": 50,
+    "min_ms": 8.503,
+    "p50_ms": 10.761,
+    "p95_ms": 14.016,
+    "p99_ms": 15.479,
+    "mean_ms": 10.972
+   },
+   {
+    "op": "saliency",
+    "size": "2048x1536",
+    "n": 50,
+    "min_ms": 4.398,
+    "p50_ms": 5.658,
+    "p95_ms": 9.604,
+    "p99_ms": 10.253,
+    "mean_ms": 6.274
+   },
+   {
+    "op": "warp",
+    "size": "2048x1536",
+    "n": 50,
+    "min_ms": 1.623,
+    "p50_ms": 1.757,
+    "p95_ms": 2.401,
+    "p99_ms": 2.434,
+    "mean_ms": 1.86
+   },
+   {
+    "op": "quality",
+    "size": "2048x1536",
+    "n": 50,
+    "min_ms": 1.472,
+    "p50_ms": 3.043,
+    "p95_ms": 5.091,
+    "p99_ms": 7.094,
+    "mean_ms": 3.316
+   },
+   {
+    "op": "segment:accurate",
+    "size": "2048x1536",
+    "n": 50,
+    "min_ms": 83.491,
+    "p50_ms": 104.05,
+    "p95_ms": 134.994,
+    "p99_ms": 186.99,
+    "mean_ms": 108.821
+   },
+   {
+    "op": "segment:fast",
+    "size": "2048x1536",
+    "n": 50,
+    "min_ms": 36.621,
+    "p50_ms": 51.319,
+    "p95_ms": 62.674,
+    "p99_ms": 66.87,
+    "mean_ms": 51.25
+   },
+   {
+    "op": "downscale",
+    "size": "2048x1536",
+    "n": 50,
+    "min_ms": 1.134,
+    "p50_ms": 1.518,
+    "p95_ms": 3.135,
+    "p99_ms": 4.83,
+    "mean_ms": 1.749
+   },
+   {
+    "op": "pyrDown",
+    "size": "4000x3000",
+    "n": 50,
+    "min_ms": 33.341,
+    "p50_ms": 36.446,
+    "p95_ms": 40.68,
+    "p99_ms": 41.65,
+    "mean_ms": 36.75
+   },
+   {
+    "op": "saliency",
+    "size": "4000x3000",
+    "n": 50,
+    "min_ms": 14.286,
+    "p50_ms": 20.852,
+    "p95_ms": 28.932,
+    "p99_ms": 30.103,
+    "mean_ms": 21.43
+   },
+   {
+    "op": "warp",
+    "size": "4000x3000",
+    "n": 50,
+    "min_ms": 1.467,
+    "p50_ms": 1.661,
+    "p95_ms": 2.541,
+    "p99_ms": 2.991,
+    "mean_ms": 1.84
+   },
+   {
+    "op": "quality",
+    "size": "4000x3000",
+    "n": 50,
+    "min_ms": 1.432,
+    "p50_ms": 3.108,
+    "p95_ms": 5.017,
+    "p99_ms": 5.432,
+    "mean_ms": 3.246
+   },
+   {
+    "op": "segment:accurate",
+    "size": "4000x3000",
+    "n": 50,
+    "min_ms": 87.844,
+    "p50_ms": 103.28,
+    "p95_ms": 209.503,
+    "p99_ms": 234.464,
+    "mean_ms": 120.608
+   },
+   {
+    "op": "segment:fast",
+    "size": "4000x3000",
+    "n": 50,
+    "min_ms": 42.968,
+    "p50_ms": 67.099,
+    "p95_ms": 162.597,
+    "p99_ms": 192.423,
+    "mean_ms": 77.134
+   },
+   {
+    "op": "downscale",
+    "size": "4000x3000",
+    "n": 50,
+    "min_ms": 37.198,
+    "p50_ms": 42.912,
+    "p95_ms": 61.361,
+    "p99_ms": 82.737,
+    "mean_ms": 47.124
+   }
+  ]
+ }
 }
