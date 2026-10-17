@@ -324,15 +324,25 @@ function renderFailures(list, realList) {
           img ? h('div', { class: 'fail__frame' }, img) : null,
           h('figcaption', {}, h('b', { class: 'fail__sub' }, `(${String.fromCharCode(97 + j)})`), ' ', String(f.what_happened ?? '')));
       })),
-      rules(cases))),
-    real.length ? h('article', { class: 'fail' },
-      h('div', { class: 'fail__fig' }, `FIG. 5.${n}`),
-      h('h4', { class: 'fail__t' }, 'Real-photo failures (described; photos not redistributable)'),
-      h('p', {}, `${real.length} cases from the CODEBRIM evaluation. Its licence does not allow sharing the photos, so each is written out instead.`),
-      h('div', { class: 'fail__cases' }, real.map((f, j) => h('figure', { class: 'fail__case' },
-        h('figcaption', {}, h('b', { class: 'fail__sub' }, `(${String.fromCharCode(97 + j)})`), ' ',
-          `${String(f.category ?? '')}${f.class ? ` · ${String(f.class)}` : ''}. ${String(f.what_happened)}`)))),
-      rules(real)) : null)));
+      rules(cases)))),
+    real.length ? realFailures(real, n) : null));
+}
+
+/** FIG. 5.n: the CODEBRIM failures as text tables (the licence bars sharing the photos, not describing them). */
+function realFailures(real, n) {
+  const table = (label, cols, rows) => h('div', { class: 'table-wrap', tabindex: '0', role: 'region', 'aria-label': label },
+    h('table', { class: 'tbl tbl--tight tbl--rows' }, h('caption', {}, label),
+      h('thead', {}, h('tr', {}, cols.map((t) => h('th', { scope: 'col' }, t)))),
+      h('tbody', {}, rows.map(([head, ...cells]) => h('tr', {}, h('th', { scope: 'row' }, head),
+        cells.map((v, i) => h('td', { 'data-label': cols[i + 1] }, v)))))));
+  const byRule = [...Map.groupBy(real, (f) => String(f.category ?? ''))];
+  return h('div', { class: 'stack' },
+    h('h4', { class: 'label' }, `FIG. 5.${n} · Real-photo failures (described; photos not redistributable)`),
+    h('p', { class: 'note' }, `${real.length} cases from the CODEBRIM evaluation, written out because its licence does not allow sharing the photos.`),
+    table('Real-photo failures', ['photo', 'class', 'what happened'],
+      real.map((f) => [String(f.id ?? ''), String(f.class ?? '–'), String(f.what_happened)])),
+    table('Rules that would catch them', ['failure', 'rule that would catch it'],
+      byRule.map(([category, cases]) => [category, String(cases[0].rule_that_would_catch_it ?? '')])));
 }
 
 export async function initResults() {
