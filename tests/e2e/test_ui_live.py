@@ -80,6 +80,12 @@ class Page:
             self.page.wait_for_timeout(200)
         raise AssertionError(f"job did not finish; pill = {self.status()!r}")
 
+    def recap_in_view(self):
+        return self.page.evaluate("""() => { const top = Math.max(document.getElementById('nav').getBoundingClientRect().bottom,
+            document.getElementById('taskbar').getBoundingClientRect().bottom);
+          return document.getElementById('recap').getBoundingClientRect().top >= top - 1
+            && [...document.querySelectorAll('#recap button')].every((b) => b.getBoundingClientRect().bottom <= innerHeight + 1); }""")
+
     def viewer_in_view(self):
         return self.page.evaluate("""() => { const c = document.getElementById('stage').getBoundingClientRect();
           const bar = document.getElementById('taskbar').getBoundingClientRect();
@@ -114,13 +120,26 @@ def run(base, server_log=None):
         critical = page.locator("#findings .finding--critical").first
         expect(critical).to_be_visible()
         assert status in ("needs sign-off", "halted", "budget spent"), status
-        assert page.evaluate("document.activeElement.id").startswith("rev-"), "the guided run ends in a reviewer field"
         expect(page.locator("#recap")).to_contain_text("What you just saw")
+        page.wait_for_timeout(1500)                       # the smooth scroll to the recap
+        assert page.evaluate("document.activeElement.id") == "sign-off", "the guided run ends on Sign them off"
+        assert p.recap_in_view(), "the recap and its buttons must be on screen at the end of the guided run"
+        page.screenshot(path=str(SHOTS / "live-desktop-done.png"))
+        page.locator("#sign-off").click()
+        assert page.evaluate("document.activeElement.id").startswith("rev-"), "Sign them off goes to a reviewer field"
         critical.locator("input").fill("E2E Engineer")
         critical.get_by_role("button", name="Approve").click()
         expect(critical.locator(".chip--state")).to_have_text("approved", timeout=10000)
-        page.screenshot(path=str(SHOTS / "live-desktop-done.png"))
-        print("ok  guided live run: paced, viewer on screen, findings, critical card, human approval signed by the server")
+        print("ok  guided live run: paced, viewer on screen, findings, recap in view, critical card, human approval signed by the server")
+
+        # Try KILL from the recap: a run shown live whose planner stalls 2 s at step 3, so KILL lands mid-job.
+        page.get_by_role("button", name="Try KILL").click()
+        expect(page.locator("#job-text")).to_contain_text("shown the moment it arrives", timeout=15000)
+        expect(page.locator("#trace .trace__line[data-step='1']")).to_be_visible(timeout=30000)
+        page.locator("#kill").click()
+        expect(page.locator("#job-pill")).to_have_text("halted", ignore_case=True, timeout=15000)
+        expect(page.locator("#trace .trace__line .chip", has_text="kill-switch")).to_have_count(1)
+        print("ok  Try KILL: the live run was halted by the server with kill-switch")
 
         # 2. KILL mid-run reaches the server, which halts before its next look and sends a kill-switch record.
         # planner_timeout parks the job for 2 s at step 3, so the click lands while it is still running.

@@ -287,7 +287,7 @@ img, canvas, svg { max-width: 100%; }
 
 /* the sheet slides out of the plan chest; its number stamps in */
 /* html's scroll-padding already clears the nav; inside the demo the sticky job bar is cleared too (the two add up) */
-#demo .pop { scroll-margin-top: calc(var(--bar, 64px) + 4px); }
+#demo .pop, .recap { scroll-margin-top: calc(var(--bar, 64px) + 4px); }
 .win--view > .win__body { padding: 12px; }
 @keyframes chest { 0% { opacity: 0; transform: translateY(28px); clip-path: inset(0 -40px 100% -40px); } 35% { opacity: 1; } 100% { opacity: 1; transform: none; clip-path: inset(-40px -40px -40px -40px); } }
 /* Hidden-until-scrolled only once app.js has wired the observer (it sets .js), and never in print:
@@ -723,6 +723,7 @@ input:checked + .switch__ui::after { transform: translateX(22px); background: va
 @media (max-width: 1100px) {
   .app { grid-template-columns: minmax(0, 1fr); }
   .taskbar:not([data-mode='running']) { position: relative; top: 0; }
+  .recap { scroll-margin-top: 0; }  /* shown once a run is over, when the job bar no longer sticks here */
   .hero { grid-template-columns: minmax(0, 1fr); }
   .art { max-width: 640px; }
   .grid-how, .bench { grid-template-columns: minmax(0, 1fr); }

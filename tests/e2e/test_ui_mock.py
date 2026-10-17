@@ -17,7 +17,8 @@ Scenarios (a real Chromium, the document served with the production CSP header):
   2. live-API path (no ?mock) against a local stand-in for /api/*: query string, X-Drishyam-Replay header,
      x-amz-content-sha256 on every POST, /api/review tokens, /api/kill {job, kill_token} answered by a kill-switch
      halt, privacy.boxes blur, halt step.
-  3. guided run: pace_ms on the request, the paced-for-viewing label, the viewer in view, hand-off to the reviewer.
+  3. guided run: pace_ms on the request, the paced-for-viewing label, the viewer in view, the critical NOTE held,
+     the recap in view, hand-off to the reviewer, and Try KILL (planner_timeout, shown live) halted by KILL.
   4. keyboard only, 5. KILL after the job had finished, 6. mobile 375 px, 7. prefers-reduced-motion,
   8. heading names, 9. pending states, 10. a COOL file with missing fields, 11. halt governor note.
 Any CSP violation, console error or page error fails the run. wait_for_function is avoided on purpose
@@ -322,6 +323,14 @@ def viewer_in_view(page):
 
 
 BOX = [round(JOB["width"] * 0.4), round(JOB["height"] * 0.4), round(JOB["width"] * 0.2), round(JOB["height"] * 0.2)]
+
+
+def recap_in_view(page):
+    """The recap's top sits below the sticky nav and job bar, and every one of its buttons is on screen."""
+    return page.evaluate("""() => { const top = Math.max(document.getElementById('nav').getBoundingClientRect().bottom,
+        document.getElementById('taskbar').getBoundingClientRect().bottom);
+      return document.getElementById('recap').getBoundingClientRect().top >= top - 1
+        && [...document.querySelectorAll('#recap button')].every((b) => b.getBoundingClientRect().bottom <= innerHeight + 1); }""")
 
 
 def card(page, fid):
@@ -679,10 +688,12 @@ def test_live_api_contract(browser, base):
 
 
 def test_guided(browser, base):
-    """The hero CTA: paced live run (pace_ms), labelled as paced, viewer in view, then the hand-off to a person."""
+    """The hero CTA: paced live run (pace_ms), labelled as paced, viewer in view, the critical finding held on
+    screen, then the recap in view and the hand-off to a person; its Try KILL starts a live run KILL can stop."""
     job = json.loads(JOB_LINES[0])
     job["pace_ms"] = 1000                                  # the server echoes the pacing it applied
-    reset_live([{"lines": [json.dumps(job), *JOB_LINES[1:]], "delay": 0.05}])
+    reset_live([{"lines": [json.dumps(job), *JOB_LINES[1:]], "delay": 0.05},
+                {"lines": JOB_LINES, "delay": 0.25, "killable": True}])
     s = Session(browser, "guided", viewport={"width": 1440, "height": 900})
     p = s.page
     p.goto(f"{base}/")
@@ -699,15 +710,37 @@ def test_guided(browser, base):
     assert p.locator(".trace__line[data-step]").count() < N_STEPS, "a guided run is shown at reading speed, not in a burst"
     expect(p.locator("#narrator")).to_contain_text("whole photo")       # step 1 in plain words
     s.shot("desktop-guided-mid.png")
+    # the first critical finding is the hand-off moment: its NOTE outlasts an ordinary decision (5 s)
+    expect(p.locator("#narrator")).to_contain_text("Critical:", timeout=T)
+    t0 = time.time()
+    until(lambda: "Critical:" not in p.locator("#narrator").inner_text(), "the critical NOTE to give way")
+    held = time.time() - t0
+    assert held >= 7, f"the critical NOTE stayed {held:.1f} s, no longer than an ordinary decision"
     p.click("#skip")
     expect(p.locator("#job-pill")).to_have_text(DONE_LABEL, timeout=T)
+    # it ends on the recap, on screen below the bars, and Sign them off hands over to the reviewer field
+    until(lambda: p.evaluate("document.activeElement.id") == "sign-off", "focus on Sign them off")
+    until(lambda: recap_in_view(p), "the recap and its buttons on screen")
+    expect(p.locator("#recap")).to_contain_text("What you just saw")
+    s.shot("desktop-guided-done.png")
+    p.click("#sign-off")
     until(lambda: p.evaluate("document.activeElement.id") == f"rev-{CRIT[0]}", "focus on the first critical card's reviewer field")
     expect(card(p, CRIT[0]).locator(".review__only")).to_be_visible()
-    expect(p.locator("#recap")).to_be_visible()
-    s.shot("desktop-guided-done.png")
+    # Try KILL: planner_timeout parks the job on the server, the page shows it live, and KILL halts it
+    p.get_by_role("button", name="Try KILL").click()
+    until(lambda: len(LIVE["jobs"]) == 2, "the Try KILL job request", page=p)
+    q = LIVE["jobs"][1]["query"]
+    assert q.get("chaos") == ["planner_timeout"] and q.get("pace_ms") == ["1000"], q
+    expect(p.locator("#job-text")).to_contain_text("shown the moment it arrives", timeout=T)   # the job event cleared the old trace
+    expect(p.locator("#skip")).to_be_hidden()              # live: nothing to skip
+    expect(p.locator(".trace__line[data-step='1']")).to_be_visible(timeout=T)
+    p.click("#kill")
+    until(lambda: LIVE["kills"], "POST /api/kill", page=p)
+    expect(p.locator("#job-pill")).to_have_text("halted", timeout=T)
+    expect(p.locator(".trace__line .chip", has_text=re.compile("^kill-switch$"))).to_have_count(1)
     s.check_clean()
     s.context.close()
-    print("ok  guided run: pace_ms sent, labelled paced, viewer in view, hand-off to the reviewer")
+    print("ok  guided run: pace_ms sent, labelled paced, viewer in view, critical NOTE held, recap in view, hand-off, Try KILL halts")
 
 
 def test_keyboard(browser, base):
@@ -726,6 +759,8 @@ def test_keyboard(browser, base):
     until(lambda: p.evaluate("document.activeElement.id") == "skip", "focus to move to Skip to end")
     p.keyboard.press("Enter")
     expect(p.locator("#job-pill")).to_have_text(DONE_LABEL, timeout=T)
+    until(lambda: p.evaluate("document.activeElement.id") == "sign-off", "focus on Sign them off")
+    p.keyboard.press("Enter")
     until(lambda: p.evaluate("document.activeElement.id") == f"rev-{CRIT[0]}", "focus on the reviewer field")
     p.keyboard.type("K. Board")
     p.keyboard.press("Tab")

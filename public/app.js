@@ -9,7 +9,7 @@ import { countUp, popup, reduced, replay, sound } from './js/fx.js';
 import { initResults } from './js/results.js';
 
 const PACE = 5000;  // ms each decision stays on screen: long enough to read its NOTE
-const HOLD = 2500;  // extra time on the first critical finding of a run
+const HOLD = PACE + 3000;  // the first critical finding's NOTE outlasts every decision: the hand-off to a person
 const GUIDE = 'bridge_03.jpg';  // exposed rebar: the default run ends with critical findings for a human
 const GUIDE_PACE_MS = 1000;  // asks the server to wait this long between looks (pace_ms); its timings exclude the wait
 const NOTE = 'Press Run and the agent’s reasoning appears here, one decision at a time, in plain words.';
@@ -251,10 +251,10 @@ function handle(ev) {
       showCam(0);
       narrate(`Photo received: ${ev.width} × ${ev.height} px. Before any look, faces and people are blurred (${pv.faces_blurred ?? 0} faces and ${pv.people_blurred ?? 0} people here).`);
       if (!S.arrived) {
-        el.text.textContent = [MOCK ? 'Recorded run: replaying a saved job from fixtures (no server), at reading speed.'
-          : ev.pace_ms > 0 ? `Paced for viewing: the agent waits ${ev.pace_ms / 1000} s between looks; timings exclude the wait.`
-            : 'Running live on the server; each decision is shown at reading speed.',
-        S.opts.killHint ? 'Press KILL in this bar while it is looking.' : ''].filter(Boolean).join(' ');
+        el.text.textContent = S.opts.killHint ? `${MOCK ? 'Recorded run' : 'Live'}: each look is shown the moment it arrives. Press KILL in this bar while it is looking.`
+          : MOCK ? 'Recorded run: replaying a saved job from fixtures (no server), at reading speed.'
+            : ev.pace_ms > 0 ? `Paced for viewing: the agent waits ${ev.pace_ms / 1000} s between looks; timings exclude the wait.`
+              : 'Running live on the server; each decision is shown at reading speed.';
       }
       return 900;
     }
@@ -463,7 +463,9 @@ function recap() {
   const breakIt = h('button', { class: 'btn btn--amber btn--sm', type: 'button' }, 'Now break it');
   breakIt.addEventListener('click', () => run({ pace: GUIDE_PACE_MS, chaos: 'planner_malformed,p95_spike' }));
   const tryKill = h('button', { class: 'btn btn--red btn--sm', type: 'button' }, 'Try KILL');
-  tryKill.addEventListener('click', () => run({ pace: GUIDE_PACE_MS, killHint: true }));
+  tryKill.addEventListener('click', () => run({ pace: GUIDE_PACE_MS, chaos: 'planner_timeout', killHint: true }));
+  const sign = h('button', { class: 'btn btn--amber btn--sm', type: 'button', id: 'sign-off' }, 'Sign them off');
+  sign.addEventListener('click', () => findings.focus(S.order.findings.find((f) => f.critical && f.state === 'pending_review')?.id, true));
   el.recap.replaceChildren(
     h('h4', { class: 'recap__t' }, 'What you just saw'),
     h('ul', { class: 'recap__list' },
@@ -472,8 +474,9 @@ function recap() {
       h('li', {}, h('b', {}, `${Math.round(S.done.coverage * 100)} %`), ' of the salient area was seen at some level (the first survey look counts).'),
       h('li', {}, h('b', {}, `$${sm.usd.toFixed(6)}`), ` modelled for ${sm.seconds} s of agent time (wall time × $0.339/h, not billed).`)),
     h('div', { class: 'recap__next' },
+      pendingCount() ? h('p', {}, sign, ' takes you to the first card that needs a person: type your name, then Approve or Reject.') : null,
       h('p', {}, breakIt, ' reruns it with a planner that sends a shell command and a segmenter slowed on purpose.'),
-      h('p', {}, tryKill, ' starts a run you can halt with the KILL button in the bar above.')));
+      h('p', {}, tryKill, ' starts a run shown live, whose planner stalls 2 s at step 3, so you can halt it with KILL in the bar above.')));
   el.recap.hidden = false;
 }
 
@@ -496,10 +499,9 @@ function finish(ev) {
   recap();
   replay(el.tbSheet, 'is-stamped');  // the sheet number stamps in: this run is on file
   sound.stamp();
-  if (S.opts.guided) {  // hand over to the human: the first card that waits for a name, or the summary
-    const first = S.order.findings.find((f) => f.critical && f.state === 'pending_review');
-    if (first) findings.focus(first.id, true);
-    else el.recap.scrollIntoView({ block: 'center', behavior: reduced() ? 'auto' : 'smooth' });
+  if (S.opts.guided) {  // end on what the run showed, in view; its Sign them off button hands over to the human
+    el.recap.scrollIntoView({ block: 'start', behavior: reduced() ? 'auto' : 'smooth' });
+    $('#sign-off')?.focus({ preventScroll: true });
   }
 }
 
@@ -531,7 +533,7 @@ async function run(opts = {}) {
   S.ctl = new AbortController();
   Object.assign(S, { events: [], arrived: null, note: null });
   clearTimeout(Q.timer);
-  Object.assign(Q, { items: [], timer: 0, skip: false });
+  Object.assign(Q, { items: [], timer: 0, skip: Boolean(opts.killHint) });  // a KILL drill is shown live: never behind the job it asks to stop
   const refocus = [el.look, el.runBar, el.resume, el.guided].includes(document.activeElement);  // all hidden or disabled while running
   setMode('running', MOCK ? 'Recorded run: replaying a saved job (no server).'
     : opts.replay ? 'Resuming: re-sending the photo and replaying the moves so far…' : undefined);
