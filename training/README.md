@@ -18,19 +18,20 @@ has to be pushed or uploaded first. It needs a Kaggle account with phone verific
    `run/last.pt`, `best.pt` and `metrics.json` every epoch, and stops starting epochs at 11 h (`--hours 11`), leaving
    time to export inside the 12 h limit. 30 epochs are estimated at 2 to 4 h on a T4 (not measured).
 5. When the version is complete: its **Output** tab > `run/drishyam_dacl10k.zip` (`best.onnx`, `best_fp16.onnx`,
-   `metrics.json`; about 40 MB) > download. The log ends with the parity table and `parity ok`. If it says
-   "resume to continue", make a new version with **Add Input > Your Work > this notebook's output** and run all again:
+   `metrics.json`; about 40 MB) > download. The log ends with the parity table and `parity ok`. The verdict is
+   FP32's: if only FP16 is over its tolerance, the log says so and the zip holds `best.onnx` without `best_fp16.onnx`.
+   If it says "resume to continue", make a new version with **Add Input > Your Work > this notebook's output** and run all again:
    `--resume auto` copies that `last.pt` and carries on.
-6. Hand back, in the repo (the main `.venv`, no torch needed):
+6. Hand back, in the repo (the main `.venv`, no torch needed), giving the zip's path as the browser saved it:
 
    ```
-   unzip drishyam_dacl10k.zip -d /tmp/dacl-model
-   scripts/install_model.sh /tmp/dacl-model/best.onnx /tmp/dacl-model/best_fp16.onnx
+   scripts/install_model.sh ~/Downloads/drishyam_dacl10k.zip
    ```
 
-   It loads both files on OpenCV 5 DNN `ENGINE_NEW` and through `OnnxSegmenter` (FP16 against FP32 too) before
-   touching anything, copies them to `models/drishyam_dacl10k.onnx` and `.fp16.onnx` (and `metrics.json` to
-   `models/drishyam_dacl10k.metrics.json`), writes their sha256, validation mIoU and **CC BY-NC 4.0** licence into
+   It unpacks the zip into a fresh temporary folder, loads both files on OpenCV 5 DNN `ENGINE_NEW` and through
+   `OnnxSegmenter` before touching anything (FP16 against FP32 too; if FP16 is over its tolerance it is dropped and
+   FP32 is installed alone, which Drishyam's fast looks then use as well), copies them to
+   `models/drishyam_dacl10k.onnx` and `.fp16.onnx` (and `metrics.json` to `models/drishyam_dacl10k.metrics.json`), writes their sha256, validation mIoU and **CC BY-NC 4.0** licence into
    `models/README.md` and the Licence line of `README.md`, runs three `drishyam run` jobs with `DRISHYAM_ONNX` set, runs
    `evals.harness` on `data/synth200` twice (classical, then the model) into `runs/model-eval/` (never
    `public/results`), prints the before/after recall table with each run's pixel fraction, and prints the `git` and
@@ -141,6 +142,10 @@ validation mIoU is the only local number). Licence **CC BY-NC 4.0**: keep it out
 <root>/images/{train,validation}/*.jpg
 ```
 
+Images are read in their stored orientation (EXIF ignored, as the toolkit reads them, so the polygons line up), and an
+image whose decoded size differs from its JSON's `imageWidth` x `imageHeight` stops training with its name instead of
+training on misplaced masks.
+
 `--data` may point at a folder one or two levels above `<root>` (what unzipping or a Kaggle dataset gives you).
 On Kaggle, attach a mirror (step 2 above; the notebook searches `/kaggle/input` up to four folders deep).
 Otherwise download (toolkit README; sha256 `dcbcd5fb82699076a2c7f3a72492a9ef798870e0ca1f0c9399360f273ea95260`)
@@ -174,7 +179,9 @@ Defaults follow the paper's baselines (512 x 512, 30 epochs, cosine schedule, 2-
 (lr 1e-3), batch 16, AMP on GPU, seed 0, horizontal flip, brightness/contrast jitter, and 70% of train samples as a random
 zoomed crop of the full-resolution photo (the virtual-PTZ regime). Lower `--batch-size` on an out-of-memory error.
 
-- Every epoch writes `last.pt` (atomic), `best.pt` (best validation mIoU over 19 classes) and `metrics.json`.
+- Every epoch writes `last.pt` (atomic), `best.pt` and `metrics.json`. `best.pt`, the checkpoint that is exported
+  and shipped, is the epoch with the best mean validation IoU of Drishyam's five defect classes (`val_miou5`); the
+  19-class mIoU (`val_miou19`) is kept beside it for comparison with the paper.
   `--hours H` starts no epoch that would end after H hours; `--resume auto` continues from `<out>/last.pt`, or from a
   `last.pt` under `/kaggle/input` (an earlier version's output). The notebook uses both (`--hours 11`).
 - Each epoch prints the IoU of all 19 classes and the mean (the paper's validation mIoU, accumulated over the whole
@@ -197,8 +204,9 @@ logits, H and W dynamic, multiples of 32) and `drishyam_dacl10k.fp16.onnx` (FP16
 `onnxconverter-common`), runs `onnxslim` when installed, prints both sizes, and loads each file on
 `cv2.dnn.readNetFromONNX(..., engine=cv2.dnn.ENGINE_NEW)` at 256 and 512 as a smoke check.
 
-`parity.py` is the FR-4 acceptance check and exits non-zero on failure. It takes 20 fixed 512 x 512 crops of
-`public/samples/*.jpg` and compares `OnnxSegmenter` (probabilities) with PyTorch at 512 (the accurate path) and 256 (the fast
+`parity.py` is the FR-4 acceptance check. It exits 1 when FP32 is over its tolerance (do not install) and 3 when
+FP32 passes and only FP16 is over (install the FP32 file alone: the FP16 margin shrinks as the model trains). It
+takes 20 fixed 512 x 512 crops of `public/samples/*.jpg` and compares `OnnxSegmenter` (probabilities) with PyTorch at 512 (the accurate path) and 256 (the fast
 path, which also proves the graph is dynamic), for FP32 (tolerance max |dprob| 1e-3) and FP16 (5e-2). It also reports
 max |dlogit| of the raw DNN output, the stricter range-independent number (|dprob| is at most about half of it).
 Run it where torch and OpenCV 5 coexist (below), with the repo checked out (it imports `drishyam.segment`).
@@ -219,6 +227,19 @@ export DRISHYAM_ONNX_FP16=/path/to/drishyam_dacl10k.fp16.onnx
 
 These map to `OnnxSegmenter(path, fp16_path)`. No `class_map` is needed because the ONNX already outputs the six classes.
 `drishyam.segment.default_segmenter` picks these variables up automatically.
+
+To take the model off the live site later, run each of these on its own (`vercel env rm` may ask to confirm), then
+redeploy:
+
+```
+vercel env rm DRISHYAM_ONNX production
+```
+
+and, only if FP16 was set:
+
+```
+vercel env rm DRISHYAM_ONNX_FP16 production
+```
 
 Publish to the Hugging Face Hub so the EC2 box can pull it (the weights inherit dacl10k's non-commercial licence, so say
 **CC BY-NC 4.0 (trained on dacl10k)** in the model card, with the `metrics.json` table):
@@ -245,7 +266,7 @@ uv pip install --python /tmp/torchenv/bin/python --no-deps opencv-python-headles
 
 /tmp/torchenv/bin/python training/train_dacl10k.py --synthetic --max-steps 3 --size 128 --batch-size 2 --out /tmp/run
 /tmp/torchenv/bin/python -m pytest tests/test_training.py
-scripts/install_model.sh /tmp/run/onnx/drishyam_dacl10k.onnx /tmp/run/onnx/drishyam_dacl10k.fp16.onnx --n 3
+scripts/install_model.sh /tmp/run/drishyam_dacl10k.zip --n 3
 ```
 
 Then undo the install (smoke weights are noise):

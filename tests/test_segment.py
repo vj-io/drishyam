@@ -122,6 +122,23 @@ def test_onnx_class_map_merges_channels(tiny_onnx):
     assert np.allclose(seg.probs[3:], 0) and np.allclose(seg.probs.sum(axis=0), 1, atol=1e-4)
 
 
+def test_eval_cache_identity_tells_same_named_models_and_the_fp16_net_apart(tiny_onnx, tmp_path):
+    """evals.harness --reuse compares this: every install is models/drishyam_dacl10k.onnx, so the name is not enough."""
+    import onnx
+    from onnx import numpy_helper
+
+    from evals.harness import segmenter_id
+
+    m = onnx.load(tiny_onnx)  # the same graph and file name, other weights: a newer training run
+    m.graph.initializer[0].CopyFrom(numpy_helper.from_array(-numpy_helper.to_array(m.graph.initializer[0]), "w"))
+    retrained = tmp_path / "tiny.onnx"
+    onnx.save(m, retrained)
+    segs = [OnnxSegmenter(tiny_onnx), OnnxSegmenter(tiny_onnx, tiny_onnx), OnnxSegmenter(str(retrained))]
+    assert {s.name for s in segs} == {"onnx:tiny.onnx"}  # summary.json's readable label
+    assert len({segmenter_id(s) for s in segs}) == 3
+    assert segmenter_id(SEG) == SEG.name
+
+
 @pytest.mark.parametrize("engine", ["classical", "onnx"])
 def test_a_shared_segmenter_gives_each_thread_its_own_result(engine, request):
     """default_segmenter() is one instance per process and the web app runs concurrent jobs' steps in

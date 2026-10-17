@@ -48,7 +48,7 @@ ready; needs the owner's AWS account) · **open**.
 | NFR-3 | 100 % planner recovery; restart-safe | `planner.consult`; `--resume` / replay | done (40/40) |
 | NFR-4 | Least privilege, no shell tool, image text never reaches planner, HTTPS, secrets | [security.md](security.md) | done (IAM roles are AWS) |
 | NFR-5 | Reproducibility: lock file, pinned OpenCV, seeds | `uv.lock`, `opencv-python-headless==5.0.0.93`, seeded synth + fake-clock tests | done |
-| NFR-6 | Datasets never committed; permissive deps | `scripts/get_data.sh`, `.gitignore`, `models/README.md` | done |
+| NFR-6 | Datasets never committed; permissive deps | `scripts/get_data.sh`, `.gitignore`, `models/README.md`; deps and bundled models are permissive, except the optional dacl10k-trained segmenter, CC BY-NC 4.0 (non-commercial), once `scripts/install_model.sh` installs it | done |
 | NFR-7 | Same code on stock OpenCV 5, x86 and Arm | CI on `ubuntu-24.04` and `ubuntu-24.04-arm` | done |
 | NFR-8 | Free-tier observability | Vercel runtime logs (one line per job) | done, adapted |
 | NFR-9 | Honesty: pixels only, measured numbers, failure gallery | measurements are `*_px`; UI banner; `public/results/failures.json` | done |

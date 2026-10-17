@@ -16,6 +16,7 @@ saliency overview included for Drishyam) over the L0 pixel count, so exhaustive 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import multiprocessing as mp
 import time
@@ -420,6 +421,14 @@ def headline(scored: dict, primary: str, n: int, label: str) -> str:
 
 
 # ---------------------------------------------------------------- run
+def segmenter_id(seg) -> str:
+    """seg.name plus each ONNX file's name and short sha256: every trained model installs as
+    models/drishyam_dacl10k.onnx, and the FP16 net (if any) serves the 'fast' looks, so the name alone does not say
+    which model made a cache."""
+    files = [Path(p) for p in getattr(seg, "files", ()) if p]
+    return " ".join([seg.name, *(f"{p.name}@{hashlib.sha256(p.read_bytes()).hexdigest()[:12]}" for p in files)])
+
+
 def run(data_dir="data/synth200", n=200, out_dir="public/results", results_dir="results", workers=None,
         chaos=(20, 20, 10), kind="auto", micro_arm="local-macos-x86", primary_boxes="components", reuse=False,
         log=lambda msg: print(msg, flush=True)) -> dict:
@@ -433,21 +442,22 @@ def run(data_dir="data/synth200", n=200, out_dir="public/results", results_dir="
         raise SystemExit(f"refusing to write CODEBRIM image crops under {out_dir}: run `make eval-real`, which keeps them in "
                          "results/codebrim and publishes only summary.json")
     log(f"{len(records)} images, {workers} worker(s); policies: downscale, tiling L2/L1/L0, drishyam {BUDGETS}")
-    seg_name = default_segmenter().name
+    seg = default_segmenter()
+    seg_name, seg_id = seg.name, segmenter_id(seg)
     cache = Path(results_dir) / "eval_per_image.json"
     if reuse and cache.exists():  # re-score and re-draw from the last run's predictions and traces
         saved = json.loads(cache.read_text())
         assert saved["ids"] == [r["id"] for r in records], "cached run is for a different image list"
         cached = saved.get("segmenter", ClassicalSegmenter.name)  # caches from before the field are all classical
-        if cached != seg_name:  # the fault drills below re-run, so they must use the cached run's segmenter too
-            raise SystemExit(f"{cache} holds {cached} predictions, but this process segments with {seg_name}: "
-                             "set or unset DRISHYAM_ONNX as for that run")
+        if cached != seg_id:  # the fault drills below re-run, so they must use the cached run's segmenter too
+            raise SystemExit(f"{cache} holds {cached} predictions, but this process segments with {seg_id}: set "
+                             "DRISHYAM_ONNX and DRISHYAM_ONNX_FP16 as for that run, or run without --reuse")
         results = saved["results"]
         log(f"reusing {cache}")
     else:
         results = pool_map(eval_image, records, workers, log, "eval")
         cache.parent.mkdir(parents=True, exist_ok=True)
-        cache.write_text(json.dumps({"ids": [r["id"] for r in records], "segmenter": seg_name, "results": results},
+        cache.write_text(json.dumps({"ids": [r["id"] for r in records], "segmenter": seg_id, "results": results},
                                     default=lambda o: o.item() if hasattr(o, "item") else str(o)))
 
     keys = ["downscale", *(f"tiling@L{lv}" for lv in TILE_LEVELS), *(f"drishyam@{c}" for c in BUDGETS)]

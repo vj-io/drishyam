@@ -223,6 +223,7 @@ class OnnxSegmenter:
     def __init__(self, path: str, fp16_path: str | None = None, input_size: int = 512,
                  class_map: list[int] | None = None, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)):
         self.name = f"onnx:{path.rsplit('/', 1)[-1]}"
+        self.files = (path, fp16_path)  # what the nets were read from (evals.harness hashes them)
         self.nets = {"accurate": self._load(path)}
         self.nets["fp16"] = self._load(fp16_path) if fp16_path else self.nets["accurate"]
         self.size = input_size

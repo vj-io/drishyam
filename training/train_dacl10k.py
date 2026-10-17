@@ -31,8 +31,8 @@ BCE + Dice, and the 19 -> 6 merge for Drishyam happens at export time (export_on
 # 4. When the version is done: its **Output** tab > `run/drishyam_dacl10k.zip` > download.
 # 5. Stopped early ("resume to continue" in the log)? New version: *Add Input* > Your Work > this notebook's
 #    output, then Save & Run All again; `--resume auto` carries on from its `last.pt`.
-# 6. On your machine, in the repo: `unzip drishyam_dacl10k.zip -d /tmp/m && scripts/install_model.sh
-#    /tmp/m/best.onnx /tmp/m/best_fp16.onnx` (checks, smoke jobs, before/after eval; see training/README.md).
+# 6. On your machine, in the repo: `scripts/install_model.sh ~/Downloads/drishyam_dacl10k.zip` (the path the
+#    browser saved it to; checks, smoke jobs, before/after eval; see training/README.md).
 #
 # The weights are trained on CC BY-NC 4.0 data, so they are for non-commercial use.
 
@@ -40,6 +40,7 @@ BCE + Dice, and the 19 -> 6 merge for Drishyam happens at export time (export_on
 from __future__ import annotations
 
 import argparse
+import glob
 import json
 import math
 import os
@@ -122,10 +123,15 @@ class Dacl10k(Dataset):
 
     def __getitem__(self, i: int):
         d = json.loads(self.ann[i].read_text())
-        img = cv2.imread(str(self.img_dir / d["imageName"]), cv2.IMREAD_COLOR)
+        path = self.img_dir / d["imageName"]
+        # Stored pixel orientation, as the dacl10k toolkit reads it (PIL, no EXIF transpose): the polygons are in it.
+        img = cv2.imread(str(path), cv2.IMREAD_COLOR | cv2.IMREAD_IGNORE_ORIENTATION)
         if img is None:
-            raise FileNotFoundError(self.img_dir / d["imageName"])
+            raise FileNotFoundError(path)
         h, w = img.shape[:2]
+        if (w, h) != (d["imageWidth"], d["imageHeight"]):
+            raise ValueError(f"{path} decodes to {w}x{h} but {self.ann[i].name} says "
+                             f"{d['imageWidth']}x{d['imageHeight']}: its polygons would be misplaced")
         S = self.size
         rng = np.random.default_rng((self.seed, self.epoch, i))  # same sample + epoch => same augmentation
         x0 = y0 = 0
@@ -150,7 +156,8 @@ class Dacl10k(Dataset):
                 x = np.clip(x.astype(np.float32) * rng.uniform(0.75, 1.25) + rng.uniform(-25, 25), 0, 255)
         rgb = cv2.cvtColor(np.ascontiguousarray(x).astype(np.uint8), cv2.COLOR_BGR2RGB)
         rgb = (rgb.astype(np.float32) / 255.0 - MEAN) / STD
-        return torch.from_numpy(rgb.transpose(2, 0, 1).copy()), torch.from_numpy(np.ascontiguousarray(mask)).float()
+        # uint8 mask (a quarter of float32 through worker shared memory and pinning); the loops convert on the device
+        return torch.from_numpy(rgb.transpose(2, 0, 1).copy()), torch.from_numpy(np.ascontiguousarray(mask))
 
 
 class Synthetic(Dataset):
@@ -195,7 +202,7 @@ def evaluate(model, loader, device, groups, amp, max_batches=0):
             break
         with torch.autocast(device.type, dtype=torch.float16, enabled=amp):
             logits = model(x.to(device))
-        pred, gt = logits.float() > 0, y.to(device) > 0.5  # logit > 0 is sigmoid > 0.5
+        pred, gt = logits.float() > 0, y.to(device) > 0  # logit > 0 is sigmoid > 0.5
         c19 = c19 + _counts(pred, gt)
         c5 = c5 + _counts(_merge(pred, groups), _merge(gt, groups))
     return _iou(c19).cpu().numpy(), _iou(c5).cpu().numpy()
@@ -238,8 +245,10 @@ def auto_resume(out: Path, search: Path = Path("/kaggle/input")) -> str | None:
     best.pt and metrics.json beside it so the history carries on."""
     if (out / "last.pt").exists():
         return str(out / "last.pt")
-    found = sorted(search.glob("**/last.pt"), key=lambda f: f.stat().st_mtime) if search.is_dir() else []
+    # glob.glob, not Path.glob: pathlib's ** does not enter symlinked folders, and an input mount may be one
+    found = sorted(map(Path, glob.glob(str(search / "**" / "last.pt"), recursive=True)), key=lambda f: f.stat().st_mtime)
     if not found:
+        print(f"--resume auto: no last.pt in {out} or under {search}, starting from epoch 0")
         return None
     for name in ("last.pt", "best.pt", "metrics.json"):
         if (found[-1].parent / name).exists():
@@ -307,7 +316,7 @@ def main(argv=None):
         model.train()
         t0, run = time.time(), 0.0
         for x, y in train_dl:
-            x, y = x.to(device, non_blocking=True), y.to(device, non_blocking=True)
+            x, y = x.to(device, non_blocking=True), y.to(device, non_blocking=True).float()
             with torch.autocast(device.type, dtype=torch.float16, enabled=amp):
                 logits = model(x)
             logits = logits.float()
@@ -325,22 +334,23 @@ def main(argv=None):
                 break
 
         iou19, iou5 = evaluate(model, val_dl, device, groups, amp, max_batches=2 if a.max_steps else 0)
-        miou = float(np.nanmean(iou19))
-        print(f"epoch {epoch} done in {time.time() - t0:.0f}s  val mIoU(19) {miou:.4f}  "
-              f"Drishyam-5 mean {float(np.nanmean(iou5)):.4f}")
+        miou, miou5 = float(np.nanmean(iou19)), float(np.nanmean(iou5))
+        print(f"epoch {epoch} done in {time.time() - t0:.0f}s  val mIoU(19) {miou:.4f}  Drishyam-5 mean {miou5:.4f}")
         for n, v in zip(names, iou19):
             print(f"  {n:<14}{v:.3f}")
         for n, v in zip(["crack", "spalling", "efflorescence", "exposed_rebar", "corrosion"], iou5):
             print(f"  [merged] {n:<14}{v:.3f}")
-        history.append({"epoch": epoch, "step": step, "train_loss": run, "val_miou19": miou,
+        history.append({"epoch": epoch, "step": step, "train_loss": run, "val_miou19": miou, "val_miou5": miou5,
                         "iou19": dict(zip(names, map(float, iou19))), "iou5": list(map(float, iou5))})
-        best = max(best, miou)
+        # best.pt is what ships: chosen on the five defects the exported graph outputs, not on all 19 classes
+        best = max(best, miou5)
         ck = {"model": model.state_dict(), "opt": opt.state_dict(), "sched": sched.state_dict(),
               "scaler": scaler.state_dict(), "epoch": epoch, "step": step, "best": best, "arch": a.arch,
-              "encoder": a.encoder, "classes": C, "names": names, "val_miou19": miou, "args": vars(a)}
+              "encoder": a.encoder, "classes": C, "names": names, "val_miou19": miou, "val_miou5": miou5,
+              "args": vars(a)}
         torch.save(ck, out / "last.pt.tmp")
         os.replace(out / "last.pt.tmp", out / "last.pt")  # every epoch; a killed session never leaves a torn file
-        if miou >= best:
+        if miou5 >= best:
             torch.save(ck, out / "best.pt")
         (out / "metrics.json").write_text(json.dumps(history, indent=1))
         if a.max_steps and step >= a.max_steps:
@@ -348,7 +358,7 @@ def main(argv=None):
         if a.hours and epoch + 1 < a.epochs and time.time() - t_run + (time.time() - t0) > a.hours * 3600:
             print(f"--hours {a.hours}: stopping after epoch {epoch}, the next would end too late; resume to continue")
             break
-    print(f"checkpoints in {out}  (best val mIoU {best:.4f})")
+    print(f"checkpoints in {out}  (best.pt: Drishyam-5 val mIoU {best:.4f})")
 
 
 def tool(script: str, *args) -> int:
@@ -388,7 +398,7 @@ if __name__ == "__main__":
     else:
         print(f"no GPU: training on CPU, fine for --synthetic smoke runs only (torch {torch.__version__})")
 
-# %% Train: <out>/last.pt and metrics.json every epoch, best.pt at the best validation mIoU
+# %% Train: <out>/last.pt and metrics.json every epoch, best.pt at the best mean IoU of Drishyam's 5 defects
 if __name__ == "__main__":
     main(FLAGS)
 
@@ -407,20 +417,26 @@ if __name__ == "__main__":
     for i in range(4):
         img = cv2.imread(str(val[i])) if i < len(val) else noise.integers(0, 256, (576, 768, 3), dtype=np.uint8)
         cv2.imwrite(str(samples / f"{i}.jpg"), cv2.resize(img, (768, 576), interpolation=cv2.INTER_AREA))
-    PARITY_OK = tool("parity.py", "--ckpt", CKPT, "--onnx", FP32, *(["--onnx-fp16", FP16] if FP16.exists() else []),
-                     "--samples", samples, "--n", 4) == 0
+    PARITY = tool("parity.py", "--ckpt", CKPT, "--onnx", FP32, *(["--onnx-fp16", FP16] if FP16.exists() else []),
+                  "--samples", samples, "--n", 4)
+    PARITY_OK = PARITY in (0, 3)  # 3 is parity.FP16_OVER: FP32 within tolerance, only FP16 over (it is left out)
 
-# %% Package: <out>/drishyam_dacl10k.zip holds best.onnx, best_fp16.onnx and metrics.json
+# %% Package: <out>/drishyam_dacl10k.zip holds best.onnx, best_fp16.onnx (if its parity passed) and metrics.json
 if __name__ == "__main__":
     ZIP = OUT / "drishyam_dacl10k.zip"
     with zipfile.ZipFile(ZIP, "w", zipfile.ZIP_DEFLATED) as z:
         for src, name in ((FP32, "best.onnx"), (FP16, "best_fp16.onnx"), (OUT / "metrics.json", "metrics.json")):
-            if src.exists():
+            if src.exists() and (src != FP16 or PARITY == 0):
                 z.write(src, name)
     print(f"{ZIP}: {', '.join(z.namelist())}, {ZIP.stat().st_size / 1e6:.1f} MB")
-    print("parity ok" if PARITY_OK else "PARITY FAILED (table above): do not install these weights")
-    print("next, on your machine in the repo, with the zip downloaded there:")
-    print("  unzip drishyam_dacl10k.zip -d /tmp/dacl-model")
-    print("  scripts/install_model.sh /tmp/dacl-model/best.onnx /tmp/dacl-model/best_fp16.onnx")
+    if PARITY == 0:
+        print("parity ok")
+    elif PARITY_OK:
+        print("FP32 parity ok, FP16 over its tolerance (table above): best_fp16.onnx is left out of the zip, so "
+              "Drishyam's fast looks will use the FP32 net")
+    else:
+        print("PARITY FAILED (table above): do not install these weights")
+    print("next, on your machine in the repo, with the zip in ~/Downloads (or give its path):")
+    print("  scripts/install_model.sh ~/Downloads/drishyam_dacl10k.zip")
     if not NOTEBOOK and not PARITY_OK:
         sys.exit(1)
