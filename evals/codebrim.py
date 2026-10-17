@@ -6,13 +6,15 @@ can carry several flags; it becomes one ground-truth entry per flag, so a spall 
 a spalling box and an exposed_rebar box (the same convention `evals.synth` uses). The zip also carries macOS
 `__MACOSX/._*` resource forks named like the real files; they are skipped.
 
-    python -m evals.codebrim --root data/codebrim --out data/eval200.txt
+    python -m evals.codebrim --unpack data/CODEBRIM_original_images.zip --root data/codebrim --out data/codebrim/eval200.txt
 """
 from __future__ import annotations
 
 import argparse
 import re
 import xml.etree.ElementTree as ET
+import zipfile
+import zlib
 from pathlib import Path
 
 import numpy as np
@@ -49,6 +51,44 @@ def parse_xml(text: str) -> dict:
             "width": int(float(size.findtext("width", "0"))) if size is not None else 0,
             "height": int(float(size.findtext("height", "0"))) if size is not None else 0,
             "boxes": boxes}
+
+
+def _members(z: zipfile.ZipFile, size: int):
+    """(basename, bytes) for every real image and annotation in the release zip.
+
+    The zip was written without zip64 records, so offsets past 4 GiB wrap at 2**32 and zipfile places each
+    entry 2**32 off (one way or the other). Each entry is tried at every in-file candidate; zipfile checks the
+    local header's file name and, on read, the CRC, so a wrong candidate cannot pass.
+    """
+    for info in z.infolist():
+        name = Path(info.filename).name
+        if info.is_dir() or "__MACOSX" in info.filename or name.startswith("._") \
+                or Path(name).suffix.lower() not in IMAGE_SUFFIXES | {".xml"}:
+            continue
+        reported = info.header_offset
+        for off in (reported, reported - 2**32, reported + 2**32):
+            if not 0 <= off < size:
+                continue
+            info.header_offset, info._end_offset = off, None  # _end_offset: zipfile's overlap guard trusts the wrapped offsets
+            try:
+                yield name, z.read(info)
+                break
+            except (zipfile.BadZipFile, zlib.error):
+                continue
+        else:
+            raise zipfile.BadZipFile(f"{info.filename}: no valid local header at any offset")
+
+
+def unpack(zip_path, root) -> int:
+    """Extract images to root/images and annotations to root/annotations (basenames only). Returns the count."""
+    root, n = Path(root), 0
+    with zipfile.ZipFile(zip_path) as z:
+        for name, data in _members(z, Path(zip_path).stat().st_size):
+            out = root / ("annotations" if name.endswith(".xml") else "images") / name
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_bytes(data)
+            n += 1
+    return n
 
 
 def load(root) -> list[dict]:
@@ -114,12 +154,15 @@ def load_eval(root, list_file) -> list[dict]:
 
 def main(argv=None) -> None:
     ap = argparse.ArgumentParser(prog="python -m evals.codebrim", description="Select the CODEBRIM eval subset.")
+    ap.add_argument("--unpack", metavar="ZIP", help="first extract the release zip into --root")
     ap.add_argument("--root", default="data/codebrim")
     ap.add_argument("--out", default="data/eval200.txt")
     ap.add_argument("--n", type=int, default=200)
     ap.add_argument("--seed", type=int, default=7)
     ap.add_argument("--min-per-class", type=int, default=40)
     a = ap.parse_args(argv)
+    if a.unpack:
+        print(f"unpacked {unpack(a.unpack, a.root)} images and annotations from {a.unpack} to {a.root}")
     records = load(a.root)
     if not records:
         raise SystemExit(f"no annotated images found under {a.root}; run `make data` first")

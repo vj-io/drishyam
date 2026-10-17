@@ -1,5 +1,6 @@
 """Evaluation harness, CODEBRIM loader and parity tool: matching rule, tiling accounting, an end-to-end tiny run."""
 import json
+import zipfile
 
 import cv2
 import numpy as np
@@ -233,6 +234,23 @@ def test_codebrim_load_and_seeded_selection(tmp_path):
     assert [r["id"] for r in codebrim.load_eval(tmp_path, out)] == [r["id"] for r in subset]
 
 
+
+def test_codebrim_unpack_survives_wrapped_offsets(tmp_path):
+    """The release zip's offsets wrap at 2**32; every entry must still come out intact, forks skipped, paths flattened."""
+    zp = tmp_path / "release.zip"
+    with zipfile.ZipFile(zp, "w") as z:
+        z.writestr("original_dataset/images/image_0000001.jpg", b"\xff\xd8jpeg")
+        z.writestr("original_dataset/annotations/image_0000001.xml", XML)
+        z.writestr("__MACOSX/original_dataset/annotations/._image_0000001.xml", b"\x00\x05\x16\x07")
+        z.writestr("../../escape.xml", "<annotation/>")
+    with zipfile.ZipFile(zp) as z:
+        for i, info in enumerate(z.infolist()):  # how zipfile sees the real file: some +2**32, some as stored
+            info.header_offset += 2**32 if i % 2 == 0 else 0
+        got = dict(codebrim._members(z, zp.stat().st_size))
+    assert got == {"image_0000001.jpg": b"\xff\xd8jpeg", "image_0000001.xml": XML.encode(), "escape.xml": b"<annotation/>"}
+    assert codebrim.unpack(zp, tmp_path / "out") == 3
+    assert sorted(p.relative_to(tmp_path / "out").as_posix() for p in (tmp_path / "out").rglob("*.*")) == \
+        ["annotations/escape.xml", "annotations/image_0000001.xml", "images/image_0000001.jpg"]
 
 def test_harness_refuses_to_publish_codebrim_crops(tmp_path):
     """CODEBRIM's licence bars redistributing its images, so the gallery crops must never land under public/."""
