@@ -135,7 +135,7 @@ async def test_every_tool_on_a_bridge_photo(d, tmp_path):
     gid = await gaze_with_rebar(d, job)  # an accurate segmentation that shows exposed rebar
     m, _ = await d.ok("measure", job=job, gaze_id=gid, cls="exposed_rebar")
     assert m["unit"] == "L0 pixels" and m["measure"]["area_px"] > 0
-    v, _ = await d.ok("verify", job=job, gaze_id=gid)
+    v, _ = await d.ok("verify", job=job, gaze_id=gid, why="new exposed_rebar mask at L1;\n confirming at L0")
     assert (
         v["level"] == 0
         and v["against_level"] == 1
@@ -169,6 +169,24 @@ async def test_every_tool_on_a_bridge_photo(d, tmp_path):
     assert all(t["cause"] and "runtime" in t and "pixels_used" in t for t in trace[1:])
     review = next(t for t in trace if t.get("tool") == "request_human_review")
     assert review["review_request"] == {"finding_id": "f1", "reason": "rebar looks exposed"}
+    # The client's `why` is the step's rationale: the trace says what measurement each call answered.
+    verify_rec = next(t for t in trace if t.get("tool") == "verify")
+    assert verify_rec["rationale"] == "new exposed_rebar mask at L1; confirming at L0"
+    assert verify_rec["cause"] == "mcp-call" and verify_rec["verify"]["iou"] == v["iou"]
+    assert on_disk["not_assessed"] == [] and wo["work_order"]["not_assessed"] == []
+
+
+async def test_why_is_optional_bounded_and_printable(d, tmp_path):
+    job = await d.open()
+    g, _ = await d.ok("gaze", job=job, x=1500, y=1000, level=2, why="prior 0.81, the top overview candidate")
+    await d.ok("gaze", job=job, x=1500, y=1000, level=1)  # no why: allowed, rationale stays empty
+    r, _ = await d.raw("gaze", job=job, x=1500, y=1000, level=1, why="x" * 201)
+    assert r.is_error
+    await d.refused("enhance", "printable", job=job, gaze_id=g["gaze"], why="bell\x07")
+    await d.ok("set_budget", job=job, seconds_cap=12, why="two looks left; capping the clock")
+    looks = [t for t in trace_of(tmp_path, job) if t.get("tool") in ("gaze", "set_budget")]
+    assert [t["rationale"] for t in looks] == [
+        "prior 0.81, the top overview candidate", "", "two looks left; capping the clock"]
 
 
 async def test_a_human_decision_survives_a_redraft(d, tmp_path):
