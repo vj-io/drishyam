@@ -314,10 +314,12 @@ def op_costs(rows: list[dict], w: int, h: int) -> dict[str, float]:
 
 
 # ---------------------------------------------------------------- failure drills
-def run_chaos(img: np.ndarray, kind: str) -> dict:
-    """One Drishyam job with a injected fault; did it recover / did the governor respond?"""
+def run_chaos(img: np.ndarray, kind: str, costs: dict | None = None) -> dict:
+    """One Drishyam job with a injected fault; did it recover / did the governor respond? With `costs` (--cost-model
+    fixed) the job runs on the eval's virtual clock, so it takes the eval's path to the injection step on any load."""
     over = {"planner_timeout_s": 0.2} if kind == "planner_timeout" else {}
-    job = Job(img, JobConfig(pixel_cap=1.0, thumbs=False, chaos=(kind,), **over))
+    cfg = JobConfig(pixel_cap=1.0, thumbs=False, chaos=(kind,), **over)
+    job = Job(img, cfg) if costs is None else FixedCostJob(img, cfg, costs)
     events = list(job.run())
     steps = [e for e in events if e["type"] == "step" and e["decision"]["action"] != "halt"]
     completed = events[-1]["type"] == "done"
@@ -341,9 +343,10 @@ def run_chaos(img: np.ndarray, kind: str) -> dict:
     return out
 
 
-def chaos_task(arg: tuple[dict, str]) -> dict:
-    rec, kind = arg
-    return {"id": rec["id"], **run_chaos(cv2.imread(rec["path"], cv2.IMREAD_COLOR), kind)}
+def chaos_task(arg: tuple[dict, str, list | None]) -> dict:
+    rec, kind, rows = arg
+    img = cv2.imread(rec["path"], cv2.IMREAD_COLOR)
+    return {"id": rec["id"], **run_chaos(img, kind, None if rows is None else op_costs(rows, img.shape[1], img.shape[0]))}
 
 
 # ---------------------------------------------------------------- pool
@@ -638,7 +641,7 @@ def run(data_dir="data/synth200", n=200, out_dir="public/results", results_dir="
     eligible = [rec for rec, res in zip(records, results, strict=True)
                 if sum(t["action"] != "halt" for t in res["configs"][full]["trace"]) >= 7]
     wanted = [("planner_timeout", chaos[0]), ("planner_malformed", chaos[1]), ("p95_spike", chaos[2])]
-    jobs = [(eligible[i % len(eligible)], k) for k, cnt in wanted for i in range(cnt)] if eligible else []
+    jobs = [(eligible[i % len(eligible)], k, rows) for k, cnt in wanted for i in range(cnt)] if eligible else []
     log(f"fault drills: {len(jobs)} jobs on {len(eligible)} long-running images")
     drills = pool_map(chaos_task, jobs, workers, log, "drills") if jobs else []
 

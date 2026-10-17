@@ -169,6 +169,10 @@ def test_chaos_drills_recover(scene):
     assert out["fired"] and out["ok"] and out["detail"]["reason"] == "timeout"
     spike = harness.run_chaos(scene, "p95_spike")
     assert spike["fired"] and spike["ok"]
+    costs = harness.op_costs(harness.cost_rows("local-macos-x86", "classical-v1"), scene.shape[1], scene.shape[0])
+    for kind in ("planner_timeout", "p95_spike"):  # on the fixed costs a drill takes the same path on any machine load
+        a, b = (harness.run_chaos(scene, kind, costs) for _ in range(2))
+        assert a == b and a["fired"] and a["ok"]
 
 
 def test_governor_activity_counts_overrides_noted_on_halt_records():
