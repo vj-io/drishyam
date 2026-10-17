@@ -23,6 +23,12 @@ out() {
 
 case ${1:-} in
   deploy)
+    # The stack only works with the app-side changes in docs/aws.md: without them KILL never reaches the
+    # job, each environment signs with its own key and every browser POST gets 403.
+    grep -q DRISHYAM_KILL_TABLE drishyam/web.py && grep -q x-amz-content-sha256 public/js/api.js || {
+      echo "app side not merged: drishyam/web.py must read DRISHYAM_KILL_TABLE and public/js/api.js must send x-amz-content-sha256 (docs/aws.md)" >&2
+      exit 1
+    }
     acct=$(aws sts get-caller-identity --query Account --output text)
     [ "$acct" = "$ACCOUNT" ] || { echo "profile $AWS_PROFILE is account $acct, not $ACCOUNT" >&2; exit 1; }
     limit=$(aws lambda get-account-settings --query AccountLimit.ConcurrentExecutions --output text)
@@ -43,7 +49,7 @@ EOF
     fi
     commit=$(git rev-parse HEAD)$(git diff --quiet HEAD || echo -dirty)
     (cd infra && $CDK bootstrap "aws://$ACCOUNT/$AWS_REGION" &&
-      $CDK deploy "$STACK" --require-approval never -c reserved_concurrency="$RESERVED" -c commit="$commit")
+      $CDK deploy "$STACK" -c reserved_concurrency="$RESERVED" -c commit="$commit")  # asks before IAM changes
     echo "site:   $(out Url)"
     echo "alerts: aws sns subscribe --topic-arn $(out AlertTopicArn) --protocol email --notification-endpoint YOUR_EMAIL --profile $AWS_PROFILE --region us-east-1"
     ;;

@@ -14,6 +14,8 @@ Three parts depend on app changes made outside `infra/`, and the deploy is only 
 and keep KILL flags in the table named by `DRISHYAM_KILL_TABLE` (otherwise each Lambda environment signs
 with its own key and KILL never reaches the job), and must print one EMF line per job for the dashboard;
 `public/js/api.js` must send `x-amz-content-sha256` on every POST (otherwise CloudFront answers 403).
+`scripts/aws.sh deploy` checks for the first and the last (it greps `web.py` for `DRISHYAM_KILL_TABLE`
+and `api.js` for `x-amz-content-sha256`) and refuses to deploy without them.
 
 ## Architecture
 
@@ -102,16 +104,25 @@ scripts/aws.sh start
 scripts/aws.sh destroy
 ```
 
-- `deploy` checks the account, builds `build/lambda/` (`scripts/build_lambda.sh`), creates `.venv-infra/`
-  with `infra/requirements.txt` if it is missing, runs `cdk bootstrap` (a no-op once done) and
-  `cdk deploy` with the CDK CLI `aws-cdk@2.1145.0` through `npx`, invalidates the CloudFront cache and
-  prints the site URL. It deploys IAM changes without asking (`--require-approval never`).
+- `deploy` checks that the app-side changes are in (see the top of this page), checks the account,
+  builds `build/lambda/` (`scripts/build_lambda.sh`), creates `.venv-infra/` with `infra/requirements.txt`
+  if it is missing, runs `cdk bootstrap` (a no-op once done) and `cdk deploy` with the CDK CLI
+  `aws-cdk@2.1145.0` through `npx`, and prints the site URL. `cdk deploy` runs with its default approval
+  level, so it lists every IAM or security-policy change and waits for a yes before applying it (it
+  fails without a terminal). The CloudFront invalidation is part of the stack's `BucketDeployment`.
 - `smoke` runs `scripts/smoke.sh` on the deployed URL (below).
 - `stop` sets reserved concurrency to 0: every request is refused with a throttle, nothing runs and
   Lambda bills nothing. `start` undoes it. A redeploy does not undo `stop`, because the template value did not change.
 - `destroy` deletes the stack, including the site bucket and its files. What stays: the CDK bootstrap
   stack (`CDKToolkit`, with the uploaded zips) and the log group that the bucket's auto-delete function
   creates when it runs.
+
+**Who deploys:** today the `drishyam` profile is the account root user: `aws sts get-caller-identity`
+returned `arn:aws:iam::242441136319:root` on 2026-10-18, through an `aws login` session
+(`login_session` in `~/.aws/config`, so no long-lived keys). AWS advises against using root for
+everyday tasks. The better setup is an IAM Identity Center user, or an IAM role with admin rights, for
+deploys, with the profile pointed at it and root kept for account tasks; that is not done yet. Until it
+is, `deploy` runs as root, and the approval prompt above is the check on IAM changes.
 
 **Before the first deploy:** this account's Lambda concurrency quota is 10 (read with
 `aws lambda get-account-settings` on 2026-10-18), and Lambda keeps 100 unreserved, so a reservation of 5
