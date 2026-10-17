@@ -47,7 +47,6 @@ PORT = int(os.environ.get("DRISHYAM_E2E_PORT", "0"))
 CSP = ("default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; font-src 'self'; "
        "connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'")
 T = 30_000  # ms
-OPTIONAL = ("/docs/agent-loop.svg",)  # FIG. 3.0 is probed and shown only once that file is published
 
 # ---- everything the tests know about the job comes from the fixture ---------------------------------
 JOB_LINES = [ln for ln in (PUBLIC / "fixtures/job.ndjson").read_text().splitlines() if ln.strip()]
@@ -233,8 +232,8 @@ class Session:
     def on_console(self, msg):
         if msg.type != "error":
             return
-        if "Failed to load resource" in msg.text and (not self.with_data or urlparse(msg.location.get("url", "")).path in OPTIONAL):
-            return  # 404s on optional files (the pending-state scenario, and FIG. 3.0 before its SVG exists)
+        if "Failed to load resource" in msg.text and not self.with_data:
+            return  # 404s on the optional data files (the pending-state scenario)
         self.errors.append(f"console.error: {msg.text}")
 
     def route(self, route):
@@ -393,12 +392,14 @@ def test_desktop_mock(browser, base):
     expect(p.locator("#bench-cool tbody tr")).to_have_count(3)                   # FIG. 4.3 from results/cool.json
     expect(p.locator("#bench-cool .kv")).to_contain_text("PRD expects 1.2–1.3×")  # the expected range sits by the measured gain
     expect(p.locator("#cool-status")).to_contain_text(f"ran at {COOL['end_to_end']['cool_gain']}×")  # the banner says what was measured
-    expect(p.locator("#loop")).to_be_hidden()                    # no docs/agent-loop.svg yet: no empty figure
     p.keyboard.press("Tab")
     outline = p.evaluate("(() => { const s = getComputedStyle(document.activeElement); return s.outlineStyle + ' ' + s.outlineWidth; })()")
     assert outline.startswith("solid"), f"no visible keyboard focus: {outline}"
     s.scroll_through()
     s.shot("desktop-hero.png")
+    s.to("#loop")                                                 # FIG. 3.0, served from public/docs/
+    until(lambda: p.locator("#loop img").evaluate("i => i.complete && i.naturalWidth"), "FIG. 3.0 to load")
+    expect(p.locator("#loop img")).to_be_visible()
 
     # --- the key explains the drawing --------------------------------------------------------
     s.to(".win--view")

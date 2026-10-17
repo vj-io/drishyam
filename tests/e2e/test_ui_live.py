@@ -18,7 +18,7 @@ from playwright.sync_api import expect, sync_playwright
 ROOT = Path(__file__).resolve().parents[2]
 SHOTS = Path(os.environ.get("DRISHYAM_SHOTS", "/tmp/drishyam-e2e"))
 DONE = ("needs sign-off", "signed", "done", "halted", "budget spent")
-OPTIONAL = ("/results/", "/docs/agent-loop.svg")  # the page shows a pending state, or no figure, without these
+OPTIONAL = ("/results/",)  # the page shows a pending state without these
 
 
 def start_local():

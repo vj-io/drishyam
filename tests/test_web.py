@@ -1,5 +1,6 @@
 import base64
 import json
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -173,3 +174,12 @@ def test_signing_key_fails_closed_on_a_deployment(monkeypatch):
         web._signing_key()
     monkeypatch.setenv("DRISHYAM_SIGNING_KEY", "s" * 48)
     assert web._signing_key() == b"s" * 48
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+@pytest.mark.skipif(not (ROOT / "docs/agent-loop.svg").exists(), reason="docs/agent-loop.svg not on this branch")
+def test_site_agent_loop_is_the_docs_figure():
+    # Vercel serves only public/, so the site keeps its own copy of FIG. 3.0; it must not drift from the docs one.
+    assert (ROOT / "public/docs/agent-loop.svg").read_bytes() == (ROOT / "docs/agent-loop.svg").read_bytes()

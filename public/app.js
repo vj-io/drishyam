@@ -703,16 +703,6 @@ const navSpy = new IntersectionObserver((entries) => {
 $$('#top, main > section, #docs').forEach((s) => navSpy.observe(s));
 $('#nav-menu').addEventListener('click', (e) => { if (e.target.closest('a')) $('#nav-menu').open = false; });
 
-// FIG. 3.0 appears only once docs/agent-loop.svg is published next to the page.
-const loop = new Image();
-loop.addEventListener('load', () => {
-  loop.className = 'loop__img';
-  loop.alt = 'The agent loop: OpenCV perception, the decision rules and planner, the action, and the human sign-off.';
-  $('#loop-body').append(loop);
-  $('#loop').hidden = false;
-}, { once: true });
-loop.src = 'docs/agent-loop.svg';
-
 // Phones see only the photo and its numbered balloons (the parts list below carries the callout text).
 const artMq = matchMedia('(max-width: 560px)');
 const fitArt = () => $('.art__svg').setAttribute('viewBox', artMq.matches ? '0 0 492 372' : '0 0 600 430');
