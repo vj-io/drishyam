@@ -153,7 +153,7 @@ The same harness, segmenter and matching rule on **200 real inspection photos** 
 - **On real photos the segmenter, not where the agent looks, limits recall.** The classical engine was tuned on synthetic images. On real concrete it reports up to thousands of boxes per image (929 for Drishyam at 30 %, 3,144 for L0 tiling), so part of the credit is chance centre hits, and 98 to 100 % of every policy's critical predictions match no critical ground truth. It finds cracks (0.30) and corrosion (0.53) and effectively misses spalling (0.00) and exposed rebar (0.01).
 - **The agent's control carries over.** 100 % of steps carry a cause; 40 of 40 planner drills and 10 of 10 governor drills recovered. The governor stepped in 91 times during the run: 77 times the p95 segmentation time of a 512 px look went over its 500 ms SLA, and 14 warp spikes (on the synthetic set: 0 and 1). At the 30 % cap a job takes 17 looks (p50; 26 at p95), against 3 on the smaller synthetic images.
 - **Failure cases** (8, kept local): cracks missed under the 30 % cap that the full budget finds, and exposed rebar or spalling reported as corrosion.
-- **Next:** the dacl10k-trained segmenter ([training/](../training/README.md), a Kaggle notebook) is what these numbers call for; after `scripts/install_model.sh`, `DRISHYAM_ONNX=models/drishyam_dacl10k.onnx .venv/bin/python -m evals.harness --data data/codebrim --out runs/model-eval/codebrim --results-dir runs/model-eval/codebrim/raw` repeats this comparison with it and leaves the published classical numbers in place. A leakage check between dacl10k and this subset (PRD section 9) has to come first; it has not been run.
+- **Next:** the dacl10k-trained segmenter ([training/](../training/README.md), a Kaggle notebook) is what these numbers call for; after `scripts/install_model.sh`, `DRISHYAM_ONNX=models/drishyam_dacl10k.onnx .venv/bin/python -m evals.harness --data data/codebrim --out runs/model-eval/codebrim --results-dir runs/model-eval/codebrim/raw` repeats this comparison with it and leaves the published classical numbers in place. A leakage check between dacl10k and this subset (the PRD's Data section) has to come first; it has not been run.
 
 Full numbers: [public/results/codebrim/summary.json](../public/results/codebrim/summary.json), also on the live site (FIG. 4.2). CODEBRIM: Mundt, Majumder, Murali, Panetsos and Ramesh, "Meta-learning Convolutional Neural Architectures for Multi-target Concrete Defect Classification with the COncrete DEfect BRidge IMage Dataset", CVPR 2019.
 
@@ -180,10 +180,11 @@ Twelve measured failures from the synthetic run, two per category (FIG. 5 on the
 
 Every camera move is a KleidiCV-accelerated op (`pyrDown`, `warpPerspective`,
 `resize`), and there is no `filter2D` and no NumPy pixel loop on the gaze path.
-The classical segmenter and the measurement step also use ops COOL does not
-accelerate (`connectedComponentsWithStats`, `findContours`, CLAHE,
-`adaptiveThreshold`, `Laplacian`) and a NumPy softmax; segmentation is 69 % of a
-job and the KleidiCV-covered imgproc share is 9 % (`results/local-macos-x86/macro.json`). `bench/run_all.sh <arm>` runs the micro and macro benchmarks and a parity
+Not every op is: the classical segmenter adds `connectedComponentsWithStats` and
+a NumPy softmax, and measurement adds `findContours`. In the local macro
+benchmark segmentation is 69 % of a job, and the stages it times as
+KleidiCV-covered (pyramid, saliency, warp, quality gate) are 9 %
+(`results/local-macos-x86/macro.json`). `bench/run_all.sh <arm>` runs the micro and macro benchmarks and a parity
 save with a provenance block (OpenCV version, build-info hash, whether `cv2` loads from
 `/opt/cool`) and `bench/parity.py` checks that two arms produce identical masks.
 The same code passes CI on GitHub's free arm64 runners.
@@ -221,7 +222,8 @@ c8g.2xlarge + COOL rate ($0.339/h) so the curves read as a buyer's cost.
 - The policy comparison holds on synthetic images, but on 200 real CODEBRIM
   photos the **classical** segmenter caps every policy at about 0.2 recall.
   Next: train the dacl10k model on Kaggle (`training/`), install it with
-  `scripts/install_model.sh`, and re-run `make eval-real` with `DRISHYAM_ONNX` set.
+  `scripts/install_model.sh`, check dacl10k against this subset for leakage, and
+  re-run the CODEBRIM comparison into `runs/` with `DRISHYAM_ONNX` set (section 4).
 - The COOL three-arm benchmark and the DynamoDB / SNS / CDK stack need AWS.
 - The web demo is stateless; the signed `work_order.json` is its audit trail.
 

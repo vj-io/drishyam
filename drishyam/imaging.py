@@ -1,8 +1,9 @@
 """Image intake, pyramid, saliency overview and the virtual-PTZ gaze.
 
-Every pixel op on the hot path is a KleidiCV-accelerated OpenCV call (pyrDown,
-cvtColor, GaussianBlur, Sobel, morphologyEx, inRange, warpPerspective, resize),
-so the agent's own camera moves are the workload COOL speeds up on Graviton.
+The camera moves are KleidiCV-accelerated OpenCV calls (pyrDown, warpPerspective,
+resize), so the agent's own camera moves are the workload COOL speeds up on
+Graviton. Saliency and the quality gate also use CLAHE, adaptiveThreshold,
+Laplacian and connected components.
 """
 
 from __future__ import annotations
