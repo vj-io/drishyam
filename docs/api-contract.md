@@ -123,7 +123,7 @@ A `review_request` asks a person to look; it changes no state (only a critical f
 - `"iou 0.19 < 0.5 between L3 and L2"`: a critical finding whose finer look disagrees with the coarser one;
 - `"unconfirmed: iou 0.07 < 0.5 between L1 and L0"`: a disagreement no further look will settle (no finer
   level, or the region's one extra look is spent); the finding has `verified: false`;
-- `"ambiguous: crack 5232 px (>= A_min 64) lies inside spalling f2; recorded as spalling only"`: two classes
+- `"ambiguous: crack 5232 px (>= A_min 64) is mostly inside spalling f2; recorded as spalling only"`: two classes
   cleared `A_min` on one spot and the agent kept the dominant one (once per finding and class).
 
 A finding event repeats, with the same `id`, whenever another look sees the same

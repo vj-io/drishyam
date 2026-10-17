@@ -391,7 +391,7 @@ class Job:
                         if (f.id, c) not in asked:
                             asked.add((f.id, c))
                             new_events.append({"type": "review_request", "finding_id": f.id, "reason": (
-                                f"ambiguous: {c} {seg.areas[c]} px (>= A_min {cfg.a_min}) lies inside {f.cls} {f.id}; "
+                                f"ambiguous: {c} {seg.areas[c]} px (>= A_min {cfg.a_min}) is mostly inside {f.cls} {f.id}; "
                                 f"recorded as {f.cls} only")})
                         continue
                     checked = f if c == best else checked

@@ -401,7 +401,7 @@ def test_review_on_ambiguity_when_a_class_is_absorbed_by_another(scene):
     ids = {f.id: f for f in job.findings}
     for e in asked:
         f = ids[e["finding_id"]]
-        assert f.cls in e["reason"] and f"inside {f.cls} {f.id}" in e["reason"]
+        assert f.cls in e["reason"] and f"is mostly inside {f.cls} {f.id}" in e["reason"]
     assert len({e["reason"].split(" px")[0] + e["finding_id"] for e in asked}) == len(asked)
 
 
