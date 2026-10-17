@@ -20,10 +20,9 @@ BCE + Dice, and the 19 -> 6 merge for Drishyam happens at export time (export_on
 # 1. **Data**: *Add Input* > Datasets > search `dacl10k-v2-devphase` and add **winterqi131/dacl10k-v2-devphase**
 #    (the official v2 devphase files: 6,935 train and 975 validation images with labelme JSON; the identical
 #    **sristi29raj/dacl10k-dataset** also works). Both are third-party re-uploads; the data's own licence is
-#    CC BY-NC 4.0 (its `LICENSE.md`). Neither available? Download the official zip to `/tmp` in a cell:
-#    `!wget -q https://dacl10k.s3.eu-central-1.amazonaws.com/dacl10k-challenge/dacl10k_v2_devphase.zip -P /tmp`
-#    then `!unzip -q /tmp/dacl10k_v2_devphase.zip -d /tmp/dacl10k` and put `--data /tmp/dacl10k` in the
-#    settings cell (not `/kaggle/working`: that is saved as output).
+#    CC BY-NC 4.0 (its `LICENSE.md`). Off Kaggle (Colab, a laptop), `kagglehub.dataset_download(
+#    "winterqi131/dacl10k-v2-devphase")` fetches the same files without a token; pass its path to `--data`.
+#    (The official AWS zip answers "All access to this object has been disabled" since 2026-10.)
 # 2. **Settings** (right panel): Accelerator **GPU T4 x2** (one GPU is used), Internet **on** (pip and the
 #    ImageNet encoder weights; needs a phone-verified account).
 # 3. **Save Version > Save & Run All (Commit)**. It runs in the background (you can close the tab) for up to

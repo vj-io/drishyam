@@ -154,17 +154,19 @@ training on misplaced masks.
 
 `--data` may point at a folder one or two levels above `<root>` (what unzipping or a Kaggle dataset gives you).
 On Kaggle, attach a mirror (step 2 above; the notebook searches `/kaggle/input` up to four folders deep).
-Otherwise download (toolkit README; sha256 `dcbcd5fb82699076a2c7f3a72492a9ef798870e0ca1f0c9399360f273ea95260`)
-to `/tmp`, not `/kaggle/working`, which is saved as notebook output:
+Elsewhere, fetch the same Kaggle dataset with `kagglehub` (public, so no token is needed) and pass its path to
+`--data`. The official AWS zip from the toolkit README now answers "All access to this object has been disabled".
 
-```
-!wget -q https://dacl10k.s3.eu-central-1.amazonaws.com/dacl10k-challenge/dacl10k_v2_devphase.zip -P /tmp
-!echo "dcbcd5fb82699076a2c7f3a72492a9ef798870e0ca1f0c9399360f273ea95260  /tmp/dacl10k_v2_devphase.zip" | sha256sum -c
-!unzip -q /tmp/dacl10k_v2_devphase.zip -d /tmp/dacl10k
-```
+On **Colab** (a T4 runtime), the same notebook runs with one cell added at the top: it creates `/kaggle/working`
+(which switches on the notebook's own setup: the pins and OpenCV 5 in its own folder), downloads the data and sets
+the flags. Free Colab sessions end without warning and lose `/content`, so cap the run and download the zip promptly:
 
-then put `--data /tmp/dacl10k` in `NOTEBOOK_FLAGS`. The AWS link answered 403 from here (2026-10-17), so it may be gone;
-the toolkit README or the dacl.ai page may have a newer one.
+```python
+import os, kagglehub
+os.makedirs("/kaggle/working", exist_ok=True)
+DATA = kagglehub.dataset_download("winterqi131/dacl10k-v2-devphase")
+os.environ["DACL_FLAGS"] = f"--data {DATA} --out /content/run --hours 3"
+```
 
 ## 5. Train on Kaggle
 
