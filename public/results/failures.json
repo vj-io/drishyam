@@ -2,25 +2,25 @@
  {
   "image": "failures/f01.jpg",
   "category": "Graffiti read as damage",
-  "what_happened": "s0162, drishyam@0.3: a spalling finding (confidence 0.97, step 2 at L1) lies within the bounding box of a graffiti patch and overlaps no ground-truth box of any class.",
+  "what_happened": "s0162, drishyam@0.3: a spalling finding (confidence 0.97, step 2 at L1) lies within the bounding box of a graffiti patch and matches no ground-truth box of any class.",
   "rule_that_would_catch_it": "Chroma gate before drafting: spray paint is far more saturated than concrete or rust, so a candidate whose median saturation sits well above the surrounding concrete and outside the rust hue band is dropped as non-structural. Not implemented."
  },
  {
   "image": "failures/f02.jpg",
   "category": "Graffiti read as damage",
-  "what_happened": "s0160, drishyam@0.3: a spalling finding (confidence 0.96, step 2 at L1) lies within the bounding box of a graffiti patch and overlaps no ground-truth box of any class.",
+  "what_happened": "s0160, drishyam@0.3: a spalling finding (confidence 0.96, step 2 at L1) lies within the bounding box of a graffiti patch and matches no ground-truth box of any class.",
   "rule_that_would_catch_it": "Chroma gate before drafting: spray paint is far more saturated than concrete or rust, so a candidate whose median saturation sits well above the surrounding concrete and outside the rust hue band is dropped as non-structural. Not implemented."
  },
  {
   "image": "failures/f03.jpg",
   "category": "Formwork line read as crack",
-  "what_happened": "s0041, drishyam@1.0: a crack finding (confidence 0.94, step 4 at L0) lies within the bounding box of a formwork line patch and overlaps no ground-truth box of any class.",
+  "what_happened": "s0041, drishyam@1.0: a crack finding (confidence 0.94, step 4 at L0) lies within the bounding box of a formwork line patch and matches no ground-truth box of any class.",
   "rule_that_would_catch_it": "Straightness test on the crack mask: a centreline that fits one straight line within about 1.5 px over a length of 20x its width is a formwork seam, not a crack, because real cracks meander (cv2.fitLine residual, minAreaRect aspect). Not implemented."
  },
  {
   "image": "failures/f04.jpg",
   "category": "Formwork line read as crack",
-  "what_happened": "s0189, drishyam@1.0: a crack finding (confidence 0.93, step 4 at L0) lies within the bounding box of a formwork line patch and overlaps no ground-truth box of any class.",
+  "what_happened": "s0189, drishyam@1.0: a crack finding (confidence 0.93, step 4 at L0) lies within the bounding box of a formwork line patch and matches no ground-truth box of any class.",
   "rule_that_would_catch_it": "Straightness test on the crack mask: a centreline that fits one straight line within about 1.5 px over a length of 20x its width is a formwork seam, not a crack, because real cracks meander (cv2.fitLine residual, minAreaRect aspect). Not implemented."
  },
  {

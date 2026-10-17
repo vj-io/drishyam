@@ -8,7 +8,7 @@ top-left. All measurements are pixels; there are no millimetres anywhere.
 ## `GET /api/health`
 
 ```json
-{"ok": true, "opencv": "5.0.0", "build": "stock (not COOL)", "segmenter": "classical-v1",
+{"ok": true, "version": "1.0.2", "opencv": "5.0.0", "build": "stock (not COOL)", "segmenter": "classical-v1",
  "max_upload_bytes": 4400000, "max_pixels": 25000000}
 ```
 

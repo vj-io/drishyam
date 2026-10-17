@@ -286,7 +286,7 @@ Train on dacl10k, evaluate on 200 CODEBRIM originals, and keep both datasets out
 - **Eval subset:** 200 CODEBRIM originals chosen by a fixed seed, stratified so each of the 5 classes has ≥40 boxes; the file list `data/eval200.txt` is committed so anyone can rebuild it. The remaining 1,390 images are a final sweep only if Day 8 leaves time.
 - **Class mapping for scoring:** dacl10k damage classes collapse to CODEBRIM's five (crack, spallation, efflorescence, exposed bars, corrosion stain); the mapping table is committed and reported, including which dacl10k classes are dropped.
 - **Leakage check:** compare bridge identifiers and perceptual hashes (imagehash, BSD) between dacl10k and the eval subset; any overlap is removed from the subset and the count is reported.
-- **Model weights:** our fine-tuned ONNX files are published on Hugging Face under Apache 2.0 so judges can run the harness without training; the dataset license restricts the data, not weights trained for non-commercial use, which the report states.
+- **Model weights:** our fine-tuned ONNX files are trained on dacl10k, so they inherit its CC BY-NC 4.0 licence (non-commercial); `scripts/install_model.sh` writes that into `models/README.md` and the README's Licence line.
 - **Redistribution:** download scripts only (`make data`), with checksums; no image is committed.
 
 ## Evaluation and success metrics
@@ -367,6 +367,6 @@ A human signs every critical finding, the agent has no shell and no way to act o
 | Prompt injection | Text inside images (graffiti, signs, OCR) is never passed to the planner; the planner sees numeric digests only |
 | Cloud security | Least-privilege IAM role per service: EC2 role limited to its S3 prefix, one DynamoDB table, one SQS queue, one SNS topic, CloudWatch PutMetricData; no shell tool for the agent; HTTPS only; secrets in SSM Parameter Store |
 | Data bias | Report per-class and per-condition performance (wet vs. dry, lighting, camera). dacl10k is half engineering-office data and half German local-authority data from 2000–2020; CODEBRIM covers 30 bridges; the report names these geographic and material limits |
-| Licensing | Non-commercial datasets downloaded by script, never redistributed; permissive model code and weights; no AGPL dependencies |
+| Licensing | Non-commercial datasets downloaded by script, never redistributed; permissive code and bundled models, except the optional dacl10k-trained weights (CC BY-NC 4.0); no AGPL dependencies |
 | Cost and energy | Report the dollars and CPU-hours of every evaluation and benchmark run |
 | Surveillance | DRISHYAM inspects structures, not people; the UI rejects images where a person occupies more than a set fraction of the frame |

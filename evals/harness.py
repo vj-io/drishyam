@@ -437,10 +437,13 @@ def run(data_dir="data/synth200", n=200, out_dir="public/results", results_dir="
     t_start = time.time()
     workers = max(1, min(8, (mp.cpu_count() or 2) // 2)) if workers is None else workers
     records, label = load_records(data_dir, n, kind)
-    if not label.startswith("synthetic") and "public" in Path(out_dir).resolve().parts:
+    out, repo = Path(out_dir).resolve(), Path(__file__).resolve().parents[1]
+    kept_local = [repo / "results" / "codebrim", repo / "runs"]  # git- and Vercel-ignored
+    if not label.startswith("synthetic") and ("public" in out.parts or (
+            out.is_relative_to(repo) and not any(out.is_relative_to(d) for d in kept_local))):
         # CODEBRIM licence, clause 4: the images and modified versions of them (the failure crops) are not redistributed
         raise SystemExit(f"refusing to write CODEBRIM image crops under {out_dir}: run `make eval-real`, which keeps them in "
-                         "results/codebrim and publishes only summary.json")
+                         "results/codebrim and publishes only summary.json (or write under runs/, or outside the repo)")
     log(f"{len(records)} images, {workers} worker(s); policies: downscale, tiling L2/L1/L0, drishyam {BUDGETS}")
     seg = default_segmenter()
     seg_name, seg_id = seg.name, segmenter_id(seg)

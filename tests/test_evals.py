@@ -1,6 +1,7 @@
 """Evaluation harness, CODEBRIM loader and parity tool: matching rule, tiling accounting, an end-to-end tiny run."""
 import json
 import zipfile
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -266,6 +267,10 @@ def test_harness_refuses_to_publish_codebrim_crops(tmp_path):
     (tmp_path / "eval200.txt").write_text("image_0000001.jpg\n")
     with pytest.raises(SystemExit, match="refusing"):
         harness.run(tmp_path, n=1, out_dir=tmp_path / "public" / "results", results_dir=tmp_path / "raw", workers=1)
+    repo = Path(harness.__file__).resolve().parents[1]
+    with pytest.raises(SystemExit, match="refusing"):  # anywhere in the repo that git or Vercel would pick up
+        harness.run(tmp_path, n=1, out_dir=repo / "docs" / "codebrim", results_dir=tmp_path / "raw", workers=1)
+    assert not (repo / "docs" / "codebrim").exists()
 
 # ---------------------------------------------------------------- parity
 def test_parity_compare_saved_files(tmp_path):

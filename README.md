@@ -56,8 +56,10 @@ make serve
 uv run drishyam run public/samples/bridge_03.jpg --pixel-cap 0.3
 ```
 
+`run` ends by printing its work order and the exact review command; use that job id in place of `j_XXXXXX`:
+
 ```bash
-uv run drishyam review runs/<job>/work_order.json f1 approve --by "Your Name"
+uv run drishyam review runs/j_XXXXXX/work_order.json f1 approve --by "Your Name"
 ```
 
 MCP server over stdio (12 allow-listed tools, no approve tool, no shell):
@@ -95,6 +97,8 @@ The images are procedural (`evals/synth.py`): 2048×1536 weathered concrete with
 
 ![Recall against pixels processed](docs/recall_vs_pixels.png)
 
+(A static drawing of the committed `public/results/summary.json`; the live site's FIG. 4.1 draws the same file.)
+
 | per-class recall | crack | spalling | efflorescence | exposed_rebar | corrosion |
 |---|---|---|---|---|---|
 | Drishyam @30 % | 0.45 | 0.62 | 0.16 | 0.54 | 0.58 |
@@ -111,7 +115,7 @@ segmentation quality.
 
 ### Real bridge photos (CODEBRIM)
 
-The same harness, segmenter and matching rule on **200 real inspection photos** from CODEBRIM: a seeded subset (seed 7) of the 1,052 annotated originals, mostly 4608×3456 px (2 to 24 MP), holding 1,685 ground-truth boxes and at least 175 in every class. `make data` downloads and checks the 8.3 GB archive, `make eval-real` runs it. The dataset's licence is non-commercial and bars sharing the photos, so only the numbers are published (the failure crops stay in the git-ignored `results/codebrim/`).
+The same harness, segmenter and matching rule on **200 real inspection photos** from CODEBRIM: a seeded subset (seed 7) of the 1,052 annotated originals, mostly 4608×3456 px (2 to 24 MP), holding 1,008 defect boxes with 1,685 class labels (a box showing several defects is scored once per class) and at least 175 labels in every class. `make data` downloads and checks the 8.3 GB archive and `make eval-real` runs it; the 200 file names are committed in `evals/codebrim_eval200.txt`. The dataset's licence is non-commercial and bars sharing the photos, so only the numbers are published (the failure crops stay in the git-ignored `results/codebrim/`).
 
 | Policy | pixels processed (× image) | recall | recall, IoU ≥ 0.3 only | boxes per image |
 | --- | --- | --- | --- | --- |
@@ -132,11 +136,11 @@ The same harness, segmenter and matching rule on **200 real inspection photos** 
 | tiling L0 | 0.31 | 0.01 | 0.02 | 0.00 | 0.58 |
 | downscale | 0.29 | 0.01 | 0.06 | 0.00 | 0.55 |
 
-- **The PRD's hypothesis test (G1, defined on these photos) passes on paper and means little.** At a 30 % cap Drishyam reaches **0.97×** exhaustive tiling's recall at **0.18×** its pixels. But every policy finds about one defect box in five, a single 1024-px downscale matches Drishyam at a quarter of its pixels, and without the contains-the-centre clause recall is 0.06 to 0.09 for every policy.
-- **On real photos the segmenter, not where the agent looks, limits recall.** The classical engine was tuned on synthetic images. On real concrete it reports hundreds to thousands of boxes per image (929 for Drishyam at 30 %, 3,144 for L0 tiling), so part of the credit is chance centre hits, and 99 % of every policy's critical predictions match no critical ground truth. It finds cracks (0.30) and corrosion (0.53) and effectively misses spalling (0.00) and exposed rebar (0.01).
+- **The PRD's hypothesis test (G1, defined on these photos) passes on paper and means little.** At a 30 % cap Drishyam reaches **0.97×** exhaustive tiling's recall at **0.18×** its pixels. But every baseline, and Drishyam from the 20 % cap up, finds only about one labelled defect in five (0.19 to 0.22); a single 1024-px downscale matches Drishyam at a quarter of its pixels; and without the contains-the-centre clause recall is 0.04 to 0.09 for every policy.
+- **On real photos the segmenter, not where the agent looks, limits recall.** The classical engine was tuned on synthetic images. On real concrete it reports up to thousands of boxes per image (929 for Drishyam at 30 %, 3,144 for L0 tiling), so part of the credit is chance centre hits, and 98 to 100 % of every policy's critical predictions match no critical ground truth. It finds cracks (0.30) and corrosion (0.53) and effectively misses spalling (0.00) and exposed rebar (0.01).
 - **The agent's control carries over.** 100 % of steps carry a cause; 40 of 40 planner drills and 10 of 10 governor drills recovered. The governor stepped in 91 times during the run: 77 times the p95 segmentation time of a 512 px look went over its 500 ms SLA, and 14 warp spikes (on the synthetic set: 0 and 1). At the 30 % cap a job takes 17 looks (p50; 26 at p95), against 3 on the smaller synthetic images.
 - **Failure cases** (8, kept local): cracks missed under the 30 % cap that the full budget finds, and exposed rebar or spalling reported as corrosion.
-- **Next:** the dacl10k-trained segmenter ([training/](training/README.md), a Kaggle notebook) is what these numbers call for; after `scripts/install_model.sh`, `DRISHYAM_ONNX=models/drishyam_dacl10k.onnx make eval-real` repeats this comparison with it.
+- **Next:** the dacl10k-trained segmenter ([training/](training/README.md), a Kaggle notebook) is what these numbers call for; after `scripts/install_model.sh`, `DRISHYAM_ONNX=models/drishyam_dacl10k.onnx .venv/bin/python -m evals.harness --data data/codebrim --out runs/model-eval/codebrim --results-dir runs/model-eval/codebrim/raw` repeats this comparison with it and leaves the published classical numbers in place. A leakage check between dacl10k and this subset (PRD section 9) has to come first; it has not been run.
 
 Full numbers: [public/results/codebrim/summary.json](public/results/codebrim/summary.json), also on the live site (FIG. 4.2). CODEBRIM: Mundt, Majumder, Murali, Panetsos and Ramesh, "Meta-learning Convolutional Neural Architectures for Multi-target Concrete Defect Classification with the COncrete DEfect BRidge IMage Dataset", CVPR 2019.
 

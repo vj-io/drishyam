@@ -43,7 +43,7 @@ ready; needs the owner's AWS account) · **open**.
 
 | ID | Area | Where | Status |
 | --- | --- | --- | --- |
-| NFR-1 | p95 per gaze step ≤ 500 ms | measured per step in `runtime`; classical segmenter ~100 ms at 512² on a laptop | done (measured locally; Graviton number is AWS) |
+| NFR-1 | p95 per gaze step ≤ 500 ms | measured per step in `runtime`; classical segmenter ~100 ms at 512² on a laptop | done on the synthetic set (0 breaches); on 200 CODEBRIM photos under 8-worker load the segmentation p95 went over 500 ms 77 times and the governor responded each time; the Graviton number needs AWS |
 | NFR-2 | $/1k images reported; default cap $0.05 | `governor.USD_PER_HOUR`, `bench/macro.py` | done |
 | NFR-3 | 100 % planner recovery; restart-safe | `planner.consult`; `--resume` / replay | done (40/40) |
 | NFR-4 | Least privilege, no shell tool, image text never reaches planner, HTTPS, secrets | [security.md](security.md) | done (IAM roles are AWS) |

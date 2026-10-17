@@ -172,6 +172,9 @@ def main(argv=None) -> None:
     print(f"{len(records)} annotated images; wrote {len(subset)} to {a.out}; boxes per class: {counts}")
     if shortfall:
         print(f"WARNING: below the {a.min_per_class}-box floor: {shortfall}")
+    committed = Path(__file__).with_name("codebrim_eval200.txt")  # the published run's list (PRD: committed)
+    if (a.n, a.seed, a.min_per_class) == (200, 7, 40) and committed.read_text() != Path(a.out).read_text():
+        print(f"WARNING: {a.out} differs from the committed {committed.name}; results will not match the published run")
 
 
 if __name__ == "__main__":

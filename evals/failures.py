@@ -65,7 +65,7 @@ def _false_alarm(kind, classes, label):
                         yield {"id": rec["id"], "cfg": cfg, "score": 10 * crit + share + p["conf"],
                                "marks": [_mark("pred", f"{p['cls']} {p['conf']:.2f}", p["box"]), _mark("other", label, d["box"])],
                                "what": (f"{rec['id']}, {cfg}: {_a(p['cls'])} finding (confidence {p['conf']:.2f}, step {p['step']} at "
-                                        f"L{p['level']}) lies within the bounding box of {_a(label)} patch and overlaps no "
+                                        f"L{p['level']}) lies within the bounding box of {_a(label)} patch and matches no "
                                         f"ground-truth box of any class." + (" It is critical, so it would stop at human review." if crit else ""))}
     return find
 
