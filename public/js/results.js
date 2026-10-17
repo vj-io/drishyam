@@ -91,8 +91,11 @@ function heroChips(sum) {
   if (drishyam && num(drishyam.usd)) {
     fill('stat-cost', drishyam.usd, { decimals: 4, prefix: '$' }, num(tiling?.usd) ? `per image, vs $${tiling.usd} for tiling` : 'per image, modelled');
   }
-  const slow = (sum.micro ?? []).filter((m) => num(m?.p95_ms)).reduce((a, m) => (!a || m.p95_ms > a.p95_ms ? m : a), null);
-  if (slow) fill('stat-ops', slow.p95_ms, { decimals: 1, suffix: ' ms' }, `${slow.op} ${slow.size ?? ''} p95`.trim());
+  // Agentic evidence, not speed: injected planner and governor faults the agent recovered from.
+  const am = sum.agent_metrics ?? {};
+  const fired = (am.planner_recovery?.timeout?.fired ?? 0) + (am.planner_recovery?.malformed?.fired ?? 0) + (am.governor_response?.fired ?? 0);
+  const ok = (am.planner_recovery?.recovered_total ?? 0) + (am.governor_response?.recovered ?? 0);
+  if (fired > 0) fill('stat-ops', ok, { decimals: 0, suffix: ` / ${fired}` }, `fired faults recovered; ${num(am.steps_with_cause_pct) ? Math.round(am.steps_with_cause_pct) : '–'} % of steps carry a cause`);
 }
 
 function renderBench(sum) {

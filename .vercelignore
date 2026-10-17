@@ -10,3 +10,5 @@ bench/results
 *.pyc
 .env*
 test-results
+.claude
+brag-output
