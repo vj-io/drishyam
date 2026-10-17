@@ -658,6 +658,33 @@ def test_halt_governor_note_and_critical_trigger(browser, base):
     print("ok  halt governor note and critical trigger rendered")
 
 
+def test_planner_status_shows_the_fallback_chip(browser, base):
+    """The API keeps a look's own cause and puts a failed planner consultation in `planner_status`: the trace
+    still flags that look `planner-fallback`."""
+    events = [json.loads(ln) for ln in JOB_LINES]
+    fell = {e["step"]: e for e in events if e["type"] == "planner" and e["status"] in ("rejected", "fallback")}
+    assert fell, "the fixture should hold a failed planner consultation"
+    for e in events:
+        if e["type"] == "step" and e["step"] in fell:
+            e["cause"] = "best-score"
+            e["planner_status"] = {"status": fell[e["step"]]["status"], "reason": fell[e["step"]]["reason"]}
+    LIVE["plans"] = [{"lines": [json.dumps(e) for e in events], "delay": 0}]
+    LIVE["jobs"].clear(); LIVE["kills"].clear(); LIVE["reviews"].clear(); LIVE["tokens"] = 0
+    LIVE["order"] = json.loads(json.dumps(DONE["work_order"]))
+    s = Session(browser, "planner-status", viewport={"width": 1440, "height": 900})
+    p = s.page
+    p.goto(f"{base}/")
+    p.locator(".thumb").click()
+    expect(p.locator("#look")).to_be_enabled(timeout=T)
+    p.click("#look")
+    expect(p.locator("#job-pill")).to_have_text(re.compile(DONE_LABEL, re.IGNORECASE), timeout=T)
+    for n in fell:
+        expect(p.locator(f"#trace .trace__line[data-step='{n}'] .chip--gov", has_text="planner-fallback")).to_have_count(1)
+    s.check_clean()
+    s.context.close()
+    print("ok  planner_status rejected/fallback shows the planner-fallback chip")
+
+
 if __name__ == "__main__":
     test_static_csp_hygiene()
     srv, base = serve()
@@ -672,6 +699,7 @@ if __name__ == "__main__":
             test_pending_states(browser, base)
             test_cool_missing_fields(browser, base)
             test_halt_governor_note_and_critical_trigger(browser, base)
+            test_planner_status_shows_the_fallback_chip(browser, base)
             browser.close()
     finally:
         srv.shutdown()

@@ -4,6 +4,8 @@ import { countUp } from './fx.js';
 
 const GOVERNOR = new Set(['p95>SLA', 'warp-spike', 'usd≥80%', 'cap-hit', 'kill-switch', 'planner-fallback']);
 export const isGovernor = (cause) => GOVERNOR.has(cause);
+// A planner that timed out or was refused leaves the rule's look standing; the step keeps its own cause.
+export const plannerFell = (s) => ['rejected', 'fallback'].includes(s.planner_status?.status);
 
 const CHIP = {
   'best-score': 'look', 'entropy>tau': 'unsure', 'area<A_min': 'unsure', 'iou<0.5': 'unsure',
@@ -85,6 +87,7 @@ export class Trace {
     if (num(s.verify?.iou)) parts.push('·', h('span', {}, 'iou ', h('b', {}, s.verify.iou.toFixed(2))));
     if (s.cause) parts.push('·', chip(s.cause));
     if (s.governor?.cause) parts.push(chip(s.governor.cause));  // an override made on the step that then halted
+    if (plannerFell(s)) parts.push(chip('planner-fallback'));
     if (s.quality?.ok === false) parts.push(h('span', { class: 'chip chip--gov' }, `quality: ${s.quality.reason ?? 'rejected'}`));
     if (s.injected) parts.push(h('span', { class: 'chip chip--inject' }, `injected ${s.injected}`));
     if (num(s.latency_ms)) parts.push('·', h('span', {}, `${s.latency_ms} ms`));

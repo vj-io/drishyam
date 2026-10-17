@@ -3,7 +3,7 @@ import { $, $$, h, num } from './js/dom.js';
 import { MOCK, streamJob, postReview, postKill, getJSON, health } from './js/api.js';
 import { prepareImage } from './js/prep.js';
 import { Viewport, pointOf } from './js/viewport.js';
-import { Budget, Trace, renderStepDetail, isGovernor } from './js/panels.js';
+import { Budget, Trace, renderStepDetail, isGovernor, plannerFell } from './js/panels.js';
 import { Findings } from './js/findings.js';
 import { countUp, popup, reduced, replay, sound } from './js/fx.js';
 import { initResults } from './js/results.js';
@@ -141,7 +141,8 @@ function addStep(step) {
   el.count.textContent = `step ${step.step}`;
   if (follow) goto(S.steps.length, true);
   else el.sliderOut.textContent = `step ${viewport.cursor} / ${S.steps.length}`;
-  for (const cause of [step.governor?.cause, step.cause]) {  // a halt record may carry the governor's last override
+  // a halt record may carry the governor's last override; a failed planner consultation is in planner_status
+  for (const cause of [step.governor?.cause, step.cause, plannerFell(step) && 'planner-fallback']) {
     if (isGovernor(cause)) popup(++S.rev, cause, GOVERNOR_TEXT[cause](step));
   }
   sound.scratch();

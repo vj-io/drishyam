@@ -250,7 +250,7 @@ The planner receives a numeric digest only (scores, entropies, p95s, $ and pixel
 }
 ```
 
-- Validator: strategy in the allow-list, params within ranges, no change that exceeds the budget; 2-second timeout; on any failure the rule planner's choice stands and the trace records `planner-fallback`
+- Validator: strategy in the allow-list, params within ranges, no change that exceeds the budget; 2-second timeout; on any failure the rule planner's choice stands, the look keeps its own cause, and the step records the outcome in `planner_status` (`rejected` or `fallback`; the page shows it as `planner-fallback`)
 - The planner never sees OCR output or any text found in images (graffiti, signs); image text is untrusted and is not a tool result
 - Default model: local `llama-server` with Qwen2.5-3B-Instruct Q4\_0; Bedrock Claude or Gemini free tier selectable by environment variable for the demo
 
