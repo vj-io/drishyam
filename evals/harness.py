@@ -565,7 +565,7 @@ def headline(scored: dict, primary: str, n: int, label: str) -> str:
     hs = headline_stats(m, n)
     hyp = "the 0.9x-at-0.3x hypothesis"
     verdict = (f"meets {hyp}" if hs["meets_target_ci"] else
-               f"meets {hyp} on the point estimate, but the 95% CI includes values below 0.9," if hs["meets_target"] else
+               f"meets {hyp} on the point estimate, but the 95% CI includes values below 0.9" if hs["meets_target"] else
                f"does not meet {hyp}")
     ci = lambda v: "" if None in v else f"95% CI {v[0]:.2f}-{v[1]:.2f}, "
     names = {"components": "per-component", "union": "one-box-per-class", "as_specified": "as-specified mixed"}
@@ -670,7 +670,8 @@ def run(data_dir="data/synth200", n=200, out_dir="public/results", results_dir="
     }
     if rows:
         am["timing"]["note"] = "wall times are modelled (--cost-model fixed): micro.json job_ops p50 per call, not measured"
-    prov = provenance()
+    prev = Path(results_dir) / "eval_raw.json"  # a re-score keeps the machine, load and time of the run it re-scores
+    prov = json.loads(prev.read_text())["provenance"] if reuse and prev.exists() else provenance()
     keep = {k: prov[k] for k in ("cv2", "build_info_sha256", "machine", "cpu", "python", "timestamp", "build", "load_avg")}
     keep["machine"] += (f", {prov['logical_cpus']} logical CPUs; eval ran {workers} worker(s) x "
                         f"{am['timing']['cv2_threads_per_worker']} cv2 thread(s); micro arm {micro_arm}")
