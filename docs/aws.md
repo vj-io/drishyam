@@ -146,20 +146,32 @@ S3, so the 50 MB direct-upload limit does not apply. The dacl10k model is not bu
 
 ## Smoke
 
-`scripts/smoke.sh <url>` (curl, jq and shasum; it stores nothing) prints one line per check:
+`scripts/smoke.sh <url>` (curl, jq and shasum) prints one line per check:
 
-1. `GET /api/health` answers `ok`, with the version, OpenCV build and time to first byte.
-2. A job on `public/samples/bridge_03.jpg` streams to its `done` event.
+1. `GET /api/health`, twice, answers `ok`, with the version, OpenCV build, host, `arch` and commit, and
+   the time to first byte of both requests: the first is cold if the function was idle or just
+   deployed (the script cannot tell), the second is warm.
+2. A job on `public/samples/bridge_03.jpg` streams to its `done` event. An `INFO latency` line follows:
+   the nearest-rank p95 of the steps' `latency_ms` (warp plus segmentation, no pacing), with the host's
+   `arch` and the build from `/api/health` (on Lambda, `aarch64` and `stock (not COOL)`: the stock
+   OpenCV wheel, not the COOL build). It is the p95 over one job's steps, a handful of numbers.
 3. KILL: a second job is started, `/api/kill` is sent once step 2 has streamed, and the job must end
    `halted` with cause `kill-switch`.
 4. Behind CloudFront only: a `POST` without `x-amz-content-sha256` gets 403.
 5. With `FUNCTION_URL` set (`scripts/aws.sh smoke` sets it): the raw Function URL gets 403.
-6. With `WAF_LOOP=1`: empty-bodied job starts (the app answers 400 without running a job) until the WAF
-   answers 403, expected after about 12 in 60 s. Job starts from that IP stay blocked until its rate
-   falls back under the limit, about a minute after the loop.
+6. With `E2E=1`: `tests/e2e/test_ui_live.py <url>`, the browser flows (needs Playwright in `.venv`, see
+   the README). It starts about 3 jobs.
+7. With `WAF_LOOP=1`: empty-bodied job starts (the app answers 400 without running a job) until the WAF
+   answers 403, expected after about 10 in 120 s, fewer if the checks above started jobs. Job starts from
+   that IP stay blocked until its rate falls back under the limit, up to two minutes after the loop.
+
+The last line sums up the run: UTC timestamp, URL, the commit from `/api/health`, the package digest
+(`CODE_SHA256`; `scripts/aws.sh smoke` passes the function's `CodeSha256`), both times to first byte, the
+step p95 and pass or FAIL. With `SMOKE_LOG=<file>` (relative to the repository root) every line of the run
+is appended to that file; `scripts/aws.sh smoke` appends to `runs/aws-smoke.log` (gitignored).
 
 `.github/workflows/smoke.yml` runs checks 1 to 5 by hand (`workflow_dispatch`) with the URL as input; it
-has read-only repository permissions and no AWS credentials.
+has read-only repository permissions and no AWS credentials, so its package digest reads `unreported`.
 
 ## Cost estimate
 

@@ -3,7 +3,8 @@
 # CLI profile drishyam (override with AWS_PROFILE), region us-east-1 (CloudFront's WAF scope lives there).
 #
 #   scripts/aws.sh deploy    build the Lambda package, bootstrap CDK if needed, deploy, print the URLs
-#   scripts/aws.sh smoke     scripts/smoke.sh against the deployed URL, plus the raw Function URL check
+#   scripts/aws.sh smoke     scripts/smoke.sh against the deployed URL, plus the raw Function URL check;
+#                            appends the results to runs/aws-smoke.log (SMOKE_LOG overrides)
 #   scripts/aws.sh stop      reserved concurrency 0: every request is refused, nothing runs or bills
 #   scripts/aws.sh start     undo stop (reserved concurrency back to 5, or no reservation with RESERVED=none)
 #   scripts/aws.sh destroy   delete the stack: function, distribution, WAF, table, secret, logs, alarms, budget
@@ -46,7 +47,12 @@ EOF
     echo "site:   $(out Url)"
     echo "alerts: aws sns subscribe --topic-arn $(out AlertTopicArn) --protocol email --notification-endpoint YOUR_EMAIL --profile $AWS_PROFILE --region us-east-1"
     ;;
-  smoke) FUNCTION_URL=$(out FunctionUrl) scripts/smoke.sh "$(out Url)" ;;
+  smoke)
+    mkdir -p runs
+    FUNCTION_URL=$(out FunctionUrl) SMOKE_LOG=${SMOKE_LOG:-runs/aws-smoke.log} \
+      CODE_SHA256=$(aws lambda get-function-configuration --function-name "$FN" --query CodeSha256 --output text) \
+      scripts/smoke.sh "$(out Url)"
+    ;;
   stop) aws lambda put-function-concurrency --function-name "$FN" --reserved-concurrent-executions 0 ;;
   start)
     if [ "$RESERVED" = none ]; then aws lambda delete-function-concurrency --function-name "$FN"
@@ -57,5 +63,5 @@ EOF
     aws cloudformation wait stack-delete-complete --stack-name "$STACK"
     echo "deleted $STACK (the CDKToolkit bootstrap stack stays; delete it in CloudFormation if nothing else uses it)"
     ;;
-  *) sed -n '2,10p' "$0"; exit 2 ;;
+  *) sed -n '2,11p' "$0"; exit 2 ;;
 esac
