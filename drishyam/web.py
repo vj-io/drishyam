@@ -311,11 +311,10 @@ async def review(request: Request):
     return {"token": token, "work_order": wo}
 
 
-if os.environ.get("DRISHYAM_SERVE_STATIC") == "1":  # local dev and e2e tests only; Vercel serves public/ from its CDN
+if os.environ.get("DRISHYAM_SERVE_STATIC") == "1":  # local dev and e2e tests only; on AWS CloudFront serves public/
     from fastapi.staticfiles import StaticFiles
 
-    _HEADERS = {h["key"]: h["value"] for rule in json.loads((ROOT / "vercel.json").read_text())["headers"]
-                for h in rule["headers"]}
+    _HEADERS = {h["key"]: h["value"] for h in json.loads((ROOT / "infra" / "headers.json").read_text())}
 
     @app.middleware("http")
     async def _static_headers(request: Request, call_next):

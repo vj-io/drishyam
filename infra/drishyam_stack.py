@@ -1,6 +1,6 @@
-"""The AWS copy of the web demo, as one stack (docs/aws.md).
+"""The web demo on AWS, as one stack (docs/aws.md).
 
-The same FastAPI app as on Vercel runs on Lambda arm64 (Python 3.12 zip plus the Lambda Web Adapter layer),
+The FastAPI app (drishyam/web.py) runs on Lambda arm64 (Python 3.12 zip plus the Lambda Web Adapter layer),
 streams NDJSON through a Function URL (RESPONSE_STREAM, AWS_IAM auth) and is reached only through
 CloudFront, which signs every origin request with Origin Access Control. CloudFront serves the static
 site (public/) from a private S3 bucket, also through OAC, so only /api/* reaches the function. A WAF web
@@ -124,16 +124,15 @@ class DrishyamStack(Stack):
             ])
 
         # The static site: a private bucket read only by this distribution (OAC), with the response headers
-        # of vercel.json, so CSP and HSTS are the same as on Vercel and in local runs.
+        # of infra/headers.json, so CSP and HSTS are the same as in local runs.
         site = s3.Bucket(self, "Site", block_public_access=s3.BlockPublicAccess.BLOCK_ALL, enforce_ssl=True,
                          encryption=s3.BucketEncryption.S3_MANAGED, removal_policy=RemovalPolicy.DESTROY,
                          auto_delete_objects=True)
-        headers = {h["key"]: h["value"] for rule in json.loads((ROOT / "vercel.json").read_text())["headers"]
-                   for h in rule["headers"]}
+        headers = {h["key"]: h["value"] for h in json.loads((ROOT / "infra" / "headers.json").read_text())}
         hsts = headers.pop("Strict-Transport-Security")
         headers.pop("X-Content-Type-Options")  # its only value is nosniff
         page_headers = cf.ResponseHeadersPolicy(
-            self, "PageHeaders", comment="Drishyam page headers, from vercel.json",
+            self, "PageHeaders", comment="Drishyam page headers, from infra/headers.json",
             security_headers_behavior=cf.ResponseSecurityHeadersBehavior(
                 content_security_policy=cf.ResponseHeadersContentSecurityPolicy(
                     content_security_policy=headers.pop("Content-Security-Policy"), override=True),

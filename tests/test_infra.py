@@ -138,7 +138,7 @@ def test_api_behaviour_is_uncached_and_forwards_the_body_hash(template):
     assert api["TargetOriginId"] == fn_origin["Id"] and fn_origin["CustomOriginConfig"]["OriginReadTimeout"] == 60
 
 
-def test_static_site_is_a_private_bucket_with_the_vercel_headers(template):
+def test_static_site_is_a_private_bucket_with_the_local_headers(template):
     resources = template["Resources"]
     dist_id = next(k for k, r in resources.items() if r["Type"] == "AWS::CloudFront::Distribution")
     cfg = resources[dist_id]["Properties"]["DistributionConfig"]
@@ -164,9 +164,8 @@ def test_static_site_is_a_private_bucket_with_the_vercel_headers(template):
               + "; includeSubDomains" * hsts["IncludeSubdomains"] + "; preload" * hsts["Preload"],
               **({"X-Content-Type-Options": "nosniff"} if "ContentTypeOptions" in sec else {}),
               **{h["Header"]: h["Value"] for h in custom}}
-    vercel = {h["key"]: h["value"] for rule in json.loads((ROOT / "vercel.json").read_text())["headers"]
-              for h in rule["headers"]}
-    assert served == vercel  # the same headers as Vercel and local runs
+    local = {h["key"]: h["value"] for h in json.loads((ROOT / "infra" / "headers.json").read_text())}
+    assert served == local  # the same headers as local runs (web.py serves public/ with this file)
     assert all(v["Override"] for v in [*sec.values(), *custom])
 
     deploy = one(template, "Custom::CDKBucketDeployment")
