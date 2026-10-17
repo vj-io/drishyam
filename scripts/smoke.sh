@@ -4,7 +4,7 @@
 #   scripts/smoke.sh https://dxxxxxxxxxxxx.cloudfront.net
 #   FUNCTION_URL=https://xxxx.lambda-url.us-east-1.on.aws scripts/smoke.sh <url>    adds: raw Function URL is refused
 #   WAF_LOOP=1 scripts/smoke.sh <url>    adds: job starts from this IP are blocked after about 12 in 60 s
-#                                        (that IP then cannot start jobs for a few minutes)
+#                                        (that IP cannot start jobs for about a minute after)
 #
 # Checks, one line each: /api/health; a job on public/samples/bridge_03.jpg reaches its done event; a KILL
 # sent once step 2 has streamed halts the job with cause kill-switch; behind CloudFront, a POST without
