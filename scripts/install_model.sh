@@ -2,6 +2,7 @@
 # Fold the Kaggle-trained dacl10k segmenter back into the repo (training/README.md, "Kaggle in 6 steps"):
 #
 #   scripts/install_model.sh ~/Downloads/drishyam_dacl10k.zip [--n 200]
+#   scripts/install_model.sh ~/Downloads/drishyam_dacl10k [--n 200]     (the folder Safari expands the zip into)
 #   scripts/install_model.sh best.onnx [best_fp16.onnx] [--n 200]
 #
 # The zip (the notebook's output, wherever the browser saved it) is unpacked into a fresh temporary folder.
@@ -18,8 +19,8 @@
 # PY defaults to .venv/bin/python (the repo venv: OpenCV 5, no torch needed).
 set -euo pipefail
 
-usage() { echo "usage: scripts/install_model.sh drishyam_dacl10k.zip | best.onnx [best_fp16.onnx]  [--n N]" >&2; exit 2; }
-abspath() { [ -f "$1" ] || { echo "no such file: $1" >&2; exit 2; }; echo "$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"; }
+usage() { echo "usage: scripts/install_model.sh drishyam_dacl10k.zip | its unpacked folder | best.onnx [best_fp16.onnx]  [--n N]" >&2; exit 2; }
+abspath() { [ -e "$1" ] || { echo "no such file or folder: $1" >&2; exit 2; }; echo "$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"; }
 N=200 MODEL="" FP16=""
 while [ $# -gt 0 ]; do
   case $1 in
@@ -37,9 +38,13 @@ if [[ $MODEL == *.zip ]]; then
   UNZIPPED=$(mktemp -d "${TMPDIR:-/tmp}/drishyam-model.XXXXXX")
   trap 'rm -rf "$UNZIPPED"' EXIT
   unzip -o -q "$MODEL" -d "$UNZIPPED"
-  [ -f "$UNZIPPED/best.onnx" ] || { echo "no best.onnx in $MODEL" >&2; exit 2; }
-  MODEL="$UNZIPPED/best.onnx"
-  if [ -f "$UNZIPPED/best_fp16.onnx" ]; then FP16="$UNZIPPED/best_fp16.onnx"; fi
+  MODEL=$UNZIPPED
+fi
+if [ -d "$MODEL" ]; then  # the unpacked zip, ours or the browser's
+  [ -z "$FP16" ] || usage
+  [ -f "$MODEL/best.onnx" ] || { echo "no best.onnx in $MODEL" >&2; exit 2; }
+  if [ -f "$MODEL/best_fp16.onnx" ]; then FP16="$MODEL/best_fp16.onnx"; fi
+  MODEL="$MODEL/best.onnx"
 fi
 
 cd "$(dirname "$0")/.."
@@ -190,7 +195,7 @@ echo "  git commit -m \"models: dacl10k segmenter\""
 echo "  printf %s $DST | vercel env add DRISHYAM_ONNX production"
 if [ -n "$FP16" ]; then echo "  printf %s $DST16 | vercel env add DRISHYAM_ONNX_FP16 production"
 else echo "Only if an earlier install set DRISHYAM_ONNX_FP16 (that file is gone now):"
-  echo "  vercel env rm DRISHYAM_ONNX_FP16 production"; fi
+  echo "  vercel env rm DRISHYAM_ONNX_FP16 production --yes"; fi
 echo "Deploy, or push if the project deploys from git:"
 echo "  vercel deploy --prod"
 echo "Then expect \"segmenter\":\"onnx:drishyam_dacl10k.onnx\" from:"

@@ -436,7 +436,7 @@ if __name__ == "__main__":
               "Drishyam's fast looks will use the FP32 net")
     else:
         print("PARITY FAILED (table above): do not install these weights")
-    print("next, on your machine in the repo, with the zip in ~/Downloads (or give its path):")
+    print("next, on your machine in the repo, with the zip in ~/Downloads (or give its path, or the folder Safari unpacked it into):")
     print("  scripts/install_model.sh ~/Downloads/drishyam_dacl10k.zip")
     if not NOTEBOOK and not PARITY_OK:
         sys.exit(1)

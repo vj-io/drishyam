@@ -28,6 +28,12 @@ has to be pushed or uploaded first. It needs a Kaggle account with phone verific
    scripts/install_model.sh ~/Downloads/drishyam_dacl10k.zip
    ```
 
+   If your browser unpacked it (Safari does by default), give the folder instead:
+
+   ```
+   scripts/install_model.sh ~/Downloads/drishyam_dacl10k
+   ```
+
    It unpacks the zip into a fresh temporary folder, loads both files on OpenCV 5 DNN `ENGINE_NEW` and through
    `OnnxSegmenter` before touching anything (FP16 against FP32 too; if FP16 is over its tolerance it is dropped and
    FP32 is installed alone, which Drishyam's fast looks then use as well), copies them to
@@ -228,17 +234,16 @@ export DRISHYAM_ONNX_FP16=/path/to/drishyam_dacl10k.fp16.onnx
 These map to `OnnxSegmenter(path, fp16_path)`. No `class_map` is needed because the ONNX already outputs the six classes.
 `drishyam.segment.default_segmenter` picks these variables up automatically.
 
-To take the model off the live site later, run each of these on its own (`vercel env rm` may ask to confirm), then
-redeploy:
+To take the model off the live site later, run each of these on its own, then redeploy:
 
 ```
-vercel env rm DRISHYAM_ONNX production
+vercel env rm DRISHYAM_ONNX production --yes
 ```
 
 and, only if FP16 was set:
 
 ```
-vercel env rm DRISHYAM_ONNX_FP16 production
+vercel env rm DRISHYAM_ONNX_FP16 production --yes
 ```
 
 Publish to the Hugging Face Hub so the EC2 box can pull it (the weights inherit dacl10k's non-commercial licence, so say
