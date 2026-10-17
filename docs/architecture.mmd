@@ -1,0 +1,67 @@
+%% Drishyam system architecture: the same content as docs/architecture.svg.
+%% Dashed boxes: the AWS path is planned, not deployed. The Vercel mirror is live today.
+%% cv2 names are the calls made in drishyam/imaging.py, privacy.py, segment.py, measure.py and agent.py.
+flowchart TB
+    subgraph CLIENTS["1 · Clients"]
+        UI["Browser UI<br/>public/index.html + app.js, strict CSP<br/>upload · live trace · review · KILL"]
+        CLI["drishyam CLI, local<br/>run → Job.run() in-process<br/>review → decide(actor='human') · kill → KILL file"]
+        MCPC["MCP client, e.g. Claude Code, local<br/>drishyam mcp over stdio<br/>12 allow-listed tools: no approve, no shell"]
+    end
+
+    subgraph AWS["2 · AWS path (planned, not deployed)"]
+        CF["CloudFront + Origin Access Control<br/>AWS WAF rate-based rules<br/>POST bodies carry x-amz-content-sha256"]
+        FURL["Lambda Function URL<br/>AuthType AWS_IAM · InvokeMode RESPONSE_STREAM"]
+        LAMBDA["Lambda arm64 (Graviton) · Python 3.12<br/>AWS Lambda Web Adapter → FastAPI web tier, web.py<br/>CSP · HMAC-SHA256 work-order token · per-job kill token"]
+        DDB[("DynamoDB kill-flag table<br/>GetItem ConsistentRead before every step")]
+        SM["Secrets Manager<br/>DRISHYAM_SIGNING_KEY"]
+        CW["CloudWatch<br/>EMF metrics · dashboard · alarms → SNS email"]
+        BUD["AWS Budgets<br/>account spend alerts"]
+    end
+
+    VERCEL["2 · Vercel mirror, live today<br/>same app.py → web.py, x86, stock OpenCV 5<br/>WAF: 12 job starts per IP per minute<br/>KILL channel: Vercel Runtime Cache"]
+
+    subgraph CORE["3 · Agent core, drishyam/"]
+        POLICY["agent.py Job.run policy<br/>survey · best-score · entropy#gt;tau · area#lt;A_min<br/>verify-new-mask · iou#lt;0.5 · stop-rule"]
+        GOV["governor.py check() before every step<br/>kill-switch · cap-hit · p95#gt;SLA · warp-spike · usd≥80%"]
+        PLAN["planner.py, optional LLM<br/>numeric digest → validate() allow-list<br/>→ planner-fallback on any failure"]
+        GATE["findings.py human gate<br/>exposed_rebar, spalling ≥ 40 000 px² → pending_review<br/>only decide(actor='human') leaves it"]
+        GOV --> POLICY
+        PLAN --> POLICY
+        POLICY --> GATE
+    end
+
+    subgraph CV["4 · OpenCV 5 layer"]
+        DEC["decode<br/>cv2.imdecode after a header sniff"]
+        PRIV["privacy<br/>cv2.FaceDetectorYN YuNet · cv2.dnn.readNet NanoDet-Plus<br/>cv2.dnn.NMSBoxes · cv2.GaussianBlur"]
+        PYR["pyramid<br/>cv2.pyrDown × 4 → L0 … L4"]
+        SAL["saliency at L3<br/>cv2.createCLAHE · cv2.Sobel · cv2.morphologyEx BLACKHAT<br/>cv2.adaptiveThreshold · cv2.inRange · cv2.connectedComponentsWithStats"]
+        GAZE["virtual PTZ gaze<br/>cv2.warpPerspective · cv2.perspectiveTransform"]
+        QG["quality gate<br/>cv2.Laplacian variance, glare, dark"]
+        SEG["segment<br/>cv2.dnn.readNetFromONNX, engine=cv2.dnn.ENGINE_NEW (OpenCV 5 only)<br/>or the classical engine, no weights"]
+        MEAS["measure + verify<br/>cv2.morphologyEx HITMISS · cv2.minAreaRect · cv2.arcLength<br/>look_iou: cv2.warpPerspective + cv2.dilate"]
+        DEC --> PRIV --> PYR --> SAL
+        GAZE --> QG --> SEG --> MEAS
+    end
+
+    subgraph OUT["5 · Outputs"]
+        TRACE["NDJSON trace, one line per step<br/>web: streamed · CLI/MCP: trace.jsonl"]
+        WO["work_order.json<br/>web: HMAC-SHA256 token, 7-day expiry"]
+    end
+
+    UI -->|"HTTPS · NDJSON streams back"| CF
+    UI -.->|"mirror"| VERCEL
+    CF -->|"SigV4 via OAC"| FURL --> LAMBDA
+    LAMBDA <-->|"kill flag"| DDB
+    SM -->|"signing key"| LAMBDA
+    LAMBDA -->|"EMF"| CW
+    BUD ~~~ CW
+    LAMBDA -->|"Job(image, cfg, kill).run()"| CORE
+    VERCEL --> CORE
+    CLI -->|"in-process"| CORE
+    MCPC -->|"tool calls"| CORE
+    CORE -->|"gaze · quality · segment_view · measure"| CV
+    CV -->|"entropy, mask areas, IoU, sharpness, ms"| CORE
+    CORE --> OUT
+
+    classDef planned stroke-dasharray: 6 4
+    class CF,FURL,LAMBDA,DDB,SM,CW,BUD planned
