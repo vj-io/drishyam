@@ -277,7 +277,8 @@ function handle(ev) {
       if (!String(ev.reason).endsWith(' is critical')) {  // that one is said by the finding's own line
         const f = findings.cards.get(ev.finding_id)?.finding;
         trace.addNote('review', S.steps.at(-1)?.step ?? 0, ev.finding_id, `${f?.cls ?? 'finding'} ${ev.finding_id} → human`,
-          `${ev.reason}: the looks disagree on a critical finding, so a person must check it`, () => findings.focus(ev.finding_id));
+          /^iou /.test(ev.reason) ? `${ev.reason}: two looks disagree on a critical finding, so a person must check it` : ev.reason,
+          () => findings.focus(ev.finding_id));
       }
       return 0;
     }
