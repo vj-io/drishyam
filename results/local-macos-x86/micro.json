@@ -653,5 +653,41 @@
     "mean_ms": 47.124
    }
   ]
+ },
+ "dnn": {
+  "onnx": null,
+  "onnx_fp16": null,
+  "provenance": {
+   "cv2": "5.0.0",
+   "build_info_sha256": "fe5f9337dbc8663639ee7bcb2deb09359893fc8d2aa5b6a447cee2a0117d2ec7",
+   "cv2_file": "/Users/mac/Documents/Projects/opencv/.claude/worktrees/wf_06edc486-c71-3/.venv/lib/python3.13/site-packages/cv2/__init__.py",
+   "under_opt_cool": false,
+   "build": "stock (not COOL)",
+   "machine": "Darwin 25.6.0 x86_64",
+   "platform": "macOS-26.7.1-x86_64-i386-64bit-Mach-O",
+   "cpu": "Intel(R) Core(TM) i9-9880H CPU @ 2.30GHz",
+   "logical_cpus": 16,
+   "cv2_threads": 16,
+   "python": "3.13.16",
+   "numpy": "2.5.4",
+   "timestamp": "2026-10-17T22:22:37Z",
+   "load_avg": [
+    2.96,
+    4.42,
+    6.35
+   ]
+  },
+  "results": [
+   {
+    "op": "nanodet",
+    "size": "416x416",
+    "n": 50,
+    "min_ms": 29.945,
+    "p50_ms": 31.851,
+    "p95_ms": 34.284,
+    "p99_ms": 35.979,
+    "mean_ms": 32.084
+   }
+  ]
  }
 }

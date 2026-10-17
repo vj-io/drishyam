@@ -5,7 +5,9 @@
 Writes results/<arm>/micro.json with a provenance block. `results` holds single OpenCV calls; `job_ops` holds
 the agent's own timed ops under the names its trace uses (segment:* on `default_segmenter()`, so DRISHYAM_ONNX
 selects the engine), which `python -m evals.harness --cost-model fixed` charges per call. `--job-ops-only`
-re-times just those, keeping `results`. Also home of `provenance()`, which the other benchmarks and the
+re-times just those, keeping `results`. `dnn` holds bare OpenCV DNN forwards: the NanoDet-Plus privacy detector
+on its 416x416 input, and the segmentation ONNX that DRISHYAM_ONNX (FP32) and DRISHYAM_ONNX_FP16 name, read with
+ENGINE_NEW at 256 and 512; every run times them, and `--dnn-only` re-times only them. Also home of `provenance()`, which the other benchmarks and the
 evaluation harness import. Nothing here touches the network unless DRISHYAM_ON_EC2=1, in which case instance
 type, AMI and id are read from IMDSv2 (never otherwise).
 """
@@ -25,7 +27,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from drishyam import imaging
+from drishyam import imaging, privacy
 from drishyam.segment import default_segmenter, segment_view
 
 SIZES = ((1024, 768), (2048, 1536), (4000, 3000))
@@ -141,6 +143,30 @@ def job_ops(w: int, h: int, seg) -> dict:
     }
 
 
+def dnn_ops() -> dict:
+    """name -> (input size, forward). NanoDet always; the segmentation ONNX only when DRISHYAM_ONNX(_FP16) is set."""
+    nano = cv2.dnn.readNet(str(privacy.NANODET))  # as privacy.py reads it
+    names = nano.getUnconnectedOutLayersNames()
+    nano.setInput(np.zeros((1, 3, privacy.NANO_SIZE, privacy.NANO_SIZE), np.float32))
+    table = {"nanodet": (privacy.NANO_SIZE, lambda: nano.forward(names))}
+    for label, var in (("fp32", "DRISHYAM_ONNX"), ("fp16", "DRISHYAM_ONNX_FP16")):
+        if os.environ.get(var):
+            for s in (256, 512):
+                net = cv2.dnn.readNetFromONNX(os.environ[var], engine=cv2.dnn.ENGINE_NEW)
+                net.setInput(np.random.default_rng(0).standard_normal((1, 3, s, s)).astype(np.float32))
+                table[f"onnx:{label}@{s}"] = (s, net.forward)
+    return table
+
+
+def time_dnn(repeats: int) -> dict:
+    rows = []
+    for name, (s, fn) in dnn_ops().items():
+        rows.append({"op": name, "size": f"{s}x{s}", **time_op(fn, repeats)})
+        print(f"{name:18s} {s}x{s:<5d} p50 {rows[-1]['p50_ms']:9.3f} ms  p95 {rows[-1]['p95_ms']:9.3f} ms", flush=True)
+    return {"onnx": os.environ.get("DRISHYAM_ONNX"), "onnx_fp16": os.environ.get("DRISHYAM_ONNX_FP16"),
+            "provenance": provenance(), "results": rows}
+
+
 def time_op(fn, repeats: int, warmup: int = WARMUP) -> dict:
     for _ in range(warmup):
         fn()
@@ -163,21 +189,30 @@ def _time_all(table, sizes, repeats) -> list[dict]:
     return rows
 
 
-def run(arm: str, repeats: int = 50, threads: int = 1, out_dir="results", sizes=SIZES, job_ops_only=False) -> dict:
+def run(arm: str, repeats: int = 50, threads: int = 1, out_dir="results", sizes=SIZES, job_ops_only=False,
+        dnn_only=False) -> dict:
     if repeats < 30:
         raise ValueError("at least 30 repeats")
     cv2.setNumThreads(threads)
     out = Path(out_dir) / arm / "micro.json"
+    if dnn_only:
+        if not out.exists():
+            raise SystemExit(f"--dnn-only adds to an existing {out}: run without it first")
+        doc = {**json.loads(out.read_text()), "dnn": time_dnn(repeats)}
+        out.write_text(json.dumps(doc, indent=1))
+        print(f"wrote {out}")
+        return doc
     seg = default_segmenter()
     jobs = {"segmenter": seg.name, "provenance": provenance(),
             "results": _time_all(lambda w, h: job_ops(w, h, seg), sizes, repeats)}
     if job_ops_only and out.exists():
-        doc = {**json.loads(out.read_text()), "job_ops": jobs}
+        doc = {**json.loads(out.read_text()), "job_ops": jobs, "dnn": time_dnn(repeats)}
     else:
         doc = {"arm": arm, "config": {"repeats": repeats, "warmup": WARMUP, "cv2_threads": cv2.getNumThreads(),
                                       "requested_threads": threads, "sizes": [f"{w}x{h}" for w, h in sizes],
                                       "gaze_view_px": 512},
-               "provenance": provenance(), "results": [] if job_ops_only else _time_all(ops, sizes, repeats), "job_ops": jobs}
+               "provenance": provenance(), "results": [] if job_ops_only else _time_all(ops, sizes, repeats), "job_ops": jobs,
+               "dnn": time_dnn(repeats)}
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(doc, indent=1))
     print(f"wrote {out}")
@@ -190,9 +225,10 @@ def main(argv=None) -> None:
     ap.add_argument("--repeats", type=int, default=50)
     ap.add_argument("--threads", type=int, default=1, help="cv2.setNumThreads; recorded in the output")
     ap.add_argument("--out-dir", default="results")
-    ap.add_argument("--job-ops-only", action="store_true", help="re-time only the agent's ops; keep the rest of micro.json")
+    ap.add_argument("--job-ops-only", action="store_true", help="re-time only the agent's ops (and dnn); keep the rest")
+    ap.add_argument("--dnn-only", action="store_true", help="re-time only the DNN forwards; keep the rest of micro.json")
     a = ap.parse_args(argv)
-    run(a.arm, a.repeats, a.threads, a.out_dir, job_ops_only=a.job_ops_only)
+    run(a.arm, a.repeats, a.threads, a.out_dir, job_ops_only=a.job_ops_only, dnn_only=a.dnn_only)
 
 
 if __name__ == "__main__":
