@@ -14,7 +14,8 @@ import numpy as np
 
 from drishyam.findings import is_critical
 
-LIME, PINK, WHITE, INK = (59, 255, 182), (216, 79, 255), (255, 255, 255), (28, 24, 24)  # BGR; the site's lime and pink
+# BGR, the site's drawing palette: ground truth in sky, predictions in callout amber, on blueprint deep.
+SKY, AMBER, WHITE, INK = (255, 200, 156), (87, 200, 255), (255, 241, 232), (85, 42, 8)
 PREFIX = "failures"  # image paths in failures.json, relative to public/results/ (what public/js/results.js prepends)
 GAZE_CFGS = ("drishyam@0.3", "drishyam@1.0")
 MAX_W, MAX_H = 900, 800
@@ -207,7 +208,7 @@ def _inset(img, region, marks, gaze, width=240):
     if len(gaze) > 1:
         cv2.polylines(ins, [np.array([Q(t["x"], t["y"]) for t in gaze], np.int32)], False, WHITE, 1, cv2.LINE_AA)
     for m in marks:
-        color = {"gt": LIME, "pred": PINK}.get(m["kind"])
+        color = {"gt": SKY, "pred": AMBER}.get(m["kind"])
         if color:
             b = m["box"]
             cv2.rectangle(ins, Q(b[0], b[1]), Q(b[0] + b[2], b[1] + b[3]), color, 1, cv2.LINE_AA)
@@ -255,7 +256,7 @@ def render_case(img: np.ndarray, case: dict, trace: list[dict], title: str, path
             label(m["box"], m["label"], WHITE)
     for m in case["marks"]:
         if m["kind"] != "other":
-            color = LIME if m["kind"] == "gt" else PINK
+            color = SKY if m["kind"] == "gt" else AMBER
             rect(m["box"], color, 3)
             label(m["box"], m["label"], color)
     for i, (px, py) in enumerate(pts, start=1):
@@ -272,7 +273,7 @@ def render_case(img: np.ndarray, case: dict, trace: list[dict], title: str, path
     cx, cy = min(corners, key=overlap)
     if ins.shape[0] + 16 < vh and ins.shape[1] + 16 < vw:
         view[cy:cy + ins.shape[0], cx:cx + ins.shape[1]] = ins
-    legend = (("ground truth", LIME), ("prediction", PINK), ("gaze order", WHITE))
+    legend = (("ground truth", SKY), ("prediction", AMBER), ("gaze order", WHITE))
     need = 370 + cv2.getTextSize(title, FONT, 0.5, 1)[0][0]
     rows = 1 if need < view.shape[1] else 2  # narrow crops: legend goes on its own line
     bar = np.full((34 if rows == 1 else 56, view.shape[1], 3), INK, np.uint8)

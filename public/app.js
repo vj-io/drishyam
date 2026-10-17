@@ -35,6 +35,7 @@ const GOVERNOR_TEXT = {
 const displayStatus = () => (S.done?.status === 'awaiting_review' && S.order?.status === 'ready' ? 'completed' : S.done?.status);
 
 function setMode(mode, text) {
+  const onKill = document.activeElement === el.kill;  // hiding KILL would drop keyboard focus on the page body
   S.mode = mode;
   $('#taskbar').dataset.mode = mode;
   const label = { idle: 'ready', running: 'looking', killed: 'killed', error: 'error', done: displayStatus() }[mode];
@@ -48,6 +49,7 @@ function setMode(mode, text) {
   el.resume.hidden = !(mode === 'killed' || (mode === 'error' && S.steps.length > 0));
   el.look.disabled = mode === 'running' || !S.image;
   if (mode !== 'running') el.count.textContent = '';
+  if (onKill && mode !== 'running') (el.resume.hidden ? el.look : el.resume).focus({ preventScroll: true });
 }
 
 // ---- stepping / replay --------------------------------------------------------
@@ -156,7 +158,7 @@ function buildDone() {
   const pill = h('span', { class: 'pill' });
   const orderState = h('span', { class: 'note' });
   const specs = [
-    ['steps', sm.steps, {}], ['of the pixels', sm.pixels_frac * 100, { decimals: 1, suffix: ' %' }],
+    ['looks', sm.steps, {}], ['of the pixels', sm.pixels_frac * 100, { decimals: 1, suffix: ' %' }],
     ['$ modelled', sm.usd, { decimals: 4, prefix: '$' }], ['seconds', sm.seconds, { decimals: 1 }],
     ['findings', sm.findings, {}], ['critical pending', sm.critical_pending, {}],
   ].map(([label, value, opts]) => ({ value, opts, pair: tile(label) }));
@@ -170,8 +172,8 @@ function buildDone() {
     orderState,
     h('div', { class: 'tiles' }, specs.map((s) => s.pair[0])),
     h('div', { class: 'meter' },
-      h('div', { class: 'meter__head' }, h('span', {}, 'coverage'), h('span', {}, coverNum)),
-      h('div', { class: 'meter__track', role: 'progressbar', 'aria-label': 'Coverage of candidate regions', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': Math.round(coverage * 100) }, cover)),
+      h('div', { class: 'meter__head' }, h('span', {}, 'saliency coverage'), h('span', {}, coverNum)),
+      h('div', { class: 'meter__track', role: 'progressbar', 'aria-label': 'Saliency-weighted coverage', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': Math.round(coverage * 100) }, cover)),
     h('div', {}, h('h4', { class: 'label' }, 'unvisited regions'),
       unvisited?.length ? h('p', { class: 'chips' }, unvisited.map((r) => h('span', { class: 'chip chip--look' }, r))) : h('p', { class: 'note' }, 'none: every candidate was visited')),
     privacy ? h('p', { class: 'note' }, `privacy: ${privacy.faces_blurred ?? 0} faces and ${privacy.people_blurred ?? 0} people blurred`) : null,
@@ -213,7 +215,7 @@ function finish(ev) {
   S.token = ev.token;
   S.order = ev.work_order;
   const sm = ev.summary;
-  setMode('done', `${sm.steps} steps · ${(sm.pixels_frac * 100).toFixed(1)} % of pixels · ${sm.seconds} s · coverage ${Math.round(ev.coverage * 100)} %`);
+  setMode('done', `${sm.steps} looks · ${(sm.pixels_frac * 100).toFixed(1)} % of pixels · ${sm.seconds} s · saliency coverage ${Math.round(ev.coverage * 100)} %`);
   findings.setReady();
   buildDone();
   replay(el.tbSheet, 'is-stamped');  // the sheet number stamps in: this run is on file
@@ -243,7 +245,9 @@ function params() {
 async function run(replay = null) {
   if (!S.image || S.mode === 'running') return;
   S.ctl = new AbortController();
+  const refocus = [el.look, el.resume].includes(document.activeElement);  // both are disabled or hidden while running
   setMode('running');
+  if (refocus) el.kill.focus({ preventScroll: true });
   if (matchMedia('(max-width: 960px)').matches) $('.win--view').scrollIntoView({ behavior: reduced() ? 'auto' : 'smooth', block: 'start' });
   try {
     for await (const ev of streamJob({ blob: S.image.blob, params: params(), replay, signal: S.ctl.signal })) handle(ev);
@@ -343,6 +347,15 @@ for (const type of ['dragover', 'drop']) window.addEventListener(type, (e) => e.
 $('#cap-px').addEventListener('input', (e) => { $('#cap-px-out').textContent = `${e.target.value} %`; });
 $('#cap-sec').addEventListener('input', (e) => { $('#cap-sec-out').textContent = `${e.target.value} s`; });
 
+// Phones see only the photo and its numbered balloons (the parts list below carries the callout text).
+const artMq = matchMedia('(max-width: 560px)');
+const fitArt = () => $('.art__svg').setAttribute('viewBox', artMq.matches ? '0 0 492 372' : '0 0 600 430');
+artMq.onchange = fitArt;
+fitArt();
+
+// The sticky bar's real height: scroll padding and focus scrolling keep controls clear of it.
+new ResizeObserver(() => document.documentElement.style.setProperty('--bar', `${$('#taskbar').offsetHeight}px`)).observe($('#taskbar'));
+
 const pops = new IntersectionObserver((entries) => {
   let i = 0;
   for (const e of entries) {
@@ -353,6 +366,7 @@ const pops = new IntersectionObserver((entries) => {
   }
 }, { threshold: 0.06 });
 $$('.pop').forEach((w) => pops.observe(w));
+document.documentElement.classList.add('js');  // only now may CSS hide not-yet-scrolled windows (a failed script leaves them visible)
 
 clearJob();
 setMode('idle');

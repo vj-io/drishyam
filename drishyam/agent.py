@@ -190,7 +190,7 @@ class Job:
         y0, x0 = max(0, y - pad), max(0, x - pad)
         view = crop[y0 : y + h + pad, x0 : x + w + pad].copy()
         cs, _ = cv2.findContours(mask[y0 : y + h + pad, x0 : x + w + pad], cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        cv2.drawContours(view, cs, -1, (216, 79, 255), max(1, view.shape[0] // 160))
+        cv2.drawContours(view, cs, -1, (87, 200, 255), max(2, view.shape[0] // 64))  # BGR callout amber #FFC857, ~2 px at card size
         thumb = imaging.jpeg_b64(view, 256) if self.cfg.thumbs else None
         conf = seg.confidence[cls]
         # One physical defect, one finding: rust on exposed bars is the bar, a spall's rim is the spall.

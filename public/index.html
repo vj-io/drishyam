@@ -45,7 +45,7 @@
     </div>
 
     <div class="hero__side">
-    <figure class="art" aria-hidden="true">
+    <figure class="art pop" aria-hidden="true">
       <svg class="art__svg" viewBox="0 0 600 430" fill="none">
         <defs>
           <marker id="ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 1L8 4L0 7Z" class="mk-fill"/></marker>
@@ -117,8 +117,14 @@
         </g>
 
         <text class="t-note" x="20" y="392">PIXELS, NOT MILLIMETRES. EVERY LOOK HAS A CAUSE.</text>
-        <path class="ext" d="M20 404H580"/>
+        <path class="ext rule" d="M20 404H580"/>
       </svg>
+      <ol class="art__key">
+        <li><b>Survey</b> L2 &middot; whole photo</li>
+        <li><b>Escalate</b> L1 &middot; unsure, zoom</li>
+        <li><b>Verify</b> L0 &middot; re-segment</li>
+        <li><b>Exposed rebar</b> needs a human</li>
+      </ol>
     </figure>
     <dl class="tblock" aria-hidden="true">
       <div class="tblock__title"><dt>Title</dt><dd>Drishyam &mdash; virtual-PTZ bridge inspector</dd></div>
@@ -155,7 +161,7 @@
 
     <div class="taskbar" id="taskbar">
       <div class="taskbar__id"><span class="taskbar__mark" aria-hidden="true"></span><span>job</span></div>
-      <p class="taskbar__status"><span id="job-pill" class="pill pill--idle">ready</span><span id="job-text">Pick a photo, set a budget, hit LOOK.</span><span id="job-steps" class="taskbar__steps" aria-hidden="true"></span></p>
+      <p class="taskbar__status" aria-live="polite"><span id="job-pill" class="pill pill--idle">ready</span><span id="job-text">Pick a photo, set a budget, hit LOOK.</span><span id="job-steps" class="taskbar__steps" aria-hidden="true"></span></p>
       <div class="taskbar__actions">
         <button class="btn btn--red btn--kill" id="kill" type="button" hidden>KILL</button>
         <button class="btn" id="resume" type="button" hidden>Resume</button>
@@ -281,7 +287,7 @@
         <dl class="tblock tblock--live" aria-label="Drawing status">
           <div><dt>Drawn by</dt><dd>agent</dd></div>
           <div><dt>Checked by</dt><dd id="tb-checked">human reviewer</dd></div>
-          <div><dt>Sheet</dt><dd class="tblock__sheet" id="tb-sheet">0 of 0</dd></div>
+          <div><dt>Step</dt><dd class="tblock__sheet" id="tb-sheet">0 of 0</dd></div>
           <div><dt>Scale</dt><dd id="tb-scale">overview</dd></div>
         </dl>
         <div id="done"><p class="note">No job has finished yet. Status, coverage and the work order download appear here.</p></div>

@@ -592,7 +592,7 @@ def log_finding(job: JobId, gaze_id: RecordId, cls: Defect) -> str:
             cs, _ = cv2.findContours(
                 mask[py : y + h + pad, px : x + w + pad], cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
             )
-            cv2.drawContours(view, cs, -1, (216, 79, 255), max(1, view.shape[0] // 160))
+            cv2.drawContours(view, cs, -1, (87, 200, 255), max(2, view.shape[0] // 64))  # BGR callout amber #FFC857, ~2 px at card size
             same = Finding(
                 f"f{len(s.findings) + 1}",
                 cls,

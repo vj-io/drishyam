@@ -10,6 +10,9 @@ const lerp = (a, b, t) => a + (b - a) * t;
 const ease = (t) => 1 - (1 - t) ** 3;
 const back = (t) => 1 + 2.70158 * (t - 1) ** 3 + 1.70158 * (t - 1) ** 2;
 const phase = (t, a, b) => Math.min(1, Math.max(0, (t - a) / (b - a)));
+const around = (x, y, r) => ({ x: x - r, y: y - r, w: 2 * r, h: 2 * r });
+const hit = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+const overlap = (a, b) => Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)) * Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
 
 export const pointOf = (step) => {
   const a = step.decision?.args;
@@ -58,7 +61,7 @@ function arrow(g, x, y, ang) {
   g.fill();
 }
 
-/** Text in a filled box, centred on (x, y). */
+/** Text in a filled box, centred on (x, y). Returns the box. */
 function label(g, text, x, y, { bg = C.deep, fg = C.line, edge = C.line, font = `700 11.5px ${MONO}` } = {}) {
   g.font = font;
   const w = g.measureText(text).width + 12;
@@ -73,6 +76,7 @@ function label(g, text, x, y, { bg = C.deep, fg = C.line, edge = C.line, font = 
   g.textAlign = 'center';
   g.textBaseline = 'middle';
   g.fillText(text, x, y + 0.5);
+  return { x: x - w / 2, y: y - 9, w, h: 18 };
 }
 
 export class Viewport {
@@ -80,6 +84,8 @@ export class Viewport {
     this.c = canvas;
     this.g = canvas.getContext('2d');
     this.onPick = onPick;
+    this.fig = canvas.closest('.win')?.querySelector('.win__fig')?.textContent.trim() ?? 'FIG.';  // gaze step n is FIG. 2.3.n
+    this.occ = [];  // what is drawn so far (balloons, crosses, labels), for the labels placed after it to avoid
     this.img = null;
     this.job = null;
     this.heat = null;
@@ -165,6 +171,7 @@ export class Viewport {
     this.dpr = window.devicePixelRatio || 1;
     this.cw = r.width;
     this.ch = r.height;
+    this.narrow = r.width < 500;  // phones: no FIG. callout (the step detail below carries it), one dimension only
     this.c.width = Math.round(r.width * this.dpr);
     this.c.height = Math.round(r.height * this.dpr);
     this.rebuildPrivacy();
@@ -245,36 +252,59 @@ export class Viewport {
 
     const t = this.progress(now);
     const shown = this.steps.slice(0, this.cursor);
-    this.drawCandidates(g, X, Y, f, shown);
+    const seen = new Set(shown.map((s) => s.region));
+    const boxes = this.cands.filter((c) => Array.isArray(c.box) && c.box.length === 4 && c.box.every(num));
+    this.occ = [];
+    this.drawCandidates(g, X, Y, f, boxes, seen);
     const current = shown[shown.length - 1];
     const win = current?.window?.length === 4 ? current : null;
     if (win) this.drawWindow(g, X, Y, f, win);
     const co = this.drawPath(g, X, Y, shown, t);
     if (win) this.drawDims(g, X, Y, win, t);  // measured values and the callout stay readable over the path
-    if (co) this.callout(g, ...co);
+    if (co && !this.narrow) this.callout(g, ...co);
+    this.drawTags(g, X, Y, f, boxes, seen);
   }
 
-  drawCandidates(g, X, Y, f, shown) {
-    const seen = new Set(shown.map((s) => s.region));
+  /** Candidate regions as dashed boxes, stopped at the photo's frame like any line on a drawing. */
+  drawCandidates(g, X, Y, f, boxes, seen) {
     g.save();
-    for (const c of this.cands) {
-      if (!Array.isArray(c.box) || !c.box.every(num)) continue;
+    g.beginPath();
+    g.rect(f.x, f.y, f.W * f.s, f.H * f.s);
+    g.clip();
+    g.setLineDash([8, 5]);
+    g.lineWidth = 2;
+    for (const c of boxes) {
       const [bx, by, bw, bh] = c.box;
-      const col = seen.has(c.id) ? C.amber : C.line2;
-      g.setLineDash([8, 5]);
-      g.lineWidth = 2;
-      g.strokeStyle = col;
+      g.strokeStyle = seen.has(c.id) ? C.amber : C.line2;
       g.strokeRect(X(bx), Y(by), bw * f.s, bh * f.s);
-      g.setLineDash([]);
-      g.font = `700 11px ${MONO}`;
+    }
+    g.restore();
+  }
+
+  /** Region tags go on last, in the first corner of their box (inside the photo) that covers no balloon or label; none fits, no tag. */
+  drawTags(g, X, Y, f, boxes, seen) {
+    g.save();
+    g.font = `700 11px ${MONO}`;
+    g.textAlign = 'left';
+    g.textBaseline = 'middle';
+    const fx1 = f.x + f.W * f.s;
+    const fy1 = f.y + f.H * f.s;
+    for (const c of boxes) {
+      const [bx, by, bw, bh] = c.box;
       const text = String(c.id);
       const w = g.measureText(text).width + 10;
+      const h = 17;
+      const l = Math.max(X(bx), f.x);
+      const t = Math.max(Y(by), f.y);
+      const r = Math.min(X(bx + bw), fx1) - w;
+      const b = Math.min(Y(by + bh), fy1) - h;
+      const spot = [[l, t], [r, t], [l, b], [r, b]].map(([x, y]) => ({ x, y, w, h })).find((q) => !this.occ.some((o) => hit(q, o)));
+      if (!spot) continue;
+      this.occ.push(spot);
       g.fillStyle = C.deep;
-      g.fillRect(X(bx), Y(by), w, 17);
-      g.fillStyle = col;
-      g.textAlign = 'left';
-      g.textBaseline = 'middle';
-      g.fillText(text, X(bx) + 5, Y(by) + 9);
+      g.fillRect(spot.x, spot.y, w, h);
+      g.fillStyle = seen.has(c.id) ? C.amber : C.line2;
+      g.fillText(text, spot.x + 5, spot.y + 9);
     }
     g.restore();
   }
@@ -315,23 +345,48 @@ export class Viewport {
     const x = X(wx), y = Y(wy), w = ww * (X(1) - X(0)), h = wh * (Y(1) - Y(0));
     g.save();
     const d = ease(phase(t, 0.12, 0.85));
-    this.dimH(g, x, x + w, y, ww, d);
-    this.dimV(g, y, y + h, x, wh, d);
+    this.dimH(g, x, x + w, y, y + h, ww, d);
+    if (!this.narrow) this.dimV(g, y, y + h, x, x + w, wh, d);
     const level = step.decision?.args?.level;
     if (num(level)) {
       const text = `L${level} · 1:${2 ** level}`;
       g.font = `700 11.5px ${MONO}`;
       const tw = g.measureText(text).width + 12;
-      const tx = Math.min(Math.max(x + 10, 26), this.cw - tw - 4);
-      const ty = Math.min(Math.max(y + 12, 34), this.ch - 22);
-      label(g, text, tx + tw / 2, ty + 9, { bg: C.amber, fg: C.ink, edge: null });
+      const at = (tx, ty) => ({ x: Math.min(Math.max(tx, 4), this.cw - tw - 4), y: Math.min(Math.max(ty, 4), this.ch - 22), w: tw, h: 18 });
+      // inside the window's top-left corner, else below it, inside its foot or beside it: whichever covers least
+      const spot = this.least([at(Math.max(x + 10, 26), Math.max(y + 12, 34)), at(x, y + h + 6), at(x + 10, y + h - 30), at(x + w + 6, y), at(x - tw - 6, y)]);
+      this.occ.push(label(g, text, spot.x + tw / 2, spot.y + 9, { bg: C.amber, fg: C.ink, edge: null }));
     }
     g.restore();
   }
 
-  /** Horizontal dimension above the window (or just inside it when the window runs off the top). */
-  dimH(g, x0, x1, edge, value, d) {
-    const yy = edge - 16 >= 10 ? edge - 16 : Math.min(this.ch - 10, Math.max(10, edge + 22));
+  /** The candidate box (first choice first) that covers least of what is already placed: balloons, crosses, labels. */
+  least(boxes) {
+    const cost = (b) => this.occ.reduce((n, o) => n + overlap(b, o), 0);
+    return boxes.reduce((best, b) => (cost(b) < cost(best) ? b : best));
+  }
+
+  /**
+   * Which side of the window a dimension goes on (`sides`: first choice first) and how far its label slides from
+   * mid-span, so the label clears every balloon and label already placed. As on paper, a label that fits nowhere
+   * between the arrows goes just outside one of them. Reserves the final label box.
+   */
+  place(lo, hi, size, sides, box, limit) {
+    const mid = (lo + hi) / 2;
+    const inside = [0, -1, 1, -2, 2].map((k) => Math.min(Math.max(mid + k * (size + 10), lo + size / 2), Math.max(lo + size / 2, hi - size / 2)));
+    const spots = [...inside, lo - size / 2 - 12, hi + size / 2 + 12].map((v) => Math.min(Math.max(v, size / 2 + 4), limit - size / 2 - 4));
+    const best = this.least(sides.flatMap((side) => spots.map((c) => Object.assign(box(side, c), { side, c }))));
+    this.occ.push(best);
+    return [best.side, best.c - mid];
+  }
+
+  /** Horizontal dimension above the window, else below it (or just inside it when the window runs off the top). */
+  dimH(g, x0, x1, top, bottom, value, d) {
+    g.font = `700 11.5px ${MONO}`;
+    const fw = g.measureText(`${Math.round(value)} px`).width + 12;  // the final label, so nothing hops while it counts up
+    const sides = top - 16 >= 10 ? [top - 16, ...(bottom + 16 <= this.ch - 10 ? [bottom + 16] : [])] : [Math.min(this.ch - 10, Math.max(10, top + 22))];
+    const [yy, off] = this.place(Math.max(x0, 4), Math.min(x1, this.cw - 4), fw, sides, (row, c) => ({ x: c - fw / 2, y: row - 9, w: fw, h: 18 }), this.cw);
+    const edge = yy > bottom ? bottom : top;
     const mid = (x0 + x1) / 2;
     const a = mid - ((x1 - x0) / 2) * d;
     const b = mid + ((x1 - x0) / 2) * d;
@@ -348,18 +403,23 @@ export class Viewport {
     g.strokeStyle = C.line;
     g.fillStyle = C.line;
     g.lineWidth = 2;
+    const lx = (va + vb) / 2 + off * d;  // the line runs on to a label set outside the arrows
     g.beginPath();
-    g.moveTo(va, yy);
-    g.lineTo(vb, yy);
+    g.moveTo(Math.min(va, lx), yy);
+    g.lineTo(Math.max(vb, lx), yy);
     g.stroke();
     if (a >= 4) arrow(g, a, yy, Math.PI);
     if (b <= this.cw - 4) arrow(g, b, yy, 0);
-    label(g, `${Math.round(value * d)} px`, (va + vb) / 2, yy);
+    label(g, `${Math.round(value * d)} px`, lx, yy);
   }
 
-  /** Vertical dimension left of the window (or just inside it when the window runs off the left). */
-  dimV(g, y0, y1, edge, value, d) {
-    const xx = edge - 16 >= 10 ? edge - 16 : Math.min(this.cw - 10, Math.max(10, edge + 22));
+  /** Vertical dimension left of the window, else right of it (or just inside it when the window runs off the left). */
+  dimV(g, y0, y1, left, right, value, d) {
+    g.font = `700 11.5px ${MONO}`;
+    const fw = g.measureText(`${Math.round(value)} px`).width + 12;
+    const sides = left - 16 >= 10 ? [left - 16, ...(right + 16 <= this.cw - 10 ? [right + 16] : [])] : [Math.min(this.cw - 10, Math.max(10, left + 22))];
+    const [xx, off] = this.place(Math.max(y0, 4), Math.min(y1, this.ch - 4), fw, sides, (col, c) => ({ x: col - 9, y: c - fw / 2, w: 18, h: fw }), this.ch);
+    const edge = xx > right ? right : left;
     const mid = (y0 + y1) / 2;
     const a = mid - ((y1 - y0) / 2) * d;
     const b = mid + ((y1 - y0) / 2) * d;
@@ -376,14 +436,15 @@ export class Viewport {
     g.strokeStyle = C.line;
     g.fillStyle = C.line;
     g.lineWidth = 2;
+    const ly = (va + vb) / 2 + off * d;
     g.beginPath();
-    g.moveTo(xx, va);
-    g.lineTo(xx, vb);
+    g.moveTo(xx, Math.min(va, ly));
+    g.lineTo(xx, Math.max(vb, ly));
     g.stroke();
     if (a >= 4) arrow(g, xx, a, -Math.PI / 2);
     if (b <= this.ch - 4) arrow(g, xx, b, Math.PI / 2);
     g.save();
-    g.translate(xx, (va + vb) / 2);
+    g.translate(xx, ly);
     g.rotate(-Math.PI / 2);
     label(g, `${Math.round(value * d)} px`, 0, 0);
     g.restore();
@@ -410,6 +471,7 @@ export class Viewport {
     const pts = shown.filter(pointOf);
     if (!pts.length) return;
     const at = this.layout(pts, X, Y);
+    for (const p of at) this.occ.push(around(p.cx, p.cy, 17), around(p.px, p.py, 9));
     const tt = pts[pts.length - 1] === shown[shown.length - 1] ? t : 1;
     const last = at.length - 1;
     g.save();
@@ -486,32 +548,34 @@ export class Viewport {
     g.fillText(String(step.step), x, y + 1);
   }
 
-  /** "FIG. n · ACTION · Ln" snapped onto a shoulder line off the newest numbered circle. */
+  /** "FIG. 2.3.n · ACTION · Ln" snapped onto a shoulder line off the newest numbered circle. */
   callout(g, p, step, k) {
     const a = step.decision?.args ?? {};
-    const text = `FIG. ${step.step} · ${String(step.decision?.action ?? 'step').toUpperCase()}${num(a.level) ? ` · L${a.level}` : ''}`;
+    const text = `${this.fig}.${step.step} · ${String(step.decision?.action ?? 'step').toUpperCase()}${num(a.level) ? ` · L${a.level}` : ''}`;
     g.font = `700 11.5px ${MONO}`;
     const w = g.measureText(text).width + 14;
-    let dir = 1;  // to the right: the window's own dimensions sit above and to the left
-    if (dir > 0 && p.cx + 18 + w > this.cw - 4) dir = -1;
-    if (dir < 0 && p.cx - 18 - w < 4) dir = 1;
-    const x0 = p.cx + dir * 18;
-    const x1 = x0 + dir * w * k;
     const y = p.cy;
+    // right of the balloon and above its shoulder first (the window's dimensions sit above and to the left), then
+    // the other side, then below the shoulder: whichever spot inside the canvas covers least
+    const box = ([dir, dy]) => ({ x: dir > 0 ? p.cx + 18 : p.cx - 18 - w, y: y + dy, w, h: 18 });
+    const fits = (o) => box(o).x >= 4 && box(o).x + w <= this.cw - 4;
+    const opts = [[1, -21], [-1, -21], [1, 3], [-1, 3]];
+    const [dir, dy] = this.least((opts.some(fits) ? opts.filter(fits) : opts).map((o) => Object.assign(box(o), { o }))).o;
+    const { x: left } = box([dir, dy]);
+    this.occ.push(box([dir, dy]));
     g.strokeStyle = C.amber;
     g.lineWidth = 2;
     g.beginPath();
     g.moveTo(p.cx + dir * 12, y);
-    g.lineTo(x1, y);
+    g.lineTo(p.cx + dir * (18 + w * k), y);
     g.stroke();
     g.globalAlpha = k;
-    const left = dir > 0 ? x0 : x0 - w;
     g.fillStyle = 'rgba(8,42,85,.88)';
-    g.fillRect(left, y - 21, w, 18);
+    g.fillRect(left, y + dy, w, 18);
     g.fillStyle = C.amber;
     g.textAlign = 'left';
     g.textBaseline = 'middle';
-    g.fillText(text, left + 7 - dir * 6 * (1 - k), y - 11.5);
+    g.fillText(text, left + 7 - dir * 6 * (1 - k), y + dy + 9.5);
     g.globalAlpha = 1;
   }
 

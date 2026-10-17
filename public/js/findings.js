@@ -5,6 +5,8 @@ import { countUp, replay, sound } from './fx.js';
 
 const PRINTABLE = /^[^\x00-\x1f\x7f]{1,64}$/;
 const STATE = { draft: 'draft', pending_review: 'needs review', approved: 'approved', rejected: 'rejected' };
+const ISO_UTC = /^(\d{4}-\d\d-\d\d)T(\d\d:\d\d)(:\d\d(\.\d+)?)?Z$/;
+const when = (at) => String(at ?? '').replace(ISO_UTC, '$1 $2 UTC');  // 2026-10-17T06:36:31Z -> 2026-10-17 06:36 UTC
 const px = (v, d = 0) => (num(v) ? `${v.toLocaleString('en-US', { maximumFractionDigits: d })}` : '–');
 
 export class Findings {
@@ -168,7 +170,7 @@ export class Findings {
       this.sync1(card);
       if (before !== wf.state && card.review) {
         const a = (order.approvals ?? []).find((x) => x.finding_id === wf.id);
-        card.note = a ? `${wf.state} by ${a.reviewer} at ${a.at}` : wf.state;
+        card.note = a ? `${wf.state} by ${a.reviewer} at ${when(a.at)}` : wf.state;
         this.sync1(card);
         this.stamp(card, wf.state, a);
       }
