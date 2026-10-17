@@ -27,7 +27,7 @@ export AWS_DEFAULT_REGION=us-east-1
 export AWS_PAGER=""
 EMAIL=<FILL: address for budget alerts>
 BUCKET=<FILL: a new, globally unique S3 bucket name, e.g. drishyam-bench-4821>
-KEY_NAME=<FILL: name of an existing EC2 key pair in this region; used only by the SSH fallback>
+KEY_NAME=
 BUDGET=drishyam-bench
 ACCT=$(aws sts get-caller-identity --query Account --output text)
 REF=$(git ls-remote https://github.com/vj-io/drishyam refs/heads/main | cut -f1)
@@ -37,7 +37,7 @@ aws service-quotas get-service-quota --service-code ec2 --quota-code L-1216C47A 
 
 Everything runs in us-east-1, the region the rates above are for, and every arm checks out commit `REF`. `AWS_PAGER=""` stops the CLI from showing its output in `less`, which would swallow the next pasted line (an `attach-role-policy`, for example).
 
-If you have no key pair in the region, create one first with `aws ec2 create-key-pair --key-name drishyam-bench --query KeyMaterial --output text > ~/drishyam-bench.pem && chmod 400 ~/drishyam-bench.pem`, then set `KEY_NAME=drishyam-bench`. The file goes in your home directory, outside the repo.
+`KEY_NAME` can stay empty: instances then launch without a key pair, which only the SSH fallback at the end needs. For that fallback, create one first with `aws ec2 create-key-pair --key-name drishyam-bench --query KeyMaterial --output text > ~/drishyam-bench.pem && chmod 400 ~/drishyam-bench.pem`, then set `KEY_NAME=drishyam-bench`. The file goes in your home directory, outside the repo.
 
 The last line prints your on-demand vCPU quota for standard instances. Running all three arms at once needs 24. If the quota is lower, request an increase, or run the arms in rounds: launch the arms that fit in step 5 and take steps 6 to 9 for them, then clear their ids (for example `IA=; IB=`), launch the rest with their `launch` lines and take steps 6 to 9 again. Steps 6 to 9 use only the ids that are set.
 
@@ -132,7 +132,7 @@ Paste this block once. `launch <arm> <instance type> <ami>` prints the instance 
 ```bash
 SG_BENCH=$(aws ec2 create-security-group --group-name drishyam-bench --description "no inbound rules" --query GroupId --output text)
 launch() {
-  aws ec2 run-instances --image-id "$3" --instance-type "$2" --key-name "$KEY_NAME" --security-group-ids "$SG_BENCH" \
+  aws ec2 run-instances --image-id "$3" --instance-type "$2" ${KEY_NAME:+--key-name "$KEY_NAME"} --security-group-ids "$SG_BENCH" \
     --iam-instance-profile Name=drishyam-bench-ec2 --instance-initiated-shutdown-behavior terminate \
     --metadata-options HttpTokens=required --user-data file://bench/aws_user_data.sh \
     --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=drishyam-bench-$1},{Key=project,Value=drishyam-bench}]" \
