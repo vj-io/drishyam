@@ -134,7 +134,9 @@ function addStep(step) {
   el.count.textContent = `step ${step.step}`;
   if (follow) goto(S.steps.length, true);
   else el.sliderOut.textContent = `step ${viewport.cursor} / ${S.steps.length}`;
-  if (isGovernor(step.cause)) popup('governor.exe', step.cause, GOVERNOR_TEXT[step.cause](step));
+  for (const cause of [step.governor?.cause, step.cause]) {  // a halt record may carry the governor's last override
+    if (isGovernor(cause)) popup('governor.exe', cause, GOVERNOR_TEXT[cause](step));
+  }
 }
 
 // ---- work order / done state --------------------------------------------------

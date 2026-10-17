@@ -7,7 +7,7 @@ export const isGovernor = (cause) => GOVERNOR.has(cause);
 
 const CHIP = {
   'best-score': 'look', 'entropy>tau': 'unsure', 'area<A_min': 'unsure', 'iou<0.5': 'unsure',
-  'verify-new-mask': 'verify', replay: 'chrome',
+  'verify-new-mask': 'verify', replay: 'chrome', survey: 'look',
 };
 const chip = (cause) => h('span', { class: `chip chip--${GOVERNOR.has(cause) ? 'gov' : CHIP[cause] ?? 'chrome'}` }, cause);
 
@@ -84,6 +84,7 @@ export class Trace {
     if (num(s.observation?.entropy)) parts.push('·', h('span', {}, 'entropy ', h('b', {}, s.observation.entropy.toFixed(2))));
     if (num(s.verify?.iou)) parts.push('·', h('span', {}, 'iou ', h('b', {}, s.verify.iou.toFixed(2))));
     if (s.cause) parts.push('·', chip(s.cause));
+    if (s.governor?.cause) parts.push(chip(s.governor.cause));  // an override made on the step that then halted
     if (s.quality?.ok === false) parts.push(h('span', { class: 'chip chip--gov' }, `quality: ${s.quality.reason ?? 'rejected'}`));
     if (s.injected) parts.push(h('span', { class: 'chip chip--inject' }, `injected ${s.injected}`));
     if (num(s.latency_ms)) parts.push('·', h('span', {}, `${s.latency_ms} ms`));
@@ -137,6 +138,7 @@ export function renderStepDetail(root, step) {
       row('classes', o ? classes : null),
       row('sharpness / exposure', o ? `${o.sharpness ?? '–'} / ${o.exposure ?? '–'}` : null),
       row('quality', step.quality ? (step.quality.ok ? 'ok' : `rejected: ${step.quality.reason}`) : null),
+      row('governor', step.governor?.cause ? `${step.governor.cause}: ${step.governor.rationale ?? ''}` : null),
       row('verify IoU', num(step.verify?.iou) ? `${step.verify.iou.toFixed(2)} vs L${step.verify.against_level}` : null),
       row('model / planner', step.model ? `${step.model} / ${step.planner ?? '–'}` : null),
       row('warp p50/p95', rt ? pair(rt, 'warp') : null),

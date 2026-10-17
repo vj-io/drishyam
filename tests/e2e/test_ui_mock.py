@@ -351,7 +351,8 @@ def test_desktop_mock(browser, base):
             shot_taken = True
         time.sleep(0.15)
     expect(p.locator("#job-pill")).to_have_text(re.compile(DONE_LABEL, re.IGNORECASE), timeout=T)
-    live_causes = [st["cause"] for st in STEPS if st["step"] > replayed]
+    live_causes = [c for st in STEPS if st["step"] > replayed       # a halt record may also carry a governor note
+                   for c in (st["cause"], st.get("governor", {}).get("cause")) if c]
     if any(c in GOVERNOR for c in live_causes):
         assert shot_taken, "a governor pop-up window should have appeared during the run"
     expect(p.locator(".trace__line")).to_have_count(N_TRACE)

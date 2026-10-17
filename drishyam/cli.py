@@ -75,6 +75,8 @@ def _progress(ev: dict) -> None:
         d = ev["decision"]
         if d["action"] == "halt":
             line = f"step {ev['step']}  halt  {ev['cause']}: {ev['rationale']}"
+            if g := ev.get("governor"):
+                line += f"  (governor {g['cause']}: {g['rationale']})"
         else:
             a = d["args"]
             line = (
