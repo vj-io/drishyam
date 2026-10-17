@@ -38,6 +38,16 @@ def test_class_map_is_the_official_dacl10k_list_mapped_onto_drishyam():
     assert cm["map"]["Rust"] == "corrosion" and cm["map"]["ExposedRebars"] == "exposed_rebar"
 
 
+def test_kaggle_notebook_is_built_from_the_current_script():
+    sys.path.insert(0, str(TRAINING))
+    import make_notebook
+
+    assert make_notebook.main(["--check"]) == 0, "stale notebook: run python training/make_notebook.py"
+    nb = json.loads((TRAINING / "drishyam_dacl10k_kaggle.ipynb").read_text())
+    setup = next("".join(c["source"]) for c in nb["cells"] if "".join(c["source"]).startswith("# Setup"))
+    assert nb["nbformat"] == 4 and all(repr(rel) in setup for rel in make_notebook.CARRIED)
+
+
 @pytest.fixture(scope="module")
 def mods():
     sys.path.insert(0, str(TRAINING))
@@ -91,13 +101,37 @@ def test_dataset_rasterises_labelme_polygons_per_class(mods, tmp_path):
     (root / "annotations" / "train" / "a.json").write_text(
         json.dumps({"imageWidth": 120, "imageHeight": 60, "imageName": "a.jpg", "shapes": shapes}))
     assert train.find_root(str(tmp_path)) == root
+    kaggle = tmp_path / "input" / "datasets" / "owner" / "slug"  # a Kaggle mount may add more wrapper folders
+    kaggle.mkdir(parents=True)
+    root = root.rename(kaggle / root.name)
+    assert train.find_root(str(tmp_path / "input")) == root
     x, m = train.Dacl10k(root, "train", 64, names, train=False, seed=0)[0]
     assert x.shape == (3, 64, 64) and m.shape == (19, 64, 64)
+    assert m.dtype == torch.uint8  # a quarter of float32 through the workers' shared memory; floated on the device
     crack, rust, spall = (m[names.index(n)] for n in ("Crack", "Rust", "Spalling"))
-    assert crack[:, :28].mean() > 0.95 and crack[:, 36:].sum() == 0  # left half only
+    assert crack[:, :28].float().mean() > 0.95 and crack[:, 36:].sum() == 0  # left half only
     assert torch.equal(crack, rust)  # one pixel, two classes
     assert spall[:, :36].sum() == 0 and spall[:, 36:].sum() > 0
     assert m.sum() == crack.sum() + rust.sum() + spall.sum()  # the unknown label drew nothing
+    ann = root / "annotations" / "train" / "a.json"  # the JSON's size disagrees with the image: refuse, never misplace
+    ann.write_text(ann.read_text().replace('"imageWidth": 120', '"imageWidth": 60'))
+    with pytest.raises(ValueError, match="decodes to 120x60"):
+        train.Dacl10k(root, "train", 64, names, train=False, seed=0)[0]
+
+
+@needs_torch
+def test_resume_auto_finds_last_pt_through_a_symlinked_input(mods, tmp_path, capsys):
+    train = mods[1]
+    (tmp_path / "mnt" / "v1" / "run").mkdir(parents=True)
+    (tmp_path / "mnt" / "v1" / "run" / "last.pt").write_bytes(b"ck")
+    (tmp_path / "input").mkdir()
+    (tmp_path / "input" / "notebook").symlink_to(tmp_path / "mnt" / "v1")  # pathlib's ** would not enter it
+    out = tmp_path / "out"
+    out.mkdir()
+    assert train.auto_resume(out, tmp_path / "input") == str(out / "last.pt")
+    assert (out / "last.pt").read_bytes() == b"ck"
+    assert train.auto_resume(tmp_path / "empty", tmp_path / "mnt" / "none") is None
+    assert "no last.pt" in capsys.readouterr().out
 
 
 @pytest.fixture(scope="module")
@@ -116,6 +150,10 @@ def test_synthetic_smoke_writes_checkpoint_and_metrics(exported):
     assert ckpt.exists() and (ckpt.parent / "best.pt").exists()
     history = json.loads((ckpt.parent / "metrics.json").read_text())
     assert history[-1]["step"] == 3 and set(history[-1]["iou19"]) == set(TARGET_LIST)
+    import torch
+
+    best = torch.load(ckpt.parent / "best.pt", map_location="cpu")  # chosen on Drishyam's five defects
+    assert best["val_miou5"] == max(h["val_miou5"] for h in history) == best["best"]
 
 
 @needs_torch
@@ -137,3 +175,14 @@ def test_onnxsegmenter_matches_pytorch(exported, mods):
     rows = mods[3].run(str(ckpt), str(paths["fp32"]), str(fp16) if fp16 else None, n=2)
     assert all(r["ok"] for r in rows), rows
     assert rows[0]["max_dprob"] < 1e-3
+
+
+@needs_torch
+def test_fp16_over_tolerance_does_not_fail_a_good_fp32_model(exported, mods):
+    ckpt, paths = exported
+    if "fp16" not in paths:
+        pytest.skip("no FP16 export (onnxconverter-common missing)")
+    parity = mods[3]
+    args = ["--ckpt", str(ckpt), "--onnx", str(paths["fp32"]), "--onnx-fp16", str(paths["fp16"]), "--n", "1"]
+    assert parity.main([*args, "--tol-fp16", "0"]) == parity.FP16_OVER  # train_dacl10k.py then zips FP32 alone
+    assert parity.main([*args, "--tol", "0"]) == 1

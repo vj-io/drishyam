@@ -7,7 +7,9 @@ must match the PyTorch checkpoint on 20 fixed crops.
 Compared per crop: probabilities (softmax over the 6 logits, as OnnxSegmenter returns them) and the raw DNN
 logits. Crops are 512 x 512 windows of public/samples/*.jpg at fixed positions. Each ONNX runs at 512 (the
 "accurate" path) and at 256 (the "fast" path), which also checks that H x W really is dynamic.
-Exits non-zero when max |dprob| exceeds the tolerance (FP32 1e-3, FP16 5e-2 by default).
+Exit status: 0 when every row is within its tolerance (max |dprob|: FP32 1e-3, FP16 5e-2 by default), 1 when an
+FP32 row is not (do not install), FP16_OVER (3) when FP32 passes and only FP16 is over (install the FP32 file alone:
+the FP16 margin shrinks as training goes on, so it must not hold back a good FP32 model).
 """
 from __future__ import annotations
 
@@ -26,6 +28,8 @@ sys.path.insert(0, str(ROOT))
 from dacl_common import MEAN, STD, DrishyamHead, load_checkpoint, load_class_map
 
 from drishyam.segment import OnnxSegmenter
+
+FP16_OVER = 3
 
 
 def crops(samples: Path, n: int, size: int, seed: int) -> list[np.ndarray]:
@@ -101,7 +105,13 @@ def main(argv=None) -> int:
     for r in rows:
         print(f"{r['case']:<15}{r['size']:>5}{r['max_dprob']:>12.2e}{r['max_dlogit']:>13.2e}{r['max_abs_logit']:>12.2f}"
               f"{r['label_agreement']:>13.5f}{r['tol']:>8.0e}  {'ok' if r['ok'] else 'FAIL'}")
-    return 0 if all(r["ok"] for r in rows) else 1
+    if not all(r["ok"] for r in rows if r["case"].startswith("fp32")):
+        print("FP32 over tolerance: do not install these weights")
+        return 1
+    if not all(r["ok"] for r in rows):
+        print("FP32 ok; FP16 over tolerance: install the FP32 ONNX alone (Drishyam's fast looks then use it too)")
+        return FP16_OVER
+    return 0
 
 
 if __name__ == "__main__":

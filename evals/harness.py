@@ -2,7 +2,8 @@
 
     python -m evals.harness --data data/synth200 --n 200 --out public/results
 
-Every policy uses `drishyam.segment.ClassicalSegmenter`, so only the looking policy differs:
+Every policy uses `drishyam.segment.default_segmenter()` (the classical engine, or the ONNX that DRISHYAM_ONNX
+names: summary.json says which), so only the looking policy differs:
   downscale   one read of the whole image resized to 1024 px on the long side, segmented once
   tiling      512 px tiles with 20 % overlap at L0, plus the same grid read from pyramid levels 1 and 2
   drishyam    `Job` with pixel_cap in BUDGETS, thumbs off
@@ -15,6 +16,7 @@ saliency overview included for Drishyam) over the L0 pixel count, so exhaustive 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import multiprocessing as mp
 import time
@@ -29,7 +31,7 @@ from drishyam import imaging
 from drishyam.agent import PLANNER_MALFORMED_STEP, PLANNER_TIMEOUT_STEP, Job, JobConfig
 from drishyam.findings import SPALL_CRITICAL_AREA_PX, is_critical
 from drishyam.governor import USD_PER_HOUR
-from drishyam.segment import DEFECTS, ClassicalSegmenter, restrict
+from drishyam.segment import DEFECTS, ClassicalSegmenter, default_segmenter, restrict
 from evals import codebrim, synth
 
 CLASSES = DEFECTS  # crack, spalling, efflorescence, exposed_rebar, corrosion
@@ -168,10 +170,10 @@ def run_tiling(img: np.ndarray, seg, level: int) -> dict:
 
 
 class RecordingSegmenter:
-    """ClassicalSegmenter that keeps every Segmentation, so per-component boxes can be rebuilt after a job."""
+    """The default segmenter, keeping every Segmentation so per-component boxes can be rebuilt after a job."""
 
     def __init__(self) -> None:
-        self.inner, self.log = ClassicalSegmenter(), []
+        self.inner, self.log = default_segmenter(), []
 
     def predict(self, crop, model="accurate"):
         self.log.append(self.inner.predict(crop, model))
@@ -221,7 +223,7 @@ def run_drishyam(img: np.ndarray, cap: float) -> dict:
 def eval_image(rec: dict, budgets=BUDGETS) -> dict:
     """Every policy on one image (a worker task)."""
     img = cv2.imread(rec["path"], cv2.IMREAD_COLOR)
-    seg = ClassicalSegmenter()
+    seg = default_segmenter()
     cfg = {"downscale": run_downscale(img, seg)}
     for lvl in TILE_LEVELS:
         cfg[f"tiling@L{lvl}"] = run_tiling(img, seg, lvl)
@@ -267,7 +269,7 @@ def chaos_task(arg: tuple[dict, str]) -> dict:
 def _init_worker() -> None:
     cv2.setNumThreads(1)  # one thread per worker process: what a vCPU-per-worker deployment would run
     warm = np.random.default_rng(0).integers(0, 255, (768, 1024, 3)).astype(np.uint8)
-    ClassicalSegmenter().predict(warm[:512, :512].copy())
+    default_segmenter().predict(warm[:512, :512].copy())
     list(Job(warm, JobConfig(pixel_cap=0.5, thumbs=False)).run())
 
 
@@ -419,6 +421,14 @@ def headline(scored: dict, primary: str, n: int, label: str) -> str:
 
 
 # ---------------------------------------------------------------- run
+def segmenter_id(seg) -> str:
+    """seg.name plus each ONNX file's name and short sha256: every trained model installs as
+    models/drishyam_dacl10k.onnx, and the FP16 net (if any) serves the 'fast' looks, so the name alone does not say
+    which model made a cache."""
+    files = [Path(p) for p in getattr(seg, "files", ()) if p]
+    return " ".join([seg.name, *(f"{p.name}@{hashlib.sha256(p.read_bytes()).hexdigest()[:12]}" for p in files)])
+
+
 def run(data_dir="data/synth200", n=200, out_dir="public/results", results_dir="results", workers=None,
         chaos=(20, 20, 10), kind="auto", micro_arm="local-macos-x86", primary_boxes="components", reuse=False,
         log=lambda msg: print(msg, flush=True)) -> dict:
@@ -432,16 +442,22 @@ def run(data_dir="data/synth200", n=200, out_dir="public/results", results_dir="
         raise SystemExit(f"refusing to write CODEBRIM image crops under {out_dir}: run `make eval-real`, which keeps them in "
                          "results/codebrim and publishes only summary.json")
     log(f"{len(records)} images, {workers} worker(s); policies: downscale, tiling L2/L1/L0, drishyam {BUDGETS}")
+    seg = default_segmenter()
+    seg_name, seg_id = seg.name, segmenter_id(seg)
     cache = Path(results_dir) / "eval_per_image.json"
     if reuse and cache.exists():  # re-score and re-draw from the last run's predictions and traces
         saved = json.loads(cache.read_text())
         assert saved["ids"] == [r["id"] for r in records], "cached run is for a different image list"
+        cached = saved.get("segmenter", ClassicalSegmenter.name)  # caches from before the field are all classical
+        if cached != seg_id:  # the fault drills below re-run, so they must use the cached run's segmenter too
+            raise SystemExit(f"{cache} holds {cached} predictions, but this process segments with {seg_id}: set "
+                             "DRISHYAM_ONNX and DRISHYAM_ONNX_FP16 as for that run, or run without --reuse")
         results = saved["results"]
         log(f"reusing {cache}")
     else:
         results = pool_map(eval_image, records, workers, log, "eval")
         cache.parent.mkdir(parents=True, exist_ok=True)
-        cache.write_text(json.dumps({"ids": [r["id"] for r in records], "results": results},
+        cache.write_text(json.dumps({"ids": [r["id"] for r in records], "segmenter": seg_id, "results": results},
                                     default=lambda o: o.item() if hasattr(o, "item") else str(o)))
 
     keys = ["downscale", *(f"tiling@L{lv}" for lv in TILE_LEVELS), *(f"drishyam@{c}" for c in BUDGETS)]
@@ -487,6 +503,7 @@ def run(data_dir="data/synth200", n=200, out_dir="public/results", results_dir="
     summary = {
         "dataset": label,
         "n_images": len(records),
+        "segmenter": seg_name,
         "policies": {
             "downscale": [point(metrics["downscale"])],
             "tiling": [point(metrics[f"tiling@L{lv}"]) for lv in TILE_LEVELS],

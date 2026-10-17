@@ -133,7 +133,7 @@ def test_three_image_run_writes_valid_summary_and_gallery(tmp_path):
     summary = harness.run(str(data), n=3, out_dir=pub, results_dir=raw, workers=1, chaos=(0, 0, 0), log=lambda *_: None)
     on_disk = json.loads((pub / "summary.json").read_text())
     assert on_disk == json.loads(json.dumps(summary))
-    assert list(on_disk) == ["dataset", "n_images", "policies", "per_class", "agent_metrics", "micro", "provenance", "headline"]
+    assert list(on_disk) == ["dataset", "n_images", "segmenter", "policies", "per_class", "agent_metrics", "micro", "provenance", "headline"]
     assert on_disk["n_images"] == 3 and on_disk["dataset"].startswith("synthetic-3")
     pol = on_disk["policies"]
     assert [len(pol[k]) for k in ("downscale", "tiling", "drishyam")] == [1, 3, 6]
@@ -156,6 +156,12 @@ def test_three_image_run_writes_valid_summary_and_gallery(tmp_path):
     assert (raw / "eval_raw.json").exists() and (raw / "eval_per_image.json").exists()
     again = harness.run(str(data), n=3, out_dir=pub, results_dir=raw, workers=1, chaos=(0, 0, 0), reuse=True, log=lambda *_: None)
     assert again["policies"]["drishyam"] == summary["policies"]["drishyam"]  # same predictions, re-scored
+    cache = raw / "eval_per_image.json"
+    saved = json.loads(cache.read_text())
+    assert saved["segmenter"] == summary["segmenter"] == "classical-v1"
+    cache.write_text(json.dumps({**saved, "segmenter": "onnx:m.onnx"}))  # an ONNX run, re-scored without DRISHYAM_ONNX
+    with pytest.raises(SystemExit, match="onnx:m.onnx predictions"):
+        harness.run(str(data), n=3, out_dir=pub, results_dir=raw, workers=1, chaos=(0, 0, 0), reuse=True, log=lambda *_: None)
 
 
 def test_gallery_picks_a_real_false_alarm(tmp_path):

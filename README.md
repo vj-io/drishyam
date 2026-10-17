@@ -46,8 +46,10 @@ flowchart TD
 uv sync --all-extras
 ```
 
+Web app and UI on http://127.0.0.1:8000 (same CSP as production):
+
 ```bash
-make serve          # web app + UI on http://127.0.0.1:8000 (same CSP as production)
+make serve
 ```
 
 ```bash
@@ -58,8 +60,10 @@ uv run drishyam run public/samples/bridge_03.jpg --pixel-cap 0.3
 uv run drishyam review runs/<job>/work_order.json f1 approve --by "Your Name"
 ```
 
+MCP server over stdio (12 allow-listed tools, no approve tool, no shell):
+
 ```bash
-uv run drishyam mcp  # MCP server over stdio: 12 allow-listed tools, no approve tool, no shell
+uv run drishyam mcp
 ```
 
 Tests: `make test` (unit, API, MCP, CLI, evals; same as CI) · browser e2e under the production CSP: `uv pip install playwright && .venv/bin/playwright install chromium && make e2e` · CI runs on x86 and arm64.
