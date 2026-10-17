@@ -286,8 +286,9 @@ img, canvas, svg { max-width: 100%; }
 .win--wide { grid-column: 1 / -1; }
 
 /* the sheet slides out of the plan chest; its number stamps in */
-/* html's scroll-padding already clears the nav; inside the demo the sticky job bar is cleared too (the two add up) */
-#demo .pop, .recap { scroll-margin-top: calc(var(--bar, 64px) + 4px); }
+/* html's scroll-padding already clears the nav (+16 px); inside the demo the sticky job bar, which sticks 8 px under
+   the nav, is cleared too: the two add up to a 4 px gap under the bar */
+#demo .pop, .recap { scroll-margin-top: calc(var(--bar, 64px) - 4px); }
 .win--view > .win__body { padding: 12px; }
 @keyframes chest { 0% { opacity: 0; transform: translateY(28px); clip-path: inset(0 -40px 100% -40px); } 35% { opacity: 1; } 100% { opacity: 1; transform: none; clip-path: inset(-40px -40px -40px -40px); } }
 /* Hidden-until-scrolled only once app.js has wired the observer (it sets .js), and never in print:
@@ -463,6 +464,7 @@ input:checked + .switch__ui::after { transform: translateX(22px); background: va
 .narrator__text { margin: 0; font: 500 14px/1.5 var(--f-mono); color: var(--line); }
 .narrator__sub { margin: 4px 0 0; overflow: hidden; font: 400 11.5px/1.45 var(--f-mono); color: var(--line-3); white-space: nowrap; text-overflow: ellipsis; }
 .narrator__sub:empty { display: none; }
+.pip { display: none; }  /* phones only: the camera crop over the photo's corner, so photo, view and NOTE share one screen */
 
 /* the camera panel: the look as the agent saw it, and why it took it */
 .cam { display: grid; grid-template-columns: minmax(140px, 180px) minmax(0, 1fr); gap: 14px; align-items: start; }
@@ -783,10 +785,11 @@ input:checked + .switch__ui::after { transform: translateX(22px); background: va
   .stat__k { min-height: 0; }
   .taskbar__id { display: none; }
   .taskbar__actions { margin-left: 0; width: 100%; }
-  /* running on a phone: one row of status and the two controls that matter (Skip to end, KILL) */
-  .taskbar[data-mode='running'] .taskbar__status { flex: 0 1 auto; }
+  /* running on a phone: the two controls that matter (Skip to end, KILL), then one line of status, which says it is a replay */
+  .taskbar[data-mode='running'] .taskbar__status { order: 1; flex-basis: 100%; }
   .taskbar[data-mode='running'] .taskbar__actions { width: auto; margin-left: auto; }
   .taskbar[data-mode='running'] :is(#sound, #job-steps, #job-pill) { display: none; }
+  .taskbar[data-mode='running'] #job-text { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 12px; }
   .win__bar .win__fig { display: none; }  /* the step number and title carry it on a phone */
   .nav__in { padding: 6px 12px; gap: 8px; }
   .nav__mark { display: none; }
@@ -804,10 +807,13 @@ input:checked + .switch__ui::after { transform: translateX(22px); background: va
   .drop { min-height: 0; }
   .cam { grid-template-columns: minmax(0, 1fr); }
   .cam__fig { max-width: 320px; }
-  .narrator { padding: 36px 12px 10px; }
+  .pip { display: block; position: absolute; right: 6px; bottom: 6px; width: 96px; height: 96px; object-fit: cover; border: 2.5px solid var(--amber); background: var(--deep); pointer-events: none; }
+  .narrator { padding: 10px 12px; }
+  .narrator__tag { position: static; float: left; margin: 1px 8px 0 0; }
+  .narrator__text { font-size: 13px; }
+  .narrator__sub { display: none; }  /* the NOTE keeps to its main sentence; the step detail has the rest */
   .key__list > div { grid-template-columns: 56px minmax(0, 1fr); }
   .btn--kill { min-height: 44px; padding: .45em 1.1em; font-size: 1.1rem; }
-  .taskbar[data-mode='running'] #job-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }  /* still read out; the step count shows */
   .finding__body { grid-template-columns: 108px minmax(0, 1fr); }
   .finding__crop, .finding__dim { width: 108px; }
   .finding__crop { height: 108px; }
@@ -824,6 +830,7 @@ input:checked + .switch__ui::after { transform: translateX(22px); background: va
 
 @media (min-width: 1101px) {
   .trace { max-height: 260px; }  /* the newest line stays on screen beside the photo while a run plays */
+  .detail { max-height: 220px; overflow-y: auto; }  /* no taller than the crop beside it, so a long step never pushes the trace down */
 }
 @media (min-width: 1101px) and (min-height: 800px) {
   .win--order { position: sticky; top: calc(var(--nav, 56px) + var(--bar, 64px) + 24px); }  /* the work order stays beside the findings it summarises */

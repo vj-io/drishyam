@@ -19,8 +19,9 @@ Scenarios (a real Chromium, the document served with the production CSP header):
      halt, privacy.boxes blur, halt step.
   3. guided run: pace_ms on the request, the paced-for-viewing label, the viewer in view, the critical NOTE held,
      the recap in view, hand-off to the reviewer, and Try KILL (planner_timeout, shown live) halted by KILL.
-  4. keyboard only, 5. KILL after the job had finished, 6. mobile 375 px, 7. prefers-reduced-motion,
-  8. heading names, 9. pending states, 10. a COOL file with missing fields, 11. halt governor note.
+  4. photo, NOTE and newest trace line on one screen (1440x900; 375x812 with the crop and the replay label),
+  5. keyboard only, 6. KILL after the job had finished, 7. mobile 375 px, 8. prefers-reduced-motion,
+  9. heading names, 10. pending states, 11. a COOL file with missing fields, 12. halt governor note.
 Any CSP violation, console error or page error fails the run. wait_for_function is avoided on purpose
 (it is blocked by a strict CSP): every wait uses locators or polls page.evaluate.
 """
@@ -743,6 +744,37 @@ def test_guided(browser, base):
     print("ok  guided run: pace_ms sent, labelled paced, viewer in view, critical NOTE held, recap in view, hand-off, Try KILL halts")
 
 
+def test_fits_on_screen(browser, base):
+    """While a run plays, the photo and its NOTE share one screen: at 1440x900 with the newest trace line too, for the
+    overview and every decision of the fixture (it holds the p95>SLA override and both planner drills that "Now break
+    it" shows); at 375x812 with the camera crop over the photo and a visible replay label in the job bar."""
+    for size, phone in (({"width": 1440, "height": 900}, False), ({"width": 375, "height": 812}, True)):
+        s = Session(browser, f"fit-{size['width']}", viewport=size, is_mobile=phone, has_touch=phone, reduced_motion="reduce")
+        p = s.page
+        p.goto(f"{base}/?mock=1")
+        expect(p.locator("#look")).to_be_enabled(timeout=T)
+        p.click("#look")
+        expect(p.locator(".trace__line[data-step='1']")).to_be_visible(timeout=T)
+        top = p.evaluate("document.getElementById('stage').getBoundingClientRect().top")   # where run() put the photo
+        if phone:
+            expect(p.locator("#pip")).to_be_visible()
+            assert p.locator("#job-text").evaluate("e => e.getBoundingClientRect().height") > 10, "the replay label is hidden"
+        p.click("#skip")
+        expect(p.locator("#job-pill")).to_have_text(DONE_LABEL, timeout=T)
+        for k in range(N_STEPS + 1):                       # step 0 is the overview's NOTE
+            p.locator("#replay").fill(str(k))
+            ends = p.evaluate("""() => { const c = document.getElementById('stage').getBoundingClientRect().top;
+              const end = (sel) => document.querySelector(sel).getBoundingClientRect().bottom - c;
+              return {NOTE: end('.narrator'), trace: end('#trace')}; }""")
+            if phone:
+                del ends["trace"]                          # one column: the trace sits further down on a phone
+            for what, end in ends.items():
+                assert top + end <= size["height"] + 1, f"{size['width']} px, step {k}: the {what} ends {top + end - size['height']:.0f} px below the fold"
+        s.check_clean()
+        s.context.close()
+    print("ok  fits: photo, NOTE and newest trace line on one 1440x900 screen; photo, crop, NOTE and replay label at 375x812")
+
+
 def test_keyboard(browser, base):
     """Tab to the CTA, run it, skip with Enter, then sign off a critical finding without a mouse."""
     s = Session(browser, "keyboard", viewport={"width": 1440, "height": 900})
@@ -778,7 +810,7 @@ def test_kill_after_finish(browser, base):
     p.goto(f"{base}/?mock=1")
     expect(p.locator("#look")).to_be_enabled(timeout=T)
     p.click("#look")
-    expect(p.locator("#job-text")).to_contain_text("replaying its", timeout=T)   # done arrived; the replay is behind
+    expect(p.locator("#job-text")).to_contain_text("Replay: the recorded agent took", timeout=T)   # done arrived; the replay is behind
     p.click("#kill")
     expect(p.locator("#job-text")).to_contain_text("had already finished", timeout=T)
     expect(p.locator("#job-pill")).to_have_text(DONE_LABEL)
@@ -934,6 +966,7 @@ if __name__ == "__main__":
             test_desktop_mock(browser, base)
             test_live_api_contract(browser, base)
             test_guided(browser, base)
+            test_fits_on_screen(browser, base)
             test_keyboard(browser, base)
             test_kill_after_finish(browser, base)
             test_mobile(browser, base)

@@ -20,7 +20,7 @@ const el = {
   file: $('#file'), drop: $('#drop'), prep: $('#prep'), gallery: $('#gallery'), galleryEmpty: $('#gallery-empty'),
   slider: $('#replay'), sliderOut: $('#replay-out'), play: $('#play'), heat: $('#heat'), tiles: $('#tiles'), tilesNote: $('#tiles-note'),
   detail: $('#step-detail'), done: $('#done'), recap: $('#recap'), narrator: $('#narrator'), narratorSub: $('#narrator-sub'),
-  camImg: $('#cam-img'), camCap: $('#cam-cap'), stages: $('#stages'), say1: $('#say-1'), say4: $('#say-4'),
+  camImg: $('#cam-img'), pip: $('#pip'), camCap: $('#cam-cap'), stages: $('#stages'), say1: $('#say-1'), say4: $('#say-4'),
   states: [1, 2, 3, 4].map((i) => $(`#state-${i}`)),
   tbSheet: $('#tb-sheet'), tbScale: $('#tb-scale'), tbChecked: $('#tb-checked'),
 };
@@ -119,21 +119,21 @@ const overviewLevel = () => {
 function overviewText() {
   const n = S.overview.candidates?.length ?? 0;
   const top = (S.job?.levels?.length ?? 1) - 1;
-  return `It shrank the photo into a pyramid (L0 is full size, each level up is half that, down to L${top}), `
-    + `mapped where damage looks likely (the heatmap) and marked ${n} region${n === 1 ? '' : 's'} worth a closer look (the dashed boxes).`;
+  return `It shrank the photo into a pyramid (L0 is full size, each level up halves it, down to L${top}), `
+    + `mapped where damage looks likely (the heatmap) and marked ${n} region${n === 1 ? '' : 's'} worth a closer look (dashed boxes).`;
 }
 
 /** The camera panel: the newest look's crop as the agent saw it, or the stages before the first look. */
 function showCam(k) {
   const look = S.steps.slice(0, k).reverse().find((s) => s.crop_jpeg_b64);
   const url = look ? dataUrl('image/jpeg', look.crop_jpeg_b64) : null;
-  el.camImg.hidden = !url;
+  el.camImg.hidden = el.pip.hidden = !url;
   el.stages.hidden = Boolean(url);
   if (!url) {
     el.camCap.textContent = S.job ? 'Before the first look' : 'No look yet. Press Run.';
     return;
   }
-  el.camImg.src = url;
+  el.camImg.src = el.pip.src = url;
   el.camImg.alt = `What the agent saw at step ${look.step}`;
   const L = look.decision.args.level;
   const ov = overviewLevel();
@@ -167,7 +167,10 @@ function goto(k, animate = false) {
     : { pixels: S.overview?.pixels_frac ?? 0, usd: 0, seconds: 0 });
   budget.setOps(step);
   showCam(k);
-  if (step) narrate(explain(step, planner), step.rationale ? `recorded: ${step.rationale}` : '');
+  if (step) {  // the NOTE keeps to the main sentence; the rest goes on its secondary line
+    const [main, ...more] = explain(step, planner);
+    narrate(main, more.length ? more.join(' ') : step.rationale ? `recorded: ${step.rationale}` : '');
+  }
   else if (S.overview) narrate(overviewText());
 }
 
@@ -221,7 +224,10 @@ function causeFrom(s) {
   return s.cause === 'survey' || /^(?:.*; )?argmax/.test(s.rationale ?? '') ? 'the overview' : null;
 }
 
-const scrollToViewer = () => $('.win--view').scrollIntoView({ behavior: reduced() ? 'auto' : 'smooth', block: 'start' });
+function scrollToViewer() {
+  bars();  // the job bar has just changed height (running), and the scroll margin is computed from it now
+  $('.win--view').scrollIntoView({ behavior: reduced() ? 'auto' : 'smooth', block: 'start' });
+}
 
 function showBox(box) {
   viewport.highlight(box);
@@ -359,8 +365,8 @@ function arrive(ev) {
     S.arrived = ev;
     if (Q.timer || Q.items.length) {
       const n = S.events.filter((e) => e.type === 'step').length;
-      el.text.textContent = `${MOCK ? 'The recorded agent' : 'The agent'} finished in ${ev.summary.seconds} s${S.job?.pace_ms > 0 ? ' (not counting the paced waits)' : ''}; `
-        + `replaying its ${n} decisions at reading speed. Skip to end shows the result now.`;
+      el.text.textContent = `Replay: ${MOCK ? 'the recorded agent' : 'the agent'} took ${ev.summary.seconds} s for its ${n} decisions`  // a phone shows only the start
+        + `${S.job?.pace_ms > 0 ? ' (not counting the paced waits)' : ''}; shown at reading speed. Skip to end shows the result now.`;
     }
   }
   if (!['end', 'error'].includes(ev.type)) S.events.push(ev);
@@ -712,10 +718,11 @@ artMq.onchange = fitArt;
 fitArt();
 
 // The sticky bars' real heights: scroll padding and focus scrolling keep controls clear of them.
-new ResizeObserver(() => {
+function bars() {
   document.documentElement.style.setProperty('--nav', `${$('#nav').offsetHeight}px`);
   document.documentElement.style.setProperty('--bar', `${$('#taskbar').offsetHeight}px`);
-}).observe($('#taskbar'));
+}
+new ResizeObserver(bars).observe($('#taskbar'));
 
 const pops = new IntersectionObserver((entries) => {
   let i = 0;

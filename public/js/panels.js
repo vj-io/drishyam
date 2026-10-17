@@ -71,7 +71,8 @@ function lookText(s) {
   return why || 'No reason was recorded.';
 }
 
-/** One step in plain English: governor or planner notes first, then the look (or the halt), then the quality gate. */
+/** One step in plain English, as its sentences: governor or planner notes first (the main one when there is one),
+    then the look (or the halt), then the quality gate. */
 export function explain(s, planner) {
   const why = s.rationale ?? '';
   const halt = s.decision?.action === 'halt';
@@ -82,7 +83,7 @@ export function explain(s, planner) {
     plannerText(planner),
     halt ? haltText(s.cause) : lookText(s),
     quality ? `The view failed the quality check (${quality[1]}), so it does not trust this look.` : '',
-  ].filter(Boolean).join(' ');
+  ].filter(Boolean);
 }
 
 /** The rationale as text nodes, its deciding number (the one before a comparison, else the first) in bold. */
@@ -228,7 +229,7 @@ export function renderStepDetail(root, step, planner) {
   root.replaceChildren(...[
     h('p', { class: 'detail__title' }, `step ${step.step} · ${step.decision?.action ?? 'step'}`, step.cause ? ' ' : null, step.cause ? chip(step.cause) : null),
     h('h4', { class: 'detail__h' }, 'Why this look'),
-    h('p', { class: 'detail__why' }, explain(step, planner)),
+    h('p', { class: 'detail__why' }, explain(step, planner).join(' ')),
     saw ? h('h4', { class: 'detail__h' }, 'What it saw') : null,
     saw ? h('p', { class: 'detail__why' }, saw) : null,
     h('details', { class: 'detail__more' }, h('summary', {}, 'All numbers for this step'),
