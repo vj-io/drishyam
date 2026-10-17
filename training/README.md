@@ -18,7 +18,7 @@ has to be pushed or uploaded first. It needs a Kaggle account with phone verific
    `run/last.pt`, `best.pt` and `metrics.json` every epoch, and stops starting epochs at 11 h (`--hours 11`), leaving
    time to export inside the 12 h limit. 30 epochs are estimated at 2 to 4 h on a T4 (not measured).
 5. When the version is complete: its **Output** tab > `run/drishyam_dacl10k.zip` (`best.onnx`, `best_fp16.onnx`,
-   `metrics.json`; about 40 MB) > download. The log ends with the parity table and `parity ok`. The verdict is
+   `metrics.json`, `run_info.json`; about 40 MB) > download. The log ends with the parity table and `parity ok`. The verdict is
    FP32's: if only FP16 is over its tolerance, the log says so and the zip holds `best.onnx` without `best_fp16.onnx`.
    If it says "resume to continue", make a new version with **Add Input > Your Work > this notebook's output** and run all again:
    `--resume auto` copies that `last.pt` and carries on.
@@ -37,7 +37,7 @@ has to be pushed or uploaded first. It needs a Kaggle account with phone verific
    It unpacks the zip into a fresh temporary folder, loads both files on OpenCV 5 DNN `ENGINE_NEW` and through
    `OnnxSegmenter` before touching anything (FP16 against FP32 too; if FP16 is over its tolerance it is dropped and
    FP32 is installed alone, which Drishyam's fast looks then use as well), copies them to
-   `models/drishyam_dacl10k.onnx` and `.fp16.onnx` (and `metrics.json` to `models/drishyam_dacl10k.metrics.json`), writes their sha256, validation mIoU and **CC BY-NC 4.0** licence into
+   `models/drishyam_dacl10k.onnx` and `.fp16.onnx` (and `metrics.json` and `run_info.json` to `models/drishyam_dacl10k.metrics.json` and `.run_info.json`), writes their sha256, validation mIoU, the run's package versions and source, and **CC BY-NC 4.0** licence into
    `models/README.md` and the Licence line of `README.md`, runs three `drishyam run` jobs with `DRISHYAM_ONNX` set, runs
    `evals.harness` on `data/synth200` twice (classical, then the model) into `runs/model-eval/` (never
    `public/results`), prints the before/after recall table with each run's pixel fraction, and prints the `git` and
@@ -172,7 +172,7 @@ os.environ["DACL_FLAGS"] = f"--data {DATA} --out /content/run --hours 3"
 
 The notebook (steps above) installs what it adds, pinned: `segmentation-models-pytorch==0.5.0`, `onnx==1.23.2`,
 `onnxslim==0.1.98`, `onnxconverter-common==1.16.0` (the versions verified on the Mac). torch, torchvision, timm and
-numpy stay Kaggle's own (pinning them would replace the CUDA build). onnx is pinned because Kaggle force-installs
+numpy stay Kaggle's own (pinning them would replace the CUDA build); each run's `run_info.json` records the versions it used. onnx is pinned because Kaggle force-installs
 protobuf 5.29.5, which recent onnx wheels refuse to load; this onnx pulls protobuf >= 6.31 into the session. Kaggle holds `cv2` below 5 on purpose (its OpenCV wheels share one `cv2/` folder),
 so `opencv-python-headless==5.0.0.93` goes to its own `--target` folder and only the export and parity child
 processes put it first on `PYTHONPATH`; training's imread/resize/fillPoly run on Kaggle's 4.x. Checked against
@@ -187,6 +187,11 @@ Defaults follow the paper's baselines (512 x 512, 30 epochs, cosine schedule, 2-
 (lr 1e-3), batch 16, AMP on GPU, seed 0, horizontal flip, brightness/contrast jitter, and 70% of train samples as a random
 zoomed crop of the full-resolution photo (the virtual-PTZ regime). Lower `--batch-size` on an out-of-memory error.
 
+- Each session first appends to `run_info.json`: its first epoch, Python, the torch, torchvision, timm,
+  segmentation-models-pytorch, onnx, onnxslim, onnxconverter-common, numpy and OpenCV (training and export) versions
+  as installed, the git SHA when run from a checkout, and `source_sha256`, which `make_notebook.py` writes into the
+  notebook (Kaggle has no checkout): `source_sha256()` from `training/make_notebook.py` at a commit gives the same
+  value when the notebook was built there.
 - Every epoch writes `last.pt` (atomic), `best.pt` and `metrics.json`. `best.pt`, the checkpoint that is exported
   and shipped, is the epoch with the best mean validation IoU of Drishyam's five defect classes (`val_miou5`); the
   19-class mIoU (`val_miou19`) is kept beside it for comparison with the paper.
@@ -268,13 +273,17 @@ OpenCV with `--no-deps`:
 ```
 uv venv --python 3.12 /tmp/torchenv
 uv pip install --python /tmp/torchenv/bin/python torch==2.2.2 torchvision==0.17.2 --index-url https://download.pytorch.org/whl/cpu
-uv pip install --python /tmp/torchenv/bin/python "numpy<2" segmentation-models-pytorch timm onnx onnxslim onnxconverter-common pytest
+uv pip install --python /tmp/torchenv/bin/python "numpy<2" segmentation-models-pytorch==0.5.0 timm==1.0.30 onnx==1.23.2 onnxslim==0.1.98 onnxconverter-common==1.16.0 pytest
 uv pip install --python /tmp/torchenv/bin/python --no-deps opencv-python-headless==5.0.0.93
 
 /tmp/torchenv/bin/python training/train_dacl10k.py --synthetic --max-steps 3 --size 128 --batch-size 2 --out /tmp/run
 /tmp/torchenv/bin/python -m pytest tests/test_training.py
 scripts/install_model.sh /tmp/run/drishyam_dacl10k.zip --n 3
 ```
+
+These are the notebook's pins, plus timm 1.0.30, the version all nine tests in `tests/test_training.py` passed with on
+torch 2.2.2 (2026-10-18). On Kaggle torch, torchvision and timm stay the image's own; which versions a run used is in
+its `run_info.json` (zipped with the weights, and copied into `models/README.md` by `scripts/install_model.sh`).
 
 Then undo the install (smoke weights are noise):
 

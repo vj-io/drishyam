@@ -406,8 +406,8 @@ def render(seed: int, width: int, height: int, spec: dict | None = None) -> tupl
     def rng():  # one independent stream per defect: editing one never reshuffles the others
         return np.random.default_rng((seed, 1, next(counter)))
 
-    def add(cls, box):
-        gt.append({"cls": cls, "box": box})
+    def add(cls, box, **flags):
+        gt.append({"cls": cls, "box": box, **flags})
 
     for _ in range(sp.get("corrosion", 0)):
         add("corrosion", corrosion(img, rng(), S))
@@ -419,9 +419,10 @@ def render(seed: int, width: int, height: int, spec: dict | None = None) -> tupl
         add("exposed_rebar", bbox)
     for _ in range(sp.get("crack", 0)):
         r = rng()
-        box, path = crack(img, r, S, sp["hairline"] if "hairline" in sp else r.random() < 0.35)
+        thin = bool(sp["hairline"] if "hairline" in sp else r.random() < 0.35)
+        box, path = crack(img, r, S, thin)
         paths.append(path)
-        add("crack", box)
+        add("crack", box, hairline=thin)
     for _ in range(sp.get("efflorescence", 0)):
         r = rng()
         anchor = paths[int(r.integers(len(paths)))] if paths and r.random() < 0.8 else None
@@ -430,7 +431,7 @@ def render(seed: int, width: int, height: int, spec: dict | None = None) -> tupl
         if kind == "blur_region":
             r = rng()
             box, _ = crack(img, r, S, True)
-            add("crack", box)
+            add("crack", box, hairline=True)
             extra.append({"kind": kind, "box": blur_region(img, r, S, box)})
         else:
             extra.append({"kind": kind, "box": _SIMPLE_DISTRACTORS[kind](img, rng(), S)})

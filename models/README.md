@@ -8,3 +8,8 @@
 Both are used only by `drishyam/privacy.py` to blur faces, people and vehicles
 before an image is analysed or displayed. Fonts in `public/fonts/` are SIL OFL 1.1
 (`public/fonts/OFL-plex.txt`, `public/fonts/OFL-archivo.txt`).
+
+The trained segmenter `drishyam_dacl10k.onnx` (and `.fp16.onnx`), built by `training/` and installed here by
+`scripts/install_model.sh`, is not a permissive model: it is trained on dacl10k, so its weights are
+[CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) (non-commercial, with attribution). Until it is
+installed, no such file is in this folder.

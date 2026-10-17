@@ -5,12 +5,14 @@
 
 The module docstring (before the first `# %%`) is left out; a `# %% [markdown]` cell becomes markdown without its
 `# ` prefixes. The notebook has to run on Kaggle without the repo, so the script's empty `REPO_FILES` line is
-replaced by the CARRIED files' text, which the setup cell writes to disk. Standard library only.
+replaced by the CARRIED files' text, which the setup cell writes to disk, and its empty `SOURCE_SHA256` line by
+`source_sha256()`, which run_info.json records in place of a git SHA. Standard library only.
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -21,6 +23,15 @@ NOTEBOOK = ROOT / "training" / "drishyam_dacl10k_kaggle.ipynb"
 CARRIED = ("training/dacl_common.py", "training/class_map.json", "training/export_onnx.py", "training/parity.py",
            "drishyam/__init__.py", "drishyam/segment.py")  # what the cells import or run, parity included
 PLACEHOLDER = "REPO_FILES: dict[str, str] = {}\n"
+SHA_PLACEHOLDER = 'SOURCE_SHA256 = ""'
+
+
+def source_sha256() -> str:
+    """sha256 over the training script and the CARRIED files as they are on disk (the script with its placeholders)."""
+    h = hashlib.sha256()
+    for rel in ("training/train_dacl10k.py", *CARRIED):
+        h.update((ROOT / rel).read_bytes())
+    return h.hexdigest()
 
 
 def _lines(text: str) -> list[str]:
@@ -29,8 +40,9 @@ def _lines(text: str) -> list[str]:
 
 def build() -> str:
     src = SCRIPT.read_text()
-    if src.count(PLACEHOLDER) != 1:
-        raise SystemExit(f"{SCRIPT.name}: expected one line {PLACEHOLDER.strip()!r}")
+    if src.count(PLACEHOLDER) != 1 or src.count(SHA_PLACEHOLDER) != 1:
+        raise SystemExit(f"{SCRIPT.name}: expected one line {PLACEHOLDER.strip()!r} and one {SHA_PLACEHOLDER!r}")
+    src = src.replace(SHA_PLACEHOLDER, f'SOURCE_SHA256 = "{source_sha256()}"')
     carried = "".join(f"    {rel!r}: {(ROOT / rel).read_text()!r},\n" for rel in CARRIED)
     src = src.replace(PLACEHOLDER, "REPO_FILES = {  # written by make_notebook.py from the repo: edit those files\n"
                       + carried + "}\n")

@@ -1,4 +1,5 @@
 """Evaluation harness, CODEBRIM loader and parity tool: matching rule, tiling accounting, an end-to-end tiny run."""
+import gzip
 import json
 import zipfile
 from pathlib import Path
@@ -47,6 +48,58 @@ def test_critical_false_accepts():
              {"cls": "spalling", "box": [500, 0, 300, 300], "area": 60_000},  # matches the big spall
              {"cls": "crack", "box": [0, 0, 10, 10], "area": 10}]  # never critical
     assert harness.critical_counts(preds, gts) == (4, 2)
+
+
+def test_chance_baseline_precision_and_intervals():
+    """Each policy's own boxes moved to random places must score below the real thing; precision, FP/image,
+    strata and the paired bootstrap come out of the same per-image counts."""
+    gts = [{"cls": "crack", "box": [100 + 7 * i, 200, 60, 40], "hairline": i % 2 == 0} for i in range(20)]
+    records = [{"id": f"s{i}", "boxes": [g]} for i, g in enumerate(gts)]
+    hit = lambda g: {"cls": "crack", "box": list(g["box"]), "area": 100, "conf": 0.9}
+    miss = {"cls": "crack", "box": [900, 900, 30, 30], "area": 100, "conf": 0.5}
+    results = [{"width": 2000, "height": 1500, "configs": {
+        "good": {"preds": [hit(g), miss], "pixels_frac": 0.3, "wall_s": 0.1},
+        "half": {"preds": [hit(g)] if i % 2 else [miss], "pixels_frac": 0.3, "wall_s": 0.1},
+        "dup": {"preds": [hit(g), {**hit(g), "conf": 0.8}], "pixels_frac": 0.3, "wall_s": 0.1}}} for i, g in enumerate(gts)]
+    good, half, dup = (harness.score_config(k, records, results) for k in ("good", "half", "dup"))
+    assert good["recall"] == 1.0 and good["chance_recall"] < 0.2 and good["chance_recall_iou_only"] <= good["chance_recall"]
+    assert good["precision"] == 0.5 and good["fp_per_image"] == 1.0 and good["predictions_per_image"] == 2
+    # one GT box re-reported twice: one match, one false positive (one-to-one), not two hits
+    assert dup["precision"] == 0.5 and dup["fp_per_image"] == 1.0 and dup["hits_per_matched_gt"] == 2.0
+    assert good["hits_per_matched_gt"] == 1.0
+    assert half["recall"] == 0.5 and half["strata"] == {"hairline_crack": 0.0, "small_box": 0.5}
+    assert good["strata_gt"] == {"hairline_crack": 10, "small_box": 20}
+    lo, hi = harness.boot_ci(harness.recall_of(half), len(records))
+    assert lo < 0.5 < hi and harness.boot_ci(harness.recall_of(good), len(records)) == [1.0, 1.0]
+    assert harness.ratio_ci(half, good, len(records)) == [lo, hi]  # paired: the same resamples for both policies
+    assert harness.score_config("good", records, results)["chance_recall"] == good["chance_recall"]  # seeded
+
+
+def test_target_met_on_the_point_estimate_but_not_by_the_interval():
+    """19 of 20 boxes against tiling's 20 of 20 is 0.95x, but a bootstrap over 20 images reaches below 0.9x."""
+    row = lambda f: [f, f, 0, 0, 1]
+    pol = lambda found, px: {"recall": sum(found) / 20, "recall_iou_only": sum(found) / 20, "pixels_frac": px,
+                             "per_image": [row(f) for f in found]}
+    m = {"drishyam@0.3": pol([1] * 19 + [0], 0.3), "tiling@L0": pol([1] * 20, 1.67), "downscale": pol([1] * 20, 0.25)}
+    hs = harness.headline_stats(m, 20)
+    assert hs["recall_ratio_vs_tiling"] == 0.95 and hs["meets_target"] and not hs["meets_target_ci"]
+    assert hs["recall_ratio_vs_tiling_ci"][0] < 0.9 and hs["recall_ratio_iou_only_vs_tiling"] == 0.95
+
+
+def test_fixed_cost_model_is_load_independent(scene):
+    """--cost-model fixed: every timed op costs its table value, so two runs of one image make identical decisions."""
+    rows = harness.cost_rows("local-macos-x86", "classical-v1")
+    costs = harness.op_costs(rows, scene.shape[1], scene.shape[0])
+    a, b = (harness.run_drishyam(scene, 1.0, costs) for _ in range(2))
+    assert a["trace"] == b["trace"] and a["preds"] == b["preds"] and a["wall_s"] == b["wall_s"] > 0
+    looks = sum(t["action"] != "halt" for t in a["trace"])
+    per_look = costs["warp"] + costs["quality"] + costs["segment:accurate"]
+    assert a["wall_s"] == pytest.approx((costs["pyrDown"] + costs["saliency"] + looks * per_look) / 1000)
+    big = harness.op_costs(rows, 4608, 3456)  # nearest timed size 4000x3000: per-image ops scale with the pixels
+    ref = {r["op"]: r["p50_ms"] for r in rows if r["size"] == "4000x3000"}
+    assert big["pyrDown"] == pytest.approx(ref["pyrDown"] * 4608 * 3456 / 12e6) and big["warp"] == ref["warp"]
+    with pytest.raises(SystemExit, match="segments with onnx"):
+        harness.cost_rows("local-macos-x86", "onnx:m.onnx")
 
 
 # ---------------------------------------------------------------- tiling and downscale accounting
@@ -116,6 +169,10 @@ def test_chaos_drills_recover(scene):
     assert out["fired"] and out["ok"] and out["detail"]["reason"] == "timeout"
     spike = harness.run_chaos(scene, "p95_spike")
     assert spike["fired"] and spike["ok"]
+    costs = harness.op_costs(harness.cost_rows("local-macos-x86", "classical-v1"), scene.shape[1], scene.shape[0])
+    for kind in ("planner_timeout", "p95_spike"):  # on the fixed costs a drill takes the same path on any machine load
+        a, b = (harness.run_chaos(scene, kind, costs) for _ in range(2))
+        assert a == b and a["fired"] and a["ok"]
 
 
 def test_governor_activity_counts_overrides_noted_on_halt_records():
@@ -134,16 +191,26 @@ def test_three_image_run_writes_valid_summary_and_gallery(tmp_path):
     summary = harness.run(str(data), n=3, out_dir=pub, results_dir=raw, workers=1, chaos=(0, 0, 0), log=lambda *_: None)
     on_disk = json.loads((pub / "summary.json").read_text())
     assert on_disk == json.loads(json.dumps(summary))
-    assert list(on_disk) == ["dataset", "n_images", "segmenter", "policies", "per_class", "agent_metrics", "micro", "provenance", "headline"]
-    assert on_disk["n_images"] == 3 and on_disk["dataset"].startswith("synthetic-3")
+    assert list(on_disk) == ["dataset", "n_images", "segmenter", "cost_model", "policies", "headline_stats", "strata",
+                             "per_class", "agent_metrics", "micro", "provenance", "headline"]
+    assert on_disk["n_images"] == 3 and on_disk["dataset"].startswith("synthetic-3 at 640x480")
+    assert on_disk["cost_model"]["kind"] == "fixed" and on_disk["cost_model"]["ms_per_call"]["segment:accurate"] > 0
     pol = on_disk["policies"]
     assert [len(pol[k]) for k in ("downscale", "tiling", "drishyam")] == [1, 3, 6]
     for points in pol.values():
         for p in points:
-            assert set(p) == {"pixels_frac", "recall", "usd"} and 0 <= p["recall"] <= 1 and p["pixels_frac"] > 0 and p["usd"] >= 0
+            assert set(p) == {"pixels_frac", "recall", "recall_ci", "recall_iou_only", "recall_iou_only_ci", "chance_recall",
+                              "chance_recall_iou_only", "precision", "fp_per_image", "boxes_per_image",
+                              "hits_per_matched_gt", "usd"}
+            assert 0 <= p["recall"] <= 1 and p["pixels_frac"] > 0 and p["usd"] >= 0
+            assert p["recall_ci"][0] <= p["recall"] <= p["recall_ci"][1]
+    hs = on_disk["headline_stats"]
+    assert hs["budget"] == 0.3 and len(hs["recall_ratio_vs_tiling_ci"]) == 2 and isinstance(hs["meets_target"], bool)
+    assert isinstance(hs["meets_target_ci"], bool) and len(hs["recall_ratio_iou_only_vs_tiling_ci"]) == 2
+    assert set(on_disk["strata"]["recall"]["downscale"]) == {"hairline_crack", "small_box"}
     assert {"drishyam@0.3", "tiling@1.0", "downscale"} <= set(on_disk["per_class"])
     assert set(on_disk["per_class"]["downscale"]) == set(synth.CLASSES)
-    assert set(on_disk["provenance"]) == {"cv2", "build_info_sha256", "machine", "cpu", "python", "timestamp", "build"}
+    assert set(on_disk["provenance"]) == {"cv2", "build_info_sha256", "machine", "cpu", "python", "timestamp", "build", "load_avg"}
     am = on_disk["agent_metrics"]
     assert am["steps_with_cause_pct"] == 100.0 and set(am["box_convention"]["recall"]) == {"components", "union", "as_specified"}
     head = on_disk["headline"]
@@ -152,14 +219,23 @@ def test_three_image_run_writes_valid_summary_and_gallery(tmp_path):
         assert baseline in head, baseline
     gallery = json.loads((pub / "failures.json").read_text())
     for g in gallery:
-        assert set(g) == {"image", "category", "what_happened", "rule_that_would_catch_it"}
+        assert set(g) == {"image", "id", "class", "category", "what_happened", "rule_that_would_catch_it"}
         assert (pub / g["image"]).exists()  # paths in failures.json are relative to public/results/ (the page prepends results/)
     assert (raw / "eval_raw.json").exists() and (raw / "eval_per_image.json").exists()
+    cache = raw / "eval_per_image.json"
+    assert gzip.decompress((pub / "per_image.json.gz").read_bytes()) == cache.read_bytes()
     again = harness.run(str(data), n=3, out_dir=pub, results_dir=raw, workers=1, chaos=(0, 0, 0), reuse=True, log=lambda *_: None)
     assert again["policies"]["drishyam"] == summary["policies"]["drishyam"]  # same predictions, re-scored
-    cache = raw / "eval_per_image.json"
+    fresh = harness.run(str(data), n=3, out_dir=tmp_path / "pub2", results_dir=tmp_path / "raw2", workers=1, chaos=(0, 0, 0),
+                        log=lambda *_: None)
+    assert fresh["policies"] == summary["policies"]  # fixed costs: a second full run decides and scores the same
     saved = json.loads(cache.read_text())
-    assert saved["segmenter"] == summary["segmenter"] == "classical-v1"
+    assert saved["segmenter"] == summary["segmenter"] == "classical-v1" and saved["cost_model"] == "fixed"
+    with pytest.raises(SystemExit, match="cost-model fixed, not live"):
+        harness.run(str(data), n=3, out_dir=pub, results_dir=raw, workers=1, chaos=(0, 0, 0), reuse=True,
+                    cost_model="live", log=lambda *_: None)
+    with pytest.raises(SystemExit, match="seed 7, not --seed 8"):
+        harness.run(str(data), n=3, out_dir=pub, results_dir=raw, workers=1, chaos=(0, 0, 0), seed=8, log=lambda *_: None)
     cache.write_text(json.dumps({**saved, "segmenter": "onnx:m.onnx"}))  # an ONNX run, re-scored without DRISHYAM_ONNX
     with pytest.raises(SystemExit, match="onnx:m.onnx predictions"):
         harness.run(str(data), n=3, out_dir=pub, results_dir=raw, workers=1, chaos=(0, 0, 0), reuse=True, log=lambda *_: None)
@@ -271,6 +347,51 @@ def test_harness_refuses_to_publish_codebrim_crops(tmp_path):
     with pytest.raises(SystemExit, match="refusing"):  # anywhere in the repo that git or Vercel would pick up
         harness.run(tmp_path, n=1, out_dir=repo / "docs" / "codebrim", results_dir=tmp_path / "raw", workers=1)
     assert not (repo / "docs" / "codebrim").exists()
+
+def test_leakage_finds_a_resized_rotated_copy(tmp_path):
+    from evals import leakage
+
+    a, b = (synth.generate(s, 640, 480)[0] for s in (1, 2))
+    (tmp_path / "train").mkdir()
+    cv2.imwrite(str(tmp_path / "a.jpg"), a)
+    cv2.imwrite(str(tmp_path / "b.jpg"), b)
+    cv2.imwrite(str(tmp_path / "train" / "copy.jpg"), cv2.rotate(cv2.resize(a, (320, 240)), cv2.ROTATE_90_CLOCKWISE))
+    cv2.imwrite(str(tmp_path / "train" / "other.jpg"), synth.generate(3, 640, 480)[0])
+    rep = leakage.near_duplicates([tmp_path / "a.jpg", tmp_path / "b.jpg"], sorted((tmp_path / "train").iterdir()))
+    assert rep["eval_images"] == 2 and rep["train_images"] == 2 and rep["near_duplicates"] == rep["candidates"] == 1
+    assert rep["pairs"][0][:2] == ["a.jpg", "copy.jpg"] and rep["pairs"][0][2] <= 8 and rep["pairs"][0][3] > 0.9
+    cal = leakage.calibrate([tmp_path / "a.jpg", tmp_path / "b.jpg"], [tmp_path / "train" / "other.jpg"], n_copies=2)
+    assert cal["copies"]["n"] == 2 and cal["copies"]["jpeg50"]["found"] == 2 and cal["other_photos"]["n"] == 2
+    assert cal["other_photos"]["confirmed"] == 0
+    out = tmp_path / "leak.json"
+    assert leakage.main(["--dacl10k", str(tmp_path / "absent"), "--out", str(out)]) == {"skipped": f"no dacl10k images under {tmp_path / 'absent'}"}
+    assert json.loads(out.read_text())["skipped"]
+
+
+def test_leakage_keeps_unrelated_low_texture_photos_apart():
+    """Two different plain walls under the same lighting gradient: a 9x8 dHash sees only the gradient (distance near 0),
+    the lighting-free pHash and the NCC check must not call them copies."""
+    from evals import leakage
+
+    ramp = np.linspace(60, 200, 800, dtype=np.float32)[None, :].repeat(600, 0)
+    wall = lambda seed: np.clip(ramp + cv2.GaussianBlur(np.random.default_rng(seed).normal(0, 12, (600, 800)).astype(np.float32),
+                                                         (0, 0), 3), 0, 255).astype(np.uint8)
+    a, b = wall(1), wall(2)
+    def old(g):  # the 9x8 dHash this check replaced
+        s = cv2.resize(g, (9, 8), interpolation=cv2.INTER_AREA).astype(np.int16)
+        return np.packbits(s[:, :-1] > s[:, 1:])
+    assert np.unpackbits(old(a) ^ old(b)).sum() <= 4  # what the old check would have flagged
+    assert leakage.nearest(a, leakage.phash(b)[None])[2] > leakage.MAX_DIST and leakage.ncc(a, b) < leakage.MIN_NCC
+    assert leakage.nearest(a, leakage.phash(cv2.resize(a, (400, 300)))[None])[2] <= leakage.MAX_DIST  # a copy still is one
+
+
+def test_model_eval_refuses_a_mislabelled_arm():
+    from evals import model_eval
+
+    assert model_eval.check({"segmenter": "onnx:m.onnx"}, "onnx:m.onnx", "x") == {"segmenter": "onnx:m.onnx"}
+    with pytest.raises(SystemExit, match="scored with classical-v1, not onnx:m.onnx"):
+        model_eval.check({"segmenter": "classical-v1"}, "onnx:m.onnx", "runs/model-eval/onnx-synth")
+
 
 # ---------------------------------------------------------------- parity
 def test_parity_compare_saved_files(tmp_path):

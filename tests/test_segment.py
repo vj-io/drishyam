@@ -109,6 +109,20 @@ def tiny_onnx(tmp_path_factory):
     return str(path)
 
 
+def test_micro_times_nanodet_and_the_onnx_named_by_the_env(tiny_onnx, monkeypatch):
+    from bench import micro
+
+    monkeypatch.delenv("DRISHYAM_ONNX_FP16", raising=False)
+    monkeypatch.delenv("DRISHYAM_ONNX", raising=False)
+    assert set(micro.dnn_ops()) == {"nanodet"}  # nothing to time but the privacy detector without a model
+    monkeypatch.setenv("DRISHYAM_ONNX", tiny_onnx)
+    table = micro.dnn_ops()
+    assert set(table) == {"nanodet", "onnx:fp32@256", "onnx:fp32@512"}
+    for name, (s, forward) in table.items():
+        if name.startswith("onnx:"):
+            assert np.asarray(forward()).shape == (1, 6, s, s)
+
+
 @pytest.mark.parametrize("shape", [(512, 512), (320, 480), (256, 256)])
 def test_onnx_engine_new_dynamic_hw(tiny_onnx, shape):
     seg = OnnxSegmenter(tiny_onnx).predict(concrete(*shape, 17))

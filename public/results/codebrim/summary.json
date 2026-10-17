@@ -2,63 +2,300 @@
  "dataset": "CODEBRIM eval subset (200 images)",
  "n_images": 200,
  "segmenter": "classical-v1",
+ "cost_model": {
+  "kind": "fixed",
+  "source": "results/local-macos-x86/micro.json job_ops (p50 ms per call)",
+  "ms_per_call": {
+   "pyrDown": 19.97,
+   "saliency": 10.5,
+   "warp": 1.76,
+   "quality": 3.04,
+   "segment:accurate": 104.05,
+   "segment:fast": 51.32,
+   "downscale": 2.82
+  }
+ },
  "policies": {
   "downscale": [
    {
     "pixels_frac": 0.0726,
     "recall": 0.1982,
-    "usd": 0.000105
+    "recall_ci": [
+     0.1715,
+     0.2265
+    ],
+    "recall_iou_only": 0.076,
+    "recall_iou_only_ci": [
+     0.0593,
+     0.0962
+    ],
+    "chance_recall": 0.1027,
+    "chance_recall_iou_only": 0.019,
+    "precision": 0.0074,
+    "fp_per_image": 182.8,
+    "boxes_per_image": 184.1,
+    "hits_per_matched_gt": 1.05,
+    "usd": 3.3e-05
    }
   ],
   "tiling": [
    {
     "pixels_frac": 0.1047,
     "recall": 0.2142,
-    "usd": 0.00018
+    "recall_ci": [
+     0.1857,
+     0.243
+    ],
+    "recall_iou_only": 0.0819,
+    "recall_iou_only_ci": [
+     0.0646,
+     0.1015
+    ],
+    "chance_recall": 0.0938,
+    "chance_recall_iou_only": 0.0196,
+    "precision": 0.0062,
+    "fp_per_image": 251.9,
+    "boxes_per_image": 253.5,
+    "hits_per_matched_gt": 1.06,
+    "usd": 6.1e-05
    },
    {
     "pixels_frac": 0.4191,
     "recall": 0.2226,
-    "usd": 0.000701
+    "recall_ci": [
+     0.1929,
+     0.2531
+    ],
+    "recall_iou_only": 0.0766,
+    "recall_iou_only_ci": [
+     0.0592,
+     0.0957
+    ],
+    "chance_recall": 0.092,
+    "chance_recall_iou_only": 0.0166,
+    "precision": 0.0019,
+    "fp_per_image": 928.5,
+    "boxes_per_image": 930.3,
+    "hits_per_matched_gt": 1.15,
+    "usd": 0.000226
    },
    {
     "pixels_frac": 1.6229,
     "recall": 0.2059,
-    "usd": 0.003217
+    "recall_ci": [
+     0.1748,
+     0.2387
+    ],
+    "recall_iou_only": 0.057,
+    "recall_iou_only_ci": [
+     0.042,
+     0.0731
+    ],
+    "chance_recall": 0.0825,
+    "chance_recall_iou_only": 0.0131,
+    "precision": 0.0005,
+    "fp_per_image": 3142.7,
+    "boxes_per_image": 3144.4,
+    "hits_per_matched_gt": 1.2,
+    "usd": 0.000875
    }
   ],
   "drishyam": [
    {
     "pixels_frac": 0.0418,
     "recall": 0.1056,
-    "usd": 6.3e-05
+    "recall_ci": [
+     0.0753,
+     0.139
+    ],
+    "recall_iou_only": 0.0392,
+    "recall_iou_only_ci": [
+     0.025,
+     0.0549
+    ],
+    "chance_recall": 0.0742,
+    "chance_recall_iou_only": 0.0142,
+    "precision": 0.0075,
+    "fp_per_image": 94.4,
+    "boxes_per_image": 95.1,
+    "hits_per_matched_gt": 1.21,
+    "usd": 2.4e-05
    },
    {
-    "pixels_frac": 0.0912,
-    "recall": 0.1341,
-    "usd": 0.000137
+    "pixels_frac": 0.0911,
+    "recall": 0.1347,
+    "recall_ci": [
+     0.1065,
+     0.1668
+    ],
+    "recall_iou_only": 0.0516,
+    "recall_iou_only_ci": [
+     0.0368,
+     0.0678
+    ],
+    "chance_recall": 0.0872,
+    "chance_recall_iou_only": 0.0125,
+    "precision": 0.0037,
+    "fp_per_image": 263.9,
+    "boxes_per_image": 264.9,
+    "hits_per_matched_gt": 1.36,
+    "usd": 5.1e-05
    },
    {
     "pixels_frac": 0.1918,
-    "recall": 0.1852,
-    "usd": 0.00027
+    "recall": 0.1869,
+    "recall_ci": [
+     0.1567,
+     0.2185
+    ],
+    "recall_iou_only": 0.0772,
+    "recall_iou_only_ci": [
+     0.0591,
+     0.0973
+    ],
+    "chance_recall": 0.1205,
+    "chance_recall_iou_only": 0.0273,
+    "precision": 0.0024,
+    "fp_per_image": 599.5,
+    "boxes_per_image": 600.9,
+    "hits_per_matched_gt": 1.55,
+    "usd": 0.000108
    },
    {
-    "pixels_frac": 0.2906,
-    "recall": 0.1988,
-    "usd": 0.000397
+    "pixels_frac": 0.2909,
+    "recall": 0.2006,
+    "recall_ci": [
+     0.17,
+     0.2323
+    ],
+    "recall_iou_only": 0.0878,
+    "recall_iou_only_ci": [
+     0.0688,
+     0.1091
+    ],
+    "chance_recall": 0.1365,
+    "chance_recall_iou_only": 0.0237,
+    "precision": 0.0018,
+    "fp_per_image": 918.3,
+    "boxes_per_image": 919.9,
+    "hits_per_matched_gt": 1.62,
+    "usd": 0.000163
    },
    {
-    "pixels_frac": 0.42,
-    "recall": 0.2196,
-    "usd": 0.000537
+    "pixels_frac": 0.4235,
+    "recall": 0.2226,
+    "recall_ci": [
+     0.1919,
+     0.2551
+    ],
+    "recall_iou_only": 0.0961,
+    "recall_iou_only_ci": [
+     0.0757,
+     0.1198
+    ],
+    "chance_recall": 0.1365,
+    "chance_recall_iou_only": 0.0285,
+    "precision": 0.0014,
+    "fp_per_image": 1322.4,
+    "boxes_per_image": 1324.2,
+    "hits_per_matched_gt": 1.82,
+    "usd": 0.000232
    },
    {
-    "pixels_frac": 0.4392,
-    "recall": 0.2196,
-    "usd": 0.000543
+    "pixels_frac": 0.4425,
+    "recall": 0.2243,
+    "recall_ci": [
+     0.1939,
+     0.2579
+    ],
+    "recall_iou_only": 0.0973,
+    "recall_iou_only_ci": [
+     0.0767,
+     0.1214
+    ],
+    "chance_recall": 0.1412,
+    "chance_recall_iou_only": 0.0344,
+    "precision": 0.0013,
+    "fp_per_image": 1361.3,
+    "boxes_per_image": 1363.2,
+    "hits_per_matched_gt": 1.85,
+    "usd": 0.000238
    }
   ]
+ },
+ "headline_stats": {
+  "budget": 0.3,
+  "target": {
+   "recall_ratio": 0.9,
+   "pixels_ratio": 0.3
+  },
+  "recall_ratio_vs_tiling": 0.9741,
+  "recall_ratio_vs_tiling_ci": [
+   0.881,
+   1.0767
+  ],
+  "recall_ratio_iou_only_vs_tiling": 1.5417,
+  "recall_ratio_iou_only_vs_tiling_ci": [
+   1.2555,
+   1.918
+  ],
+  "pixels_ratio_vs_tiling": 0.1793,
+  "meets_target": true,
+  "meets_target_ci": false,
+  "recall_ratio_vs_downscale": 1.012,
+  "recall_ratio_vs_downscale_ci": [
+   0.9267,
+   1.1027
+  ]
+ },
+ "strata": {
+  "gt_boxes": {
+   "hairline_crack": 0,
+   "small_box": 13
+  },
+  "small_box_px": 9216,
+  "recall": {
+   "downscale": {
+    "hairline_crack": null,
+    "small_box": 0.1538
+   },
+   "tiling@L2": {
+    "hairline_crack": null,
+    "small_box": 0.2308
+   },
+   "tiling@L1": {
+    "hairline_crack": null,
+    "small_box": 0.3846
+   },
+   "tiling@L0": {
+    "hairline_crack": null,
+    "small_box": 0.3846
+   },
+   "drishyam@0.05": {
+    "hairline_crack": null,
+    "small_box": 0.0769
+   },
+   "drishyam@0.1": {
+    "hairline_crack": null,
+    "small_box": 0.0769
+   },
+   "drishyam@0.2": {
+    "hairline_crack": null,
+    "small_box": 0.1538
+   },
+   "drishyam@0.3": {
+    "hairline_crack": null,
+    "small_box": 0.3077
+   },
+   "drishyam@0.5": {
+    "hairline_crack": null,
+    "small_box": 0.4615
+   },
+   "drishyam@1.0": {
+    "hairline_crack": null,
+    "small_box": 0.4615
+   }
+  }
  },
  "per_class": {
   "downscale": {
@@ -101,31 +338,31 @@
    "spalling": 0.0,
    "efflorescence": 0.0229,
    "exposed_rebar": 0.0032,
-   "corrosion": 0.4332
+   "corrosion": 0.4362
   },
   "drishyam@0.2": {
-   "crack": 0.271,
+   "crack": 0.2731,
    "spalling": 0.0,
    "efflorescence": 0.0514,
-   "exposed_rebar": 0.0063,
-   "corrosion": 0.5104
+   "exposed_rebar": 0.0095,
+   "corrosion": 0.5134
   },
   "drishyam@0.3": {
-   "crack": 0.3046,
+   "crack": 0.3109,
    "spalling": 0.0,
    "efflorescence": 0.0514,
    "exposed_rebar": 0.0095,
    "corrosion": 0.5282
   },
   "drishyam@0.5": {
-   "crack": 0.355,
+   "crack": 0.3655,
    "spalling": 0.0,
    "efflorescence": 0.0571,
    "exposed_rebar": 0.0095,
    "corrosion": 0.5579
   },
   "drishyam@1.0": {
-   "crack": 0.355,
+   "crack": 0.3718,
    "spalling": 0.0,
    "efflorescence": 0.0571,
    "exposed_rebar": 0.0095,
@@ -134,7 +371,7 @@
  },
  "agent_metrics": {
   "headline_budget": 0.3,
-  "escalation_rate": 0.1432,
+  "escalation_rate": 0.137,
   "steps_per_image": {
    "p50": 17.0,
    "p95": 26.0
@@ -161,8 +398,8 @@
     }
    },
    "0.1": {
-    "escalation_rate": 0.1545,
-    "verify_rate": 0.325,
+    "escalation_rate": 0.149,
+    "verify_rate": 0.3299,
     "steps_p50": 5.0,
     "steps_p95": 7.0,
     "pixels_frac_p50": 0.0979,
@@ -174,8 +411,8 @@
     }
    },
    "0.2": {
-    "escalation_rate": 0.1384,
-    "verify_rate": 0.3536,
+    "escalation_rate": 0.1283,
+    "verify_rate": 0.3652,
     "steps_p50": 11.0,
     "steps_p95": 16.0,
     "pixels_frac_p50": 0.1967,
@@ -187,8 +424,8 @@
     }
    },
    "0.3": {
-    "escalation_rate": 0.1432,
-    "verify_rate": 0.349,
+    "escalation_rate": 0.137,
+    "verify_rate": 0.3567,
     "steps_p50": 17.0,
     "steps_p95": 26.0,
     "pixels_frac_p50": 0.2955,
@@ -196,36 +433,35 @@
     "pixels_p50": 4705911,
     "pixels_p95": 7190400,
     "halt_causes": {
-     "cap-hit": 192,
-     "stop-rule": 8
+     "cap-hit": 195,
+     "stop-rule": 5
     }
    },
    "0.5": {
-    "escalation_rate": 0.1591,
-    "verify_rate": 0.342,
+    "escalation_rate": 0.1452,
+    "verify_rate": 0.3565,
     "steps_p50": 24.0,
-    "steps_p95": 31.0,
-    "pixels_frac_p50": 0.4271,
+    "steps_p95": 30.0,
+    "pixels_frac_p50": 0.4436,
     "pixels_frac_p95": 0.493,
     "pixels_p50": 6540499,
-    "pixels_p95": 8445606,
+    "pixels_p95": 8249375,
     "halt_causes": {
      "cap-hit": 61,
      "stop-rule": 139
     }
    },
    "1.0": {
-    "escalation_rate": 0.1665,
-    "verify_rate": 0.3395,
+    "escalation_rate": 0.1506,
+    "verify_rate": 0.3553,
     "steps_p50": 24.0,
     "steps_p95": 34.0,
-    "pixels_frac_p50": 0.4271,
-    "pixels_frac_p95": 0.6327,
+    "pixels_frac_p50": 0.4436,
+    "pixels_frac_p95": 0.5948,
     "pixels_p50": 6540499,
     "pixels_p95": 9161795,
     "halt_causes": {
-     "exhausted": 1,
-     "stop-rule": 199
+     "stop-rule": 200
     }
    }
   },
@@ -249,14 +485,14 @@
    "recovered": 10
   },
   "governor_activity_in_eval": {
-   "p95>SLA": 77,
-   "warp-spike": 14,
+   "p95>SLA": 0,
+   "warp-spike": 0,
    "usd≥80%": 0
   },
   "timing": {
    "workers": 8,
    "cv2_threads_per_worker": 1,
-   "note": "wall times are per image while the other workers were busy; read ratios, not absolutes"
+   "note": "wall times are modelled (--cost-model fixed): micro.json job_ops p50 per call, not measured"
   },
   "false_accept_critical": {
    "downscale": {
@@ -280,19 +516,19 @@
     "rate": 1.0
    },
    "drishyam@0.05": {
-    "critical_predictions": 65,
-    "false": 65,
+    "critical_predictions": 62,
+    "false": 62,
     "rate": 1.0
    },
    "drishyam@0.1": {
-    "critical_predictions": 124,
-    "false": 122,
-    "rate": 0.9839
+    "critical_predictions": 121,
+    "false": 119,
+    "rate": 0.9835
    },
    "drishyam@0.2": {
-    "critical_predictions": 223,
-    "false": 220,
-    "rate": 0.9865
+    "critical_predictions": 221,
+    "false": 217,
+    "rate": 0.9819
    },
    "drishyam@0.3": {
     "critical_predictions": 291,
@@ -300,14 +536,14 @@
     "rate": 0.9863
    },
    "drishyam@0.5": {
-    "critical_predictions": 370,
-    "false": 366,
-    "rate": 0.9892
+    "critical_predictions": 378,
+    "false": 374,
+    "rate": 0.9894
    },
    "drishyam@1.0": {
-    "critical_predictions": 355,
-    "false": 351,
-    "rate": 0.9887
+    "critical_predictions": 378,
+    "false": 374,
+    "rate": 0.9894
    },
    "note": "a critical prediction is exposed_rebar or spalling >= 40000 px^2; false = matches no critical GT box (spalling GT is critical at box area >= the same threshold)"
   },
@@ -321,11 +557,11 @@
      "tiling@L1": 0.2226,
      "tiling@L0": 0.2059,
      "drishyam@0.05": 0.1056,
-     "drishyam@0.1": 0.1341,
-     "drishyam@0.2": 0.1852,
-     "drishyam@0.3": 0.1988,
-     "drishyam@0.5": 0.2196,
-     "drishyam@1.0": 0.2196
+     "drishyam@0.1": 0.1347,
+     "drishyam@0.2": 0.1869,
+     "drishyam@0.3": 0.2006,
+     "drishyam@0.5": 0.2226,
+     "drishyam@1.0": 0.2243
     },
     "union": {
      "downscale": 0.4742,
@@ -333,11 +569,11 @@
      "tiling@L1": 0.4783,
      "tiling@L0": 0.4641,
      "drishyam@0.05": 0.1976,
-     "drishyam@0.1": 0.2475,
-     "drishyam@0.2": 0.3543,
-     "drishyam@0.3": 0.3822,
-     "drishyam@0.5": 0.4214,
-     "drishyam@1.0": 0.4196
+     "drishyam@0.1": 0.2481,
+     "drishyam@0.2": 0.3555,
+     "drishyam@0.3": 0.3834,
+     "drishyam@0.5": 0.4249,
+     "drishyam@1.0": 0.4285
     },
     "as_specified": {
      "downscale": 0.1982,
@@ -345,11 +581,11 @@
      "tiling@L1": 0.2226,
      "tiling@L0": 0.2059,
      "drishyam@0.05": 0.1976,
-     "drishyam@0.1": 0.2475,
-     "drishyam@0.2": 0.3543,
-     "drishyam@0.3": 0.3822,
-     "drishyam@0.5": 0.4214,
-     "drishyam@1.0": 0.4196
+     "drishyam@0.1": 0.2481,
+     "drishyam@0.2": 0.3555,
+     "drishyam@0.3": 0.3834,
+     "drishyam@0.5": 0.4249,
+     "drishyam@1.0": 0.4285
     }
    },
    "recall_iou_only": {
@@ -359,11 +595,11 @@
      "tiling@L1": 0.0766,
      "tiling@L0": 0.057,
      "drishyam@0.05": 0.0392,
-     "drishyam@0.1": 0.051,
-     "drishyam@0.2": 0.0748,
-     "drishyam@0.3": 0.0861,
-     "drishyam@0.5": 0.0944,
-     "drishyam@1.0": 0.0926
+     "drishyam@0.1": 0.0516,
+     "drishyam@0.2": 0.0772,
+     "drishyam@0.3": 0.0878,
+     "drishyam@0.5": 0.0961,
+     "drishyam@1.0": 0.0973
     },
     "union": {
      "downscale": 0.0326,
@@ -372,10 +608,10 @@
      "tiling@L0": 0.1733,
      "drishyam@0.05": 0.0136,
      "drishyam@0.1": 0.0398,
-     "drishyam@0.2": 0.0682,
-     "drishyam@0.3": 0.0783,
-     "drishyam@0.5": 0.092,
-     "drishyam@1.0": 0.0961
+     "drishyam@0.2": 0.0665,
+     "drishyam@0.3": 0.0801,
+     "drishyam@0.5": 0.0961,
+     "drishyam@1.0": 0.0985
     },
     "as_specified": {
      "downscale": 0.076,
@@ -384,10 +620,10 @@
      "tiling@L0": 0.057,
      "drishyam@0.05": 0.0136,
      "drishyam@0.1": 0.0398,
-     "drishyam@0.2": 0.0682,
-     "drishyam@0.3": 0.0783,
-     "drishyam@0.5": 0.092,
-     "drishyam@1.0": 0.0961
+     "drishyam@0.2": 0.0665,
+     "drishyam@0.3": 0.0801,
+     "drishyam@0.5": 0.0961,
+     "drishyam@1.0": 0.0985
     }
    },
    "false_accept_rate": {
@@ -397,11 +633,11 @@
      "tiling@L1": 0.99,
      "tiling@L0": 1.0,
      "drishyam@0.05": 1.0,
-     "drishyam@0.1": 0.9839,
-     "drishyam@0.2": 0.9865,
+     "drishyam@0.1": 0.9835,
+     "drishyam@0.2": 0.9819,
      "drishyam@0.3": 0.9863,
-     "drishyam@0.5": 0.9892,
-     "drishyam@1.0": 0.9887
+     "drishyam@0.5": 0.9894,
+     "drishyam@1.0": 0.9894
     },
     "union": {
      "downscale": 0.9057,
@@ -410,10 +646,10 @@
      "tiling@L0": 0.9856,
      "drishyam@0.05": 0.9615,
      "drishyam@0.1": 0.9583,
-     "drishyam@0.2": 0.9467,
+     "drishyam@0.2": 0.9351,
      "drishyam@0.3": 0.9505,
-     "drishyam@0.5": 0.9597,
-     "drishyam@1.0": 0.9496
+     "drishyam@0.5": 0.9516,
+     "drishyam@1.0": 0.9516
     },
     "as_specified": {
      "downscale": 0.9923,
@@ -422,10 +658,10 @@
      "tiling@L0": 1.0,
      "drishyam@0.05": 0.9615,
      "drishyam@0.1": 0.9583,
-     "drishyam@0.2": 0.9467,
+     "drishyam@0.2": 0.9351,
      "drishyam@0.3": 0.9505,
-     "drishyam@0.5": 0.9597,
-     "drishyam@1.0": 0.9496
+     "drishyam@0.5": 0.9516,
+     "drishyam@1.0": 0.9516
     }
    },
    "predictions_per_image": {
@@ -434,12 +670,12 @@
      "tiling@L2": 253.5,
      "tiling@L1": 930.3,
      "tiling@L0": 3144.4,
-     "drishyam@0.05": 94.2,
-     "drishyam@0.1": 264.0,
-     "drishyam@0.2": 606.1,
-     "drishyam@0.3": 928.6,
-     "drishyam@0.5": 1355.2,
-     "drishyam@1.0": 1347.1
+     "drishyam@0.05": 95.1,
+     "drishyam@0.1": 264.9,
+     "drishyam@0.2": 600.9,
+     "drishyam@0.3": 919.9,
+     "drishyam@0.5": 1324.2,
+     "drishyam@1.0": 1363.2
     },
     "union": {
      "downscale": 2.9,
@@ -450,8 +686,8 @@
      "drishyam@0.1": 5.1,
      "drishyam@0.2": 11.1,
      "drishyam@0.3": 16.8,
-     "drishyam@0.5": 23.8,
-     "drishyam@1.0": 24.5
+     "drishyam@0.5": 24.2,
+     "drishyam@1.0": 24.9
     },
     "as_specified": {
      "downscale": 184.1,
@@ -462,8 +698,8 @@
      "drishyam@0.1": 5.1,
      "drishyam@0.2": 11.1,
      "drishyam@0.3": 16.8,
-     "drishyam@0.5": 23.8,
-     "drishyam@1.0": 24.5
+     "drishyam@0.5": 24.2,
+     "drishyam@1.0": 24.9
     }
    }
   }
@@ -475,8 +711,13 @@
   "machine": "Darwin 25.6.0 x86_64, 16 logical CPUs; eval ran 8 worker(s) x 1 cv2 thread(s); micro arm local-macos-x86",
   "cpu": "Intel(R) Core(TM) i9-9880H CPU @ 2.30GHz",
   "python": "3.13.16",
-  "timestamp": "2026-10-17T16:19:33Z",
-  "build": "stock (not COOL)"
+  "timestamp": "2026-10-17T21:08:01Z",
+  "build": "stock (not COOL)",
+  "load_avg": [
+   50.38,
+   38.62,
+   41.88
+  ]
  },
- "headline": "On 200 CODEBRIM images, Drishyam at a 30% pixel cap found 0.20 of ground-truth boxes using 0.29 of the image's pixels, versus 0.21 for 20%-overlap 512-px tiling using 1.62: 0.97x its recall (0.82x with one-box-per-class boxes, 1.86x with as-specified mixed boxes) at 0.18x its pixels, which meets the 0.9x-at-0.3x hypothesis. It is 1.00x a single 1024-px downscale (0.20 at 0.07 of the pixels), 0.89x L1 tiling (0.22 at 0.42, the best grid) and 0.93x L2 tiling (0.21 at 0.10), and 1.51x L0 tiling when a match needs IoU >= 0.3 (no contains-the-centre clause)."
+ "headline": "On 200 CODEBRIM images, Drishyam at a 30% pixel cap found 0.20 of ground-truth boxes using 0.29 of the image's pixels, versus 0.21 for 20%-overlap 512-px tiling using 1.62: 0.97x its recall (95% CI 0.88-1.08, 0.83x with one-box-per-class boxes, 1.86x with as-specified mixed boxes) at 0.18x its pixels, which meets the 0.9x-at-0.3x hypothesis on the point estimate, but the 95% CI includes values below 0.9. It is 1.01x a single 1024-px downscale (95% CI 0.93-1.10, 0.20 at 0.07 of the pixels), 0.90x L1 tiling (0.22 at 0.42, the best grid) and 0.94x L2 tiling (0.21 at 0.10), and 1.54x L0 tiling when a match needs IoU >= 0.3 (95% CI 1.26-1.92, no contains-the-centre clause); its own boxes placed at random would score 0.14 (0.02 with IoU only)."
 }

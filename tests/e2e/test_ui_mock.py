@@ -103,6 +103,11 @@ SUMMARY = {
               {"op": "warpPerspective", "size": "4000x3000", "p50_ms": 9.2, "p95_ms": 11.8}],
     "provenance": {"cv2": "5.0.0", "machine": "test rig", "build": "stock"},
 }
+# a model summary (evals.model_eval --publish): FIG. 4.1/4.2 add its Drishyam curve as a fourth series
+MODEL = {"dataset": "fixture", "segmenter": "onnx:drishyam_dacl10k.onnx",
+         "policies": {"drishyam": [{"pixels_frac": 0.1, "recall": 0.6}, {"pixels_frac": 0.29, "recall": 0.9}]}}
+REAL = {**SUMMARY, "dataset": "CODEBRIM (test fixture)",
+        "policies": {k: [{**pt, "recall_iou_only": round(pt["recall"] / 2, 2)} for pt in v] for k, v in SUMMARY["policies"].items()}}
 # the shape bench.compare_arms --summary writes; the numbers are made up for the test
 COOL = {"expected": {"op_level": [1.2, 1.8], "end_to_end": [1.2, 1.3]},
         "end_to_end": {"cool_gain": 1.04, "hardware_gain": 1.1, "a_over_c": 1.144},
@@ -122,7 +127,9 @@ DATA = {
     "/samples/bridge_01.jpg": ("image/jpeg", MOCK_JPG),
     "/samples/thumbs/bridge_01.jpg": ("image/jpeg", THUMB_BYTES),
     "/results/summary.json": ("application/json", json.dumps(SUMMARY).encode()),
-    "/results/codebrim/summary.json": ("application/json", json.dumps({**SUMMARY, "dataset": "CODEBRIM (test fixture)"}).encode()),
+    "/results/codebrim/summary.json": ("application/json", json.dumps(REAL).encode()),
+    "/results/synth_dacl10k/summary.json": ("application/json", json.dumps(MODEL).encode()),
+    "/results/codebrim_dacl10k/summary.json": ("application/json", json.dumps(MODEL).encode()),
     "/results/cool.json": ("application/json", json.dumps(COOL).encode()),
     "/results/failures.json": ("application/json", json.dumps(FAILURES).encode()),
     "/results/failures/f01.jpg": ("image/jpeg", MOCK_JPG),
@@ -397,7 +404,11 @@ def test_desktop_mock(browser, base):
     expect(p.locator("#advanced")).not_to_have_attribute("open", "")  # budget and drills start folded away
     expect(p.locator("#stat-recall .stat__v")).to_contain_text("tiling", timeout=T)  # benchmarks replaced the chip
     expect(p.locator("#bench svg.chart")).to_be_visible()
-    expect(p.locator("#bench .legend li")).to_have_count(3)
+    expect(p.locator("#bench .legend li")).to_have_count(4)                       # three policies + the trained model
+    expect(p.locator("#bench-real .chart__line--model")).to_have_count(1)
+    n_iou = sum(len(v) for v in REAL["policies"].values())
+    expect(p.locator("#bench-real .chart__plot path[d*='l10 10']")).to_have_count(n_iou)  # IoU-only crosses on FIG. 4.2 only
+    expect(p.locator("#bench .chart__plot path[d*='l10 10']")).to_have_count(0)
     expect(p.locator("#fail .fail")).to_have_count(1)
     expect(p.locator("#bench-cool tbody tr")).to_have_count(3)                   # FIG. 4.3 from results/cool.json
     expect(p.locator("#bench-cool .kv")).to_contain_text("PRD expects 1.2–1.3×")  # the expected range sits by the measured gain

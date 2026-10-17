@@ -62,7 +62,7 @@ def _false_alarm(kind, classes, label):
                     share = _inside(p["box"], d["box"])
                     if share >= 0.5:
                         crit = is_critical(p["cls"], p["area"])
-                        yield {"id": rec["id"], "cfg": cfg, "score": 10 * crit + share + p["conf"],
+                        yield {"id": rec["id"], "cls": p["cls"], "cfg": cfg, "score": 10 * crit + share + p["conf"],
                                "marks": [_mark("pred", f"{p['cls']} {p['conf']:.2f}", p["box"]), _mark("other", label, d["box"])],
                                "what": (f"{rec['id']}, {cfg}: {_a(p['cls'])} finding (confidence {p['conf']:.2f}, step {p['step']} at "
                                         f"L{p['level']}) lies within the bounding box of {_a(label)} patch and matches no "
@@ -83,7 +83,7 @@ def _glare_gate(rec, res):
             inside = [g for g in rec["boxes"] if _centre_in(g["box"], t["window"])]
             missed = [g for g in inside if not found(g, c["preds"])]
             gt = (missed or inside or [None])[0]
-            yield {"id": rec["id"], "cfg": cfg, "score": 5 * len(missed) + len(inside),
+            yield {"id": rec["id"], "cls": gt and gt["cls"], "cfg": cfg, "score": 5 * len(missed) + len(inside),
                    "marks": ([_mark("gt", f"GT {gt['cls']}", gt["box"])] if gt else [])
                    + [_mark("other", "glare", hit), _mark("other", f"gaze {t['step']} (refused)", t["window"])],
                    "what": (f"{rec['id']}, {cfg}: step {t['step']} (L{t['level']}) was refused by the quality gate "
@@ -112,7 +112,7 @@ def _blurred_crack(rec, res):
                        f"({gated[0]['q_reason']}, sharpness {gated[0]['sharpness']})." if gated else
                        f"it was looked at (step {seen[0]['step']}, L{seen[0]['level']}, sharpness {seen[0]['sharpness']}), "
                        "the gate accepted the view, and no crack mask came out of it.")
-                yield {"id": rec["id"], "cfg": cfg, "score": cfg.endswith("1.0") + len(seen) / 10,
+                yield {"id": rec["id"], "cls": "crack", "cfg": cfg, "score": cfg.endswith("1.0") + len(seen) / 10,
                        "marks": [_mark("gt", "GT crack", g["box"]), _mark("other", "blurred patch", b)],
                        "what": f"{rec['id']}, {cfg}: a {g['box'][2]}x{g['box'][3]} px crack inside a blurred patch was not found; {how}"}
                 break
@@ -131,7 +131,7 @@ def _budget_miss(rec, res):
         how = (f"it was looked at (step {seen[0]['step']}, L{seen[0]['level']}) but no crack mask survived." if seen else
                f"its window was never visited: the job ended after {looks} looks ({small['halt_cause']}) before the "
                "saliency ranking reached it.")
-        yield {"id": rec["id"], "cfg": "drishyam@0.3", "score": 10 * len(by) - min(g["box"][2], g["box"][3]) / 100,
+        yield {"id": rec["id"], "cls": "crack", "cfg": "drishyam@0.3", "score": 10 * len(by) - min(g["box"][2], g["box"][3]) / 100,
                "marks": [_mark("gt", "GT crack", g["box"])],
                "what": (f"{rec['id']}, drishyam@0.3: a {g['box'][2]}x{g['box'][3]} px crack box is missed under the 30% cap "
                         f"but found by {' and '.join(by)}; {how}")}
@@ -147,7 +147,7 @@ def _confusion(rec, res):
             wrong = [p for p in preds if p["cls"] in group and p["cls"] != g["cls"] and hits(p["box"], g["box"])]
             if wrong:
                 p = max(wrong, key=lambda p: p["conf"] * p["area"])
-                yield {"id": rec["id"], "cfg": cfg, "score": 10 * (g["cls"] == "exposed_rebar") + p["conf"],
+                yield {"id": rec["id"], "cls": g["cls"], "cfg": cfg, "score": 10 * (g["cls"] == "exposed_rebar") + p["conf"],
                        "marks": [_mark("gt", f"GT {g['cls']}", g["box"]), _mark("pred", f"{p['cls']} {p['conf']:.2f}", p["box"])],
                        "what": (f"{rec['id']}, {cfg}: ground truth is {g['cls']}, the job reported {p['cls']} there "
                                 f"(confidence {p['conf']:.2f}, step {p['step']} at L{p['level']}) and no {g['cls']} finding overlaps the box.")}
@@ -317,6 +317,6 @@ def build_gallery(records: list[dict], results: list[dict], out_dir, log=print) 
             trace = res["configs"][c["cfg"]].get("trace", [])
             render_case(cv2.imread(rec["path"], cv2.IMREAD_COLOR), c, trace, f"f{n:02d}  {title}  |  {c['id']}  |  {c['cfg']}",
                         out / f"f{n:02d}.jpg")
-            rows.append({"image": f"{PREFIX}/f{n:02d}.jpg", "category": title, "what_happened": c["what"],
-                         "rule_that_would_catch_it": rule})
+            rows.append({"image": f"{PREFIX}/f{n:02d}.jpg", "id": c["id"], "class": c["cls"], "category": title,
+                         "what_happened": c["what"], "rule_that_would_catch_it": rule})
     return rows

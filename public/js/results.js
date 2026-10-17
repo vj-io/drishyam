@@ -8,6 +8,8 @@ const SERIES = [
   ['tiling', 'exhaustive tiling', 'tiling', 'diamond'],
   ['drishyam', 'Drishyam', 'drishyam', 'circle'],
 ];
+// The trained segmenter's Drishyam curve (evals.model_eval --publish), drawn only once its summary is published.
+const MODEL = ['model', 'Drishyam, dacl10k model', 'model', 'circle'];
 
 const pending = (what, file, by = 'the evaluation harness') => h('div', { class: 'pending' },
   h('p', { class: 'pending__title' }, `${what} pending`),
@@ -19,6 +21,11 @@ const headline = (policies) => points(policies?.drishyam).filter((p) => p.pixels
 
 const points = (list) => (Array.isArray(list) ? list.filter((p) => num(p?.pixels_frac) && num(p?.recall)).sort((a, b) => a.pixels_frac - b.pixels_frac) : []);
 
+/** [lo, hi] when `r` is a two-number interval, else null. */
+const interval = (r) => (Array.isArray(r) && r.length === 2 && r.every(num) ? r : null);
+const dec = (v, d = 2) => (num(v) ? v.toFixed(d) : '–');
+const pct = (v) => `${Math.round(v * 100)} %`;
+
 function marker(kind, x, y, cls) {
   const a = { class: `mk mk--${cls}` };
   if (kind === 'rect') return svg('rect', { ...a, x: x - 5.5, y: y - 5.5, width: 11, height: 11 });
@@ -28,19 +35,19 @@ function marker(kind, x, y, cls) {
 
 const NARROW = matchMedia('(max-width: 640px)');
 
-function chart(policies) {
+function chart(policies, series = SERIES, iou = false) {
   // Phones get a smaller sheet, so the lettering is drawn at a legible size instead of shrinking with the chart.
   const [W, H, L, R, T, B] = NARROW.matches ? [360, 300, 54, 14, 14, 50] : [640, 380, 58, 20, 18, 58];
   const PW = W - L - R;
   // Overlapping tiles can process more than 100% of the pixels. Then the x axis is broken after 75% (a drafting
   // break mark), so the range where the policies actually differ gets most of the width.
-  const xmax = Math.max(1, ...SERIES.flatMap(([key]) => points(policies[key]).map((p) => p.pixels_frac)));
+  const xmax = Math.max(1, ...series.flatMap(([key]) => points(policies[key]).map((p) => p.pixels_frac)));
   const BRK = 0.75;
   const broken = xmax > 1;
   const X = (v) => (!broken ? L + (v / xmax) * PW
     : v <= BRK ? L + (v / BRK) * PW * 0.8 : L + PW * 0.9 + ((v - BRK) / (xmax - BRK)) * PW * 0.1);
   const Y = (v) => T + (1 - v) * (H - T - B);
-  const root = svg('svg', { viewBox: `0 0 ${W} ${H}`, class: 'chart', role: 'img', 'aria-label': `Line chart of recall against the fraction of full-resolution pixels processed, for three policies${broken ? `; the pixel axis is broken between 75% and ${Math.round(xmax * 100)}%` : ''}. A data table follows.` });
+  const root = svg('svg', { viewBox: `0 0 ${W} ${H}`, class: 'chart', role: 'img', 'aria-label': `Line chart of recall against the fraction of full-resolution pixels processed, for ${series.length} policies${broken ? `; the pixel axis is broken between 75% and ${Math.round(xmax * 100)}%` : ''}. A data table follows.` });
   for (let i = 0; i <= 5; i++) {
     const v = i / 5;
     root.append(
@@ -63,15 +70,26 @@ function chart(policies) {
     svg('text', { class: 'chart__title', transform: `translate(${NARROW.matches ? 12 : 14} ${(T + H - B) / 2}) rotate(-90)`, 'text-anchor': 'middle' }, 'defect recall'));
   const plot = svg('g', { class: 'chart__plot' });
   root.append(plot);
-  for (const [key, name, cls, kind] of SERIES) {
+  for (const [key, name, cls, kind] of series) {
     const pts = points(policies[key]);
     if (pts.length > 1) {
       const d = pts.map((p, i) => `${i ? 'L' : 'M'}${X(p.pixels_frac)} ${Y(p.recall)}`).join(' ');
       plot.append(svg('path', { class: 'chart__halo', d }), svg('path', { class: `chart__line chart__line--${cls}`, d }));
     }
     for (const p of pts) {
-      const m = marker(kind, X(p.pixels_frac), Y(p.recall), cls);
-      m.append(svg('title', {}, `${name}: ${(p.pixels_frac * 100).toFixed(1)}% of pixels, recall ${p.recall.toFixed(2)}${num(p.usd) ? `, $${p.usd}/image` : ''}`));
+      const x = X(p.pixels_frac);
+      const ci = interval(p.recall_ci);
+      // 95 % bootstrap interval as a capped bar, and the policy's chance level as a dotted tick under it
+      if (ci) plot.append(svg('path', { class: `mk mk--${cls}`, opacity: 0.55, d: `M${x} ${Y(ci[0])}V${Y(ci[1])}M${x - 4} ${Y(ci[0])}h8M${x - 4} ${Y(ci[1])}h8` }));
+      if (num(p.chance_recall)) plot.append(svg('path', { class: `mk mk--${cls}`, 'stroke-dasharray': '2 3', d: `M${x - 9} ${Y(p.chance_recall)}h18` }));
+      // IoU-only recall (no contains-the-centre clause) as a cross, where the two matching rules are co-primary
+      if (iou && num(p.recall_iou_only)) {
+        const y = Y(p.recall_iou_only);
+        plot.append(svg('path', { class: `mk mk--${cls}`, d: `M${x - 5} ${y - 5}l10 10M${x - 5} ${y + 5}l10 -10` },
+          svg('title', {}, `${name}, IoU-only: recall ${p.recall_iou_only.toFixed(2)}`)));
+      }
+      const m = marker(kind, x, Y(p.recall), cls);
+      m.append(svg('title', {}, `${name}: ${(p.pixels_frac * 100).toFixed(1)}% of pixels, recall ${p.recall.toFixed(2)}${ci ? ` (95% CI ${ci[0].toFixed(2)}–${ci[1].toFixed(2)})` : ''}${num(p.chance_recall) ? `, chance ${p.chance_recall.toFixed(2)}` : ''}${num(p.usd) ? `, $${p.usd}/image` : ''}`));
       plot.append(m);
     }
   }
@@ -97,14 +115,24 @@ function callout(x, y, lines, W, bottom) {
       lines.map((t, i) => svg('tspan', { x: nx, dy: i ? '1.3em' : 0 }, t))));
 }
 
-const legend = () => h('ul', { class: 'legend' }, SERIES.map(([, name, cls]) => h('li', {}, h('i', { class: `sw sw--${cls}` }), name)));
+const legend = (series) => h('ul', { class: 'legend' }, series.map(([, name, cls]) => h('li', {}, h('i', { class: `sw sw--${cls}` }), name)));
 
-function dataTable(policies) {
-  const rows = SERIES.flatMap(([key, name]) => points(policies[key]).map((p) => h('tr', {},
-    h('th', { scope: 'row' }, name), h('td', {}, `${(p.pixels_frac * 100).toFixed(1)}%`), h('td', {}, p.recall.toFixed(2)), h('td', {}, num(p.usd) ? `$${p.usd}` : '–'))));
+/** What the bars, dotted ticks and crosses mean, when the file has them. */
+const marks = (policies, series, iou) => (series.some(([key]) => points(policies[key]).some((p) => interval(p.recall_ci)))
+  ? h('p', { class: 'note' }, 'Bars: 95 % interval (bootstrap over images). Dotted ticks: chance, the same policy’s boxes moved to random places in the photo.',
+    iou ? ' Crosses: recall when a match needs IoU ≥ 0.3 (no contains-the-centre clause).' : '')
+  : null);
+
+function dataTable(policies, series) {
+  const ci = (r) => (interval(r) ? `${r[0].toFixed(2)}–${r[1].toFixed(2)}` : '–');
+  const rows = series.flatMap(([key, name]) => points(policies[key]).map((p) => h('tr', {},
+    h('th', { scope: 'row' }, name),
+    [`${(p.pixels_frac * 100).toFixed(1)}%`, p.recall.toFixed(2), ci(p.recall_ci), dec(p.recall_iou_only), dec(p.chance_recall),
+      dec(p.precision, 3), dec(p.fp_per_image, 1), dec(p.boxes_per_image, 1), dec(p.hits_per_matched_gt), num(p.usd) ? `$${p.usd}` : '–'].map((v) => h('td', {}, v)))));
+  const cols = ['policy', 'pixels', 'recall', '95 % CI', 'IoU-only recall', 'chance recall', 'precision', 'false boxes / image', 'boxes / image', 'hits per matched box', '$ / image'];
   return h('details', { class: 'data' }, h('summary', {}, 'Chart data as a table'),
     h('div', { class: 'table-wrap', tabindex: '0', role: 'region', 'aria-label': 'Chart data' },
-      h('table', { class: 'tbl tbl--tight' }, h('thead', {}, h('tr', {}, ['policy', 'pixels', 'recall', '$ / image'].map((t) => h('th', { scope: 'col' }, t)))), h('tbody', {}, rows))));
+      h('table', { class: 'tbl tbl--tight' }, h('thead', {}, h('tr', {}, cols.map((t) => h('th', { scope: 'col' }, t)))), h('tbody', {}, rows))));
 }
 
 function microTable(micro) {
@@ -119,35 +147,76 @@ function microTable(micro) {
       h('thead', {}, h('tr', {}, (one ? ['op', 'p50', 'p95'] : ['op', 'size', 'p50', 'p95']).map((t) => h('th', { scope: 'col', class: t[0] === 'p' ? 'n' : null }, t)))), h('tbody', {}, rows)));
 }
 
-function heroChips(sum) {
-  const drishyam = headline(sum.policies);
+/** How Drishyam compares with one downscale, from the paired 95 % interval of the recall ratio. */
+function versusDownscale(hs) {
+  const ci = interval(hs?.recall_ratio_vs_downscale_ci);
+  if (!ci) return '';
+  return ci[0] > 1 ? '; it beats one downscale' : ci[1] < 1 ? '; one downscale does better' : '; one downscale does as well';
+}
+
+/** Hero chips, each a measured fact with its caveat. `real` (CODEBRIM) fills #stat-real when the page has that slot. */
+function heroChips(sum, real) {
   // Exhaustive tiling (the most pixels) is the PRD's reference point for the headline ratio.
-  const tiling = points(sum.policies?.tiling).pop();
-  const fill = (id, value, opts, sub) => {
+  const tilingOf = (s) => points(s?.policies?.tiling).pop();
+  const fill = (id, key, value, opts, sub) => {
     const el = $(`#${id}`);
+    if (!el) return;  // a slot the page does not have (yet)
+    if (!$('.stat__v', el)) {
+      el.classList.add('stat');
+      el.replaceChildren(h('span', { class: 'stat__k' }), h('i', { class: 'stat__dim', 'aria-hidden': 'true' }), h('b', { class: 'stat__v' }), h('span', { class: 'stat__s' }));
+    }
+    if (key) $('.stat__k', el).textContent = key;
     countUp($('.stat__v', el), value, opts);
     $('.stat__s', el).textContent = sub;
     el.classList.add('is-measured');
   };
+  const drishyam = headline(sum.policies);
+  const tiling = tilingOf(sum);
   if (drishyam && tiling?.recall > 0) {
-    fill('stat-recall', drishyam.recall / tiling.recall, { decimals: 2, suffix: '× tiling' }, `recall at ${(drishyam.pixels_frac * 100).toFixed(0)}% of the pixels, synthetic set`);
+    const target = sum.headline_stats?.target?.recall_ratio;
+    fill('stat-recall', null, Math.round((100 * drishyam.recall) / tiling.recall), { suffix: ' % of tiling' },
+      `recall, with ${pct(drishyam.pixels_frac / tiling.pixels_frac)} of its pixels${num(target) ? `; target was ${pct(target)}` : ''}${versusDownscale(sum.headline_stats)} (synthetic)`);
   }
-  if (drishyam && num(drishyam.usd)) {
-    fill('stat-cost', drishyam.usd, { decimals: 6, prefix: '$' }, num(tiling?.usd) ? `per image, vs $${tiling.usd} for tiling` : 'per image, modelled');
+  const rd = headline(real?.policies);
+  const rt = tilingOf(real);
+  if (rd && rt?.recall > 0) {
+    const all = [...points(real.policies.downscale), ...points(real.policies.tiling), rd].map((p) => p.recall);
+    const [lo, hi] = [Math.min(...all), Math.max(...all)];
+    const strict = num(rd.recall_iou_only) && rt.recall_iou_only > 0 ? rd.recall_iou_only / rt.recall_iou_only : null;
+    const sci = interval(real.headline_stats?.recall_ratio_iou_only_vs_tiling_ci);
+    fill('stat-real', 'real photos (CODEBRIM)', rd.recall / rt.recall, { decimals: 2, suffix: '× tiling' },
+      `recall at ${(rd.pixels_frac / rt.pixels_frac).toFixed(2)}× its pixels${strict ? ` (${strict.toFixed(2)}× with IoU-only matching${sci ? `, 95 % CI ${sci[0].toFixed(2)}–${sci[1].toFixed(2)}` : ''})` : ''}; ${hi - lo <= 0.05 ? `every policy about ${((lo + hi) / 2).toFixed(1)}` : `policies ${lo.toFixed(2)}–${hi.toFixed(2)}`}${num(rd.chance_recall) ? ` (its boxes at random places: ${rd.chance_recall.toFixed(2)})` : ''}, limited by the segmenter`);
   }
-  // Agentic evidence, not speed: injected planner and governor faults the agent recovered from.
+  // The uncapped run: where the stop rule (value per ms) ended the job by itself.
   const am = sum.agent_metrics ?? {};
+  const uncapped = points(sum.policies?.drishyam).pop();
+  const halts = am.by_budget?.['1.0']?.halt_causes;
+  if (uncapped && tiling?.recall > 0 && halts) {
+    const stops = halts['stop-rule'] ?? 0;
+    const jobs = Object.values(halts).reduce((a, b) => a + b, 0);
+    fill('stat-cost', stops * 2 >= jobs ? 'stops itself' : 'uncapped run', Math.round(100 * uncapped.pixels_frac), { suffix: ' % of pixels' },
+      `with ${(uncapped.recall / tiling.recall).toFixed(2)}× exhaustive tiling's recall; the stop rule ended ${stops} of ${jobs} jobs (synthetic)`);
+  }
+  // Agentic evidence: every step's cause is logged, and injected planner and governor faults are recovered from.
   const fired = (am.planner_recovery?.timeout?.fired ?? 0) + (am.planner_recovery?.malformed?.fired ?? 0) + (am.governor_response?.fired ?? 0);
   const ok = (am.planner_recovery?.recovered_total ?? 0) + (am.governor_response?.recovered ?? 0);
-  if (fired > 0) fill('stat-ops', ok, { decimals: 0, suffix: ` / ${fired}` }, `fired faults recovered; ${num(am.steps_with_cause_pct) ? Math.round(am.steps_with_cause_pct) : '–'} % of steps carry a cause`);
+  const injected = (am.planner_recovery?.injected_total ?? 0) + (am.governor_response?.injected ?? 0);
+  if (num(am.steps_with_cause_pct)) {
+    fill('stat-ops', 'steps carry a cause', Math.round(am.steps_with_cause_pct), { suffix: ' %' },
+      fired > 0 ? `${ok} of ${fired} planner and governor faults that fired were recovered (${injected} injected)` : 'every decision in the trace names what caused it');
+  }
 }
 
-function renderBench(sum, id, file, note) {
+function renderBench(sum, id, file, note, model, iou = false) {
   const root = $(`#${id}`);
   if (!sum?.policies) return root.replaceChildren(pending('benchmarks', file));
   const prov = Object.entries(sum.provenance ?? {});
-  const plot = h('div', {}, chart(sum.policies), legend(), dataTable(sum.policies));
-  NARROW.addEventListener('change', () => plot.firstElementChild.replaceWith(chart(sum.policies)));
+  const withModel = points(model?.policies?.drishyam).length > 0;
+  const series = withModel ? [...SERIES, MODEL] : SERIES;
+  const policies = withModel ? { ...sum.policies, model: model.policies.drishyam } : sum.policies;
+  const plot = h('div', {}, chart(policies, series, iou), legend(series), marks(policies, series, iou), dataTable(policies, series),
+    withModel ? h('p', { class: 'note' }, `Dashed red: Drishyam with the trained segmenter (${String(model.segmenter ?? 'ONNX')}) on the same images; the other lines use the classical one.`) : null);
+  NARROW.addEventListener('change', () => plot.firstElementChild.replaceWith(chart(policies, series, iou)));
   root.replaceChildren(h('div', { class: 'stack' },
     h('p', { class: 'dataset' }, h('span', { class: 'dataset__k' }, 'dataset'), h('b', {}, String(sum.dataset ?? 'unlabelled'))),
     note?.(sum) ?? null,
@@ -165,9 +234,38 @@ function realNote(sum) {
   const best = Math.max(...SERIES.flatMap(([key]) => points(sum.policies[key]).map((p) => p.recall)));
   const strict = Object.values(sum.agent_metrics?.box_convention?.recall_iou_only?.components ?? {}).filter(num);
   if (!Number.isFinite(best)) return null;
+  const all = SERIES.flatMap(([key]) => points(sum.policies[key]));
+  const top = (f) => Math.max(...all.map((p) => p[f]).filter(num));
+  const chance = top('chance_recall');
   return h('p', { class: 'note' }, `The best recall of any policy on these photos is ${best.toFixed(2)}`,
-    strict.length ? ` (${Math.max(...strict).toFixed(2)} when a match needs IoU ≥ 0.3)` : '',
+    strict.length ? ` (${Math.max(...strict).toFixed(2)} when a match needs IoU ≥ 0.3, the stricter rule, reported alongside)` : '',
+    Number.isFinite(chance) ? `; each policy’s own boxes at random places already score up to ${chance.toFixed(2)} (${top('chance_recall_iou_only').toFixed(2)} with IoU only), so much of the lenient score is chance` : '',
     '. Here the classical segmenter, tuned on synthetic images, limits recall more than where the agent looks; a trained model is the next step.');
+}
+
+/** FIG. 4.1's footnotes: the CODEBRIM-sized synthetic set and the run on measured wall time, when published. */
+function synthNotes(large, live) {
+  const at = (s) => s?.policies && headline(s.policies);
+  const out = [];
+  const ld = at(large);
+  const ls = points(large?.policies?.downscale)[0];
+  const lt = points(large?.policies?.tiling).pop();
+  if (ld && ls && lt) {
+    const cmp = versusDownscale(large.headline_stats);
+    const best = points(large.policies.tiling).reduce((a, b) => (b.recall > a.recall ? b : a));
+    out.push(h('p', { class: 'note' }, `At CODEBRIM’s size, on ${String(large.dataset ?? 'the large synthetic set')}: Drishyam found ${ld.recall.toFixed(2)} at ${pct(ld.pixels_frac)} of the pixels, `
+      + `one downscale ${ls.recall.toFixed(2)} at ${pct(ls.pixels_frac)}, exhaustive tiling ${lt.recall.toFixed(2)}`
+      + `${best !== lt ? ` and the best tiling grid ${best.recall.toFixed(2)} at ${pct(best.pixels_frac)}` : ''}${cmp}${cmp ? ' (by the 95 % interval of the ratio)' : ''}.`));
+  }
+  const vd = at(live);
+  const gov = live?.agent_metrics?.governor_activity_in_eval ?? {};
+  if (vd && num(gov['p95>SLA'])) {
+    const load = live.provenance?.load_avg;
+    out.push(h('p', { class: 'note' }, `On measured wall time instead of fixed costs${Array.isArray(load) ? ` (machine load ${load[0]})` : ''}, `
+      + `Drishyam found ${vd.recall.toFixed(2)} at ${pct(vd.pixels_frac)} of the pixels; the governor switched the model ${gov['p95>SLA']} times`
+      + `${num(gov['warp-spike']) ? ` and shrank the gaze on ${gov['warp-spike']} warp spikes` : ''}. Live timings move with the machine, so the chart uses fixed costs.`));
+  }
+  return out;
 }
 
 const times = (v) => (num(v) ? `${v}×` : '–');
@@ -219,14 +317,20 @@ function failureImage(path) {
   return img;
 }
 
-/** One plate per failure category; each case on it is a sub-figure (a), (b), ... under one shared rule. */
-function renderFailures(list) {
+const rules = (cases) => [...new Set(cases.map((f) => String(f.rule_that_would_catch_it ?? '')))]
+  .map((rule) => h('p', { class: 'fail__rule' }, h('b', {}, 'Rule that would catch it'), rule));
+
+/** One plate per failure category; each case on it is a sub-figure (a), (b), ... under one shared rule. Real-photo
+ * failures (CODEBRIM, text only: its licence bars sharing the photos) follow as one more plate. */
+function renderFailures(list, realList) {
   const root = $('#fail');
   const items = Array.isArray(list) ? list.filter((f) => f && f.category) : [];
-  if (!items.length) return root.replaceChildren(pending('failure gallery', 'results/failures.json'));
+  const real = Array.isArray(realList) ? realList.filter((f) => f && f.what_happened) : [];
+  if (!items.length) return root.replaceChildren(pending('failure gallery', 'results/failures.json'), real.length ? realFailures(real, 1) : '');
   const plates = [...Map.groupBy(items, (f) => String(f.category))];
+  const n = plates.length + (real.length ? 1 : 0);
   const fig = root.closest('.win')?.querySelector('.win__fig');
-  if (fig) fig.textContent = plates.length > 1 ? `FIG. 5.1–5.${plates.length}` : 'FIG. 5.1';
+  if (fig) fig.textContent = n > 1 ? `FIG. 5.1–5.${n}` : 'FIG. 5.1';
   root.replaceChildren(h('div', { class: 'stack' },
     h('p', { class: 'note' }, 'Where it was wrong, and the rule that would have caught it. Kept in the open on purpose.'),
     h('div', { class: 'fails' }, plates.map(([category, cases], i) => h('article', { class: 'fail' },
@@ -238,14 +342,34 @@ function renderFailures(list) {
           img ? h('div', { class: 'fail__frame' }, img) : null,
           h('figcaption', {}, h('b', { class: 'fail__sub' }, `(${String.fromCharCode(97 + j)})`), ' ', String(f.what_happened ?? '')));
       })),
-      [...new Set(cases.map((f) => String(f.rule_that_would_catch_it ?? '')))].map((rule) => h('p', { class: 'fail__rule' }, h('b', {}, 'Rule that would catch it'), rule)))))));
+      rules(cases)))),
+    real.length ? realFailures(real, n) : null));
+}
+
+/** FIG. 5.n: the CODEBRIM failures as text tables (the licence bars sharing the photos, not describing them). */
+function realFailures(real, n) {
+  const table = (label, cols, rows) => h('div', { class: 'table-wrap', tabindex: '0', role: 'region', 'aria-label': label },
+    h('table', { class: 'tbl tbl--tight tbl--rows' }, h('caption', {}, label),
+      h('thead', {}, h('tr', {}, cols.map((t) => h('th', { scope: 'col' }, t)))),
+      h('tbody', {}, rows.map(([head, ...cells]) => h('tr', {}, h('th', { scope: 'row' }, head),
+        cells.map((v, i) => h('td', { 'data-label': cols[i + 1] }, v)))))));
+  const byRule = [...Map.groupBy(real, (f) => String(f.category ?? ''))];
+  return h('div', { class: 'stack' },
+    h('h4', { class: 'label' }, `FIG. 5.${n} · Real-photo failures (described; photos not redistributable)`),
+    h('p', { class: 'note' }, `${real.length} cases from the CODEBRIM evaluation, written out because its licence does not allow sharing the photos.`),
+    table('Real-photo failures', ['photo', 'class', 'what happened'],
+      real.map((f) => [String(f.id ?? ''), String(f.class ?? '–'), String(f.what_happened)])),
+    table('Rules that would catch them', ['failure', 'rule that would catch it'],
+      byRule.map(([category, cases]) => [category, String(cases[0].rule_that_would_catch_it ?? '')])));
 }
 
 export async function initResults() {
-  const [sum, real, cool, fails] = await Promise.all(
-    ['results/summary.json', 'results/codebrim/summary.json', 'results/cool.json', 'results/failures.json'].map(getJSON));
-  if (renderBench(sum, 'bench', 'results/summary.json')) heroChips(sum);
-  renderBench(real, 'bench-real', 'results/codebrim/summary.json', realNote);
+  const [sum, real, cool, fails, realFails, large, live, synthModel, realModel] = await Promise.all(
+    ['results/summary.json', 'results/codebrim/summary.json', 'results/cool.json', 'results/failures.json',
+      'results/codebrim/failures_text.json', 'results/large/summary.json', 'results/live/summary.json',
+      'results/synth_dacl10k/summary.json', 'results/codebrim_dacl10k/summary.json'].map(getJSON));
+  if (renderBench(sum, 'bench', 'results/summary.json', () => synthNotes(large, live), synthModel)) heroChips(sum, real);
+  renderBench(real, 'bench-real', 'results/codebrim/summary.json', realNote, realModel, true);
   renderCool(cool);
-  renderFailures(fails);
+  renderFailures(fails, realFails);
 }

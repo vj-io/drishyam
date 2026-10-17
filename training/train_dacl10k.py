@@ -15,7 +15,7 @@ BCE + Dice, and the 19 -> 6 merge for Drishyam happens at export time (export_on
 #
 # Generated from `training/train_dacl10k.py` by `training/make_notebook.py` (edit the script, not this notebook).
 # It trains a UNet + MobileNetV3 on dacl10k, exports the FP32 and FP16 ONNX that Drishyam loads, checks them
-# against PyTorch on OpenCV 5 DNN, and zips `best.onnx`, `best_fp16.onnx` and `metrics.json`.
+# against PyTorch on OpenCV 5 DNN, and zips `best.onnx`, `best_fp16.onnx`, `metrics.json` and `run_info.json`.
 #
 # 1. **Data**: *Add Input* > Datasets > search `dacl10k-v2-devphase` and add **winterqi131/dacl10k-v2-devphase**
 #    (the official v2 devphase files: 6,935 train and 975 validation images with labelme JSON; the identical
@@ -63,6 +63,7 @@ from torch.utils.data import DataLoader, Dataset
 # In the notebook make_notebook.py fills REPO_FILES with the training helpers and drishyam/segment.py (for the
 # parity check), so it runs on Kaggle without the repo; run from the repo, the files beside this script are used.
 REPO_FILES: dict[str, str] = {}
+SOURCE_SHA256 = ""  # make_notebook.py writes the sha256 of the sources it built the notebook from
 NOTEBOOK = "__file__" not in globals()
 KAGGLE = Path("/kaggle/working").is_dir()
 CV5 = Path(tempfile.gettempdir()) / "cv5"  # OpenCV 5 for the DNN checks, kept apart from Kaggle's OpenCV 4
@@ -240,9 +241,33 @@ def parse(argv=None):
     return a
 
 
+def run_info(start_epoch: int) -> dict:
+    """This session's package versions and source, one entry of <out>/run_info.json (zipped with the weights). On
+    Kaggle there is no git checkout: `source_sha256` (make_notebook.source_sha256 at the commit the notebook was
+    built from) identifies the code instead."""
+    from importlib import metadata
+
+    def version(dist: str, path: list[str] | None = None) -> str | None:
+        found = next(iter(metadata.distributions(name=dist, **({"path": path} if path else {}))), None)
+        return found.version if found else None
+
+    names = ("torch", "torchvision", "timm", "segmentation-models-pytorch", "onnx", "onnxslim", "onnxconverter-common",
+             "numpy")
+    try:
+        git = subprocess.run(["git", "rev-parse", "HEAD"], cwd=HERE, capture_output=True, text=True, check=False).stdout.strip()
+    except OSError:
+        git = ""
+    if not SOURCE_SHA256:
+        from make_notebook import source_sha256
+    return {"start_epoch": start_epoch, "python": sys.version.split()[0],
+            "versions": {**{n: version(n) for n in names}, "cv2": cv2.__version__,
+                         "cv2_export": version("opencv-python-headless", [str(CV5)]) if KAGGLE else cv2.__version__},
+            "git_sha": git or None, "source_sha256": SOURCE_SHA256 or source_sha256()}
+
+
 def auto_resume(out: Path, search: Path = Path("/kaggle/input")) -> str | None:
     """`--resume auto`: <out>/last.pt, else the newest last.pt under `search`, copied into <out> with the
-    best.pt and metrics.json beside it so the history carries on."""
+    best.pt, metrics.json and run_info.json beside it so the history carries on."""
     if (out / "last.pt").exists():
         return str(out / "last.pt")
     # glob.glob, not Path.glob: pathlib's ** does not enter symlinked folders, and an input mount may be one
@@ -250,7 +275,7 @@ def auto_resume(out: Path, search: Path = Path("/kaggle/input")) -> str | None:
     if not found:
         print(f"--resume auto: no last.pt in {out} or under {search}, starting from epoch 0")
         return None
-    for name in ("last.pt", "best.pt", "metrics.json"):
+    for name in ("last.pt", "best.pt", "metrics.json", "run_info.json"):
         if (found[-1].parent / name).exists():
             shutil.copy2(found[-1].parent / name, out / name)
     print(f"resuming from {found[-1]}")
@@ -308,6 +333,9 @@ def main(argv=None):
         scaler.load_state_dict(ck["scaler"])
         start, step, best = ck["epoch"] + 1, ck["step"], ck.get("best", -1.0)
         history = json.loads((out / "metrics.json").read_text()) if (out / "metrics.json").exists() else []
+    # one entry per session: a run resumed on another Kaggle image says which epochs which versions trained
+    info = json.loads((out / "run_info.json").read_text()) if a.resume and (out / "run_info.json").exists() else []
+    (out / "run_info.json").write_text(json.dumps([*info, run_info(start)], indent=1))
     print(f"{a.arch}/{a.encoder}  device={device.type} amp={amp}  train={len(train_ds)} val={len(val_ds)}  "
           f"steps/epoch={len(train_dl)}  total_steps={total}  start epoch {start}")
 
@@ -421,11 +449,12 @@ if __name__ == "__main__":
                   "--samples", samples, "--n", 4)
     PARITY_OK = PARITY in (0, 3)  # 3 is parity.FP16_OVER: FP32 within tolerance, only FP16 over (it is left out)
 
-# %% Package: <out>/drishyam_dacl10k.zip holds best.onnx, best_fp16.onnx (if its parity passed) and metrics.json
+# %% Package: <out>/drishyam_dacl10k.zip: best.onnx, best_fp16.onnx (if its parity passed), metrics.json, run_info.json
 if __name__ == "__main__":
     ZIP = OUT / "drishyam_dacl10k.zip"
     with zipfile.ZipFile(ZIP, "w", zipfile.ZIP_DEFLATED) as z:
-        for src, name in ((FP32, "best.onnx"), (FP16, "best_fp16.onnx"), (OUT / "metrics.json", "metrics.json")):
+        for src, name in ((FP32, "best.onnx"), (FP16, "best_fp16.onnx"), (OUT / "metrics.json", "metrics.json"),
+                          (OUT / "run_info.json", "run_info.json")):
             if src.exists() and (src != FP16 or PARITY == 0):
                 z.write(src, name)
     print(f"{ZIP}: {', '.join(z.namelist())}, {ZIP.stat().st_size / 1e6:.1f} MB")

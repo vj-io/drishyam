@@ -655,10 +655,12 @@ input:checked + .switch__ui::after { transform: translateX(22px); background: va
 .chart__line--drishyam { stroke: var(--amber); stroke-width: 3.5; }
 .chart__line--tiling { stroke: var(--line); stroke-dasharray: 10 7; stroke-linecap: butt; }
 .chart__line--downscale { stroke: var(--sky); stroke-dasharray: 1 7; }
+.chart__line--model { stroke: var(--red); stroke-dasharray: 6 4; }
 .mk { fill: var(--deep); stroke-width: 2.5; }
 .mk--drishyam { stroke: var(--amber); fill: var(--amber); }
 .mk--tiling { stroke: var(--line); }
 .mk--downscale { stroke: var(--sky); }
+.mk--model { stroke: var(--red); }
 .chart__lead { fill: none; stroke: var(--amber); stroke-width: 2; }
 .chart__num { fill: var(--deep); stroke: var(--amber); stroke-width: 2.5; }
 .chart__numt { fill: var(--amber); font: 700 12px var(--f-mono); }
@@ -674,6 +676,7 @@ input:checked + .switch__ui::after { transform: translateX(22px); background: va
 .sw--drishyam { border-color: var(--amber); }
 .sw--tiling { border-top-style: dashed; border-color: var(--line); }
 .sw--downscale { border-top-style: dotted; border-color: var(--sky); }
+.sw--model { border-top-style: dashed; border-color: var(--red); }
 .data summary { cursor: pointer; font: 500 12px/1.2 var(--f-mono); color: var(--amber); }
 .data .table-wrap { margin-top: 8px; }
 .prov { padding: 12px; border: 2px dashed var(--line-3); background: var(--deep); }
