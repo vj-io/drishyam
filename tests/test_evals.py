@@ -116,6 +116,14 @@ def test_chaos_drills_recover(scene):
     assert spike["fired"] and spike["ok"]
 
 
+def test_governor_activity_counts_overrides_noted_on_halt_records():
+    trace = [{"action": "gaze", "cause": "survey"}, {"action": "gaze", "cause": "p95>SLA"},
+             {"action": "halt", "cause": "stop-rule", "governor": "warp-spike"}]
+    res = [{"width": 100, "height": 100, "configs": {"drishyam@0.3": {"trace": trace, "pixels_frac": 0.2, "halt_cause": "stop-rule"}}}]
+    gov = harness.agent_metrics(res, [], (0.3,), 1)["governor_activity_in_eval"]
+    assert gov == {"p95>SLA": 1, "warp-spike": 1, "usd≥80%": 0}
+
+
 # ---------------------------------------------------------------- end to end
 def test_three_image_run_writes_valid_summary_and_gallery(tmp_path):
     data = tmp_path / "data"

@@ -211,7 +211,8 @@ def run_drishyam(img: np.ndarray, cap: float) -> dict:
               "x": r["decision"]["args"].get("x"), "y": r["decision"]["args"].get("y"),
               "level": r["decision"]["args"].get("level"), "window": r.get("window"),
               "q_ok": r.get("quality", {}).get("ok", True), "q_reason": r.get("quality", {}).get("reason"),
-              "sharpness": r.get("observation", {}).get("sharpness"), "model": r.get("model")} for r in job.trace]
+              "sharpness": r.get("observation", {}).get("sharpness"), "model": r.get("model"),
+              "governor": r.get("governor", {}).get("cause")} for r in job.trace]
     return {"preds": finding_components(job, rec_seg.log), "preds_union": preds,
             "pixels_frac": done["summary"]["pixels_frac"], "wall_s": wall, "trace": trace,
             "status": done["status"], "halt_cause": done["cause"]}
@@ -360,8 +361,8 @@ def agent_metrics(results: list[dict], chaos: list[dict], budgets, workers: int)
             "halt_causes": {k: sum(c["halt_cause"] == k for c in tr) for k in sorted({c["halt_cause"] for c in tr})}}
         causes += sum(bool(t["cause"]) for c in tr for t in c["trace"])
         total += sum(len(c["trace"]) for c in tr)
-    gov = {k: sum(t["cause"] == k for r in results for cap in budgets for t in r["configs"][f"drishyam@{cap}"]["trace"])
-           for k in GOVERNOR_CAUSES}
+    gov = {k: sum(k in (t["cause"], t.get("governor")) for r in results for cap in budgets  # halt records note overrides
+                  for t in r["configs"][f"drishyam@{cap}"]["trace"]) for k in GOVERNOR_CAUSES}
     by_kind = lambda k: [c for c in chaos if c["kind"] == k]
     tally = lambda k: {"injected": len(by_kind(k)), "fired": sum(c["fired"] for c in by_kind(k)),
                        "recovered": sum(c["ok"] for c in by_kind(k))}
