@@ -4,7 +4,7 @@ The recorded session in this folder was made with it: `claude -p` was not availa
 Claude (Opus 5.5, inside Claude Code) issued each call by writing a request file, read the reply (and looked at
 the crop JPEGs it saved) and only then chose the next call. The bridge never chooses anything.
 
-    python docs/mcp-session/bridge.py DIR      # serves DIR/req-NNN.json -> DIR/rep-NNN.json, logs DIR/calls.jsonl
+    python docs/mcp-session/bridge.py DIR      # serves DIR/req-NNN.json -> DIR/rep-NNN.json
 
 A request is {"tool": name, "args": {...}}; {"tool": "_quit"} ends the session. Image content in a reply is saved
 as DIR/img-NNN-K.<ext> and replaced by its file name, so the reply stays readable.
@@ -66,8 +66,6 @@ async def main(out: Path) -> None:
                    "content": _content(getattr(res, "content", []), out, n),
                    "seconds": round(time.time() - t0, 3)}
             (out / f"rep-{n:03d}.json").write_text(json.dumps(rep, indent=2))
-            with open(out / "calls.jsonl", "a") as f:
-                f.write(json.dumps({k: rep[k] for k in ("n", "tool", "args", "is_error", "seconds")}) + "\n")
             n += 1
 
 
