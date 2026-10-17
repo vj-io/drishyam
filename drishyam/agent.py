@@ -8,6 +8,7 @@ quality) or a runtime statistic (p95, $, pixels), and carries a `cause`.
 from __future__ import annotations
 
 import math
+import random
 import secrets
 import time
 from collections import deque
@@ -17,7 +18,7 @@ import cv2
 import numpy as np
 
 from . import imaging
-from .findings import SEVERITY, Finding, now_iso, work_order
+from .findings import IOU_AGREE, SEVERITY, Finding, now_iso, work_order
 from .governor import MIN_GAZE, USD_PER_HOUR, Budget, RuntimeStats, Settings, check
 from .measure import measure
 from .planner import TIMEOUT_S, ChaosPlanner, consult
@@ -51,6 +52,16 @@ class JobConfig:
     usd_per_hour: float = USD_PER_HOUR
     thumbs: bool = True
     max_steps: int = 200
+    # Ablation switches (FR-21); the defaults are the agent as published.
+    use_uncertainty: bool = True  # the (1 + entropy) term of a region's score
+    survey: bool = True  # one coarse look that covers every candidate before zooming
+    verify: bool = True  # verify looks: a new mask, or a finer look that disagrees with the coarser one
+    order: str = "score"  # "random": a seeded random pick among unseen candidates instead of the argmax
+    seed: int = 0
+    governor: bool = True  # False: kill switch and caps only; no model, level, gaze-size or critical-only override
+    # A fixed predicted cost per look, {"warp": ms, "segment": ms, "segment:<model>": ms}, instead of live p95s:
+    # scores and the stop rule then do not move with machine load. The caps still run on the real clock.
+    t_hat_ms: dict | None = None
 
 
 @dataclass
@@ -116,6 +127,8 @@ class Job:
 
     def _t_hat(self) -> float:
         """Predicted ms for one look; a model with no samples yet borrows the median of all segment calls."""
+        if t := self.cfg.t_hat_ms:
+            return t["warp"] + t.get(f"segment:{self.settings.model}", t["segment"])
         seg_prior = self.stats.median("segment") or 30.0
         return self.stats.p("warp", 95, 5.0) + self.stats.p(f"segment:{self.settings.model}", 95, seg_prior)
 
@@ -123,7 +136,8 @@ class Job:
         level = min(r.next_level + self.settings.level_bias, self.max_level)
         _, _, win = self._window(r.cx, r.cy, level, self.settings.size)
         a = self._unseen(win, level)
-        ev = r.prior * SEVERITY.get(r.cls, 1.0) * (1 + r.entropy) * a
+        u = r.entropy if self.cfg.use_uncertainty else 0.0
+        ev = r.prior * SEVERITY.get(r.cls, 1.0) * (1 + u) * a
         return ev / max(self._t_hat(), 1e-3), ev, a
 
     def digest(self) -> dict:
@@ -147,7 +161,7 @@ class Job:
         }
 
     def _plan(self):
-        """Consult the planner when due. Returns (event or None, cause or None, halt?)."""
+        """Consult the planner when due. Returns (planner event or None, halt?)."""
         cfg, planner = self.cfg, None
         if "planner_timeout" in cfg.chaos and self.step == PLANNER_TIMEOUT_STEP:
             planner = ChaosPlanner("timeout")
@@ -156,16 +170,16 @@ class Job:
         elif self.planner and self.step and self.step % cfg.planner_every == 0:
             planner = self.planner
         if planner is None:
-            return None, None, False
+            return None, False
         proposal, status, reason = consult(planner, self.digest(), cfg.planner_timeout_s)
         event = {"type": "planner", "step": self.step, "status": status, "reason": reason, "proposal": proposal}
         if proposal is None:
-            return event, "planner-fallback", False
+            return event, False
         strategy, p = proposal["strategy"], proposal["params"]
         if strategy == "switch_model" and p["model"] == "accurate" and "p95>SLA" in self.settings.history:
             # The governor downgraded the model for latency; a planner cannot quietly undo that.
             event.update(status="rejected", reason="governor downgraded the model (p95>SLA)", proposal=None)
-            return event, "planner-fallback", False
+            return event, False
         if strategy == "switch_model":
             self.settings.model = "accurate" if p["model"] == "accurate" else "fast"
         elif strategy == "batch_remaining":
@@ -177,11 +191,12 @@ class Job:
             self.forced.appendleft(("verify" if strategy == "reverify" else "gaze", r, level,
                                     f"planner:{strategy}", proposal["rationale"][:120]))
         elif strategy == "stop":
-            return event, "planner:stop", True
+            return event, True
         # change_level / reverify queue their own look, which carries planner:<strategy> as its cause.
-        return event, (f"planner:{strategy}" if strategy in ("switch_model", "batch_remaining") else None), False
+        return event, False
 
-    def _log_finding(self, r, cls, seg, crop, to_l0, level):
+    def _log_finding(self, r, cls, seg, crop, to_l0, level, verify_iou=None):
+        """(finding, "new" | "update"), or (the finding that absorbed it, "absorbed")."""
         mask = seg.mask(cls)
         m = measure(mask, 2**level, linear=cls == "crack")
         x, y, w, h = cv2.boundingRect(cv2.findNonZero(mask))
@@ -194,16 +209,21 @@ class Job:
         thumb = imaging.jpeg_b64(view, 256) if self.cfg.thumbs else None
         conf = seg.confidence[cls]
         # One physical defect, one finding: rust on exposed bars is the bar, a spall's rim is the spall.
-        if any(f.cls in DOMINATED_BY.get(cls, ()) and _inside(box, f.box) >= 0.5 for f in self.findings):
-            return None, False
+        if dom := next((f for f in self.findings if f.cls in DOMINATED_BY.get(cls, ()) and _inside(box, f.box) >= 0.5),
+                       None):
+            if verify_iou is not None:  # the check was of this defect, seen as the class it absorbed
+                dom.set_verify(verify_iou)
+            return dom, "absorbed"
         same = [f for f in self.findings if f.cls == cls and (f.region == r.id or imaging.box_iou(f.box, box) > 0.3)]
         if same:
             f = same[0]
-            f.agent_update(confidence=conf, measure=m, box=box, step=self.step, level=level, crop_jpeg_b64=thumb)
-            return f, False
-        f = Finding(f"f{len(self.findings) + 1}", cls, conf, m, box, self.step, level, r.id, crop_jpeg_b64=thumb)
+            f.agent_update(confidence=conf, measure=m, box=box, step=self.step, level=level, crop_jpeg_b64=thumb,
+                           verify_iou=verify_iou)
+            return f, "update"
+        f = Finding(f"f{len(self.findings) + 1}", cls, conf, m, box, self.step, level, r.id, crop_jpeg_b64=thumb,
+                    verify_iou=verify_iou)
         self.findings.append(f)
-        return f, True
+        return f, "new"
 
     # ---- the loop ------------------------------------------------------------------------------
     def run(self):
@@ -247,12 +267,17 @@ class Job:
             prev_r = r
         n_replay = len(self.forced)
         looks = (self.budget.pixels_cap - self.budget.pixels_used) // cfg.size**2
-        if not self.replay and (s := survey_look(cands, (W, H), cfg.size, first, self.max_level, looks)):
+        if not self.replay and cfg.survey and (s := survey_look(cands, (W, H), cfg.size, first, self.max_level,
+                                                               looks)):
             r = self.regions["s0"] = Region("s0", s[0], s[1], max(c.prior for c in cands), s[2])
             self.forced.append(("gaze", r, s[2], "survey", (f"one L{s[2]} look covers all {len(cands)} candidates "
                                                            f"before zooming; {looks} looks affordable")))
         value, cost_ms, halt_cause, halt_why = 0.0, 0.0, None, ""
         govs: list = []  # governor overrides not yet written to the trace (PRD rule 5: every override writes a cause)
+        rng = random.Random(cfg.seed)  # only the order="random" ablation draws from it
+        self.not_assessed: list[dict] = []
+        asked: set = set()  # (finding id, class) pairs already sent to review as ambiguous
+        self.followups = 0  # events that follow the step record just yielded (its findings and review requests)
         self.step = 0
 
         while self.step < cfg.max_steps:
@@ -260,7 +285,8 @@ class Job:
             step_t0 = clock()
             replaying = n_replay > 0
             # 1. governor first: it may halt, or change the model, level or gaze size, before a look is chosen
-            verdict = check(self.budget, self.stats, self.settings, self.settings.size ** 2, cfg.sla_ms, self.kill())
+            verdict = check(self.budget, self.stats, self.settings, self.settings.size ** 2, cfg.sla_ms, self.kill(),
+                            overrides=cfg.governor)
             if verdict.halt:
                 halt_cause, halt_why = verdict.cause, verdict.rationale
                 break
@@ -287,10 +313,13 @@ class Job:
                     halt_cause = "stop-rule"
                     halt_why = f"best score {best:.2e} < lambda {lam:.2e} (eps x value/cost)"
                     break
-                action, level, cause = "gaze", r.next_level, "best-score"
-                why = f"argmax score {best:.2e}: prior {r.prior:.2f}, unseen {a:.2f}, t_hat {self._t_hat():.0f} ms"
-            if govs:
-                why = "; ".join([*(g.rationale for g in govs), why])
+                pick, cause = "argmax", "best-score"
+                if cfg.order == "random":  # ablation: any unseen candidate; the stop rule still reads the best score
+                    (best, _, a), r = rng.choice(scored)
+                    pick, cause = f"random pick (seed {cfg.seed}),", "random-order"
+                action, level = "gaze", r.next_level
+                why = (f"{pick} score {best:.2e}: prior {r.prior:.2f}, unseen {a:.2f}, t_hat {self._t_hat():.0f} ms; "
+                       f"lambda {lam:.2e}")
             if not replaying:
                 level = min(level + self.settings.level_bias, self.max_level)
             if self.settings.critical_only and action == "verify" and not any(
@@ -298,14 +327,17 @@ class Job:
                 r.done = True
                 self.step -= 1
                 continue
-            # 3. optional planner
-            planner_cause = None
+            # 3. optional planner: its outcome goes to planner_status; the look keeps its own cause
+            planner_status = None
             if not replaying:
-                event, planner_cause, stop = self._plan()
+                event, stop = self._plan()
                 if event:
                     yield event
+                    planner_status = {"status": event["status"], "reason": event["reason"]}
+                    if event["proposal"]:
+                        planner_status["strategy"] = event["proposal"]["strategy"]
                 if stop:
-                    halt_cause, halt_why = planner_cause, "planner proposed stop; validator accepted"
+                    halt_cause, halt_why = "planner:stop", "planner proposed stop; validator accepted"
                     break
             # 4. the look itself
             size = self.settings.size
@@ -339,6 +371,8 @@ class Job:
             batch = self.settings.batch
             if not q["ok"]:
                 r.done = True
+                self.not_assessed.append({"step": self.step, "box": imaging.l0_box((0, 0, size, size), to_l0, (W, H)),
+                                          "reason": q["reason"], "action": "re-shoot"})
             elif level > 0 and not batch and seg.entropy > cfg.tau:
                 follow = ("escalate", r, level - 1, "entropy>tau", f"entropy {seg.entropy:.2f} > {cfg.tau} at L{level}")
             elif level > 0 and not batch and best and area < cfg.a_min:
@@ -347,34 +381,47 @@ class Job:
                                              key=lambda c: -SEVERITY[c])):
                 # Every class with a confident mask becomes evidence, most severe first.
                 r.cls = present[0]
-                critical = None
+                critical = checked = None
                 # Realised value of the look, in the same units as a region's expected value
                 # (one class's severity), so the stop rule compares like with like.
                 value += max(SEVERITY[c] * seg.confidence[c] for c in present)
                 for c in present:
-                    f, is_new = self._log_finding(r, c, seg, crop, to_l0, level)
-                    if f is None:
+                    # The IoU compares this look's `best` mask with the last look's: it is evidence about that finding.
+                    f, kind = self._log_finding(r, c, seg, crop, to_l0, level, iou if c == best else None)
+                    checked = f if c == best else checked
+                    if kind == "absorbed":
+                        if c == best and iou is not None:  # the absorbing finding now carries this look's check
+                            new_events.append({"type": "finding", "finding": f.to_dict()})
+                        # Review on ambiguity: two classes clear A_min on one spot and the agent kept one of them.
+                        if (f.id, c) not in asked:
+                            asked.add((f.id, c))
+                            new_events.append({"type": "review_request", "finding_id": f.id, "reason": (
+                                f"ambiguous: {c} {seg.areas[c]} px (>= A_min {cfg.a_min}) is mostly inside {f.cls} {f.id}; "
+                                f"recorded as {f.cls} only")})
                         continue
                     new_events.append({"type": "finding", "finding": f.to_dict()})
                     if f.critical:
                         critical = critical or f
-                        if is_new:
+                        if kind == "new":
                             new_events.append({"type": "review_request", "finding_id": f.id,
                                                "reason": f"{c} is critical"})
-                disagree = f"iou {iou:.2f} < 0.5 between L{prev_level} and L{level}" if iou is not None else ""
-                if iou is not None and iou < 0.5 and critical:
-                    f = critical
+                disagree = f"iou {iou:g} < {IOU_AGREE} between L{prev_level} and L{level}" if iou is not None else ""
+                if iou is not None and iou < IOU_AGREE and critical:
+                    f = checked if checked and checked.critical else critical  # the finding whose mask was compared
                     new_events.append({"type": "review_request", "finding_id": f.id, "reason": disagree})
                     r.done = True
-                elif iou is not None and iou < 0.5 and not r.extra_used and level > 0:
+                elif iou is not None and iou < IOU_AGREE and not r.extra_used and level > 0 and cfg.verify:
                     r.extra_used = True
                     follow = ("verify", r, level - 1, "iou<0.5", disagree)
-                elif iou is None and level > 0 and not batch and not r.verified:
+                elif iou is None and level > 0 and not batch and not r.verified and cfg.verify:
                     follow = ("verify", r, level - 1, "verify-new-mask",
                               f"new {best} mask at L{level}; confirming at L{level - 1}")
                 else:
-                    r.verified = iou is not None and iou >= 0.5
+                    r.verified = iou is not None and iou >= IOU_AGREE
                     r.done = True
+                    if iou is not None and iou < IOU_AGREE and checked:  # no further look will settle it
+                        new_events.append({"type": "review_request", "finding_id": checked.id,
+                                           "reason": f"unconfirmed: {disagree}"})
             else:
                 r.done = True
             # While replaying, the trace already holds the follow-ups; only the last replayed look may queue one.
@@ -386,7 +433,7 @@ class Job:
 
             # 6. account and log
             step_s = clock() - step_t0
-            cost_ms += step_s * 1000
+            cost_ms += self._t_hat() if cfg.t_hat_ms else step_s * 1000
             usd_before = self.budget.usd_used
             self.budget.pixels_used += size * size
             self.budget.seconds_used = clock() - t_start
@@ -402,8 +449,9 @@ class Job:
                 "quality": {"ok": q["ok"], "reason": q["reason"]},
                 "runtime": self.stats.snapshot(self.budget.usd_used),
                 "rationale": why if q["ok"] else f"{why}; quality gate: {q['reason']}",
-                "cause": (govs and govs[0].cause) or planner_cause or cause,
-                "planner": "llm" if planner_cause and planner_cause.startswith("planner:") else "rule",
+                "cause": cause,
+                "planner": "llm" if cause.startswith("planner:") or (planner_status or {}).get("strategy") in (
+                    "switch_model", "batch_remaining") else "rule",
                 "model": model, "latency_ms": round(warp_ms + seg_ms, 1),
                 "cost_usd": round(self.budget.usd_used - usd_before, 8),
                 "pixels_used": self.budget.pixels_used,
@@ -413,13 +461,16 @@ class Job:
             }
             if iou is not None:
                 rec["verify"] = {"iou": iou, "against_level": prev_level}
+            if planner_status:
+                rec["planner_status"] = planner_status
             if cfg.thumbs:
                 rec["crop_jpeg_b64"] = imaging.jpeg_b64(crop, 160, 70)
-            if len(govs) > 1:
+            if govs:
                 rec["governor"] = {"cause": govs[0].cause, "causes": [g.cause for g in govs],
                                    "rationale": "; ".join(g.rationale for g in govs)}
             self.trace.append(rec)
             govs = []
+            self.followups = len(new_events)
             yield rec
             yield from new_events
         else:
@@ -442,7 +493,7 @@ class Job:
         status = "halted" if halted else ("awaiting_review" if pending else "completed")
         seen_any = np.logical_or.reduce(self.seen)
         coverage = float((sal * seen_any).sum() / max(sal.sum(), 1e-6))
-        self.work_order = work_order(self.id, self.findings, self.gaze_path)
+        self.work_order = work_order(self.id, self.findings, self.gaze_path, self.not_assessed)
         yield {"type": "done", "status": status, "cause": halt_cause,
                "summary": {"steps": len(self.gaze_path), "pixels_used": self.budget.pixels_used,
                            "pixels_frac": round(self.budget.pixels_used / (W * H), 4),

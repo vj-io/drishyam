@@ -15,7 +15,7 @@ import sys
 import threading
 from pathlib import Path
 
-from . import findings, governor, imaging, privacy
+from . import findings, governor, imaging, planner, privacy
 from .agent import REPLAY_ACTIONS, Job, JobConfig, gaze_path_from_trace
 
 CAPS = {"pixel_cap": (0.02, 1.0), "usd_cap": (0.0001, 0.05), "seconds_cap": (1.0, 30.0)}  # as the web API
@@ -125,6 +125,7 @@ def cmd_run(a) -> int:
         JobConfig(pixel_cap=a.pixel_cap, usd_cap=a.usd_cap, seconds_cap=a.seconds_cap, chaos=a.chaos),
         kill=lambda: stop.is_set() or kill_path().exists(),
         replay=replay,
+        planner=planner.from_env(),  # None unless DRISHYAM_PLANNER_URL is set
     )
     run_dir = Path(a.out) / job.id
     run_dir.mkdir(parents=True)

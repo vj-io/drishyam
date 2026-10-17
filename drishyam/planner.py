@@ -4,7 +4,7 @@ The planner sees a numeric digest only (scores, entropies, latencies, budget
 left, counts per fixed class name). It never sees pixels, OCR or any text found
 in an image, so text painted on a bridge cannot steer the agent. Anything other
 than a valid allow-listed JSON proposal is discarded and the rule planner's
-choice stands, logged as `planner-fallback`.
+choice stands; the step records the outcome in `planner_status` (`rejected` or `fallback`).
 """
 
 from __future__ import annotations

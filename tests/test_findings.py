@@ -1,5 +1,7 @@
+import json
 import time
 
+import numpy as np
 import pytest
 
 from drishyam import findings as F
@@ -122,3 +124,33 @@ def test_sign_is_fast_and_small():
     t = time.perf_counter()
     token = F.sign(wo, KEY)
     assert time.perf_counter() - t < 0.05 and len(token) < 20_000
+
+
+def test_critical_rule_names_the_rule_and_the_measurement():
+    assert make("exposed_rebar", 10).critical_rule == "exposed_rebar: always critical"
+    assert make("spalling", 48_568).critical_rule == "spalling 48,568 px² >= 40,000 px²"
+    assert make("spalling", 100).critical_rule is None and make("crack", 10**7).critical_rule is None
+    s = make("spalling", 100)
+    s.agent_update(confidence=0.5, measure={"area_px": 52_000}, box=[0, 0, 1, 1], step=5, level=2)
+    s.agent_update(confidence=0.5, measure={"area_px": 61_000}, box=[0, 0, 1, 1], step=6, level=2)
+    assert s.critical_rule == "spalling 52,000 px² >= 40,000 px²"  # the look that made it critical, as critical_step
+    (wf,) = F.work_order("j_x", [s], [])["findings"]
+    assert wf["critical_rule"] == s.critical_rule
+
+
+def test_verification_result_follows_the_latest_check():
+    f = make("crack", 900)
+    assert (f.verify_iou, f.verified) == (None, None)
+    f.agent_update(confidence=0.5, measure={"area_px": 400}, box=[0, 0, 1, 1], step=4, level=0, verify_iou=0.07)
+    assert (f.verify_iou, f.verified) == (0.07, False)  # unconfirmed
+    f.agent_update(confidence=0.5, measure={"area_px": 400}, box=[0, 0, 1, 1], step=5, level=0)  # no check: kept
+    assert (f.verify_iou, f.verified) == (0.07, False)
+    g = F.Finding("f2", "crack", 0.8, {"area_px": 10}, [0, 0, 1, 1], 3, 1, "r1", verify_iou=np.float64(0.94))
+    assert g.verified is True and type(g.verify_iou) is float
+    json.dumps([f.to_dict(), g.to_dict()])  # numpy scalars never reach the JSON
+
+
+def test_work_order_lists_what_was_not_assessed():
+    na = [{"step": 3, "box": [0, 0, 512, 512], "reason": "glare", "action": "re-shoot"}]
+    assert F.work_order("j_x", [], [], na)["not_assessed"] == na
+    assert F.work_order("j_x", [], [])["not_assessed"] == []

@@ -104,8 +104,9 @@ class Verdict:
 
 
 def check(budget: Budget, stats: RuntimeStats, settings: Settings, next_pixels: int, sla_ms: float,
-          kill: bool) -> Verdict:
-    """Run the governor table from the PRD, in priority order."""
+          kill: bool, overrides: bool = True) -> Verdict:
+    """Run the governor table from the PRD, in priority order. `overrides=False` (an ablation) keeps only the
+    kill switch and the caps: no model, level, gaze-size or critical-only changes."""
     if kill or global_kill():
         return Verdict(True, "kill-switch", "kill switch set; state preserved for resume")
     if budget.pixels_used + next_pixels > budget.pixels_cap:
@@ -115,6 +116,8 @@ def check(budget: Budget, stats: RuntimeStats, settings: Settings, next_pixels: 
         return Verdict(True, "cap-hit", f"${budget.usd_used:.5f} spent of ${budget.usd_cap:.5f}")
     if budget.seconds_used >= budget.seconds_cap:
         return Verdict(True, "cap-hit", f"{budget.seconds_used:.1f} s used of {budget.seconds_cap:.0f} s")
+    if not overrides:
+        return Verdict()
 
     seg_p95 = stats.p(f"segment:{settings.model}", 95)
     if seg_p95 > sla_ms:

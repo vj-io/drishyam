@@ -21,6 +21,9 @@ def steps(events):
     return [e for e in events if e["type"] == "step"]
 
 
+LOOK_CAUSES = {"survey", "best-score", "entropy>tau", "area<A_min", "verify-new-mask", "iou<0.5"}
+
+
 def test_event_order_and_every_step_has_a_cause(scene):
     _job, events = run(scene)
     assert [e["type"] for e in events[:2]] == ["job", "overview"]
@@ -201,7 +204,9 @@ def test_forced_p95_spike_changes_next_steps_model(scene):
     st = steps(events)
     spike = next(s for s in st if s.get("injected") == "p95_spike")
     after = next(s for s in st if s["step"] == spike["step"] + 1)
-    assert after["cause"] == "p95>SLA"
+    # The override is recorded under `governor`; the look keeps its own (OpenCV or rule) cause.
+    assert after["governor"]["cause"] == "p95>SLA" and after["cause"] in LOOK_CAUSES
+    assert "model -> fast" in after["governor"]["rationale"] and "p95" not in after["rationale"]
     assert spike["model"] == "accurate" and after["model"] == "fast"
 
 
@@ -223,8 +228,12 @@ def test_planner_drills_fall_back_and_job_continues(scene):
     planner = [e for e in events if e["type"] == "planner"]
     assert [(p["step"], p["status"]) for p in planner] == [(3, "fallback"), (6, "rejected")]
     assert planner[0]["reason"] == "timeout"
-    causes = {s["step"]: s["cause"] for s in steps(events)}
-    assert causes[3] == "planner-fallback" and causes[6] == "planner-fallback"
+    by_step = {s["step"]: s for s in steps(events)}
+    # The planner's failure is the step's planner_status; its cause stays the OpenCV reason for that look.
+    assert by_step[3]["planner_status"] == {"status": "fallback", "reason": "timeout"}
+    assert by_step[6]["planner_status"]["status"] == "rejected" and "allow-list" in by_step[6]["planner_status"]["reason"]
+    assert by_step[3]["cause"] in LOOK_CAUSES and by_step[6]["cause"] in LOOK_CAUSES
+    assert not any("planner_status" in s for n, s in by_step.items() if n not in (3, 6))
     assert events[-1]["type"] == "done"
 
 
@@ -301,7 +310,7 @@ def test_planner_cannot_undo_a_governor_downgrade(scene):
     events = list(job.run())
     st = steps(events)
     after = next(s for s in st if s["step"] == 5)
-    assert after["cause"] == "p95>SLA" and after["model"] == "fast"
+    assert after["governor"]["cause"] == "p95>SLA" and after["model"] == "fast"
     refused = [e for e in events if e["type"] == "planner" and e["step"] == 5]
     assert refused and refused[0]["status"] == "rejected" and "p95>SLA" in refused[0]["reason"]
 
@@ -331,7 +340,7 @@ def test_replay_carries_the_gaze_size_the_governor_set(scene, monkeypatch):
     job = holder["job"] = Job(scene, JobConfig(thumbs=False, pixel_cap=1.0), clock=clock)
     trace = steps(list(job.run()))
     monkeypatch.setattr("drishyam.agent.imaging.gaze", real)
-    assert any(s["cause"] == "warp-spike" for s in trace) and job.settings.size < 512
+    assert any(s.get("governor", {}).get("cause") == "warp-spike" for s in trace) and job.settings.size < 512
     replay = [[s["decision"]["action"], *(s["decision"]["args"][k] for k in ("x", "y", "level", "size"))]
               for s in trace if s["decision"]["action"] != "halt"]
     again = Job(scene, JobConfig(thumbs=False, pixel_cap=1.0), clock=FakeClock(), replay=replay)
@@ -355,3 +364,155 @@ def test_killed_job_resumes_into_the_same_job(scene):
         list(resumed.run())
         assert resumed.gaze_path == full.gaze_path
         assert sorted((f.cls, f.critical) for f in resumed.findings) == sorted((f.cls, f.critical) for f in full.findings)
+
+
+def test_every_argmax_rationale_states_lambda(scene):
+    """The stop rule is visible on every chosen look: its score and the lambda it had to beat."""
+    _, events = run(scene, pixel_cap=1.0)
+    picked = [s for s in steps(events) if s["cause"] == "best-score"]
+    assert picked
+    for s in picked:
+        score = float(s["rationale"].split("score ")[1].split(":")[0])
+        lam = float(s["rationale"].split("lambda ")[1])
+        assert score >= lam
+
+
+def test_a_failed_verification_is_unconfirmed_and_sent_to_a_human(scene):
+    """IoU < 0.5 with no further look to settle it: the finding says `verified: false` and a human is asked."""
+    job, events = run(scene, pixel_cap=1.0)
+    wo = {f["id"]: f for f in events[-1]["work_order"]["findings"]}
+    checked = [f for f in job.findings if f.verify_iou is not None]
+    assert checked and all(f.verified is (f.verify_iou >= 0.5) for f in checked)
+    assert all(wo[f.id]["verify_iou"] == f.verify_iou and wo[f.id]["verified"] is f.verified for f in checked)
+    asked = [e for e in events if e["type"] == "review_request" and e["reason"].startswith("unconfirmed: ")]
+    assert asked, "the scene has a look that disagrees with its coarser look at L0"
+    for e in asked:
+        f = next(f for f in job.findings if f.id == e["finding_id"])
+        assert f.verified is False and f"iou {f.verify_iou:g} < 0.5 between L" in e["reason"]
+        assert f.state == ("pending_review" if f.critical else "draft")  # a request changes no state
+    assert all(f.verify_iou is None and f.verified is None for f in job.findings if f not in checked)
+
+
+def test_a_check_of_an_absorbed_class_counts_for_the_finding_that_absorbed_it():
+    """bridge_03: a look's best mask can be a class absorbed into another finding (rust on exposed bars, a crack in
+    a spall's rim). Its IoU is evidence about that finding: the finding carries it, and the disagreement review
+    names it, so the review and the finding's `verified` never contradict each other."""
+    from pathlib import Path
+
+    img = cv2.imread(str(Path(__file__).resolve().parent.parent / "public" / "samples" / "bridge_03.jpg"))
+    job, events = run(img)
+    ids = {f.id: f for f in job.findings}
+
+    def after(s):  # the finding and review events that follow a step record
+        rest = events[events.index(s) + 1:]
+        return rest[:next(i for i, e in enumerate(rest) if e["type"] not in ("finding", "review_request"))]
+
+    disagreements = [(e, s) for s in steps(events) if s.get("verify") for e in after(s)
+                     if e["type"] == "review_request" and f"iou {s['verify']['iou']:g} < 0.5" in e["reason"]]
+    assert {e["reason"].startswith("unconfirmed: ") for e, _ in disagreements} == {True, False}
+    for e, s in disagreements:
+        f = ids[e["finding_id"]]
+        assert f.verified is False and f.verify_iou == pytest.approx(s["verify"]["iou"])
+    # the L0 verify whose only confident classes were absorbed (bridge_03 step 4) still reaches a human
+    s = next(s for s in steps(events) if s["decision"]["action"] == "verify" and s["decision"]["args"]["level"] == 0
+             and s["verify"]["iou"] < 0.5)
+    (fe,) = [e["finding"] for e in after(s) if e["type"] == "finding"]
+    assert fe["verified"] is False and fe["verify_iou"] == pytest.approx(s["verify"]["iou"])
+    assert any(e["type"] == "review_request" and e["finding_id"] == fe["id"] and e["reason"].startswith("unconfirmed: ")
+               for e in after(s))
+
+
+def test_review_on_ambiguity_when_a_class_is_absorbed_by_another(scene):
+    """Two classes clear A_min on one spot and the agent keeps the dominant one: a human is asked, once."""
+    job, events = run(scene, pixel_cap=1.0)
+    asked = [e for e in events if e["type"] == "review_request" and e["reason"].startswith("ambiguous: ")]
+    assert asked
+    ids = {f.id: f for f in job.findings}
+    for e in asked:
+        f = ids[e["finding_id"]]
+        assert f.cls in e["reason"] and f"is mostly inside {f.cls} {f.id}" in e["reason"]
+    assert len({e["reason"].split(" px")[0] + e["finding_id"] for e in asked}) == len(asked)
+
+
+def test_quality_refused_windows_are_not_assessed(scene, monkeypatch):
+    """A look the quality gate refuses is written to the work order with its reason and box, inside the image."""
+    from drishyam import agent
+
+    real, calls = imaging.quality, []
+
+    def glare_on_second_look(crop):
+        calls.append(1)
+        q = real(crop)
+        return {**q, "ok": False, "reason": "glare"} if len(calls) == 2 else q
+
+    monkeypatch.setattr(agent.imaging, "quality", glare_on_second_look)
+    _, events = run(scene, pixel_cap=0.3)
+    refused = [s for s in steps(events) if s.get("quality", {}).get("ok") is False]
+    (na,) = events[-1]["work_order"]["not_assessed"]
+    assert len(refused) == 1 and na["step"] == refused[0]["step"] == 2
+    assert na["reason"] == "glare" and na["action"] == "re-shoot" and inside_image(na["box"], scene.shape)
+    x, y, w, h = refused[0]["window"]
+    bx, by, bw, bh = na["box"]
+    assert x <= bx and y <= by and bx + bw <= x + w and by + bh <= y + h
+
+
+# ---- ablation switches (FR-21): one test each ----------------------------------------------------------
+def test_switch_use_uncertainty_drops_the_entropy_term(scene):
+    job, _ = run(scene, pixel_cap=0.3)
+    r = next(iter(job.regions.values()))
+    r.entropy = 0.8
+    with_u = job._score(r)
+    job.cfg.use_uncertainty = False
+    without = job._score(r)
+    assert without[1] == pytest.approx(with_u[1] / 1.8) and without[2] == with_u[2]
+
+
+def test_switch_survey_off_skips_the_survey_look(scene):
+    _, events = run(scene, pixel_cap=0.3, survey=False)
+    assert steps(events)[0]["cause"] == "best-score" and not any(s["region"] == "s0" for s in steps(events))
+
+
+def test_switch_verify_off_queues_no_verify_look(scene):
+    _, on = run(scene, pixel_cap=1.0)
+    _, off = run(scene, pixel_cap=1.0, verify=False)
+    assert any(s["decision"]["action"] == "verify" for s in steps(on))
+    assert not any(s["decision"]["action"] == "verify" for s in steps(off))
+
+
+def test_switch_order_random_is_seeded(scene):
+    def path(seed):
+        _, events = run(scene, pixel_cap=1.0, order="random", seed=seed)
+        return [(s["region"], s["cause"]) for s in steps(events)]
+
+    a = path(1)
+    assert any(c == "random-order" for _, c in a) and not any(c == "best-score" for _, c in a)
+    assert a == path(1) and any(path(seed) != a for seed in (2, 3, 4))
+
+
+def test_switch_governor_off_keeps_only_kill_and_caps(scene):
+    job, events = run(scene, pixel_cap=1.0, chaos=("p95_spike",), governor=False)
+    assert not any("governor" in s for s in steps(events)) and job.settings.history == []
+    assert {s["model"] for s in steps(events)} == {"accurate"}
+    _, capped = run(scene, pixel_cap=0.1, governor=False)
+    assert capped[-1]["cause"] == "cap-hit"
+
+
+class LoadedClock(FakeClock):
+    """A machine under load: every read costs 3 ms instead of 1."""
+
+    def __call__(self):
+        self.t += 0.003
+        return self.t
+
+
+def test_a_fixed_cost_table_makes_decisions_independent_of_load(scene):
+    table = {"warp": 5.0, "segment": 30.0}
+
+    def decisions(clock, **cfg):
+        job, events = run(scene, clock=clock, pixel_cap=1.0, **cfg)
+        return job, [(s["decision"], s["cause"]) for s in steps(events)]
+
+    job, calm = decisions(FakeClock(), t_hat_ms=table)
+    assert job._t_hat() == 35.0
+    assert all("t_hat 35 ms" in s["rationale"] for s in job.trace if s["cause"] == "best-score")
+    assert decisions(LoadedClock(), t_hat_ms=table)[1] == calm
