@@ -100,7 +100,13 @@ claude -p "$(cat docs/mcp-session/prompt.txt)" --mcp-config docs/mcp-session/mcp
 ```
 
 `--tools ""` leaves the model no built-in tool (no shell, no file access), only the twelve above. The job's own
-trace lands in `runs/<job>/trace.jsonl`. No recorded session is committed yet.
+trace lands in `runs/<job>/trace.jsonl`.
+
+**Recorded session.** [mcp-session/transcript.md](mcp-session/transcript.md) is a real session on
+`bridge_03.jpg`: Claude chose each of 23 calls after reading the previous reply and looking at the crops, and
+two `verify` IoUs (0.00, then 0.72) decided whether a finding went to a human or through. `claude -p` was not
+available on the recording machine, so it ran through [mcp-session/bridge.py](mcp-session/bridge.py), a minimal
+stdio MCP client that only forwards calls.
 
 ## Command line
 

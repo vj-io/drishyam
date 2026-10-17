@@ -1,0 +1,138 @@
+{
+  "id": "wo_90a925",
+  "job": "j_90a925",
+  "created": "2026-10-17T23:09:12Z",
+  "findings": [
+    {
+      "id": "f1",
+      "cls": "exposed_rebar",
+      "confidence": 0.9026,
+      "measure": {
+        "length_px": 387.7,
+        "width_px": 23.64,
+        "area_px": 9164,
+        "orientation_deg": 176.5
+      },
+      "box": [
+        1408,
+        1464,
+        388,
+        194
+      ],
+      "step": 4,
+      "level": 1,
+      "region": "g2",
+      "critical": true,
+      "state": "pending_review",
+      "verify_iou": null,
+      "steps": [
+        4
+      ],
+      "critical_step": 4,
+      "critical_area_px": 9164,
+      "critical_rule": "exposed_rebar: always critical",
+      "verified": null
+    },
+    {
+      "id": "f2",
+      "cls": "crack",
+      "confidence": 0.9031,
+      "measure": {
+        "length_px": 455.5,
+        "width_px": 5.37,
+        "area_px": 2447,
+        "orientation_deg": 124.7
+      },
+      "box": [
+        2565,
+        908,
+        212,
+        344
+      ],
+      "step": 12,
+      "level": 0,
+      "region": "g5",
+      "critical": false,
+      "state": "draft",
+      "verify_iou": null,
+      "steps": [
+        12
+      ],
+      "critical_step": null,
+      "critical_area_px": null,
+      "critical_rule": null,
+      "verified": null
+    },
+    {
+      "id": "f3",
+      "cls": "spalling",
+      "confidence": 0.9638,
+      "measure": {
+        "length_px": 360.9,
+        "width_px": 134.57,
+        "area_px": 48568,
+        "orientation_deg": 147.1
+      },
+      "box": [
+        504,
+        1882,
+        288,
+        272
+      ],
+      "step": 16,
+      "level": 1,
+      "region": "g6",
+      "critical": true,
+      "state": "pending_review",
+      "verify_iou": null,
+      "steps": [
+        16
+      ],
+      "critical_step": 16,
+      "critical_area_px": 48568,
+      "critical_rule": "spalling 48,568 px\u00b2 >= 40,000 px\u00b2",
+      "verified": null
+    }
+  ],
+  "gaze_path": [
+    [
+      1840,
+      1226,
+      2
+    ],
+    [
+      1616,
+      1562,
+      1
+    ],
+    [
+      1616,
+      1562,
+      0
+    ],
+    [
+      2488,
+      1088,
+      1
+    ],
+    [
+      2640,
+      1096,
+      0
+    ],
+    [
+      784,
+      1738,
+      1
+    ],
+    [
+      784,
+      1738,
+      0
+    ]
+  ],
+  "not_assessed": [],
+  "approvals": [],
+  "disclaimer": "AI-assisted, not an inspection. Measurements are image pixels, not millimetres.",
+  "status": "blocked"
+}
