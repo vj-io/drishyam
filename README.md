@@ -7,7 +7,7 @@ spends compute in proportion to risk. Every camera move is an OpenCV 5
 `pyrDown` / `warpPerspective` / `resize` call, so the agent's own actions are
 the workload COOL accelerates on Graviton.
 
-- **Live demo:** LIVE_URL (stock OpenCV 5 on Vercel, x86, *not COOL*)
+- **Live demo:** https://drishyam-seven.vercel.app (stock OpenCV 5 on Vercel, x86, *not COOL*)
 - **PRD:** [docs/PRD.md](docs/PRD.md) · **Requirement traceability:** [docs/requirements.md](docs/requirements.md) · **Security model:** [docs/security.md](docs/security.md) · **API:** [docs/api-contract.md](docs/api-contract.md) · **MCP:** [docs/mcp.md](docs/mcp.md)
 
 ## What it does
@@ -16,7 +16,7 @@ the workload COOL accelerates on Graviton.
 flowchart LR
     U[photo up to 24 MP] --> P[privacy blur<br/>YuNet + NanoDet]
     P --> O[overview<br/>pyrDown L0-L4, saliency at L3]
-    O --> C[≤20 ranked candidates]
+    O --> C[≤20 ranked candidates,<br/>then one coarse survey look]
     C --> G{governor<br/>caps · kill · p95}
     G -- halt --> W[work order]
     G --> L[gaze<br/>warpPerspective at level L]
@@ -63,7 +63,34 @@ Tests: `make test` (unit, API, MCP, CLI) · `tests/e2e/test_ui_live.py` (real br
 
 ## Results
 
-RESULTS_TABLE
+Measured on **200 held-out labelled synthetic images** (seed 7; policy changes were tuned only on a separate 60-image dev split), one segmenter and one matching rule for every policy (a ground-truth box is found by a same-class component with IoU ≥ 0.3 or containing its centre).
+
+| Policy | pixels processed (× image) | recall | $ / image (modelled) |
+| --- | --- | --- | --- |
+| downscale once (1024 px) | 0.25 | 0.50 | 0.000074 |
+| tiling, L2 grid | 0.06 | 0.44 | 0.000019 |
+| tiling, L1 grid | 0.50 | 0.55 | 0.000139 |
+| tiling, L0 (exhaustive, 20 % overlap) | 1.67 | 0.55 | 0.000443 |
+| **Drishyam**, cap 5 % | 0.02 | **0.00** (no 512² look fits after the overview on a 3 MP image) | 0.000005 |
+| **Drishyam**, cap 10 % | 0.10 | **0.30** | 0.000029 |
+| **Drishyam**, cap 20 % | 0.18 | **0.43** | 0.000053 |
+| **Drishyam**, cap 30 % | 0.25 | **0.48** | 0.000072 |
+| **Drishyam**, cap 50 % | 0.37 | **0.53** | 0.000102 |
+| **Drishyam**, cap 100 % | 0.47 | **0.54** | 0.000129 |
+
+- At a **30 % cap** Drishyam finds **0.48** of the defects using **0.25** of the image's pixels: **0.88×** exhaustive tiling's recall at **0.15×** its pixels, 0.97× a same-pixel downscale.
+- At a **50 % cap**: **0.53** at 0.37 of the pixels = **0.97×** tiling's recall at **0.22×** its pixels. Measured against tiling's real pixel spend, the PRD hypothesis (≥ 0.9× recall at ≤ 0.3× pixels) holds from the 50 % cap; at the 30 % cap it is just missed (0.88×).
+- Honest caveats: the best tiling grid (L1, 0.55 at 0.50) still beats Drishyam at equal pixels; the hysteresis segmenter shipped in this round lifted every baseline too (Drishyam/L0 at 30 %: 0.99× → 0.97× on dev).
+- Critical false-accept rate (critical prediction with no critical ground truth): Drishyam @30 % 0.52 vs exhaustive tiling 0.79 (the PRD asks for ≤ tiling).
+- Agent: 100 % of steps carry a cause; planner drills 38/40 recovered (2 malformed drills never fired because those jobs finished first); governor drills 10/10.
+
+| per-class recall | crack | spalling | efflorescence | exposed_rebar | corrosion |
+|---|---|---|---|---|---|
+| Drishyam @30 % | 0.45 | 0.62 | 0.16 | 0.54 | 0.58 |
+| tiling L0 | 0.47 | 0.70 | 0.25 | 0.52 | 0.75 |
+| downscale | 0.48 | 0.57 | 0.22 | 0.44 | 0.66 |
+
+Full numbers: [public/results/summary.json](public/results/summary.json); failure gallery (12 real cases, 6 categories): [public/results/failures.json](public/results/failures.json), also on the live site.
 
 Everything above is measured, on a **labelled synthetic** dataset, with the
 **classical** segmenter (no learned weights). They show the looking policy, not
