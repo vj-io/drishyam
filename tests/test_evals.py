@@ -358,11 +358,31 @@ def test_leakage_finds_a_resized_rotated_copy(tmp_path):
     cv2.imwrite(str(tmp_path / "train" / "copy.jpg"), cv2.rotate(cv2.resize(a, (320, 240)), cv2.ROTATE_90_CLOCKWISE))
     cv2.imwrite(str(tmp_path / "train" / "other.jpg"), synth.generate(3, 640, 480)[0])
     rep = leakage.near_duplicates([tmp_path / "a.jpg", tmp_path / "b.jpg"], sorted((tmp_path / "train").iterdir()))
-    assert rep["eval_images"] == 2 and rep["train_images"] == 2 and rep["near_duplicates"] == 1
-    assert rep["pairs"][0][:2] == ["a.jpg", "copy.jpg"] and rep["pairs"][0][2] <= 4
+    assert rep["eval_images"] == 2 and rep["train_images"] == 2 and rep["near_duplicates"] == rep["candidates"] == 1
+    assert rep["pairs"][0][:2] == ["a.jpg", "copy.jpg"] and rep["pairs"][0][2] <= 8 and rep["pairs"][0][3] > 0.9
+    cal = leakage.calibrate([tmp_path / "a.jpg", tmp_path / "b.jpg"], [tmp_path / "train" / "other.jpg"], n_copies=2)
+    assert cal["copies"]["n"] == 2 and cal["copies"]["jpeg50"]["found"] == 2 and cal["other_photos"]["n"] == 2
+    assert cal["other_photos"]["confirmed"] == 0
     out = tmp_path / "leak.json"
     assert leakage.main(["--dacl10k", str(tmp_path / "absent"), "--out", str(out)]) == {"skipped": f"no dacl10k images under {tmp_path / 'absent'}"}
     assert json.loads(out.read_text())["skipped"]
+
+
+def test_leakage_keeps_unrelated_low_texture_photos_apart():
+    """Two different plain walls under the same lighting gradient: a 9x8 dHash sees only the gradient (distance near 0),
+    the lighting-free pHash and the NCC check must not call them copies."""
+    from evals import leakage
+
+    ramp = np.linspace(60, 200, 800, dtype=np.float32)[None, :].repeat(600, 0)
+    wall = lambda seed: np.clip(ramp + cv2.GaussianBlur(np.random.default_rng(seed).normal(0, 12, (600, 800)).astype(np.float32),
+                                                         (0, 0), 3), 0, 255).astype(np.uint8)
+    a, b = wall(1), wall(2)
+    def old(g):  # the 9x8 dHash this check replaced
+        s = cv2.resize(g, (9, 8), interpolation=cv2.INTER_AREA).astype(np.int16)
+        return np.packbits(s[:, :-1] > s[:, 1:])
+    assert np.unpackbits(old(a) ^ old(b)).sum() <= 4  # what the old check would have flagged
+    assert leakage.nearest(a, leakage.phash(b)[None])[2] > leakage.MAX_DIST and leakage.ncc(a, b) < leakage.MIN_NCC
+    assert leakage.nearest(a, leakage.phash(cv2.resize(a, (400, 300)))[None])[2] <= leakage.MAX_DIST  # a copy still is one
 
 
 def test_model_eval_refuses_a_mislabelled_arm():
