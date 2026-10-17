@@ -237,8 +237,10 @@ function synthNotes(large, live) {
   const lt = points(large?.policies?.tiling).pop();
   if (ld && ls && lt) {
     const cmp = versusDownscale(large.headline_stats);
+    const best = points(large.policies.tiling).reduce((a, b) => (b.recall > a.recall ? b : a));
     out.push(h('p', { class: 'note' }, `At CODEBRIM’s size (${String(large.dataset ?? '')}): Drishyam found ${ld.recall.toFixed(2)} at ${pct(ld.pixels_frac)} of the pixels, `
-      + `one downscale ${ls.recall.toFixed(2)} at ${pct(ls.pixels_frac)}, exhaustive tiling ${lt.recall.toFixed(2)}${cmp}${cmp ? ' (by the 95 % interval of the ratio)' : ''}.`));
+      + `one downscale ${ls.recall.toFixed(2)} at ${pct(ls.pixels_frac)}, exhaustive tiling ${lt.recall.toFixed(2)}`
+      + `${best !== lt ? ` and the best tiling grid ${best.recall.toFixed(2)} at ${pct(best.pixels_frac)}` : ''}${cmp}${cmp ? ' (by the 95 % interval of the ratio)' : ''}.`));
   }
   const vd = at(live);
   const switches = live?.agent_metrics?.governor_activity_in_eval?.['p95>SLA'];
