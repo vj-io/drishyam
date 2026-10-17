@@ -31,9 +31,10 @@
     ],
     "chance_recall": 0.0207,
     "chance_recall_iou_only": 0.0089,
-    "precision": 0.0856,
+    "precision": 0.085,
     "fp_per_image": 16.0,
     "boxes_per_image": 17.5,
+    "hits_per_matched_gt": 1.01,
     "usd": 3.5e-05
    }
   ],
@@ -52,9 +53,10 @@
     ],
     "chance_recall": 0.0237,
     "chance_recall_iou_only": 0.0148,
-    "precision": 0.0251,
+    "precision": 0.0241,
     "fp_per_image": 70.4,
     "boxes_per_image": 72.2,
+    "hits_per_matched_gt": 1.04,
     "usd": 6.3e-05
    },
    {
@@ -71,9 +73,10 @@
     ],
     "chance_recall": 0.0237,
     "chance_recall_iou_only": 0.0059,
-    "precision": 0.0037,
-    "fp_per_image": 529.4,
+    "precision": 0.0033,
+    "fp_per_image": 529.5,
     "boxes_per_image": 531.3,
+    "hits_per_matched_gt": 1.11,
     "usd": 0.000238
    },
    {
@@ -90,9 +93,10 @@
     ],
     "chance_recall": 0.0118,
     "chance_recall_iou_only": 0.0,
-    "precision": 0.0056,
-    "fp_per_image": 215.3,
+    "precision": 0.0049,
+    "fp_per_image": 215.5,
     "boxes_per_image": 216.5,
+    "hits_per_matched_gt": 1.14,
     "usd": 0.000963
    }
   ],
@@ -111,9 +115,10 @@
     ],
     "chance_recall": 0.0266,
     "chance_recall_iou_only": 0.0148,
-    "precision": 0.0832,
-    "fp_per_image": 16.8,
+    "precision": 0.0542,
+    "fp_per_image": 17.3,
     "boxes_per_image": 18.3,
+    "hits_per_matched_gt": 1.54,
     "usd": 2.8e-05
    },
    {
@@ -130,9 +135,10 @@
     ],
     "chance_recall": 0.0296,
     "chance_recall_iou_only": 0.0089,
-    "precision": 0.0435,
-    "fp_per_image": 62.5,
+    "precision": 0.022,
+    "fp_per_image": 63.9,
     "boxes_per_image": 65.3,
+    "hits_per_matched_gt": 1.97,
     "usd": 5.8e-05
    },
    {
@@ -149,9 +155,10 @@
     ],
     "chance_recall": 0.0266,
     "chance_recall_iou_only": 0.0089,
-    "precision": 0.0405,
-    "fp_per_image": 85.1,
+    "precision": 0.0188,
+    "fp_per_image": 87.0,
     "boxes_per_image": 88.7,
+    "hits_per_matched_gt": 2.15,
     "usd": 0.000119
    },
    {
@@ -168,9 +175,10 @@
     ],
     "chance_recall": 0.0296,
     "chance_recall_iou_only": 0.0059,
-    "precision": 0.0376,
-    "fp_per_image": 93.0,
+    "precision": 0.0173,
+    "fp_per_image": 95.0,
     "boxes_per_image": 96.6,
+    "hits_per_matched_gt": 2.17,
     "usd": 0.000179
    },
    {
@@ -187,9 +195,10 @@
     ],
     "chance_recall": 0.0355,
     "chance_recall_iou_only": 0.0148,
-    "precision": 0.033,
-    "fp_per_image": 127.9,
+    "precision": 0.0131,
+    "fp_per_image": 130.5,
     "boxes_per_image": 132.2,
+    "hits_per_matched_gt": 2.52,
     "usd": 0.000288
    },
    {
@@ -206,9 +215,10 @@
     ],
     "chance_recall": 0.0266,
     "chance_recall_iou_only": 0.0089,
-    "precision": 0.0319,
-    "fp_per_image": 139.1,
+    "precision": 0.012,
+    "fp_per_image": 141.9,
     "boxes_per_image": 143.6,
+    "hits_per_matched_gt": 2.65,
     "usd": 0.000333
    }
   ]
@@ -224,8 +234,14 @@
    1.3761,
    1.8462
   ],
+  "recall_ratio_iou_only_vs_tiling": 2.1159,
+  "recall_ratio_iou_only_vs_tiling_ci": [
+   1.7471,
+   2.5964
+  ],
   "pixels_ratio_vs_tiling": 0.1803,
   "meets_target": true,
+  "meets_target_ci": true,
   "recall_ratio_vs_downscale": 1.1046,
   "recall_ratio_vs_downscale_ci": [
    1.0067,
@@ -706,5 +722,5 @@
    39.98
   ]
  },
- "headline": "On 100 labelled synthetic images, Drishyam at a 30% pixel cap found 0.50 of ground-truth boxes using 0.29 of the image's pixels, versus 0.32 for 20%-overlap 512-px tiling using 1.63: 1.58x its recall (95% CI 1.38-1.85, 1.26x with one-box-per-class boxes, 2.52x with as-specified mixed boxes) at 0.18x its pixels, which meets the 0.9x-at-0.3x hypothesis. It is 1.10x a single 1024-px downscale (95% CI 1.01-1.20, 0.45 at 0.05 of the pixels), 0.94x L1 tiling (0.53 at 0.40) and 0.94x L2 tiling (0.53 at 0.10, the best grid), and 2.12x L0 tiling when a match needs IoU >= 0.3 (no contains-the-centre clause); its own boxes placed at random would score 0.03 (0.01 with IoU only)."
+ "headline": "On 100 labelled synthetic images, Drishyam at a 30% pixel cap found 0.50 of ground-truth boxes using 0.29 of the image's pixels, versus 0.32 for 20%-overlap 512-px tiling using 1.63: 1.58x its recall (95% CI 1.38-1.85, 1.26x with one-box-per-class boxes, 2.52x with as-specified mixed boxes) at 0.18x its pixels, which meets the 0.9x-at-0.3x hypothesis. It is 1.10x a single 1024-px downscale (95% CI 1.01-1.20, 0.45 at 0.05 of the pixels), 0.94x L1 tiling (0.53 at 0.40) and 0.94x L2 tiling (0.53 at 0.10, the best grid), and 2.12x L0 tiling when a match needs IoU >= 0.3 (95% CI 1.75-2.60, no contains-the-centre clause); its own boxes placed at random would score 0.03 (0.01 with IoU only)."
 }

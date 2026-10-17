@@ -31,9 +31,10 @@
     ],
     "chance_recall": 0.1027,
     "chance_recall_iou_only": 0.019,
-    "precision": 0.0078,
-    "fp_per_image": 182.7,
+    "precision": 0.0074,
+    "fp_per_image": 182.8,
     "boxes_per_image": 184.1,
+    "hits_per_matched_gt": 1.05,
     "usd": 3.3e-05
    }
   ],
@@ -52,9 +53,10 @@
     ],
     "chance_recall": 0.0938,
     "chance_recall_iou_only": 0.0196,
-    "precision": 0.0066,
-    "fp_per_image": 251.8,
+    "precision": 0.0062,
+    "fp_per_image": 251.9,
     "boxes_per_image": 253.5,
+    "hits_per_matched_gt": 1.06,
     "usd": 6.1e-05
    },
    {
@@ -71,9 +73,10 @@
     ],
     "chance_recall": 0.092,
     "chance_recall_iou_only": 0.0166,
-    "precision": 0.0022,
-    "fp_per_image": 928.3,
+    "precision": 0.0019,
+    "fp_per_image": 928.5,
     "boxes_per_image": 930.3,
+    "hits_per_matched_gt": 1.15,
     "usd": 0.000226
    },
    {
@@ -90,9 +93,10 @@
     ],
     "chance_recall": 0.0825,
     "chance_recall_iou_only": 0.0131,
-    "precision": 0.0007,
-    "fp_per_image": 3142.3,
+    "precision": 0.0005,
+    "fp_per_image": 3142.7,
     "boxes_per_image": 3144.4,
+    "hits_per_matched_gt": 1.2,
     "usd": 0.000875
    }
   ],
@@ -111,9 +115,10 @@
     ],
     "chance_recall": 0.0742,
     "chance_recall_iou_only": 0.0142,
-    "precision": 0.009,
-    "fp_per_image": 94.3,
+    "precision": 0.0075,
+    "fp_per_image": 94.4,
     "boxes_per_image": 95.1,
+    "hits_per_matched_gt": 1.21,
     "usd": 2.4e-05
    },
    {
@@ -130,9 +135,10 @@
     ],
     "chance_recall": 0.0872,
     "chance_recall_iou_only": 0.0125,
-    "precision": 0.0051,
-    "fp_per_image": 263.6,
+    "precision": 0.0037,
+    "fp_per_image": 263.9,
     "boxes_per_image": 264.9,
+    "hits_per_matched_gt": 1.36,
     "usd": 5.1e-05
    },
    {
@@ -149,9 +155,10 @@
     ],
     "chance_recall": 0.1205,
     "chance_recall_iou_only": 0.0273,
-    "precision": 0.0038,
-    "fp_per_image": 598.7,
+    "precision": 0.0024,
+    "fp_per_image": 599.5,
     "boxes_per_image": 600.9,
+    "hits_per_matched_gt": 1.55,
     "usd": 0.000108
    },
    {
@@ -168,9 +175,10 @@
     ],
     "chance_recall": 0.1365,
     "chance_recall_iou_only": 0.0237,
-    "precision": 0.0029,
-    "fp_per_image": 917.3,
+    "precision": 0.0018,
+    "fp_per_image": 918.3,
     "boxes_per_image": 919.9,
+    "hits_per_matched_gt": 1.62,
     "usd": 0.000163
    },
    {
@@ -187,9 +195,10 @@
     ],
     "chance_recall": 0.1365,
     "chance_recall_iou_only": 0.0285,
-    "precision": 0.0025,
-    "fp_per_image": 1320.9,
+    "precision": 0.0014,
+    "fp_per_image": 1322.4,
     "boxes_per_image": 1324.2,
+    "hits_per_matched_gt": 1.82,
     "usd": 0.000232
    },
    {
@@ -206,9 +215,10 @@
     ],
     "chance_recall": 0.1412,
     "chance_recall_iou_only": 0.0344,
-    "precision": 0.0025,
-    "fp_per_image": 1359.8,
+    "precision": 0.0013,
+    "fp_per_image": 1361.3,
     "boxes_per_image": 1363.2,
+    "hits_per_matched_gt": 1.85,
     "usd": 0.000238
    }
   ]
@@ -224,8 +234,14 @@
    0.881,
    1.0767
   ],
+  "recall_ratio_iou_only_vs_tiling": 1.5417,
+  "recall_ratio_iou_only_vs_tiling_ci": [
+   1.2555,
+   1.918
+  ],
   "pixels_ratio_vs_tiling": 0.1793,
   "meets_target": true,
+  "meets_target_ci": false,
   "recall_ratio_vs_downscale": 1.012,
   "recall_ratio_vs_downscale_ci": [
    0.9267,
@@ -703,5 +719,5 @@
    41.88
   ]
  },
- "headline": "On 200 CODEBRIM images, Drishyam at a 30% pixel cap found 0.20 of ground-truth boxes using 0.29 of the image's pixels, versus 0.21 for 20%-overlap 512-px tiling using 1.62: 0.97x its recall (95% CI 0.88-1.08, 0.83x with one-box-per-class boxes, 1.86x with as-specified mixed boxes) at 0.18x its pixels, which meets the 0.9x-at-0.3x hypothesis. It is 1.01x a single 1024-px downscale (95% CI 0.93-1.10, 0.20 at 0.07 of the pixels), 0.90x L1 tiling (0.22 at 0.42, the best grid) and 0.94x L2 tiling (0.21 at 0.10), and 1.54x L0 tiling when a match needs IoU >= 0.3 (no contains-the-centre clause); its own boxes placed at random would score 0.14 (0.02 with IoU only)."
+ "headline": "On 200 CODEBRIM images, Drishyam at a 30% pixel cap found 0.20 of ground-truth boxes using 0.29 of the image's pixels, versus 0.21 for 20%-overlap 512-px tiling using 1.62: 0.97x its recall (95% CI 0.88-1.08, 0.83x with one-box-per-class boxes, 1.86x with as-specified mixed boxes) at 0.18x its pixels, which meets the 0.9x-at-0.3x hypothesis on the point estimate, but the 95% CI includes values below 0.9. It is 1.01x a single 1024-px downscale (95% CI 0.93-1.10, 0.20 at 0.07 of the pixels), 0.90x L1 tiling (0.22 at 0.42, the best grid) and 0.94x L2 tiling (0.21 at 0.10), and 1.54x L0 tiling when a match needs IoU >= 0.3 (95% CI 1.26-1.92, no contains-the-centre clause); its own boxes placed at random would score 0.14 (0.02 with IoU only)."
 }

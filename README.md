@@ -72,29 +72,29 @@ Tests: `make test` (unit, API, MCP, CLI, evals; same as CI) · browser e2e under
 
 ## Results
 
-Measured on **200 held-out labelled synthetic images** (seed 7; policy changes were tuned only on a separate 60-image dev split, seed 4242, `make eval-dev`), one segmenter and one matching rule for every policy (a ground-truth box is found by a same-class component with IoU ≥ 0.3 or containing its centre; "IoU-only" drops the centre clause). The 95 % intervals are a bootstrap over images, paired across policies. "Chance" moves each policy's own boxes (same class and size) to random places in the photo and scores them again. All of it runs on the **fixed cost model** (`--cost-model fixed`): every op the agent times costs its p50 from the `job_ops` table in [results/local-macos-x86/micro.json](results/local-macos-x86/micro.json) on every call, so its t̂, stop rule and governor see the same costs on a busy machine as on an idle one and `make eval` reproduces these numbers exactly. $ is that modelled time × $0.339/h (untimed Python is not charged), not a bill.
+Measured on **200 held-out labelled synthetic images** (seed 7; policy changes were tuned only on a separate 60-image dev split, seed 4242, `make eval-dev`), one segmenter and one matching rule for every policy (a ground-truth box is found by a same-class component with IoU ≥ 0.3 or containing its centre; "IoU-only" drops the centre clause). The 95 % intervals are a bootstrap over images, paired across policies. "Chance" moves each policy's own boxes (same class and size) to random places in the photo and scores them again. Precision is one-to-one: in confidence order each prediction claims at most one ground-truth box, so a defect reported again from a second look is a false box; "hits per matched box" counts the predictions that land on each box found (1 = no duplicates). All of it runs on the **fixed cost model** (`--cost-model fixed`): every op the agent times costs its p50 from the `job_ops` table in [results/local-macos-x86/micro.json](results/local-macos-x86/micro.json) on every call, so its t̂, stop rule and governor see the same costs on a busy machine as on an idle one and `make eval` reproduces these numbers exactly. $ is that modelled time × $0.339/h (untimed Python is not charged), not a bill.
 
-| Policy | pixels (× image) | recall (95 % CI) | IoU-only recall | chance recall (IoU-only) | precision | false boxes / image | $ / image (modelled) |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| downscale once (1024 px) | 0.25 | 0.50 (0.46–0.54) | 0.43 | 0.02 (0.01) | 0.123 | 12.1 | 0.000030 |
-| tiling, L2 grid | 0.06 | 0.44 (0.41–0.48) | 0.40 | 0.02 (0.01) | 0.153 | 8.5 | 0.000008 |
-| tiling, L1 grid | 0.50 | 0.55 (0.52–0.59) | 0.48 | 0.02 (0.01) | 0.101 | 17.2 | 0.000060 |
-| tiling, L0 (exhaustive, 20 % overlap) | 1.67 | 0.55 (0.51–0.59) | 0.47 | 0.03 (0.01) | 0.023 | 83.3 | 0.000196 |
-| **Drishyam**, cap 5 % | 0.02 | **0.00** (no 512² look fits after the overview on a 3 MP image) | 0.00 | 0.00 (0.00) | – | 0.0 | 0.000002 |
-| **Drishyam**, cap 10 % | 0.10 | **0.30** (0.27–0.34) | 0.27 | 0.01 (0.00) | 0.132 | 6.9 | 0.000012 |
-| **Drishyam**, cap 20 % | 0.18 | **0.43** (0.39–0.47) | 0.39 | 0.02 (0.01) | 0.165 | 10.5 | 0.000022 |
-| **Drishyam**, cap 30 % | 0.25 | **0.47** (0.44–0.51) | 0.43 | 0.02 (0.01) | 0.148 | 13.7 | 0.000030 |
-| **Drishyam**, cap 50 % | 0.35 | **0.52** (0.49–0.56) | 0.46 | 0.04 (0.02) | 0.137 | 18.2 | 0.000043 |
-| **Drishyam**, cap 100 % | 0.46 | **0.53** (0.50–0.57) | 0.47 | 0.05 (0.02) | 0.123 | 23.0 | 0.000056 |
+| Policy | pixels (× image) | recall (95 % CI) | IoU-only recall | chance recall (IoU-only) | precision | false boxes / image | hits per matched box | $ / image (modelled) |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| downscale once (1024 px) | 0.25 | 0.50 (0.46–0.54) | 0.43 | 0.02 (0.01) | 0.120 | 12.2 | 1.03 | 0.000030 |
+| tiling, L2 grid | 0.06 | 0.44 (0.41–0.48) | 0.40 | 0.02 (0.01) | 0.148 | 8.5 | 1.04 | 0.000008 |
+| tiling, L1 grid | 0.50 | 0.55 (0.52–0.59) | 0.48 | 0.02 (0.01) | 0.096 | 17.3 | 1.05 | 0.000060 |
+| tiling, L0 (exhaustive, 20 % overlap) | 1.67 | 0.55 (0.51–0.59) | 0.47 | 0.03 (0.01) | 0.021 | 83.4 | 1.08 | 0.000196 |
+| **Drishyam**, cap 5 % | 0.02 | **0.00** (no 512² look fits after the overview on a 3 MP image) | 0.00 | 0.00 (0.00) | – | 0.0 | – | 0.000002 |
+| **Drishyam**, cap 10 % | 0.10 | **0.30** (0.27–0.34) | 0.27 | 0.01 (0.00) | 0.125 | 7.0 | 1.05 | 0.000012 |
+| **Drishyam**, cap 20 % | 0.18 | **0.43** (0.39–0.47) | 0.39 | 0.02 (0.01) | 0.114 | 11.2 | 1.45 | 0.000022 |
+| **Drishyam**, cap 30 % | 0.25 | **0.47** (0.44–0.51) | 0.43 | 0.02 (0.01) | 0.099 | 14.5 | 1.49 | 0.000030 |
+| **Drishyam**, cap 50 % | 0.35 | **0.52** (0.49–0.56) | 0.46 | 0.04 (0.02) | 0.083 | 19.4 | 1.64 | 0.000043 |
+| **Drishyam**, cap 100 % | 0.46 | **0.53** (0.50–0.57) | 0.47 | 0.05 (0.02) | 0.069 | 24.4 | 1.79 | 0.000056 |
 
 - At a **30 % cap** Drishyam finds **0.47** of the defects using **0.25** of the image's pixels: **0.86×** exhaustive tiling's recall (95 % CI 0.80–0.93) at **0.15×** its pixels. Against a single downscale at the same pixels it is 0.96× (95 % CI 0.90–1.02): **one downscale does as well.**
 - At a **50 % cap**: **0.52** at 0.35 of the pixels = **0.95×** tiling's recall at **0.21×** its pixels. Uncapped, the stop rule ends 182 of 200 jobs by itself, at 0.46 of the pixels with **0.97×** tiling's recall. **Verdict on the PRD hypothesis (≥ 0.9× tiling recall at ≤ 0.3 of the full-resolution pixels): not met** — at 0.25 of the pixels Drishyam reaches 0.86× (its interval reaches 0.93, so 0.9 is not ruled out either). Measured against tiling's real pixel spend (1.67× the image, because tiles overlap), it reaches 0.95× at 0.21× from the 50 % cap.
 - **Well above chance**: the same boxes at random places score 0.00 to 0.05 for every policy.
-- **Fewer false boxes**: precision 0.148 for Drishyam at 30 % (13.7 false boxes per image) against 0.023 for exhaustive tiling (83.3) and 0.123 for one downscale (12.1).
+- **False boxes**: precision 0.099 for Drishyam at 30 % (14.5 false boxes per image) against 0.120 for one downscale (12.2) and 0.021 for exhaustive tiling (83.4). Drishyam reports a defect again from each look in its evidence trail (1.49 predictions per matched box, against 1.03 for one downscale), so it makes more false boxes than one downscale, though far fewer than exhaustive tiling.
 - **Hairline cracks** (87 of the 227 crack boxes are 1–2 px wide; the flag is in the ground truth): exhaustive tiling finds 0.25 of them, one downscale 0.10, Drishyam 0.09 at the 30 % cap and 0.17 uncapped. Zooming everywhere finds the most hairlines; Drishyam's selective zoom does not beat one downscale on them at 30 %. Only 16 boxes are under 96² px, too few to read anything into (`strata` in the summary).
 - Honest caveats: the best tiling grid (L1, 0.55 at 0.50) still beats Drishyam at equal pixels, and the hysteresis segmenter shipped with this policy lifted every baseline too, so it is not a Drishyam-only gain.
 - Critical false-accept rate (critical prediction with no critical ground truth): Drishyam @30 % 0.52 vs exhaustive tiling 0.79 (the PRD asks for ≤ tiling); a single downscale (0.49) and L2 tiling (0.42) are lower still.
-- Agent: 100 % of steps carry a cause; 36 of 36 planner drills that fired were recovered by the rule planner (4 of the 40 injected never fired because those jobs finished first; the drills run on measured time, on a loaded machine); governor drills 9 of the 9 that fired (1 of 10 did not); escalation rate 17 %; at the 30 % cap, 3 looks and 0.27 of the pixels per image (p50 = p95). Human-approval latency is not measured (the web demo is stateless) and the FR-21 ablations were not run.
+- Agent: 100 % of steps carry a cause; 40 of 40 injected planner drills were recovered by the rule planner and 10 of 10 governor drills (the drills run on the same fixed costs, so each job reaches its injection step on any machine load); escalation rate 17 %; at the 30 % cap, 3 looks and 0.27 of the pixels per image (p50 = p95). Human-approval latency is not measured (the web demo is stateless) and the FR-21 ablations were not run.
 
 The images are procedural (`evals/synth.py`): 2048×1536 weathered concrete with drawn cracks, spalls, efflorescence, exposed rebar and rust run-off, plus graffiti, formwork lines, water stains, blur and glare as distractors. The eight bundled samples in `public/samples/` come from the same generator. The same harness on real photos is [below](#real-bridge-photos-codebrim).
 
@@ -124,11 +124,11 @@ segmentation quality.
 | --- | --- | --- | --- | --- | --- |
 | downscale once (1024 px) | 0.05 | 0.45 (0.39–0.51) | 0.40 | 0.02 | 16.0 |
 | tiling, L2 grid | 0.10 | 0.53 (0.47–0.59) | 0.48 | 0.02 | 70.4 |
-| tiling, L1 grid | 0.40 | 0.53 (0.47–0.59) | 0.45 | 0.02 | 529.4 |
-| tiling, L0 (exhaustive, 20 % overlap) | 1.63 | 0.32 (0.26–0.38) | 0.20 | 0.01 | 215.3 |
-| **Drishyam**, cap 10 % | 0.10 | **0.43** (0.38–0.50) | 0.38 | 0.03 | 62.5 |
-| **Drishyam**, cap 30 % | 0.29 | **0.50** (0.45–0.55) | 0.43 | 0.03 | 93.0 |
-| **Drishyam**, cap 100 % | 0.54 | **0.51** (0.46–0.57) | 0.45 | 0.03 | 139.1 |
+| tiling, L1 grid | 0.40 | 0.53 (0.47–0.59) | 0.45 | 0.02 | 529.5 |
+| tiling, L0 (exhaustive, 20 % overlap) | 1.63 | 0.32 (0.26–0.38) | 0.20 | 0.01 | 215.5 |
+| **Drishyam**, cap 10 % | 0.10 | **0.43** (0.38–0.50) | 0.38 | 0.03 | 63.9 |
+| **Drishyam**, cap 30 % | 0.29 | **0.50** (0.45–0.55) | 0.43 | 0.03 | 95.0 |
+| **Drishyam**, cap 100 % | 0.54 | **0.51** (0.46–0.57) | 0.45 | 0.03 | 141.9 |
 
 - **Against one downscale, zooming now wins, narrowly**: Drishyam at 30 % finds 0.50 against 0.45, 1.10× (95 % CI 1.01–1.20), where on the 2048×1536 set it was 0.96× (0.90–1.02). The downscale shrinks these images 4.5× instead of 2×.
 - **A coarse tiling grid still does better**: L2 tiling (512-px tiles on the quarter-scale image) finds 0.53 at 0.10 of the pixels, a third of Drishyam's. Exhaustive L0 tiling falls to 0.32 (spalling 0.16, exposed rebar 0.00): the generator scales spalls with the image, so here they are about 225 to 860 px across and a 512-px full-resolution tile often holds only part of one. The headline ratio against L0 tiling (1.58×, which formally "meets" the 0.9× target) therefore says more about L0 tiling than about Drishyam.
@@ -159,9 +159,9 @@ Two matching rules are reported side by side here, because on these photos they 
 | tiling L0 | 0.31 | 0.01 | 0.02 | 0.00 | 0.58 |
 | downscale | 0.29 | 0.01 | 0.06 | 0.00 | 0.55 |
 
-- **The PRD's hypothesis test (G1, defined on these photos) passes on paper and means little.** At a 30 % cap Drishyam reaches **0.97×** exhaustive tiling's recall (95 % CI 0.88–1.08, so not clearly above 0.9) at **0.18×** its pixels, and 1.01× a single 1024-px downscale (0.93–1.10) that uses a quarter of its pixels. Every baseline, and Drishyam from the 20 % cap up, finds only about one labelled defect in five (0.19 to 0.22).
+- **The PRD's hypothesis test (G1, defined on these photos) passes on paper and means little.** At a 30 % cap Drishyam reaches **0.97×** exhaustive tiling's recall (95 % CI 0.88–1.08, so not clearly above 0.9) at **0.18×** its pixels (1.54×, 1.26–1.92, when a match needs IoU ≥ 0.3), and 1.01× a single 1024-px downscale (0.93–1.10) that uses a quarter of its pixels. Every baseline, and Drishyam from the 20 % cap up, finds only about one labelled defect in five (0.19 to 0.22).
 - **Much of that lenient score is chance.** Each policy's own boxes, moved to random places, already score 0.07 to 0.14 under the lenient rule, because thousands of boxes per image (920 for Drishyam at 30 %, 3,144 for L0 tiling) contain many ground-truth centres by luck. Under IoU-only, recall is 0.04 to 0.10 and chance 0.01 to 0.03: above chance, but low for every policy.
-- **On real photos the segmenter, not where the agent looks, limits recall.** The classical engine was tuned on synthetic images. Precision is 0.001 to 0.009, and 98 to 100 % of every policy's critical predictions match no critical ground truth. It finds cracks (0.31) and corrosion (0.53) and effectively misses spalling (0.00) and exposed rebar (0.01).
+- **On real photos the segmenter, not where the agent looks, limits recall.** The classical engine was tuned on synthetic images. Precision (one-to-one) is 0.0005 to 0.008, and 98 to 100 % of every policy's critical predictions match no critical ground truth. It finds cracks (0.31) and corrosion (0.53) and effectively misses spalling (0.00) and exposed rebar (0.01).
 - **The agent's control carries over.** 100 % of steps carry a cause; 40 of 40 planner drills and 10 of 10 governor drills recovered. With fixed costs the governor never had to step in (an earlier run on measured wall time with 8 workers saw 77 SLA breaches and 14 warp spikes). At the 30 % cap a job takes 17 looks (p50; 26 at p95), against 3 on the smaller synthetic images; uncapped, the stop rule ends all 200 jobs, at 0.44 of the pixels.
 - **Failure cases** (8): cracks missed under the 30 % cap that the full budget finds, and exposed rebar or spalling reported as corrosion. They are published as text ([public/results/codebrim/failures_text.json](public/results/codebrim/failures_text.json), and under FIG. 5 on the site); the crops stay in the git-ignored `results/codebrim/`.
 - **Next:** the dacl10k-trained segmenter ([training/](training/README.md), a Kaggle notebook) is what these numbers call for. After `scripts/install_model.sh`, `make eval-model DACL10K=<the dacl10k folder> CODEBRIM=data/codebrim` runs the leakage check between dacl10k and this subset (`evals/leakage.py`: a 9×8 dHash per image, four rotations, Hamming distance ≤ 10 of 64; written, not yet run), then this comparison and the synthetic one with `DRISHYAM_ONNX` set, refuses to compare unless each summary names the segmenter it should, and publishes the model's numbers next to these (`public/results/codebrim_dacl10k/`), leaving the classical ones in place.
