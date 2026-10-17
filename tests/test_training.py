@@ -117,6 +117,16 @@ def test_dataset_rasterises_labelme_polygons_per_class(mods, tmp_path):
     ann.write_text(ann.read_text().replace('"imageWidth": 120', '"imageWidth": 60'))
     with pytest.raises(ValueError, match="decodes to 120x60"):
         train.Dacl10k(root, "train", 64, names, train=False, seed=0)[0]
+    # A phone photo stored 120x60 with EXIF orientation 6 is a 60x120 picture, and labelme drew its polygons (and
+    # wrote its JSON size) in that rotated frame, as dacl10k_v2_train_3544.jpg is: it must load, not raise.
+    from PIL import Image
+
+    exif = Image.Exif()
+    exif[274] = 6
+    Image.fromarray(np.full((60, 120, 3), 128, np.uint8)).save(root / "images" / "train" / "a.jpg", exif=exif)
+    ann.write_text(json.dumps({"imageWidth": 60, "imageHeight": 120, "imageName": "a.jpg", "shapes": shapes[:1]}))
+    x, m = train.Dacl10k(root, "train", 64, names, train=False, seed=0)[0]
+    assert x.shape == (3, 64, 64) and m[names.index("Crack")].sum() > 0
 
 
 @needs_torch

@@ -148,7 +148,7 @@ validation mIoU is the only local number). Licence **CC BY-NC 4.0**: keep it out
 <root>/images/{train,validation}/*.jpg
 ```
 
-Images are read in their stored orientation (EXIF ignored, as the toolkit reads them, so the polygons line up), and an
+Images are read with their EXIF orientation applied (labelme applied it when the polygons were drawn: the 10 of 7,910 photos with a 90-degree EXIF rotation are labelled in the rotated frame), and an
 image whose decoded size differs from its JSON's `imageWidth` x `imageHeight` stops training with its name instead of
 training on misplaced masks.
 

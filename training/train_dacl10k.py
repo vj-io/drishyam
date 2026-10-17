@@ -123,8 +123,9 @@ class Dacl10k(Dataset):
     def __getitem__(self, i: int):
         d = json.loads(self.ann[i].read_text())
         path = self.img_dir / d["imageName"]
-        # Stored pixel orientation, as the dacl10k toolkit reads it (PIL, no EXIF transpose): the polygons are in it.
-        img = cv2.imread(str(path), cv2.IMREAD_COLOR | cv2.IMREAD_IGNORE_ORIENTATION)
+        # EXIF orientation applied (cv2's default), as labelme applied it when the polygons were drawn: the 10 of 7,910
+        # dacl10k photos with a 90-degree EXIF rotation are labelled in the rotated frame (their JSON size is transposed).
+        img = cv2.imread(str(path), cv2.IMREAD_COLOR)
         if img is None:
             raise FileNotFoundError(path)
         h, w = img.shape[:2]
