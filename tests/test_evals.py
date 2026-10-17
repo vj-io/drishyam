@@ -344,7 +344,7 @@ def test_harness_refuses_to_publish_codebrim_crops(tmp_path):
     with pytest.raises(SystemExit, match="refusing"):
         harness.run(tmp_path, n=1, out_dir=tmp_path / "public" / "results", results_dir=tmp_path / "raw", workers=1)
     repo = Path(harness.__file__).resolve().parents[1]
-    with pytest.raises(SystemExit, match="refusing"):  # anywhere in the repo that git or Vercel would pick up
+    with pytest.raises(SystemExit, match="refusing"):  # anywhere in the repo that git would pick up
         harness.run(tmp_path, n=1, out_dir=repo / "docs" / "codebrim", results_dir=tmp_path / "raw", workers=1)
     assert not (repo / "docs" / "codebrim").exists()
 
