@@ -17,6 +17,7 @@ from datetime import UTC, datetime
 
 SEVERITY = {"exposed_rebar": 3.0, "spalling": 2.0, "crack": 1.5, "corrosion": 1.0, "efflorescence": 0.5}
 SPALL_CRITICAL_AREA_PX = 40_000  # L0 px^2; there is no scale reference, so no mm threshold
+IOU_AGREE = 0.5  # PRD rule 3: a finer look whose mask overlaps the coarser one by less than this disagrees
 DISCLAIMER = "AI-assisted, not an inspection. Measurements are image pixels, not millimetres."
 TOKEN_TTL_S = 7 * 24 * 3600
 REVIEWER_MAX = 64
@@ -42,6 +43,13 @@ def is_critical(cls: str, area_px: int) -> bool:
     return cls == "exposed_rebar" or (cls == "spalling" and area_px >= SPALL_CRITICAL_AREA_PX)
 
 
+def critical_rule(cls: str, area_px: int) -> str:
+    """The rule that made a finding critical, in words a reviewer can check against the measurement."""
+    if cls == "exposed_rebar":
+        return "exposed_rebar: always critical"
+    return f"{cls} {area_px:,} px² >= {SPALL_CRITICAL_AREA_PX:,} px²"
+
+
 def now_iso() -> str:
     return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -59,11 +67,14 @@ class Finding:
     critical: bool = False
     state: str = "draft"
     crop_jpeg_b64: str | None = field(default=None, repr=False)
+    verify_iou: float | None = None  # mask IoU of the latest cross-level check of this defect; None: never checked
     steps: list[int] = field(default_factory=list, init=False)  # every look that saw it, in order
     # The look that made it critical and the area it measured: `measure` is the finest look's, which may be
     # smaller than the (coarser) look that crossed the threshold.
     critical_step: int | None = field(default=None, init=False)
     critical_area_px: int | None = field(default=None, init=False)
+    critical_rule: str | None = field(default=None, init=False)
+    verified: bool | None = field(default=None, init=False)  # verify_iou >= IOU_AGREE; False: unconfirmed
 
     def __post_init__(self) -> None:
         self.critical = is_critical(self.cls, self.measure.get("area_px", 0))
@@ -71,13 +82,18 @@ class Finding:
         self.steps = [self.step]
         if self.critical:
             self.critical_step, self.critical_area_px = self.step, self.measure.get("area_px", 0)
+            self.critical_rule = critical_rule(self.cls, self.critical_area_px)
+        if self.verify_iou is not None:
+            self.verify_iou = float(self.verify_iou)
+            self.verified = self.verify_iou >= IOU_AGREE
 
     def agent_update(self, *, confidence: float, measure: dict, box: list[int], step: int, level: int,
-                     crop_jpeg_b64: str | None = None) -> None:
+                     crop_jpeg_b64: str | None = None, verify_iou: float | None = None) -> None:
         """Another look at the same defect joins its evidence trail. `step` stays the look that found it; the box
         grows to the union of every look's box (its extent at every scale); confidence is the best seen; measure,
-        level and crop come from the finest look (ties: the latest). Class and state are not the agent's to
-        change, and criticality only rises: any look that measures a critical defect makes it critical."""
+        level and crop come from the finest look (ties: the latest); `verify_iou` and `verified` come from the
+        latest cross-level check. Class and state are not the agent's to change, and criticality only rises: any
+        look that measures a critical defect makes it critical."""
         if step not in self.steps:
             self.steps.append(step)
         x0, y0 = min(self.box[0], box[0]), min(self.box[1], box[1])
@@ -88,9 +104,13 @@ class Finding:
             self.measure, self.level = measure, level
             if crop_jpeg_b64:
                 self.crop_jpeg_b64 = crop_jpeg_b64
+        if verify_iou is not None:
+            self.verify_iou = float(verify_iou)
+            self.verified = self.verify_iou >= IOU_AGREE
         if not self.critical and is_critical(self.cls, measure.get("area_px", 0)):
             self.critical, self.state = True, "pending_review"
             self.critical_step, self.critical_area_px = step, measure.get("area_px", 0)
+            self.critical_rule = critical_rule(self.cls, self.critical_area_px)
 
     def to_dict(self, crop: bool = True) -> dict:
         d = asdict(self)
@@ -110,13 +130,15 @@ def decide(finding: dict, decision: str, actor: str) -> None:
     finding["state"] = "approved" if decision == "approve" else "rejected"
 
 
-def work_order(job_id: str, findings: list[Finding], gaze_path: list[list[int]]) -> dict:
+def work_order(job_id: str, findings: list[Finding], gaze_path: list[list[int]], not_assessed=()) -> dict:
+    """`not_assessed`: windows the quality gate refused, [{step, box, reason, action}], so they never read as clean."""
     wo = {
         "id": "wo_" + job_id.removeprefix("j_"),
         "job": job_id,
         "created": now_iso(),
         "findings": [f.to_dict(crop=False) for f in findings],
         "gaze_path": gaze_path,
+        "not_assessed": list(not_assessed),
         "approvals": [],
         "disclaimer": DISCLAIMER,
     }

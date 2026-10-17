@@ -118,6 +118,15 @@ def test_p95_breach_switches_model_then_level():
     assert not s.samples["segment:fast"]  # window reset so the next decision re-measures
 
 
+def test_overrides_off_keeps_kill_and_caps_only():
+    st = G.Settings()
+    breach = stats_with("segment:accurate", [40, 40, 900])
+    assert G.check(budget(), breach, st, 1000, 500, kill=False, overrides=False).cause is None
+    assert st.model == "accurate" and st.history == []
+    assert G.check(budget(), breach, st, 1000, 500, kill=True, overrides=False).cause == "kill-switch"
+    assert G.check(budget(seconds_used=20.0), breach, st, 1000, 500, kill=False, overrides=False).cause == "cap-hit"
+
+
 def test_warp_spike_needs_a_real_spike():
     st = G.Settings()
     assert G.check(budget(), stats_with("warp", [1, 1, 1, 1, 3]), st, 1000, 500, kill=False).cause is None
