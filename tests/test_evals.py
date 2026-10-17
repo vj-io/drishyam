@@ -55,20 +55,35 @@ def test_chance_baseline_precision_and_intervals():
     strata and the paired bootstrap come out of the same per-image counts."""
     gts = [{"cls": "crack", "box": [100 + 7 * i, 200, 60, 40], "hairline": i % 2 == 0} for i in range(20)]
     records = [{"id": f"s{i}", "boxes": [g]} for i, g in enumerate(gts)]
-    hit = lambda g: {"cls": "crack", "box": list(g["box"]), "area": 100}
-    miss = {"cls": "crack", "box": [900, 900, 30, 30], "area": 100}
+    hit = lambda g: {"cls": "crack", "box": list(g["box"]), "area": 100, "conf": 0.9}
+    miss = {"cls": "crack", "box": [900, 900, 30, 30], "area": 100, "conf": 0.5}
     results = [{"width": 2000, "height": 1500, "configs": {
         "good": {"preds": [hit(g), miss], "pixels_frac": 0.3, "wall_s": 0.1},
-        "half": {"preds": [hit(g)] if i % 2 else [miss], "pixels_frac": 0.3, "wall_s": 0.1}}} for i, g in enumerate(gts)]
-    good, half = (harness.score_config(k, records, results) for k in ("good", "half"))
+        "half": {"preds": [hit(g)] if i % 2 else [miss], "pixels_frac": 0.3, "wall_s": 0.1},
+        "dup": {"preds": [hit(g), {**hit(g), "conf": 0.8}], "pixels_frac": 0.3, "wall_s": 0.1}}} for i, g in enumerate(gts)]
+    good, half, dup = (harness.score_config(k, records, results) for k in ("good", "half", "dup"))
     assert good["recall"] == 1.0 and good["chance_recall"] < 0.2 and good["chance_recall_iou_only"] <= good["chance_recall"]
     assert good["precision"] == 0.5 and good["fp_per_image"] == 1.0 and good["predictions_per_image"] == 2
+    # one GT box re-reported twice: one match, one false positive (one-to-one), not two hits
+    assert dup["precision"] == 0.5 and dup["fp_per_image"] == 1.0 and dup["hits_per_matched_gt"] == 2.0
+    assert good["hits_per_matched_gt"] == 1.0
     assert half["recall"] == 0.5 and half["strata"] == {"hairline_crack": 0.0, "small_box": 0.5}
     assert good["strata_gt"] == {"hairline_crack": 10, "small_box": 20}
     lo, hi = harness.boot_ci(harness.recall_of(half), len(records))
     assert lo < 0.5 < hi and harness.boot_ci(harness.recall_of(good), len(records)) == [1.0, 1.0]
     assert harness.ratio_ci(half, good, len(records)) == [lo, hi]  # paired: the same resamples for both policies
     assert harness.score_config("good", records, results)["chance_recall"] == good["chance_recall"]  # seeded
+
+
+def test_target_met_on_the_point_estimate_but_not_by_the_interval():
+    """19 of 20 boxes against tiling's 20 of 20 is 0.95x, but a bootstrap over 20 images reaches below 0.9x."""
+    row = lambda f: [f, f, 0, 0, 1]
+    pol = lambda found, px: {"recall": sum(found) / 20, "recall_iou_only": sum(found) / 20, "pixels_frac": px,
+                             "per_image": [row(f) for f in found]}
+    m = {"drishyam@0.3": pol([1] * 19 + [0], 0.3), "tiling@L0": pol([1] * 20, 1.67), "downscale": pol([1] * 20, 0.25)}
+    hs = harness.headline_stats(m, 20)
+    assert hs["recall_ratio_vs_tiling"] == 0.95 and hs["meets_target"] and not hs["meets_target_ci"]
+    assert hs["recall_ratio_vs_tiling_ci"][0] < 0.9 and hs["recall_ratio_iou_only_vs_tiling"] == 0.95
 
 
 def test_fixed_cost_model_is_load_independent(scene):
@@ -181,11 +196,13 @@ def test_three_image_run_writes_valid_summary_and_gallery(tmp_path):
     for points in pol.values():
         for p in points:
             assert set(p) == {"pixels_frac", "recall", "recall_ci", "recall_iou_only", "recall_iou_only_ci", "chance_recall",
-                              "chance_recall_iou_only", "precision", "fp_per_image", "boxes_per_image", "usd"}
+                              "chance_recall_iou_only", "precision", "fp_per_image", "boxes_per_image",
+                              "hits_per_matched_gt", "usd"}
             assert 0 <= p["recall"] <= 1 and p["pixels_frac"] > 0 and p["usd"] >= 0
             assert p["recall_ci"][0] <= p["recall"] <= p["recall_ci"][1]
     hs = on_disk["headline_stats"]
     assert hs["budget"] == 0.3 and len(hs["recall_ratio_vs_tiling_ci"]) == 2 and isinstance(hs["meets_target"], bool)
+    assert isinstance(hs["meets_target_ci"], bool) and len(hs["recall_ratio_iou_only_vs_tiling_ci"]) == 2
     assert set(on_disk["strata"]["recall"]["downscale"]) == {"hairline_crack", "small_box"}
     assert {"drishyam@0.3", "tiling@1.0", "downscale"} <= set(on_disk["per_class"])
     assert set(on_disk["per_class"]["downscale"]) == set(synth.CLASSES)

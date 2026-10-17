@@ -9,8 +9,9 @@ names: summary.json says which), so only the looking policy differs:
   drishyam    `Job` with pixel_cap in BUDGETS, thumbs off
 
 A ground-truth box is FOUND when a prediction of the same class overlaps it at IoU >= 0.3 or contains its
-centre (PRD); `recall_iou_only` drops the centre clause. Each policy also gets precision (a prediction is a
-true positive when it hits a GT box of its class), false positives per image, a 95 % bootstrap interval over
+centre (PRD); `recall_iou_only` drops the centre clause. Each policy also gets precision (one-to-one: in confidence
+order each prediction claims the free GT box of its class it hits with the highest IoU, so a defect re-reported from
+several looks counts once), false positives per image, a 95 % bootstrap interval over
 images (paired across policies, so ratios get one too) and a chance baseline: the policy's own boxes, same
 class and size, moved to seeded uniform positions. Pixels are counted as pixels fed to the segmenter (tile
 overlap and re-looks included, the saliency overview included for Drishyam) over the L0 pixel count, so
@@ -73,6 +74,19 @@ def hits(pred_box, gt_box, centre: bool = True) -> bool:
 
 def found(gt: dict, preds: list[dict], centre: bool = True) -> bool:
     return any(p["cls"] == gt["cls"] and hits(p["box"], gt["box"], centre) for p in preds)
+
+
+def matched(preds: list[dict], gts: list[dict]) -> int:
+    """True positives under greedy one-to-one matching: in confidence order, each prediction claims the unclaimed
+    same-class GT box it hits with the highest IoU; a prediction with nothing left to claim is a false positive."""
+    free, tp = set(range(len(gts))), 0
+    for p in sorted(preds, key=lambda p: -p["conf"]):
+        cand = [(imaging.box_iou(p["box"], gts[j]["box"]), j) for j in free
+                if gts[j]["cls"] == p["cls"] and hits(p["box"], gts[j]["box"])]
+        if cand:
+            free.discard(max(cand)[1])
+            tp += 1
+    return tp
 
 
 def gt_critical(gt: dict) -> bool:
@@ -404,7 +418,7 @@ def strata(g: dict) -> list[str]:
 
 def score_config(key: str, records: list[dict], results: list[dict], field: str = "preds") -> dict:
     tot, fnd, strict = ({c: 0 for c in CLASSES} for _ in range(3))
-    crit = crit_false = n_preds = tp = 0
+    crit = crit_false = n_preds = tp = n_hit = 0
     px, wall, flags, per_image = [], [], {}, []
     st_tot, st_fnd = {"hairline_crack": 0, "small_box": 0}, {"hairline_crack": 0, "small_box": 0}
     rng = np.random.default_rng([CHANCE_SEED, zlib.crc32(key.encode())])  # the same draw for every run of this policy
@@ -421,11 +435,11 @@ def score_config(key: str, records: list[dict], results: list[dict], field: str 
             for name in strata(g):
                 st_tot[name] += 1
                 st_fnd[name] += f
-        hit = sum(any(g["cls"] == p["cls"] and hits(p["box"], g["box"]) for g in boxes) for p in preds)
+        hit = sum(any(g["cls"] == p["cls"] and hits(p["box"], g["box"]) for g in boxes) for p in preds)  # duplicates too
         per_image.append([sum(flags[rec["id"]]), sum(iou), sum(found(g, rand) for g in boxes),
                           sum(found(g, rand, centre=False) for g in boxes), len(boxes)])
         k, bad = critical_counts(preds, boxes)
-        crit, crit_false, n_preds, tp = crit + k, crit_false + bad, n_preds + len(preds), tp + hit
+        crit, crit_false, n_preds, tp, n_hit = crit + k, crit_false + bad, n_preds + len(preds), tp + matched(preds, boxes), n_hit + hit
         px.append(c["pixels_frac"])
         wall.append(c["wall_s"])
     ratio = lambda a, b: a / b if b else None
@@ -434,6 +448,7 @@ def score_config(key: str, records: list[dict], results: list[dict], field: str 
             "recall_iou_only": ratio(sum(strict.values()), n_gt),
             "chance_recall": ratio(int(cols[2]), n_gt), "chance_recall_iou_only": ratio(int(cols[3]), n_gt),
             "precision": ratio(tp, n_preds), "fp_per_image": (n_preds - tp) / len(records),
+            "hits_per_matched_gt": ratio(n_hit, tp),  # predictions hitting some GT box per GT box claimed: 1 = no duplicates
             "per_class": {c: ratio(fnd[c], tot[c]) for c in CLASSES}, "gt_per_class": tot,
             "strata": {k: ratio(st_fnd[k], v) for k, v in st_tot.items()}, "strata_gt": st_tot,
             "pixels_frac": float(np.mean(px)), "wall_s": float(np.mean(wall)),
@@ -457,8 +472,8 @@ def recall_of(m: dict, col: int = 0):
     return lambda idx: a[idx, col].sum() / max(1, a[idx, 4].sum())
 
 
-def ratio_ci(m: dict, base: dict, n_images: int) -> list:
-    a, b = recall_of(m), recall_of(base)
+def ratio_ci(m: dict, base: dict, n_images: int, col: int = 0) -> list:
+    a, b = recall_of(m, col), recall_of(base, col)
     return boot_ci(lambda idx: a(idx) / b(idx) if b(idx) else np.nan, n_images)
 
 
@@ -517,18 +532,24 @@ def point(m: dict) -> dict:
             "recall_iou_only": _r(m["recall_iou_only"]), "recall_iou_only_ci": m["recall_iou_only_ci"],
             "chance_recall": _r(m["chance_recall"]), "chance_recall_iou_only": _r(m["chance_recall_iou_only"]),
             "precision": _r(m["precision"]), "fp_per_image": _r(m["fp_per_image"], 1),
-            "boxes_per_image": _r(m["predictions_per_image"], 1), "usd": _r(m["usd"], 6)}
+            "boxes_per_image": _r(m["predictions_per_image"], 1), "hits_per_matched_gt": _r(m["hits_per_matched_gt"], 2),
+            "usd": _r(m["usd"], 6)}
 
 
 def headline_stats(m: dict, n: int) -> dict:
     """Drishyam at the headline cap against tiling at L0 (the PRD's target: 0.9x the recall at <= 0.3x the pixels)
-    and against one downscale, with paired bootstrap intervals."""
+    and against one downscale, with paired bootstrap intervals. `meets_target` reads the point estimate,
+    `meets_target_ci` the interval's lower end."""
     d, t, s = m[f"drishyam@{HEADLINE_BUDGET}"], m["tiling@L0"], m["downscale"]
-    r = lambda a, b: _r(a["recall"] / b["recall"]) if b["recall"] else None
+    r = lambda a, b, f="recall": _r(a[f] / b[f]) if b[f] else None
     px = d["pixels_frac"] / t["pixels_frac"]
+    ci = ratio_ci(d, t, n)
     return {"budget": HEADLINE_BUDGET, "target": {"recall_ratio": 0.9, "pixels_ratio": 0.3},
-            "recall_ratio_vs_tiling": r(d, t), "recall_ratio_vs_tiling_ci": ratio_ci(d, t, n),
+            "recall_ratio_vs_tiling": r(d, t), "recall_ratio_vs_tiling_ci": ci,
+            "recall_ratio_iou_only_vs_tiling": r(d, t, "recall_iou_only"),
+            "recall_ratio_iou_only_vs_tiling_ci": ratio_ci(d, t, n, col=1),
             "pixels_ratio_vs_tiling": _r(px), "meets_target": bool(r(d, t) and r(d, t) >= 0.9 and px <= 0.3),
+            "meets_target_ci": bool(ci[0] is not None and ci[0] >= 0.9 and px <= 0.3),
             "recall_ratio_vs_downscale": r(d, s), "recall_ratio_vs_downscale_ci": ratio_ci(d, s, n)}
 
 
@@ -539,7 +560,10 @@ def headline(scored: dict, primary: str, n: int, label: str) -> str:
     d, t, s = m[key], m["tiling@L0"], m["downscale"]
     px = d["pixels_frac"] / t["pixels_frac"]
     hs = headline_stats(m, n)
-    verdict = "meets" if hs["meets_target"] else "does not meet"
+    hyp = "the 0.9x-at-0.3x hypothesis"
+    verdict = (f"meets {hyp}" if hs["meets_target_ci"] else
+               f"meets {hyp} on the point estimate, but the 95% CI includes values below 0.9," if hs["meets_target"] else
+               f"does not meet {hyp}")
     ci = lambda v: "" if None in v else f"95% CI {v[0]:.2f}-{v[1]:.2f}, "
     names = {"components": "per-component", "union": "one-box-per-class", "as_specified": "as-specified mixed"}
     others = ", ".join(f"{ratio_of(sc, 'tiling@L0'):.2f}x with {names[name]} boxes" for name, sc in scored.items() if name != primary)
@@ -549,10 +573,10 @@ def headline(scored: dict, primary: str, n: int, label: str) -> str:
     return (f"On {n} {label}, Drishyam at a {HEADLINE_BUDGET:.0%} pixel cap found {d['recall']:.2f} of ground-truth boxes using "
             f"{d['pixels_frac']:.2f} of the image's pixels, versus {t['recall']:.2f} for 20%-overlap 512-px tiling using "
             f"{t['pixels_frac']:.2f}: {ratio_of(m, 'tiling@L0'):.2f}x its recall ({ci(hs['recall_ratio_vs_tiling_ci'])}{others}) "
-            f"at {px:.2f}x its pixels, which {verdict} the 0.9x-at-0.3x hypothesis. It is {ratio_of(m, 'downscale'):.2f}x a single "
+            f"at {px:.2f}x its pixels, which {verdict}. It is {ratio_of(m, 'downscale'):.2f}x a single "
             f"1024-px downscale ({ci(hs['recall_ratio_vs_downscale_ci'])}{s['recall']:.2f} at {s['pixels_frac']:.2f} of the pixels), "
             f"{grids}, and {ratio_of(m, 'tiling@L0', 'recall_iou_only'):.2f}x L0 tiling when a match needs IoU >= {IOU_MIN} "
-            f"(no contains-the-centre clause); its own boxes placed at random would score {d['chance_recall']:.2f} "
+            f"({ci(hs['recall_ratio_iou_only_vs_tiling_ci'])}no contains-the-centre clause); its own boxes placed at random would score {d['chance_recall']:.2f} "
             f"({d['chance_recall_iou_only']:.2f} with IoU only).")
 
 
