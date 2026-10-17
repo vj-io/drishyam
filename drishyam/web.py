@@ -44,7 +44,7 @@ MAX_REVIEW_BYTES = 100_000
 IMAGE_TYPES = {"image/jpeg", "image/png"}
 CHAOS = {"p95_spike", "planner_timeout", "planner_malformed"}
 ROOT = Path(__file__).resolve().parent.parent
-MAX_PACED_S = 30.0  # total viewing pauses per job (pace_ms), so a paced job still ends inside the 60 s function limit
+MAX_PACED_S = 25.0  # viewing pauses per job (pace_ms): with the 30 s seconds cap, still inside a 60 s function limit
 HOST = ("aws-lambda" if os.environ.get("AWS_LAMBDA_FUNCTION_NAME")
         else "vercel" if os.environ.get("VERCEL") else "local")
 
@@ -252,7 +252,7 @@ async def create_job(
                         yield line(await run_in_threadpool(next, it))
                     if pace_ms and paused[0] < MAX_PACED_S:  # paced for viewing; the wait is not the job's time
                         t0 = time.perf_counter()
-                        await asyncio.sleep(pace_ms / 1000)
+                        await asyncio.sleep(min(pace_ms / 1000, MAX_PACED_S - paused[0]))
                         paused[0] += time.perf_counter() - t0
                 # The viewer pressed KILL: the governor halts the job before its next look.
                 if await request.is_disconnected() or await KILLS.get(kill_key):

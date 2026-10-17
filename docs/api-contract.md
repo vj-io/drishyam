@@ -34,7 +34,7 @@ Query parameters (all optional, validated server-side, out-of-range → 422):
 | `usd_cap` | 0.0001 – 0.05 | 0.05 | modelled $ cap (wall time × $0.339/h) |
 | `seconds_cap` | 1 – 30 | 20 | wall-clock cap |
 | `chaos` | comma list of `p95_spike`, `planner_timeout`, `planner_malformed` | — | failure drills |
-| `pace_ms` | 0 – 1500 | 0 | wait this long after each look, for viewing (at most 30 s of waiting per job); the job's clock excludes the wait, so `seconds_used`, `usd_used` and the caps count compute only |
+| `pace_ms` | 0 – 1500 | 0 | wait this long after each look, for viewing (at most 25 s of waiting per job); the job's clock excludes the wait, so `seconds_used`, `usd_used` and the caps count compute only |
 
 With `pace_ms`, a look's `finding` and `review_request` events still arrive right after its `step`
 record; the wait comes after them, and a KILL posted during the wait halts the job before its next look.
