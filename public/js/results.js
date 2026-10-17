@@ -238,16 +238,17 @@ function synthNotes(large, live) {
   if (ld && ls && lt) {
     const cmp = versusDownscale(large.headline_stats);
     const best = points(large.policies.tiling).reduce((a, b) => (b.recall > a.recall ? b : a));
-    out.push(h('p', { class: 'note' }, `At CODEBRIM’s size (${String(large.dataset ?? '')}): Drishyam found ${ld.recall.toFixed(2)} at ${pct(ld.pixels_frac)} of the pixels, `
+    out.push(h('p', { class: 'note' }, `At CODEBRIM’s size, on ${String(large.dataset ?? 'the large synthetic set')}: Drishyam found ${ld.recall.toFixed(2)} at ${pct(ld.pixels_frac)} of the pixels, `
       + `one downscale ${ls.recall.toFixed(2)} at ${pct(ls.pixels_frac)}, exhaustive tiling ${lt.recall.toFixed(2)}`
       + `${best !== lt ? ` and the best tiling grid ${best.recall.toFixed(2)} at ${pct(best.pixels_frac)}` : ''}${cmp}${cmp ? ' (by the 95 % interval of the ratio)' : ''}.`));
   }
   const vd = at(live);
-  const switches = live?.agent_metrics?.governor_activity_in_eval?.['p95>SLA'];
-  if (vd && num(switches)) {
+  const gov = live?.agent_metrics?.governor_activity_in_eval ?? {};
+  if (vd && num(gov['p95>SLA'])) {
     const load = live.provenance?.load_avg;
     out.push(h('p', { class: 'note' }, `On measured wall time instead of fixed costs${Array.isArray(load) ? ` (machine load ${load[0]})` : ''}, `
-      + `Drishyam found ${vd.recall.toFixed(2)} at ${pct(vd.pixels_frac)} of the pixels, and the governor switched the model ${switches} times.`));
+      + `Drishyam found ${vd.recall.toFixed(2)} at ${pct(vd.pixels_frac)} of the pixels; the governor switched the model ${gov['p95>SLA']} times`
+      + `${num(gov['warp-spike']) ? ` and shrank the gaze on ${gov['warp-spike']} warp spikes` : ''}. Live timings move with the machine, so the chart uses fixed costs.`));
   }
   return out;
 }
