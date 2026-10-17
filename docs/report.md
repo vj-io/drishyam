@@ -148,8 +148,8 @@ Twelve real failures from the same run, two per category (FIG. 5 on the live sit
 The hot path uses only KleidiCV-accelerated ops (`pyrDown`, `warpPerspective`,
 `resize`, `GaussianBlur`, `Sobel`, `morphologyEx`, `medianBlur`, `cvtColor`,
 `inRange`, `dilate`/`erode`); no `filter2D`, no NumPy pixel loops on the gaze
-path. `bench/run_all.sh <arm>` runs the micro, macro and DNN workloads with a
-provenance block (OpenCV version, build-info hash, whether `cv2` loads from
+path. `bench/run_all.sh <arm>` runs the micro and macro benchmarks and a parity
+save with a provenance block (OpenCV version, build-info hash, whether `cv2` loads from
 `/opt/cool`) and `bench/parity.py` checks that two arms produce identical masks.
 The same code passes CI on GitHub's free arm64 runners.
 

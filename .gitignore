@@ -13,4 +13,5 @@ node_modules/
 test-results/
 results/eval_*.json
 results/codebrim/
+results/*/parity.npz
 brag-output*/

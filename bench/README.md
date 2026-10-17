@@ -6,7 +6,7 @@ Three arms separate what COOL (KleidiCV-accelerated OpenCV on Graviton) buys fro
 | --- | --- | --- | --- |
 | A | c8g.2xlarge, COOL AMI | COOL build, from the `/opt/cool` venv | the claimed workload |
 | B | c8g.2xlarge, Ubuntu 24.04 | stock `opencv-python-headless` 5.x wheel, pinned | COOL vs. Graviton alone (same hardware as A) |
-| C | c7i.2xlarge, Ubuntu 24.04 | the same stock wheel, x86 | Graviton vs. x86 (same build as B) |
+| C | c7i.2xlarge, Ubuntu 24.04 | the same stock wheel version, x86 build | Graviton vs. x86 (B's wheel version built for x86, so build differences count too) |
 
 A vs. B is the COOL effect, B vs. C is the hardware effect, A vs. C is what a buyer sees. Hourly cost before any speed-up: c8g.2xlarge $0.339 (on-demand $0.319 + $0.02 COOL fee), c7i.2xlarge $0.357; `--usd-per-hour` sets the rate per arm.
 
@@ -24,7 +24,7 @@ The DNN-only workload (segmenter forward pass at 512x512, FP32 and FP16) is not 
 
 ## Running the arms on AWS
 
-[aws_runbook.md](aws_runbook.md) is the copy-paste sequence: a $50/$100 budget with a stop action, an instance role limited to SSM plus one S3 prefix, one shared dataset and parity-crop file uploaded from your laptop, the three launches (each instance terminates itself after 3 hours), `run_all.sh` on each arm through SSM ([aws_arm.sh](aws_arm.sh)), the copy back and the termination. Expect about $1 per arm at most. Back on the laptop, `python -m bench.compare_arms results/A results/B results/C` folds the three folders into `docs/cool_benchmark.md` and `public/results/cool.json`. It refuses arms that ran different OpenCV major versions or different images.
+[aws_runbook.md](aws_runbook.md) is the copy-paste sequence: a $50/$100 budget with a stop action, an instance role limited to SSM plus one S3 prefix, one shared dataset and parity-crop file uploaded from your laptop, the three launches (each instance terminates itself after 3 hours), `run_all.sh` on each arm through SSM ([aws_arm.sh](aws_arm.sh)), the copy back and the termination. Expect about $1 per arm at most. Back on the laptop, `python -m bench.compare_arms results/A results/B results/C` folds the three folders into `docs/cool_benchmark.md` and `public/results/cool.json` (FIG. 4.3 on the website). It reads each arm's `parity.npz`, which git does not keep, so keep those files to re-run it. It refuses arms that ran different OpenCV major versions or different images.
 
 Run the arms on otherwise idle instances. Micro numbers are single-threaded by default so that a kernel's speed-up is not blurred by thread scheduling; use `THREADS=8` as a second pass if you want multi-threaded latency.
 
