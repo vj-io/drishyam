@@ -248,6 +248,23 @@ def test_kill_endpoint_halts_a_running_job(photo, monkeypatch, store):
         assert all(p["k"].startswith("j_abc123-") and token not in p["k"] for p in puts)  # the token is hashed
 
 
+def test_a_failed_kill_store_read_ends_the_job_as_an_error_not_a_kill(photo, monkeypatch, caplog):
+    """Fail closed (the job stops), but a DynamoDB throttle or IAM error is logged as a failure, never as KILL."""
+    import logging
+
+    from drishyam import web
+
+    class Throttled(FakeTable):
+        def get_item(self, Key, ConsistentRead=False):
+            raise RuntimeError("ProvisionedThroughputExceededException")
+
+    monkeypatch.setattr(web, "KILLS", web.DynamoKills("drishyam-kill", table=Throttled()))
+    with caplog.at_level(logging.INFO, logger="drishyam"):
+        events = lines(post(photo, params="?pixel_cap=1"))
+    assert events[-1]["type"] == "error" and not any(e["type"] == "done" for e in events)
+    assert "failed" in caplog.text and "kill-switch" not in caplog.text
+
+
 def test_dynamodb_kill_store_imports_boto3_only_when_selected(monkeypatch):
     import sys
     import types

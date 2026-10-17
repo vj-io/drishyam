@@ -257,7 +257,8 @@ async def create_job(
                 # The viewer pressed KILL: the governor halts the job before its next look.
                 if await request.is_disconnected() or await KILLS.get(kill_key):
                     stop.set()
-        except Exception:
+        except Exception:  # the job, or a kill-store read: fail closed, and log it as the failure it is
+            finished = True
             log.exception("job %s failed", job.id)
             yield json.dumps({"type": "error", "message": "the job failed; it has been logged"}) + "\n"
         finally:
