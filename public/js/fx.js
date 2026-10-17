@@ -31,21 +31,25 @@ export function replay(el, cls) {
   el.classList.add(cls);
 }
 
-/** A governor override, filed as numbered revision note `n` that closes itself. */
+/** A governor override, filed as numbered revision note `n` in the job bar: one at a time, 10 s, paused while hovered or focused. */
 export function popup(n, cause, message) {
   const host = document.getElementById('toasts');
-  while (host.children.length >= 4) host.firstElementChild.remove();
   const close = h('button', { class: 'win__x', type: 'button', 'aria-label': 'Close notification' }, 'X');
   const el = h('div', { class: 'win win--toast' },
-    h('div', { class: 'win__bar' }, h('span', { class: 'rev', 'aria-hidden': 'true' }, String(n)), h('span', { class: 'win__title' }, `Revision ${n}`), close),
-    h('div', { class: 'win__body' }, h('span', { class: 'chip chip--gov' }, cause), h('p', {}, message)));
+    h('span', { class: 'rev', 'aria-hidden': 'true' }, String(n)), h('span', { class: 'win__title' }, `Revision ${n}`),
+    h('span', { class: 'chip chip--gov' }, cause), h('p', {}, message), close);
+  let timer = 0;
   const bye = () => {
+    clearTimeout(timer);
     el.classList.add('is-closing');
     setTimeout(() => el.remove(), 260);
   };
+  const arm = () => { clearTimeout(timer); timer = setTimeout(bye, 10_000); };
+  for (const type of ['mouseenter', 'focusin']) el.addEventListener(type, () => clearTimeout(timer));
+  for (const type of ['mouseleave', 'focusout']) el.addEventListener(type, arm);
   close.addEventListener('click', bye);
-  setTimeout(bye, 4800);
-  host.append(el);
+  host.replaceChildren(el);
+  arm();
 }
 
 let ctx = null;
