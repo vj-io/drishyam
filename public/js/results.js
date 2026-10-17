@@ -9,9 +9,9 @@ const SERIES = [
   ['drishyam', 'Drishyam', 'drishyam', 'circle'],
 ];
 
-const pending = (what, file) => h('div', { class: 'pending' },
+const pending = (what, file, by = 'the evaluation harness') => h('div', { class: 'pending' },
   h('p', { class: 'pending__title' }, `${what} pending`),
-  h('p', { class: 'note' }, `${file} has not been published yet. Nothing is faked here: when the evaluation harness writes it, this window fills in by itself.`),
+  h('p', { class: 'note' }, `${file} has not been published yet. Nothing is faked here: when ${by} writes it, this window fills in by itself.`),
   h('div', { class: 'meter__track is-indeterminate', 'aria-hidden': 'true' }, h('div', { class: 'meter__fill' })));
 
 /** The point the hero quotes: Drishyam's best recall within 30 % of the pixels. */
@@ -159,6 +159,47 @@ function renderBench(sum, id, file) {
   return true;
 }
 
+const times = (v) => (num(v) ? `${v}×` : '–');
+const span = (r) => (Array.isArray(r) && r.length === 2 && r.every(num) ? `${r[0]}–${r[1]}×` : null);
+const sig = (v, prefix = '') => (num(v) ? `${prefix}${+v.toPrecision(3)}` : '–');
+const raw = (v) => (num(v) ? String(v) : '–');
+
+/** FIG. 4.3 and the footer banner, from results/cool.json (the --summary file of `python -m bench.compare_arms`). */
+function renderCool(cool) {
+  const root = $('#bench-cool');
+  const arms = Object.entries(cool?.arms ?? {}).filter(([, a]) => a && typeof a === 'object');
+  const e2e = cool?.end_to_end ?? {};
+  if (!arms.length || !num(e2e.cool_gain)) return root.replaceChildren(pending('COOL benchmark', 'results/cool.json', 'bench.compare_arms (after the AWS run)'));
+  const op = cool.op_level_geomean ?? {};
+  const ex = cool.expected ?? {};
+  const par = cool.parity_a_vs_b ?? {};
+  const gains = [  // [label, measured, the PRD's expected range]
+    ['COOL gain, whole job', times(e2e.cool_gain), span(ex.end_to_end)],
+    ['COOL gain, single ops (geomean)', times(op.cool_gain), span(ex.op_level)],
+    ['hardware gain, whole job', times(e2e.hardware_gain)],
+    ['hardware gain, single ops (geomean)', times(op.hardware_gain)],
+    ['A over C, whole job', times(e2e.a_over_c)],
+    [`mask pixel agreement, A vs B${num(par.crops) ? ` (${par.crops} crops)` : ''}`, raw(par.pixel_agreement)],
+    ['worst crop agreement, A vs B', raw(par.worst_crop_agreement)],
+  ];
+  const cols = ['instance', 'cv2', 'images/s', '$ / h', '$ / 1k images'];
+  const rows = arms.map(([r, a]) => h('tr', {},
+    h('th', { scope: 'row' }, a.what ? `${r}: ${a.what}` : r),
+    [String(a.instance_type ?? '–'), `${String(a.cv2 ?? '–')}${a.cv2_from_opt_cool ? ', /opt/cool' : ''}`,
+      sig(a.images_per_s), sig(a.usd_per_hour, '$'), sig(a.usd_per_1k_images, '$')]
+      .map((v, i) => h('td', { 'data-label': cols[i], class: i > 1 ? 'n' : null }, v))));
+  root.replaceChildren(h('div', { class: 'stack' },
+    h('p', { class: 'dataset' }, h('span', { class: 'dataset__k' }, 'measured'), h('b', {}, `COOL gain ${times(e2e.cool_gain)} on a whole job`)),
+    h('div', { class: 'bench' },
+      h('div', { class: 'table-wrap', tabindex: '0', role: 'region', 'aria-label': 'Three arms' },
+        h('table', { class: 'tbl tbl--tight tbl--rows tbl--pairs' }, h('caption', {}, 'three arms, whole job, one worker'),
+          h('thead', {}, h('tr', {}, ['arm', ...cols].map((t, i) => h('th', { scope: 'col', class: i > 2 ? 'n' : null }, t)))), h('tbody', {}, rows))),
+      h('div', { class: 'prov' }, h('h4', { class: 'label' }, 'speed-ups and mask parity'),
+        h('dl', { class: 'kv kv--nums' }, gains.map(([k, v, x]) => h('div', {},
+          h('dt', {}, k, x ? h('span', { class: 'kv__sub' }, `PRD expects ${x}`) : null), h('dd', {}, v))))))));
+  $('#cool-status').textContent = `The COOL/Graviton run has been measured (FIG. 4.3): a whole job ran at ${times(e2e.cool_gain)} the speed of the stock wheel on the same instance type${num(e2e.a_over_c) ? `, and at ${e2e.a_over_c}× the speed of the stock wheel on x86` : ''}.`;
+}
+
 function failureImage(path) {
   const ok = typeof path === 'string' && /^\w[\w./-]*$/.test(path) && !path.includes('..');
   if (!ok) return null;
@@ -190,9 +231,10 @@ function renderFailures(list) {
 }
 
 export async function initResults() {
-  const [sum, real, fails] = await Promise.all(
-    ['results/summary.json', 'results/codebrim/summary.json', 'results/failures.json'].map(getJSON));
+  const [sum, real, cool, fails] = await Promise.all(
+    ['results/summary.json', 'results/codebrim/summary.json', 'results/cool.json', 'results/failures.json'].map(getJSON));
   if (renderBench(sum, 'bench', 'results/summary.json')) heroChips(sum);
   renderBench(real, 'bench-real', 'results/codebrim/summary.json');
+  renderCool(cool);
   renderFailures(fails);
 }

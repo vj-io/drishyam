@@ -401,6 +401,11 @@
     <div class="win__body" id="bench-real"><p class="note">Loading benchmarks&hellip;</p></div>
     <p class="note win__cite">CODEBRIM: Mundt, Majumder, Murali, Panetsos and Ramesh, &ldquo;Meta-learning Convolutional Neural Architectures for Multi-target Concrete Defect Classification with the COncrete DEfect BRidge IMage Dataset&rdquo;, CVPR 2019. Its licence does not allow sharing the photos, so only the numbers appear here.</p>
   </section>
+  <section class="win pop" aria-labelledby="t-bench-cool">
+    <div class="win__bar"><span class="win__fig" aria-hidden="true">FIG. 4.3</span><h3 class="win__title" id="t-bench-cool">COOL on Graviton: three arms</h3></div>
+    <div class="win__body" id="bench-cool"><p class="note">Loading benchmarks&hellip;</p></div>
+    <p class="note win__cite">A: the COOL AMI on c8g.2xlarge (Graviton4). B: the stock <code>opencv-python-headless</code> wheel on the same instance type. C: that wheel version, built for x86, on c7i.2xlarge. COOL gain is A over B; hardware gain is B over C, so it includes the two builds&rsquo; differences. How the arms run: <a href="https://github.com/vj-io/drishyam/blob/main/bench/README.md" rel="noopener noreferrer">bench/README.md</a>.</p>
+  </section>
   <dl class="tblock tblock--mini" aria-hidden="true">
     <div><dt>Drawn by</dt><dd>eval harness</dd></div>
     <div><dt>Units</dt><dd>pixels, $, ms</dd></div>
@@ -434,7 +439,7 @@
   <div class="win">
     <div class="win__bar"><span class="win__fig" aria-hidden="true">END</span><span class="win__title">About this drawing set</span></div>
     <div class="win__body stack">
-      <p class="banner banner--honest"><b>Live demo: stock OpenCV 5 on Vercel (x86) &mdash; not COOL.</b> The same code is meant to run from <code>/opt/cool</code> on COOL/Graviton; that run needs an AWS account and has not been done yet.</p>
+      <p class="banner banner--honest"><b>Live demo: stock OpenCV 5 on Vercel (x86) &mdash; not COOL.</b> <span id="cool-status">The same code is meant to run from <code>/opt/cool</code> on COOL/Graviton; that run needs an AWS account and has not been done yet.</span></p>
       <nav aria-label="Project links">
         <ul class="links">
           <li><a href="https://github.com/vj-io/drishyam" rel="noopener noreferrer">GitHub repo</a></li>
