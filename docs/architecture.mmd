@@ -1,5 +1,5 @@
 %% Drishyam system architecture: the same content as docs/architecture.svg.
-%% Dashed boxes: the AWS path is planned, not deployed. The Vercel mirror is live today.
+%% Dashed boxes: the AWS path is planned, not deployed.
 %% cv2 names are the calls made in drishyam/imaging.py, privacy.py, segment.py, measure.py and agent.py.
 flowchart TB
     subgraph CLIENTS["1 · Clients"]
@@ -17,8 +17,6 @@ flowchart TB
         CW["CloudWatch<br/>EMF metrics · dashboard · alarms → SNS email"]
         BUD["AWS Budgets<br/>account spend alerts"]
     end
-
-    VERCEL["2 · Vercel mirror, live today<br/>same app.py → web.py, x86, stock OpenCV 5<br/>WAF: 12 job starts per IP per minute<br/>KILL channel: Vercel Runtime Cache"]
 
     subgraph CORE["3 · Agent core, drishyam/"]
         POLICY["agent.py Job.run policy<br/>survey · best-score · entropy#gt;tau · area#lt;A_min<br/>verify-new-mask · iou#lt;0.5 · stop-rule"]
@@ -49,14 +47,12 @@ flowchart TB
     end
 
     UI -->|"HTTPS · NDJSON streams back"| CF
-    UI -.->|"mirror"| VERCEL
     CF -->|"SigV4 via OAC"| FURL --> LAMBDA
     LAMBDA <-->|"kill flag"| DDB
     SM -->|"signing key"| LAMBDA
     LAMBDA -->|"EMF"| CW
     BUD ~~~ CW
     LAMBDA -->|"Job(image, cfg, kill).run()"| CORE
-    VERCEL --> CORE
     CLI -->|"in-process"| CORE
     MCPC -->|"tool calls"| CORE
     CORE -->|"gaze · quality · segment_view · measure"| CV
