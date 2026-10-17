@@ -192,9 +192,8 @@ def _call(s: Session, tool_name: str, args: dict, pixels: int = 0, why: str = ""
             "planner": "llm",
         }
         v = check(s.budget, s.stats, s.settings, pixels, SLA_MS, kill_path().exists())
-        if v.cause:
+        if v.cause:  # a setting changed, or a cap was hit (bookkeeping still runs, and its reply says so)
             rec.update(cause=v.cause, rationale=_join(v.rationale, why))
-        if v.cause and not v.halt:
             rec["governor"] = {"cause": v.cause, "rationale": v.rationale}
         if v.halt and (v.cause == "kill-switch" or tool_name not in BOOKKEEPING):
             rec.update(type="step", decision={"action": "halt", "args": {}})

@@ -260,10 +260,12 @@ async def test_a_cap_can_be_lowered_never_raised(d, tmp_path):
         r, _ = await d.raw("set_budget", job=job, **bad)
         assert r.is_error
     # A lowered cap halts looking at once, but a capped job can still be written up.
+    await d.ok("gaze", job=job, x=100, y=100, level=1)  # 512^2 px used: more than the 0.02 cap below allows
     await d.ok("set_budget", job=job, pixel_cap=0.02)
     await d.refused("gaze", "cap-hit", job=job, x=100, y=100, level=1)
-    await d.ok("runtime_stats", job=job)
-    await d.ok("draft_work_order", job=job)
+    for name in ("runtime_stats", "draft_work_order"):  # bookkeeping still runs, and its reply says a cap was hit
+        reply, _ = await d.ok(name, job=job)
+        assert reply["governor"]["cause"] == "cap-hit", name
     halt = halts_of(tmp_path, job)
     assert halt and halt[0]["cause"] == "cap-hit" and halt[0]["tool"] == "gaze"
 

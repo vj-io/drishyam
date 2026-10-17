@@ -65,8 +65,8 @@ only accepts gazes with a critical finding.
 Every call appends one line to `runs/<job>/trace.jsonl`. Looks (`gaze`, `verify`) are `step` records with the
 shape in `api-contract.md` (`decision.args` holds the centre actually used, `window`, `quality`, `runtime`,
 `cause`, `pixels_used`). Other calls are `tool` records, refusals are `step` records with action `halt`, and
-failures are `error` records. `rationale` is the client's `why`; when the governor changed a setting before a
-call, the record also carries `governor: {cause, rationale}`. The work order's `not_assessed` lists every gaze
+failures are `error` records. `rationale` is the client's `why`; when the governor acted before a call (it changed a
+setting, or a cap was hit), the record carries `governor: {cause, rationale}` and the reply `governor: {cause, note}`. The work order's `not_assessed` lists every gaze
 whose quality gate failed and that no `enhance` repaired. `drishyam replay runs/<job>/trace.jsonl` prints the gaze path and checks it
 against `work_order.json`. Calls rejected by schema validation (a level of 9, say) never reach the server code,
 so they leave no line.
