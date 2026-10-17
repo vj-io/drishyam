@@ -110,17 +110,20 @@ def test_kill_table_and_secret(template):
     assert [g["RetentionInDays"] for g in of_type(template, "AWS::Logs::LogGroup")] == [14, 14]
 
 
-def test_waf_rate_limits_posts_per_ip(template):
+def test_waf_rate_limits_per_ip(template):
     acl = one(template, "AWS::WAFv2::WebACL")
     assert acl["Scope"] == "CLOUDFRONT" and acl["DefaultAction"] == {"Allow": {}}
     rules = {r["Name"]: r for r in acl["Rules"]}
     jobs = rules["job-starts"]["Statement"]["RateBasedStatement"]
-    assert (jobs["Limit"], jobs["EvaluationWindowSec"], jobs["AggregateKeyType"]) == (12, 60, "IP")
+    # WAF's smallest limit is 10; over 120 s that is 5 job starts a minute, the reserved concurrency.
+    assert (jobs["Limit"], jobs["EvaluationWindowSec"], jobs["AggregateKeyType"]) == (10, 120, "IP")
     scope = json.dumps(jobs["ScopeDownStatement"])
     assert '"/api/jobs"' in scope and '"POST"' in scope and "URL_DECODE" in scope
     kr = rules["kill-and-review"]["Statement"]["RateBasedStatement"]
     assert (kr["Limit"], kr["EvaluationWindowSec"]) == (30, 60)
     assert '"/api/kill"' in json.dumps(kr) and '"/api/review"' in json.dumps(kr)
+    everything = rules["all-requests"]["Statement"]["RateBasedStatement"]
+    assert (everything["Limit"], everything["EvaluationWindowSec"]) == (300, 60) and "ScopeDownStatement" not in everything
     assert all(r["Action"] == {"Block": {}} for r in acl["Rules"])
     assert one(template, "AWS::CloudFront::Distribution")["DistributionConfig"]["WebACLId"]["Fn::GetAtt"][0] == "Waf"
 

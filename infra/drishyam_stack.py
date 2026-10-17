@@ -38,8 +38,11 @@ from constructs import Construct
 LWA_LAYER = "arn:aws:lambda:{region}:753240598075:layer:LambdaAdapterLayerArm64:30"
 FUNCTION_NAME = "drishyam-web"
 ROOT = Path(__file__).resolve().parents[1]
-JOBS_PER_MINUTE = 12  # POST /api/jobs per IP per 60 s (the Vercel firewall rule, now in code)
+# POST /api/jobs per IP: 10 per 120 s. WAF's smallest limit is 10, so the 120 s window is what brings
+# it to 5 starts a minute, matching the reserved concurrency of 5 (docs/aws.md, "Limits").
+JOBS_LIMIT, JOBS_WINDOW_S = 10, 120
 KILL_REVIEW_PER_MINUTE = 30  # /api/kill and /api/review together, per IP per 60 s
+REQUESTS_PER_MINUTE = 300  # every request per IP per 60 s; a page load is about 30
 BUDGET_USD = 20
 
 
@@ -50,11 +53,11 @@ def _path_is(path: str) -> waf.CfnWebACL.StatementProperty:
         text_transformations=[waf.CfnWebACL.TextTransformationProperty(priority=0, type="URL_DECODE")]))
 
 
-def _rate_rule(name: str, priority: int, limit: int, scope: waf.CfnWebACL.StatementProperty):
+def _rate_rule(name: str, priority: int, limit: int, scope: waf.CfnWebACL.StatementProperty | None, window: int = 60):
     return waf.CfnWebACL.RuleProperty(
         name=name, priority=priority, action=waf.CfnWebACL.RuleActionProperty(block={}),
         statement=waf.CfnWebACL.StatementProperty(rate_based_statement=waf.CfnWebACL.RateBasedStatementProperty(
-            limit=limit, evaluation_window_sec=60, aggregate_key_type="IP", scope_down_statement=scope)),
+            limit=limit, evaluation_window_sec=window, aggregate_key_type="IP", scope_down_statement=scope)),
         visibility_config=waf.CfnWebACL.VisibilityConfigProperty(
             cloud_watch_metrics_enabled=True, metric_name=name, sampled_requests_enabled=True))
 
@@ -102,20 +105,22 @@ class DrishyamStack(Stack):
 
         acl = waf.CfnWebACL(
             self, "Waf", scope="CLOUDFRONT", default_action=waf.CfnWebACL.DefaultActionProperty(allow={}),
-            description="Per IP rate limits on Drishyam job starts, kills and reviews",
+            description="Per IP rate limits on Drishyam job starts, kills, reviews and all requests",
             visibility_config=waf.CfnWebACL.VisibilityConfigProperty(
                 cloud_watch_metrics_enabled=True, metric_name="drishyam", sampled_requests_enabled=True),
             rules=[
-                _rate_rule("job-starts", 0, JOBS_PER_MINUTE, waf.CfnWebACL.StatementProperty(
+                _rate_rule("job-starts", 0, JOBS_LIMIT, waf.CfnWebACL.StatementProperty(
                     and_statement=waf.CfnWebACL.AndStatementProperty(statements=[
                         _path_is("/api/jobs"),
                         waf.CfnWebACL.StatementProperty(byte_match_statement=waf.CfnWebACL.ByteMatchStatementProperty(
                             field_to_match=waf.CfnWebACL.FieldToMatchProperty(method={}),
                             positional_constraint="EXACTLY", search_string="POST",
-                            text_transformations=[waf.CfnWebACL.TextTransformationProperty(priority=0, type="NONE")]))]))),
+                            text_transformations=[waf.CfnWebACL.TextTransformationProperty(priority=0, type="NONE")]))])),
+                    window=JOBS_WINDOW_S),
                 _rate_rule("kill-and-review", 1, KILL_REVIEW_PER_MINUTE, waf.CfnWebACL.StatementProperty(
                     or_statement=waf.CfnWebACL.OrStatementProperty(statements=[
                         _path_is("/api/kill"), _path_is("/api/review")]))),
+                _rate_rule("all-requests", 2, REQUESTS_PER_MINUTE, None),
             ])
 
         # The static site: a private bucket read only by this distribution (OAC), with the response headers
