@@ -38,6 +38,16 @@ def test_class_map_is_the_official_dacl10k_list_mapped_onto_drishyam():
     assert cm["map"]["Rust"] == "corrosion" and cm["map"]["ExposedRebars"] == "exposed_rebar"
 
 
+def test_kaggle_notebook_is_built_from_the_current_script():
+    sys.path.insert(0, str(TRAINING))
+    import make_notebook
+
+    assert make_notebook.main(["--check"]) == 0, "stale notebook: run python training/make_notebook.py"
+    nb = json.loads((TRAINING / "drishyam_dacl10k_kaggle.ipynb").read_text())
+    setup = next("".join(c["source"]) for c in nb["cells"] if "".join(c["source"]).startswith("# Setup"))
+    assert nb["nbformat"] == 4 and all(repr(rel) in setup for rel in make_notebook.CARRIED)
+
+
 @pytest.fixture(scope="module")
 def mods():
     sys.path.insert(0, str(TRAINING))
@@ -91,6 +101,10 @@ def test_dataset_rasterises_labelme_polygons_per_class(mods, tmp_path):
     (root / "annotations" / "train" / "a.json").write_text(
         json.dumps({"imageWidth": 120, "imageHeight": 60, "imageName": "a.jpg", "shapes": shapes}))
     assert train.find_root(str(tmp_path)) == root
+    kaggle = tmp_path / "input" / "datasets" / "owner" / "slug"  # a Kaggle mount may add more wrapper folders
+    kaggle.mkdir(parents=True)
+    root = root.rename(kaggle / root.name)
+    assert train.find_root(str(tmp_path / "input")) == root
     x, m = train.Dacl10k(root, "train", 64, names, train=False, seed=0)[0]
     assert x.shape == (3, 64, 64) and m.shape == (19, 64, 64)
     crack, rust, spall = (m[names.index(n)] for n in ("Crack", "Rust", "Spalling"))

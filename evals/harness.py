@@ -2,7 +2,8 @@
 
     python -m evals.harness --data data/synth200 --n 200 --out public/results
 
-Every policy uses `drishyam.segment.ClassicalSegmenter`, so only the looking policy differs:
+Every policy uses `drishyam.segment.default_segmenter()` (the classical engine, or the ONNX that DRISHYAM_ONNX
+names: summary.json says which), so only the looking policy differs:
   downscale   one read of the whole image resized to 1024 px on the long side, segmented once
   tiling      512 px tiles with 20 % overlap at L0, plus the same grid read from pyramid levels 1 and 2
   drishyam    `Job` with pixel_cap in BUDGETS, thumbs off
@@ -29,7 +30,7 @@ from drishyam import imaging
 from drishyam.agent import PLANNER_MALFORMED_STEP, PLANNER_TIMEOUT_STEP, Job, JobConfig
 from drishyam.findings import SPALL_CRITICAL_AREA_PX, is_critical
 from drishyam.governor import USD_PER_HOUR
-from drishyam.segment import DEFECTS, ClassicalSegmenter, restrict
+from drishyam.segment import DEFECTS, default_segmenter, restrict
 from evals import codebrim, synth
 
 CLASSES = DEFECTS  # crack, spalling, efflorescence, exposed_rebar, corrosion
@@ -168,10 +169,10 @@ def run_tiling(img: np.ndarray, seg, level: int) -> dict:
 
 
 class RecordingSegmenter:
-    """ClassicalSegmenter that keeps every Segmentation, so per-component boxes can be rebuilt after a job."""
+    """The default segmenter, keeping every Segmentation so per-component boxes can be rebuilt after a job."""
 
     def __init__(self) -> None:
-        self.inner, self.log = ClassicalSegmenter(), []
+        self.inner, self.log = default_segmenter(), []
 
     def predict(self, crop, model="accurate"):
         self.log.append(self.inner.predict(crop, model))
@@ -221,7 +222,7 @@ def run_drishyam(img: np.ndarray, cap: float) -> dict:
 def eval_image(rec: dict, budgets=BUDGETS) -> dict:
     """Every policy on one image (a worker task)."""
     img = cv2.imread(rec["path"], cv2.IMREAD_COLOR)
-    seg = ClassicalSegmenter()
+    seg = default_segmenter()
     cfg = {"downscale": run_downscale(img, seg)}
     for lvl in TILE_LEVELS:
         cfg[f"tiling@L{lvl}"] = run_tiling(img, seg, lvl)
@@ -267,7 +268,7 @@ def chaos_task(arg: tuple[dict, str]) -> dict:
 def _init_worker() -> None:
     cv2.setNumThreads(1)  # one thread per worker process: what a vCPU-per-worker deployment would run
     warm = np.random.default_rng(0).integers(0, 255, (768, 1024, 3)).astype(np.uint8)
-    ClassicalSegmenter().predict(warm[:512, :512].copy())
+    default_segmenter().predict(warm[:512, :512].copy())
     list(Job(warm, JobConfig(pixel_cap=0.5, thumbs=False)).run())
 
 
@@ -487,6 +488,7 @@ def run(data_dir="data/synth200", n=200, out_dir="public/results", results_dir="
     summary = {
         "dataset": label,
         "n_images": len(records),
+        "segmenter": default_segmenter().name,
         "policies": {
             "downscale": [point(metrics["downscale"])],
             "tiling": [point(metrics[f"tiling@L{lv}"]) for lv in TILE_LEVELS],

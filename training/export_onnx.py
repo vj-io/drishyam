@@ -9,6 +9,7 @@ Writes <out>/drishyam_dacl10k.onnx (FP32) and drishyam_dacl10k.fp16.onnx (weight
 from __future__ import annotations
 
 import argparse
+import inspect
 import sys
 import warnings
 from pathlib import Path
@@ -32,9 +33,13 @@ def export(ckpt: str, out: Path, size: int = 512, slim: bool = True, fp16: bool 
     out.mkdir(parents=True, exist_ok=True)
     paths = {"fp32": out / f"{NAME}.onnx"}
     dummy = torch.randn(1, 3, size, size)
+    # The TorchScript exporter, the one checked against OpenCV DNN here. torch >= 2.9 defaults to dynamo=True
+    # (a different graph, and it needs onnxscript); torch 2.2.2 has no such argument.
+    legacy = {"dynamo": False} if "dynamo" in inspect.signature(torch.onnx.export).parameters else {}
     with torch.no_grad():
         torch.onnx.export(model, dummy, str(paths["fp32"]), opset_version=17, input_names=["input"],
-                          output_names=["logits"], dynamic_axes={"input": {2: "h", 3: "w"}, "logits": {2: "h", 3: "w"}})
+                          output_names=["logits"], dynamic_axes={"input": {2: "h", 3: "w"}, "logits": {2: "h", 3: "w"}},
+                          **legacy)
     if slim:
         try:
             import onnxslim

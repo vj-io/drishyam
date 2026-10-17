@@ -3,11 +3,53 @@
 Fine-tune a MobileNetV3 UNet on dacl10k on Kaggle, export one ONNX that outputs Drishyam's six classes directly,
 and prove it matches PyTorch when run through `drishyam.segment.OnnxSegmenter` on OpenCV 5 DNN `ENGINE_NEW`.
 
+## Kaggle in 6 steps
+
+The notebook carries everything it needs (the training helpers and `drishyam/segment.py` are embedded), so nothing
+has to be pushed or uploaded first. It needs a Kaggle account with phone verification (for Internet and the GPU).
+
+1. kaggle.com > Create > New Notebook > File > **Import Notebook** > upload `training/drishyam_dacl10k_kaggle.ipynb`.
+2. **Add Input** > Datasets > search `dacl10k-v2-devphase` > add **winterqi131/dacl10k-v2-devphase** (checked
+   2026-10-17: the official v2 devphase layout, 6,935 train + 975 validation labelme JSON with their images, 5.1 GB;
+   **sristi29raj/dacl10k-dataset** is the same set, same byte count). Both are third-party re-uploads of data
+   licensed **CC BY-NC 4.0** (their `LICENSE.md`), whatever licence the Kaggle page shows. No mirror? See section 4.
+3. Right panel > Session options: Accelerator **GPU T4 x2**, Internet **on**.
+4. **Save Version > Save & Run All (Commit)**. It runs in the background (closing the tab is fine), checkpoints
+   `run/last.pt`, `best.pt` and `metrics.json` every epoch, and stops starting epochs at 11 h (`--hours 11`), leaving
+   time to export inside the 12 h limit. 30 epochs are estimated at 2 to 4 h on a T4 (not measured).
+5. When the version is complete: its **Output** tab > `run/drishyam_dacl10k.zip` (`best.onnx`, `best_fp16.onnx`,
+   `metrics.json`; about 40 MB) > download. The log ends with the parity table and `parity ok`. If it says
+   "resume to continue", make a new version with **Add Input > Your Work > this notebook's output** and run all again:
+   `--resume auto` copies that `last.pt` and carries on.
+6. Hand back, in the repo (the main `.venv`, no torch needed):
+
+   ```
+   unzip drishyam_dacl10k.zip -d /tmp/dacl-model
+   scripts/install_model.sh /tmp/dacl-model/best.onnx /tmp/dacl-model/best_fp16.onnx
+   ```
+
+   It loads both files on OpenCV 5 DNN `ENGINE_NEW` and through `OnnxSegmenter` (FP16 against FP32 too) before
+   touching anything, copies them to `models/drishyam_dacl10k.onnx` and `.fp16.onnx` (and `metrics.json` to
+   `models/drishyam_dacl10k.metrics.json`), writes their sha256, validation mIoU and **CC BY-NC 4.0** licence into
+   `models/README.md`, runs three `drishyam run` jobs with `DRISHYAM_ONNX` set, runs `make eval` on `data/synth200`
+   twice (classical, then the model) into `runs/model-eval/` (never `public/results`), prints the before/after
+   recall table, and prints the `git` and `vercel env add` commands that would put the model on the live site
+   (it runs none of them). 200 images is the published eval; `--n 20` is a quicker look. The ONNX run is CPU-bound:
+   on the 16-thread Intel Mac a 512 px look took 0.25 s and an image's policies about 46 s against 6 s classical
+   (smoke model, 8 workers), so 200 images should take roughly 25 minutes, against 3 for the classical run.
+
+Edit `train_dacl10k.py`, never the notebook: `python training/make_notebook.py` rebuilds it, and
+`tests/test_training.py` fails while the committed notebook is stale. The notebook's flags are the
+`NOTEBOOK_FLAGS` line of its settings cell; every flag is in `parse()`.
+
 | File | Job |
 |---|---|
 | `class_map.json` | The 19 dacl10k classes and their merge onto Drishyam's six (committed and reported, per the PRD) |
 | `dacl_common.py` | Model factory, class-map loader, and `DrishyamHead` (the 19 to 6 merge that is exported in the graph) |
-| `train_dacl10k.py` | Kaggle-ready training script, also usable cell by cell (`# %%`); `--synthetic` smoke mode |
+| `train_dacl10k.py` | Training script and the notebook's source (`# %%` cells): train, export, parity, zip; `--synthetic` smoke mode |
+| `make_notebook.py` | Builds `drishyam_dacl10k_kaggle.ipynb` from those cells, embedding the helper files; `--check` for staleness |
+| `drishyam_dacl10k_kaggle.ipynb` | The generated Kaggle notebook (do not edit by hand) |
+| `../scripts/install_model.sh` | The hand-back: checks, installs into `models/`, smoke jobs, before/after eval, Vercel commands |
 | `export_onnx.py` | Checkpoint to FP32 and FP16 ONNX, opset 17, dynamic H x W, onnxslim, OpenCV DNN load check |
 | `parity.py` | FR-4 acceptance: 20 fixed crops, PyTorch vs `OnnxSegmenter` |
 | `../tests/test_training.py` | Class-map check always; loader, merge, 3-step train, export, DNN load and parity when torch is installed |
@@ -99,35 +141,41 @@ validation mIoU is the only local number). Licence **CC BY-NC 4.0**: keep it out
 ```
 
 `--data` may point at a folder one or two levels above `<root>` (what unzipping or a Kaggle dataset gives you).
-Download (toolkit README; sha256 `dcbcd5fb82699076a2c7f3a72492a9ef798870e0ca1f0c9399360f273ea95260`):
+On Kaggle, attach a mirror (step 2 above; the notebook searches `/kaggle/input` up to four folders deep).
+Otherwise download (toolkit README; sha256 `dcbcd5fb82699076a2c7f3a72492a9ef798870e0ca1f0c9399360f273ea95260`)
+to `/tmp`, not `/kaggle/working`, which is saved as notebook output:
 
 ```
-!wget -q https://dacl10k.s3.eu-central-1.amazonaws.com/dacl10k-challenge/dacl10k_v2_devphase.zip
-!echo "dcbcd5fb82699076a2c7f3a72492a9ef798870e0ca1f0c9399360f273ea95260  dacl10k_v2_devphase.zip" | sha256sum -c
-!unzip -q dacl10k_v2_devphase.zip -d /kaggle/working/dacl10k
+!wget -q https://dacl10k.s3.eu-central-1.amazonaws.com/dacl10k-challenge/dacl10k_v2_devphase.zip -P /tmp
+!echo "dcbcd5fb82699076a2c7f3a72492a9ef798870e0ca1f0c9399360f273ea95260  /tmp/dacl10k_v2_devphase.zip" | sha256sum -c
+!unzip -q /tmp/dacl10k_v2_devphase.zip -d /tmp/dacl10k
 ```
 
-I could not confirm that the AWS link is live from here (an S3 `HEAD` returned 403); if `wget` fails, get the zip from the toolkit
-README or the dacl.ai page and attach it as a private Kaggle dataset instead (then `--data /kaggle/input/<name>`).
+then put `--data /tmp/dacl10k` in `NOTEBOOK_FLAGS`. The AWS link answered 403 from here (2026-10-17), so it may be gone;
+the toolkit README or the dacl.ai page may have a newer one.
 
 ## 5. Train on Kaggle
 
-Notebook settings: Accelerator GPU (T4 or P100; the script uses one GPU), Internet on (ImageNet encoder weights
-download from the HF hub; so does `pip`).
-
-```
-!pip install -q segmentation-models-pytorch onnx onnxslim onnxconverter-common
-# put the training/ folder (with class_map.json) next to the notebook: a Kaggle dataset or a git clone
-!python training/train_dacl10k.py --data /kaggle/working/dacl10k --out /kaggle/working/run
-```
+The notebook (steps above) installs what it adds, pinned: `segmentation-models-pytorch==0.5.0`, `onnx==1.23.2`,
+`onnxslim==0.1.98`, `onnxconverter-common==1.16.0` (the versions verified on the Mac). torch, torchvision, timm and
+numpy stay Kaggle's own (pinning them would replace the CUDA build). onnx is pinned because Kaggle force-installs
+protobuf 5.29.5, which recent onnx wheels refuse to load; this onnx pulls protobuf >= 6.31 into the session. Kaggle holds `cv2` below 5 on purpose (its OpenCV wheels share one `cv2/` folder),
+so `opencv-python-headless==5.0.0.93` goes to its own `--target` folder and only the export and parity child
+processes put it first on `PYTHONPATH`; training's imread/resize/fillPoly run on Kaggle's 4.x. Checked against
+the image definition in Kaggle/docker-python (2026-10-17: Python 3.13, a 2026-09 Colab base, protobuf 5.29.5):
+`export_onnx.py` asks for `dynamo=False` because torch 2.9+ defaults to the dynamo exporter. Replayed in a
+`python:3.13-slim` container with torch 2.14.1 (CPU), cv2 4.14 and protobuf forced to 5.29.5 (where the image's own
+onnx no longer imports), the notebook ran end to end with `DACL_FLAGS="--synthetic --max-steps 3 --size 128
+--batch-size 2 --out /kaggle/working/run"`: install, train, export, parity ok, zip. Not covered by that replay: CUDA and
+AMP, the real dataset mount, and the run time.
 
 Defaults follow the paper's baselines (512 x 512, 30 epochs, cosine schedule, 2-epoch warm-up) with BCE + Dice, AdamW
 (lr 1e-3), batch 16, AMP on GPU, seed 0, horizontal flip, brightness/contrast jitter, and 70% of train samples as a random
 zoomed crop of the full-resolution photo (the virtual-PTZ regime). Lower `--batch-size` on an out-of-memory error.
 
-- Every epoch writes `last.pt` (atomic), `best.pt` (best validation mIoU over 19 classes) and `metrics.json`. A 12-hour
-  session that dies resumes with `--resume /kaggle/working/run/last.pt` (same flags). Save `/kaggle/working/run` as
-  the notebook output.
+- Every epoch writes `last.pt` (atomic), `best.pt` (best validation mIoU over 19 classes) and `metrics.json`.
+  `--hours H` starts no epoch that would end after H hours; `--resume auto` continues from `<out>/last.pt`, or from a
+  `last.pt` under `/kaggle/input` (an earlier version's output). The notebook uses both (`--hours 11`).
 - Each epoch prints the IoU of all 19 classes and the mean (the paper's validation mIoU, accumulated over the whole
   set), then the same for the five merged Drishyam defect classes (a Drishyam class is on if any mapped channel is).
 - Expected time: **roughly 2 to 4 GPU hours for 30 epochs** on a T4 (an estimate from model size, not measured: this
@@ -155,6 +203,8 @@ max |dlogit| of the raw DNN output, the stricter range-independent number (|dpro
 Run it where torch and OpenCV 5 coexist (below), with the repo checked out (it imports `drishyam.segment`).
 
 ## 7. Point Drishyam at the model
+
+`scripts/install_model.sh` (step 6 above) does this and prints the Vercel side. By hand:
 
 ```
 export DRISHYAM_ONNX=/path/to/drishyam_dacl10k.onnx
@@ -188,10 +238,13 @@ uv pip install --python /tmp/torchenv/bin/python "numpy<2" segmentation-models-p
 uv pip install --python /tmp/torchenv/bin/python --no-deps opencv-python-headless==5.0.0.93
 
 /tmp/torchenv/bin/python training/train_dacl10k.py --synthetic --max-steps 3 --size 128 --batch-size 2 --out /tmp/run
-/tmp/torchenv/bin/python training/export_onnx.py --ckpt /tmp/run/last.pt --out /tmp/onnx
-/tmp/torchenv/bin/python training/parity.py --ckpt /tmp/run/last.pt --onnx /tmp/onnx/drishyam_dacl10k.onnx --onnx-fp16 /tmp/onnx/drishyam_dacl10k.fp16.onnx
 /tmp/torchenv/bin/python -m pytest tests/test_training.py
+scripts/install_model.sh /tmp/run/onnx/drishyam_dacl10k.onnx /tmp/run/onnx/drishyam_dacl10k.fp16.onnx --n 3
+git checkout models/README.md && rm models/drishyam_dacl10k.*   # undo: smoke weights are noise
 ```
+
+The first command is the notebook's whole path (train, export into `/tmp/run/onnx`, parity on noise crops,
+`/tmp/run/drishyam_dacl10k.zip`); `export_onnx.py` and `parity.py` also run on their own (section 6).
 
 `--synthetic` fabricates random images and masks and forces `--encoder-weights none`: it proves the pipeline runs,
 and says nothing about accuracy. On macOS `--workers` defaults to 0: with torch 2.2.2 on Python 3.12.13 a process that used
