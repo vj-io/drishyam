@@ -254,7 +254,8 @@ function kill() {
 
 function resume() {
   const moves = S.steps.filter((s) => ['gaze', 'escalate', 'verify'].includes(s.decision?.action) && pointOf(s))
-    .map((s) => [s.decision.action, s.decision.args.x, s.decision.args.y, s.decision.args.level]);
+    .map((s) => [s.decision.action, s.decision.args.x, s.decision.args.y, s.decision.args.level, s.decision.args.size]
+      .filter((v) => v !== undefined));
   run(moves.slice(0, 200));
 }
 

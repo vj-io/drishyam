@@ -104,7 +104,7 @@ def cmd_run(a) -> int:
     if a.resume:
         trace = read_trace(a.resume)
         replay = [
-            [r["decision"]["action"], *(r["decision"]["args"][k] for k in ("x", "y", "level"))]
+            [r["decision"]["action"], *(r["decision"]["args"][k] for k in ("x", "y", "level", "size"))]
             for r in trace
             if r.get("type") == "step" and r["decision"]["action"] in REPLAY_ACTIONS
         ]

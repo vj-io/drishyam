@@ -18,7 +18,7 @@ import numpy as np
 
 from . import imaging
 from .findings import SEVERITY, Finding, now_iso, work_order
-from .governor import USD_PER_HOUR, Budget, RuntimeStats, Settings, check
+from .governor import MIN_GAZE, USD_PER_HOUR, Budget, RuntimeStats, Settings, check
 from .measure import measure
 from .planner import TIMEOUT_S, ChaosPlanner, consult
 from .segment import CLASSES, DEFECT_PX_BG_MAX, MIN_BLOB_PX, default_segmenter, segment_view
@@ -88,7 +88,7 @@ class Job:
         self.planner = planner
         self.kill = kill
         self.clock = clock
-        self.replay = validate_replay(replay or [], image.shape)
+        self.replay = validate_replay(replay or [], image.shape, self.cfg.size)
         self.findings: list[Finding] = []
         self.gaze_path: list[list[int]] = []
         self.trace: list[dict] = []
@@ -162,6 +162,10 @@ class Job:
         if proposal is None:
             return event, "planner-fallback", False
         strategy, p = proposal["strategy"], proposal["params"]
+        if strategy == "switch_model" and p["model"] == "accurate" and "p95>SLA" in self.settings.history:
+            # The governor downgraded the model for latency; a planner cannot quietly undo that.
+            event.update(status="rejected", reason="governor downgraded the model (p95>SLA)", proposal=None)
+            return event, "planner-fallback", False
         if strategy == "switch_model":
             self.settings.model = "accurate" if p["model"] == "accurate" else "fast"
         elif strategy == "batch_remaining":
@@ -174,7 +178,8 @@ class Job:
                                     f"planner:{strategy}", proposal["rationale"][:120]))
         elif strategy == "stop":
             return event, "planner:stop", True
-        return event, (f"planner:{strategy}" if strategy != "continue" else None), False
+        # change_level / reverify queue their own look, which carries planner:<strategy> as its cause.
+        return event, (f"planner:{strategy}" if strategy in ("switch_model", "batch_remaining") else None), False
 
     def _log_finding(self, r, cls, seg, crop, to_l0, level):
         mask = seg.mask(cls)
@@ -229,11 +234,17 @@ class Job:
         self.regions = {c.id: Region(c.id, c.cx, c.cy, c.prior, first) for c in cands}
         self.seen = [np.zeros(sal.shape, bool) for _ in range(len(pyr))]
         self.forced: deque = deque()
-        for i, (action, x, y, level) in enumerate(self.replay):
-            r = next((r for r in self.regions.values() if (r.cx, r.cy) == (x, y)), None)
+        replay_meta: deque = deque()  # (x, y, size) of each replayed look, applied when it runs
+        prev_r = None
+        for i, (action, x, y, level, rsize) in enumerate(self.replay):
+            # escalate / verify always ran on the region of the look just before them (rule follow-ups)
+            r = prev_r if action != "gaze" and prev_r is not None else None
+            r = r or next((r for r in self.regions.values() if (r.cx, r.cy) == (x, y)), None)
             if r is None:
                 r = self.regions.setdefault(f"x{i + 1}", Region(f"x{i + 1}", x, y, 0.0, level))
             self.forced.append((action, r, level, "replay", "replayed from an earlier trace"))
+            replay_meta.append((x, y, rsize))
+            prev_r = r
         n_replay = len(self.forced)
         looks = (self.budget.pixels_cap - self.budget.pixels_used) // cfg.size**2
         if not self.replay and (s := survey_look(cands, (W, H), cfg.size, first, self.max_level, looks)):
@@ -241,7 +252,7 @@ class Job:
             self.forced.append(("gaze", r, s[2], "survey", (f"one L{s[2]} look covers all {len(cands)} candidates "
                                                            f"before zooming; {looks} looks affordable")))
         value, cost_ms, halt_cause, halt_why = 0.0, 0.0, None, ""
-        gov = None  # a governor override not yet written to the trace (PRD rule 5: every override writes a cause)
+        govs: list = []  # governor overrides not yet written to the trace (PRD rule 5: every override writes a cause)
         self.step = 0
 
         while self.step < cfg.max_steps:
@@ -253,11 +264,16 @@ class Job:
             if verdict.halt:
                 halt_cause, halt_why = verdict.cause, verdict.rationale
                 break
-            gov = verdict if verdict.cause else gov
+            if verdict.cause:
+                govs.append(verdict)
             # 2. choose the next look
             if self.forced:
                 action, r, level, cause, why = self.forced.popleft()
-                n_replay -= 1 if replaying else 0
+                if replaying:
+                    n_replay -= 1
+                    r.cx, r.cy, rsize = replay_meta.popleft()  # the recorded centre of this very look
+                    if rsize is not None:
+                        self.settings.size = rsize  # the gaze size the governor had set when this look first ran
             else:
                 live = [r for r in self.regions.values() if not r.done and not r.looks]
                 scored = sorted(((self._score(r), r) for r in live), key=lambda t: (-t[0][0], -t[0][2], t[1].cy, t[1].cx))
@@ -273,8 +289,8 @@ class Job:
                     break
                 action, level, cause = "gaze", r.next_level, "best-score"
                 why = f"argmax score {best:.2e}: prior {r.prior:.2f}, unseen {a:.2f}, t_hat {self._t_hat():.0f} ms"
-            if gov:
-                why = f"{gov.rationale}; {why}"
+            if govs:
+                why = "; ".join([*(g.rationale for g in govs), why])
             if not replaying:
                 level = min(level + self.settings.level_bias, self.max_level)
             if self.settings.critical_only and action == "verify" and not any(
@@ -386,7 +402,7 @@ class Job:
                 "quality": {"ok": q["ok"], "reason": q["reason"]},
                 "runtime": self.stats.snapshot(self.budget.usd_used),
                 "rationale": why if q["ok"] else f"{why}; quality gate: {q['reason']}",
-                "cause": (gov and gov.cause) or planner_cause or cause,
+                "cause": (govs and govs[0].cause) or planner_cause or cause,
                 "planner": "llm" if planner_cause and planner_cause.startswith("planner:") else "rule",
                 "model": model, "latency_ms": round(warp_ms + seg_ms, 1),
                 "cost_usd": round(self.budget.usd_used - usd_before, 8),
@@ -399,8 +415,11 @@ class Job:
                 rec["verify"] = {"iou": iou, "against_level": prev_level}
             if cfg.thumbs:
                 rec["crop_jpeg_b64"] = imaging.jpeg_b64(crop, 160, 70)
+            if len(govs) > 1:
+                rec["governor"] = {"cause": govs[0].cause, "causes": [g.cause for g in govs],
+                                   "rationale": "; ".join(g.rationale for g in govs)}
             self.trace.append(rec)
-            gov = None
+            govs = []
             yield rec
             yield from new_events
         else:
@@ -414,8 +433,9 @@ class Job:
                "pixels_frac": round(self.budget.pixels_used / (W * H), 4),
                "usd_used": round(self.budget.usd_used, 6), "seconds_used": round(self.budget.seconds_used, 3),
                "runtime": self.stats.snapshot(self.budget.usd_used)}
-        if gov:  # the governor changed settings on the step that then halted: the override still gets its cause
-            rec["governor"] = {"cause": gov.cause, "rationale": gov.rationale}
+        if govs:  # the governor changed settings on the step that then halted: the override still gets its cause
+            rec["governor"] = {"cause": govs[0].cause, "causes": [g.cause for g in govs],
+                               "rationale": "; ".join(g.rationale for g in govs)}
         self.trace.append(rec)
         yield rec
         pending = sum(f.state == "pending_review" for f in self.findings)
@@ -478,20 +498,24 @@ def _focus(seg, to_l0, fallback: tuple[int, int]) -> tuple[int, int]:
     return int(fx), int(fy)
 
 
-def validate_replay(replay: list, shape) -> list[tuple[str, int, int, int]]:
-    """Earlier decisions to re-execute. Client-supplied, so every field is checked."""
+def validate_replay(replay: list, shape, max_size: int = 512) -> list[tuple[str, int, int, int, int | None]]:
+    """Earlier decisions to re-execute: [action, x, y, level] or [action, x, y, level, size].
+    Client-supplied, so every field is checked."""
     if not isinstance(replay, list) or len(replay) > MAX_REPLAY:
         raise ValueError(f"replay must be a list of at most {MAX_REPLAY} decisions")
     H, W = shape[:2]
     out = []
     for item in replay:
-        if not (isinstance(item, (list, tuple)) and len(item) == 4 and item[0] in REPLAY_ACTIONS
+        if not (isinstance(item, (list, tuple)) and len(item) in (4, 5) and item[0] in REPLAY_ACTIONS
                 and all(isinstance(v, int) and not isinstance(v, bool) for v in item[1:])):
-            raise ValueError("each replay decision is [action, x, y, level] with integer x, y, level")
-        action, x, y, level = item
+            raise ValueError("each replay decision is [action, x, y, level(, size)] with integers")
+        action, x, y, level, *rest = item
+        size = rest[0] if rest else None
         if not (0 <= x < W and 0 <= y < H and 0 <= level <= 3):
             raise ValueError("replay decision outside the image or level range")
-        out.append((action, x, y, level))
+        if size is not None and not MIN_GAZE <= size <= max_size:
+            raise ValueError(f"replay gaze size must be {MIN_GAZE}..{max_size}")
+        out.append((action, x, y, level, size))
     return out
 
 

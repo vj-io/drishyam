@@ -236,8 +236,10 @@ def footprint(to_l0: np.ndarray, l0_size: tuple[int, int], size: int) -> np.ndar
 def l0_box(rect, to_l0: np.ndarray, l0_size: tuple[int, int]) -> list[int]:
     """Crop rect (x, y, w, h) as an L0 box [x, y, w, h], clipped to the W x H image."""
     x, y, w, h = rect
-    (x0, y0), (x1, y1) = map_points(to_l0, [[x, y], [x + w, y + h]])
-    x0, y0, x1, y1 = max(0.0, x0), max(0.0, y0), min(float(l0_size[0]), x1), min(float(l0_size[1]), y1)
+    # All four corners: under yaw/pitch the view is a perspective warp, so two corners can swap order.
+    c = map_points(to_l0, [[x, y], [x + w, y], [x, y + h], [x + w, y + h]])
+    hi = np.asarray(l0_size, float)
+    (x0, y0), (x1, y1) = np.clip(c.min(0), 0.0, hi), np.clip(c.max(0), 0.0, hi)
     return [int(x0), int(y0), int(x1 - x0), int(y1 - y0)]
 
 

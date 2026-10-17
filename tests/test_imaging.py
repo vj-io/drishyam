@@ -120,3 +120,13 @@ def test_decoded_bytes_budget():
         imaging.sniff(png16(100, 100, colour=5))
     sixteen = (np.random.default_rng(3).random((300, 300, 3)) * 65535).astype(np.uint16)
     assert imaging.decode_image(cv2.imencode(".png", sixteen)[1].tobytes()).dtype == np.uint8
+
+
+def test_l0_box_is_never_degenerate_under_yaw_and_pitch():
+    pyr = imaging.build_pyramid(np.zeros((1536, 2048, 3), np.uint8))
+    for x, y, yaw, pitch in ((0, 768, -40, -40), (2047, 0, 30, 20), (1024, 1535, 40, -30)):
+        _, to_l0 = imaging.gaze(pyr, x, y, 0, yaw=yaw, pitch=pitch, size=256)
+        for rect in ((0, 0, 256, 256), (10, 200, 40, 30), (200, 10, 30, 40)):
+            bx, by, bw, bh = imaging.l0_box(rect, to_l0, (2048, 1536))
+            assert bw >= 0 and bh >= 0 and 0 <= bx <= 2048 and 0 <= by <= 1536
+            assert bx + bw <= 2048 and by + bh <= 1536

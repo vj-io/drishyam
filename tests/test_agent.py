@@ -292,3 +292,66 @@ def test_small_image_still_runs():
     _, events = run(img, pixel_cap=1.0)
     assert events[-1]["type"] == "done"
     assert all(s["decision"]["args"]["level"] == 0 for s in steps(events) if s["decision"]["action"] != "halt")
+
+
+def test_planner_cannot_undo_a_governor_downgrade(scene):
+    """A planner consulted right after a p95>SLA downgrade asks for the accurate model: refused, and said so."""
+    job = Job(scene, JobConfig(thumbs=False, pixel_cap=1.0, chaos=("p95_spike",)), clock=FakeClock(),
+              planner=lambda d: '{"strategy": "switch_model", "params": {"model": "accurate"}, "rationale": "x"}')
+    events = list(job.run())
+    st = steps(events)
+    after = next(s for s in st if s["step"] == 5)
+    assert after["cause"] == "p95>SLA" and after["model"] == "fast"
+    refused = [e for e in events if e["type"] == "planner" and e["step"] == 5]
+    assert refused and refused[0]["status"] == "rejected" and "p95>SLA" in refused[0]["reason"]
+
+
+def test_planner_look_change_keeps_the_chosen_looks_cause(scene):
+    """change_level queues its own look; the look already chosen on that step keeps its rule cause."""
+    plan = '{"strategy": "change_level", "params": {"region_id": "r2", "level": 0}, "rationale": "PLANNER"}'
+    job = Job(scene, JobConfig(thumbs=False, pixel_cap=1.0), clock=FakeClock(), planner=lambda d: plan)
+    st = steps(list(job.run()))
+    consulted = next(s for s in st if s["step"] == 5)
+    assert not consulted["cause"].startswith("planner:")
+    assert any(s["cause"] == "planner:change_level" and s["region"] == "r2" for s in st)
+
+
+def test_replay_carries_the_gaze_size_the_governor_set(scene, monkeypatch):
+    """After a warp spike shrinks the gaze, replaying [action, x, y, level, size] reproduces the path exactly."""
+    from drishyam import imaging
+
+    clock, real, holder = FakeClock(), imaging.gaze, {}
+
+    def slow_gaze(*a, **k):
+        if holder["job"].step == 5:
+            clock.t += 0.05  # one slow warp
+        return real(*a, **k)
+
+    monkeypatch.setattr("drishyam.agent.imaging.gaze", slow_gaze)
+    job = holder["job"] = Job(scene, JobConfig(thumbs=False, pixel_cap=1.0), clock=clock)
+    trace = steps(list(job.run()))
+    monkeypatch.setattr("drishyam.agent.imaging.gaze", real)
+    assert any(s["cause"] == "warp-spike" for s in trace) and job.settings.size < 512
+    replay = [[s["decision"]["action"], *(s["decision"]["args"][k] for k in ("x", "y", "level", "size"))]
+              for s in trace if s["decision"]["action"] != "halt"]
+    again = Job(scene, JobConfig(thumbs=False, pixel_cap=1.0), clock=FakeClock(), replay=replay)
+    list(again.run())
+    assert again.gaze_path[: len(job.gaze_path)] == job.gaze_path
+    with pytest.raises(ValueError):
+        validate_replay([["gaze", 10, 10, 1, 9999]], scene.shape)
+
+
+def test_killed_job_resumes_into_the_same_job(scene):
+    full = Job(scene, JobConfig(thumbs=False, pixel_cap=1.0), clock=FakeClock())
+    list(full.run())
+    for k in (1, 2, 3):
+        holder = {}
+        cut = holder["job"] = Job(scene, JobConfig(thumbs=False, pixel_cap=1.0), clock=FakeClock(),
+                                  kill=lambda h=holder, k=k: len(h["job"].gaze_path) >= k)
+        trace = steps(list(cut.run()))
+        replay = [[s["decision"]["action"], *(s["decision"]["args"][x] for x in ("x", "y", "level", "size"))]
+                  for s in trace if s["decision"]["action"] != "halt"]
+        resumed = Job(scene, JobConfig(thumbs=False, pixel_cap=1.0), clock=FakeClock(), replay=replay)
+        list(resumed.run())
+        assert resumed.gaze_path == full.gaze_path
+        assert sorted((f.cls, f.critical) for f in resumed.findings) == sorted((f.cls, f.critical) for f in full.findings)

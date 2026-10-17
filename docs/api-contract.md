@@ -27,7 +27,9 @@ Query parameters (all optional, validated server-side, out-of-range → 422):
 | `chaos` | comma list of `p95_spike`, `planner_timeout`, `planner_malformed` | — | failure drills |
 
 Optional header `X-Drishyam-Replay`: base64url JSON list of earlier decisions
-`[["gaze", x, y, level], ...]` to resume a killed job (max 200 entries).
+`[["gaze", x, y, level, size], ...]` to resume a killed job (max 200 entries; `size` is the
+step's `decision.args.size`, optional, 256-512, so a look the governor had shrunk replays at
+the same size).
 
 Response: `200`, `Content-Type: application/x-ndjson`, one JSON object per line,
 streamed while the agent runs. Errors before the stream starts are plain JSON
@@ -75,7 +77,7 @@ Event types, in order:
 // status: accepted | rejected | fallback
 
 {"type": "done", "status": "awaiting_review",           // completed | halted | awaiting_review
- "cause": "stop-rule",                                  // stop-rule | exhausted | cap-hit | kill-switch
+ "cause": "stop-rule",                                  // stop-rule | exhausted | cap-hit | kill-switch | planner:stop
  "summary": {"steps": 14, "pixels_used": 1950000, "pixels_frac": 0.289, "usd": 0.0008,
              "seconds": 8.4, "findings": 3, "critical_pending": 1},
  "coverage": 0.62, "unvisited": ["r9", "r10"],
@@ -103,15 +105,20 @@ entropy or box ever comes from outside the image, and every finding `box` lies i
 The last `step` record has `decision.action` `halt` and the halt `cause`. When the
 governor changed a setting on that same step before the job stopped (say `p95>SLA`
 switched the model, then the stop rule ended the job), the override is not lost: the
-halt record carries it as `"governor": {"cause": "p95>SLA", "rationale": "..."}`,
-and its own `cause` stays the halt cause.
+halt record carries it as `"governor": {"cause": "p95>SLA", "causes": ["p95>SLA"], "rationale": "..."}`,
+and its own `cause` stays the halt cause. A step record whose look follows more than one
+pending override carries the same `governor` object (its `cause` is the first override).
 
 Step `decision.action` values: `gaze` (first look at a region, or the survey), `escalate`
 (one level finer, same centre, because the last look was uncertain), `verify`
 (one level finer to confirm a mask), `halt`. Trace `cause` values:
 `survey`, `best-score`, `entropy>tau`, `area<A_min`, `verify-new-mask`, `iou<0.5`,
 `p95>SLA`, `warp-spike`, `usd≥80%`, `cap-hit`, `kill-switch`,
-`planner-fallback`, `planner:<strategy>`, `replay`.
+`planner-fallback`, `planner:<strategy>`, `replay`; on the halt record also
+`stop-rule`, `exhausted` and `planner:stop`. A planner's `change_level` / `reverify`
+queues its own look, which carries `planner:<strategy>`; the look already chosen on that
+step keeps its own cause. A `switch_model: accurate` proposal is rejected while a
+`p95>SLA` downgrade stands.
 
 ## `POST /api/kill`
 

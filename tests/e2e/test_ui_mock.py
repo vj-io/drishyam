@@ -66,7 +66,7 @@ assert N_STEPS >= 4 and CRIT, "the fixture should hold several steps and a criti
 
 def move(step):
     a = step["decision"]["args"]
-    return [step["decision"]["action"], a["x"], a["y"], a["level"]]
+    return [step["decision"]["action"], a["x"], a["y"], a["level"], *([a["size"]] if "size" in a else [])]
 
 
 MOVES = [move(s) for s in STEPS if s["decision"]["action"] in MOVING]
@@ -597,6 +597,35 @@ def test_pending_states(browser, base):
     print("ok  pending states: friendly empty states, no errors")
 
 
+def test_halt_governor_note_and_critical_trigger(browser, base):
+    """A halt record carrying a governor override shows its chip and detail row; every critical card shows
+    the look that made it critical."""
+    events = [json.loads(ln) for ln in JOB_LINES]
+    halt = max(i for i, e in enumerate(events) if e["type"] == "step")
+    events[halt]["governor"] = {"cause": "p95>SLA", "causes": ["p95>SLA"],
+                                "rationale": "p95(segment) 900 ms > SLA 500 ms; model -> fast"}
+    critical = {e["finding"]["id"] for e in events if e["type"] == "finding" and e["finding"].get("critical")}
+    LIVE["plans"] = [{"lines": [json.dumps(e) for e in events], "delay": 0}]
+    LIVE["jobs"].clear(); LIVE["kills"].clear(); LIVE["reviews"].clear(); LIVE["tokens"] = 0
+    LIVE["order"] = json.loads(json.dumps(DONE["work_order"]))
+    s = Session(browser, "halt-governor", viewport={"width": 1440, "height": 900})
+    p = s.page
+    p.goto(f"{base}/")
+    p.locator(".thumb").click()
+    expect(p.locator("#look")).to_be_enabled(timeout=T)
+    p.click("#look")
+    expect(p.locator("#job-pill")).to_have_text(re.compile(DONE_LABEL, re.IGNORECASE), timeout=T)
+    last = p.locator("#trace .trace__line[data-step]").last
+    expect(last.locator(".chip", has_text="p95>SLA")).to_have_count(1)
+    last.locator("button").click()
+    expect(p.locator("#step-detail")).to_contain_text("governor")
+    expect(p.locator("#step-detail")).to_contain_text("model -> fast")
+    expect(p.locator(".finding__trigger")).to_have_count(len(critical))
+    s.check_clean()
+    s.context.close()
+    print("ok  halt governor note and critical trigger rendered")
+
+
 if __name__ == "__main__":
     test_static_csp_hygiene()
     srv, base = serve()
@@ -609,6 +638,7 @@ if __name__ == "__main__":
             test_reduced_motion(browser, base)
             test_heading_names(browser, base)
             test_pending_states(browser, base)
+            test_halt_governor_note_and_critical_trigger(browser, base)
             browser.close()
     finally:
         srv.shutdown()
