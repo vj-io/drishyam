@@ -384,7 +384,8 @@ def test_static_csp_hygiene():
     css = (PUBLIC / "styles.css").read_text()
     assert not re.findall(r"url\(\s*['\"]?(?:https?:)?//", css), "external url() in CSS"
     assert 'id="stat-real"' in html, "WS3 fills the #stat-real hero slot"
-    assert html.count("og:image") == 1 and '<meta name="twitter:card" content="summary_large_image">' in html, "one share card"
+    assert html.count('property="og:image"') == 1 and '<meta name="twitter:card" content="summary_large_image">' in html, "one share card"
+    assert all(f'property="og:{k}"' in html for k in ("title", "type", "url", "image:width", "image:height", "image:alt")), "the Open Graph basics"
     assert ".mp4" not in html, "no video link until the commit that ships video/drishyam.mp4 adds the player as static markup"
     print("ok  static CSP hygiene")
 
