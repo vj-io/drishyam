@@ -21,7 +21,7 @@ Scenarios (a real Chromium, the document served with the production CSP header):
      the recap in view, hand-off to the reviewer, and Try KILL (planner_timeout, shown live) halted by KILL.
   4. photo, NOTE and newest trace line on one screen (1440x900; 375x812 with the crop and the replay label),
   5. keyboard only, 6. KILL after the job had finished, 7. mobile 375 px, 8. prefers-reduced-motion,
-  9. heading names, 10. pending states, 11. a COOL file with missing fields, 12. halt governor note.
+  9. heading names, 10. pending states, 11. halt governor note.
 Any CSP violation, console error or page error fails the run. wait_for_function is avoided on purpose
 (it is blocked by a strict CSP): every wait uses locators or polls page.evaluate.
 """
@@ -91,6 +91,14 @@ THUMB = next(iter(sorted((PUBLIC / "samples/thumbs").glob("*.jpg"))), None)
 THUMB_BYTES = THUMB.read_bytes() if THUMB else MOCK_JPG[:1000]
 SUMMARY = {
     "dataset": "synthetic-200 (labelled synthetic)",
+    "n_images": 200,
+    # the fields the hero cards read; the numbers are made up for the test
+    "headline_stats": {"budget": 0.3, "target": {"recall_ratio": 0.9}, "recall_ratio_vs_tiling": 0.946,
+                       "recall_ratio_vs_downscale": 1.6, "recall_ratio_vs_downscale_ci": [1.4, 1.8]},
+    "agent_metrics": {"by_budget": {"0.3": {"halt_causes": {"cap-hit": 150, "stop-rule": 50}},
+                                    "1.0": {"halt_causes": {"cap-hit": 10, "stop-rule": 190}}},
+                      "planner_recovery": {"timeout": {"fired": 20}, "malformed": {"fired": 20}, "recovered_total": 40},
+                      "governor_response": {"fired": 10, "recovered": 9}},
     "policies": {
         "downscale": [{"pixels_frac": 0.06, "recall": 0.41, "usd": 0.0001}],
         "tiling": [{"pixels_frac": 0.25, "recall": 0.55, "usd": 0.0009}, {"pixels_frac": 0.5, "recall": 0.74, "usd": 0.0016},
@@ -103,21 +111,14 @@ SUMMARY = {
               {"op": "warpPerspective", "size": "4000x3000", "p50_ms": 9.2, "p95_ms": 11.8}],
     "provenance": {"cv2": "5.0.0", "machine": "test rig", "build": "stock"},
 }
-# a model summary (evals.model_eval --publish): FIG. 4.1/4.2 add its Drishyam curve as a fourth series
-MODEL = {"dataset": "fixture", "segmenter": "onnx:drishyam_dacl10k.onnx",
-         "policies": {"drishyam": [{"pixels_frac": 0.1, "recall": 0.6}, {"pixels_frac": 0.29, "recall": 0.9}]}}
-REAL = {**SUMMARY, "dataset": "CODEBRIM (test fixture)",
-        "policies": {k: [{**pt, "recall_iou_only": round(pt["recall"] / 2, 2)} for pt in v] for k, v in SUMMARY["policies"].items()}}
-# the shape bench.compare_arms --summary writes; the numbers are made up for the test
-COOL = {"expected": {"op_level": [1.2, 1.8], "end_to_end": [1.2, 1.3]},
-        "end_to_end": {"cool_gain": 1.04, "hardware_gain": 1.1, "a_over_c": 1.144},
-        "op_level_geomean": {"cool_gain": 1.5, "hardware_gain": 1.2},
-        "parity_a_vs_b": {"crops": 24, "pixel_agreement": 0.9991, "worst_crop_agreement": 0.98},
-        "arms": {r: {"what": what, "instance_type": it, "cv2": "5.0.0", "cv2_from_opt_cool": r == "A", "images_per_s": ips,
-                     "usd_per_hour": usd, "usd_per_1k_images": round(usd / 3.6 / ips, 6), "covered_fraction": 0.093}
-                 for r, what, it, ips, usd in (("A", "COOL build, Graviton", "c8g.2xlarge", 2.6, 0.339),
-                                               ("B", "stock wheel, Graviton", "c8g.2xlarge", 2.5, 0.319),
-                                               ("C", "stock wheel, x86", "c7i.2xlarge", 2.27, 0.357))}}
+# real photos: every policy within 0.05 of the others, as on CODEBRIM, so the hero card says "about 1 in N"
+REAL = {**SUMMARY, "dataset": "CODEBRIM (test fixture)", "policies": {
+    "downscale": [{"pixels_frac": 0.07, "recall": 0.2, "recall_iou_only": 0.08}],
+    "tiling": [{"pixels_frac": 0.1, "recall": 0.21, "recall_iou_only": 0.08}, {"pixels_frac": 0.42, "recall": 0.22, "recall_iou_only": 0.08},
+               {"pixels_frac": 1.62, "recall": 0.21, "recall_iou_only": 0.06}],
+    "drishyam": [{"pixels_frac": 0.09, "recall": 0.13, "recall_iou_only": 0.05},
+                 {"pixels_frac": 0.29, "recall": 0.2, "recall_iou_only": 0.09, "chance_recall": 0.14, "chance_recall_iou_only": 0.02},
+                 {"pixels_frac": 0.44, "recall": 0.22, "recall_iou_only": 0.1}]}}
 FAILURES = [{"image": "failures/f01.jpg", "category": "graffiti read as damage",
              "what_happened": "A spray-painted line was drafted as a crack.",
              "rule_that_would_catch_it": "reject masks with saturated paint hues"}]
@@ -128,9 +129,6 @@ DATA = {
     "/samples/thumbs/bridge_01.jpg": ("image/jpeg", THUMB_BYTES),
     "/results/summary.json": ("application/json", json.dumps(SUMMARY).encode()),
     "/results/codebrim/summary.json": ("application/json", json.dumps(REAL).encode()),
-    "/results/synth_dacl10k/summary.json": ("application/json", json.dumps(MODEL).encode()),
-    "/results/codebrim_dacl10k/summary.json": ("application/json", json.dumps(MODEL).encode()),
-    "/results/cool.json": ("application/json", json.dumps(COOL).encode()),
     "/results/failures.json": ("application/json", json.dumps(FAILURES).encode()),
     "/results/failures/f01.jpg": ("image/jpeg", MOCK_JPG),
 }
@@ -383,6 +381,7 @@ def test_static_csp_hygiene():
     css = (PUBLIC / "styles.css").read_text()
     assert not re.findall(r"url\(\s*['\"]?(?:https?:)?//", css), "external url() in CSS"
     assert 'id="stat-real"' in html, "WS3 fills the #stat-real hero slot"
+    assert html.count("og:image") == 1 and '<meta name="twitter:card" content="summary_large_image">' in html, "one share card"
     print("ok  static CSP hygiene")
 
 
@@ -402,17 +401,31 @@ def test_desktop_mock(browser, base):
     expect(p.locator(".thumb img")).to_have_attribute("src", re.compile(r"samples/thumbs/bridge_01\.jpg$"))  # manifest `thumb` is used
     expect(p.locator("#sound")).to_have_attribute("aria-pressed", "false")  # sound defaults to off
     expect(p.locator("#advanced")).not_to_have_attribute("open", "")  # budget and drills start folded away
-    expect(p.locator("#stat-recall .stat__v")).to_contain_text("tiling", timeout=T)  # benchmarks replaced the chip
+    # the hero cards: one unit (a share of the image's own pixels), every value from the summaries
+    hs = SUMMARY["headline_stats"]
+    head = max((pt for pt in SUMMARY["policies"]["drishyam"] if pt["pixels_frac"] <= hs["budget"]), key=lambda pt: pt["pixels_frac"])
+    expect(p.locator("#stat-recall .stat__v")).to_have_text(f"{round(100 * hs['recall_ratio_vs_tiling'])} %", timeout=T)
+    expect(p.locator("#stat-recall .stat__k")).to_have_text(f"Synthetic test set ({SUMMARY['n_images']} photos)")
+    expect(p.locator("#stat-recall .stat__s")).to_contain_text(f"reading {round(100 * head['pixels_frac'])} % of the image's pixels (tiling reads 100 %).")
+    expect(p.locator("#stat-recall .stat__s")).to_contain_text("Target was 90 %: met. It beats one downscaled pass (1.60×, 95 % CI 1.40–1.80).")
+    halts = SUMMARY["agent_metrics"]["by_budget"]
+    expect(p.locator("#stat-cost .stat__k")).to_have_text("Stops on its own")
+    expect(p.locator("#stat-cost .stat__v")).to_have_text(f"{halts['1.0']['halt_causes']['stop-rule']} of 200 jobs")
+    expect(p.locator("#stat-cost .stat__s")).to_contain_text(f"under the 30 % cap the cap binds first ({halts['0.3']['halt_causes']['cap-hit']} of 200)")
+    expect(p.locator("#stat-ops .stat__v")).to_have_text("49 / 50 recovered")
+    expect(p.locator("#stat-real .stat__k")).to_have_text("Real bridge photos (CODEBRIM, 200)")
+    expect(p.locator("#stat-real .stat__v")).to_have_text("about 1 in 5")           # every policy within 0.05: recall about 0.21
+    expect(p.locator("#stat-real .stat__s")).to_contain_text("Its boxes at random places score 0.14. With strict IoU matching it is 0.09 against 0.02 by chance.")
     expect(p.locator("#bench svg.chart")).to_be_visible()
-    expect(p.locator("#bench .legend li")).to_have_count(4)                       # three policies + the trained model
-    expect(p.locator("#bench-real .chart__line--model")).to_have_count(1)
+    expect(p.locator("#bench .legend li")).to_have_count(3)                       # three policies; no trained-model summary is fetched
     n_iou = sum(len(v) for v in REAL["policies"].values())
     expect(p.locator("#bench-real .chart__plot path[d*='l10 10']")).to_have_count(n_iou)  # IoU-only crosses on FIG. 4.2 only
     expect(p.locator("#bench .chart__plot path[d*='l10 10']")).to_have_count(0)
+    expect(p.locator("#bench details.data summary").last).to_have_text("Micro-benchmarks and provenance: test rig")  # folded away
+    expect(p.locator("#bench .tbl caption")).to_be_hidden()
     expect(p.locator("#fail .fail")).to_have_count(1)
-    expect(p.locator("#bench-cool tbody tr")).to_have_count(3)                   # FIG. 4.3 from results/cool.json
-    expect(p.locator("#bench-cool .kv")).to_contain_text("PRD expects 1.2–1.3×")  # the expected range sits by the measured gain
-    expect(p.locator("#cool-status")).to_contain_text(f"ran at {COOL['end_to_end']['cool_gain']}×")  # the banner says what was measured
+    expect(p.locator("#bench-cool")).to_contain_text("COOL on Graviton: not run.")  # FIG. 4.3 and the banner say why, nothing pending
+    expect(p.locator("#cool-status")).to_contain_text("COOL on Graviton: not run.")
     p.keyboard.press("Tab")
     outline = p.evaluate("(() => { const s = getComputedStyle(document.activeElement); return s.outlineStyle + ' ' + s.outlineWidth; })()")
     assert outline.startswith("solid"), f"no visible keyboard focus: {outline}"
@@ -908,8 +921,8 @@ def test_pending_states(browser, base):
     p.goto(f"{base}/")
     expect(p.locator("#bench")).to_contain_text("benchmarks pending", timeout=T)
     expect(p.locator("#fail")).to_contain_text("failure gallery pending")
-    expect(p.locator("#bench-cool")).to_contain_text("COOL benchmark pending")
-    expect(p.locator("#cool-status")).to_contain_text("has not been done yet")
+    expect(p.locator("#bench-cool")).to_contain_text("COOL on Graviton: not run.")   # static: it does not wait for a file
+    expect(p.locator("#cool-status")).to_contain_text("COOL on Graviton: not run.")
     expect(p.locator("#gallery-empty")).to_be_visible()
     expect(p.locator("#say-1")).to_contain_text("Drop your own JPEG or PNG")
     expect(p.locator("#state-1")).to_have_text("Waiting")
@@ -922,23 +935,6 @@ def test_pending_states(browser, base):
     s.check_clean()
     s.context.close()
     print("ok  pending states: friendly empty states, no errors")
-
-
-def test_cool_missing_fields(browser, base):
-    """A cool.json holding little more than the headline gain still draws FIG. 4.3 and the banner, with dashes."""
-    s = Session(browser, "cool-partial", viewport={"width": 375, "height": 812})
-    partial = {"end_to_end": {"cool_gain": 0.97}, "arms": {"A": {}, "B": None}}
-    s.context.route("**/results/cool.json", lambda r: r.fulfill(status=200, content_type="application/json", body=json.dumps(partial)))
-    p = s.page
-    p.goto(f"{base}/?mock=1")
-    expect(p.locator("#bench-cool tbody th")).to_have_text(["A"], timeout=T)  # the null arm is skipped
-    expect(p.locator("#bench-cool tbody td").first).to_have_text("–")
-    expect(p.locator("#bench-cool .kv__sub")).to_have_count(0)                # no expected range in the file, none shown
-    expect(p.locator("#cool-status")).to_have_text("The COOL/Graviton run has been measured (FIG. 4.3): a whole job ran at "
-                                                   "0.97× the speed of the stock wheel on the same instance type.")
-    s.check_clean()
-    s.context.close()
-    print("ok  COOL file with missing fields: dashes, no errors")
 
 
 def test_halt_governor_note_and_critical_trigger(browser, base):
@@ -1012,7 +1008,6 @@ if __name__ == "__main__":
             test_reduced_motion(browser, base)
             test_heading_names(browser, base)
             test_pending_states(browser, base)
-            test_cool_missing_fields(browser, base)
             test_halt_governor_note_and_critical_trigger(browser, base)
             test_planner_status_shows_the_fallback_chip(browser, base)
             browser.close()

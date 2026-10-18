@@ -77,9 +77,9 @@
         <li>Sign off what it flags</li>
       </ol>
       <ul class="stats" aria-label="Measured so far">
-        <li class="stat" id="stat-recall"><span class="stat__k">defects found vs checking every tile</span><i class="stat__dim" aria-hidden="true"></i><b class="stat__v">see benchmarks</b><span class="stat__s">a hypothesis until it is measured</span></li>
-        <li class="stat" id="stat-cost"><span class="stat__k">$ per image (modelled)</span><i class="stat__dim" aria-hidden="true"></i><b class="stat__v">see benchmarks</b><span class="stat__s">wall time &times; $0.339/h, not billed</span></li>
-        <li class="stat" id="stat-ops"><span class="stat__k">failure drills survived</span><i class="stat__dim" aria-hidden="true"></i><b class="stat__v">see benchmarks</b><span class="stat__s">planner and governor faults</span></li>
+        <li class="stat" id="stat-recall"><span class="stat__k">Synthetic test set</span><i class="stat__dim" aria-hidden="true"></i><b class="stat__v">see benchmarks</b><span class="stat__s">a hypothesis until it is measured</span></li>
+        <li class="stat" id="stat-cost"><span class="stat__k">Stops on its own</span><i class="stat__dim" aria-hidden="true"></i><b class="stat__v">see benchmarks</b><span class="stat__s">how often the stop rule ends a job</span></li>
+        <li class="stat" id="stat-ops"><span class="stat__k">Failure drills</span><i class="stat__dim" aria-hidden="true"></i><b class="stat__v">see benchmarks</b><span class="stat__s">planner and governor faults, injected on purpose</span></li>
         <li class="stat" id="stat-real"></li>
       </ul>
     </div>
@@ -516,8 +516,8 @@
   </section>
   <section class="win pop" aria-labelledby="t-bench-cool">
     <div class="win__bar"><span class="win__fig" aria-hidden="true">FIG. 4.3</span><h3 class="win__title" id="t-bench-cool">COOL on Graviton: three arms</h3></div>
-    <div class="win__body" id="bench-cool"><p class="note">Loading benchmarks&hellip;</p></div>
-    <p class="note win__cite">A: the COOL AMI on c8g.2xlarge (Graviton4). B: the stock <code>opencv-python-headless</code> wheel on the same instance type. C: that wheel version, built for x86, on c7i.2xlarge. COOL gain is A over B; hardware gain is B over C, so it includes the two builds&rsquo; differences. How the arms run: <a href="https://github.com/vj-io/drishyam/blob/main/bench/README.md" rel="noopener noreferrer">bench/README.md</a>.</p>
+    <div class="win__body" id="bench-cool"><p class="say">COOL on Graviton: not run. The COOL Marketplace AMI could not be subscribed from our AWS account (a payment-method restriction); the three-arm scripts are in <a href="https://github.com/vj-io/drishyam/tree/main/bench" rel="noopener noreferrer">bench/</a>.</p></div>
+    <p class="note win__cite">The three arms, as scripted: A, the COOL AMI on c8g.2xlarge (Graviton4); B, the stock <code>opencv-python-headless</code> wheel on the same instance type; C, that wheel version, built for x86, on c7i.2xlarge. How they would run: <a href="https://github.com/vj-io/drishyam/blob/main/bench/README.md" rel="noopener noreferrer">bench/README.md</a>.</p>
   </section>
   <dl class="tblock tblock--mini" aria-hidden="true">
     <div><dt>Drawn by</dt><dd>eval harness</dd></div>
@@ -635,7 +635,7 @@
   <div class="win">
     <div class="win__bar"><span class="win__fig" aria-hidden="true">END</span><h2 class="win__title" id="h-docs">Docs and links</h2></div>
     <div class="win__body stack">
-      <p class="banner banner--honest"><b id="live-where">Live demo: stock OpenCV 5 on AWS Lambda (arm64) &mdash; not COOL.</b> <span id="cool-status">The same code is meant to run from <code>/opt/cool</code> on COOL/Graviton; that run needs an AWS account and has not been done yet.</span></p>
+      <p class="banner banner--honest"><b id="live-where">Live demo: stock OpenCV 5 on AWS Lambda (arm64) &mdash; not COOL.</b> <span id="cool-status">COOL on Graviton: not run. The COOL Marketplace AMI could not be subscribed from our AWS account (a payment-method restriction); the three-arm scripts are in bench/.</span></p>
       <nav aria-label="Project links">
         <ul class="links">
           <li><a href="https://github.com/vj-io/drishyam" rel="noopener noreferrer">GitHub repo</a></li>

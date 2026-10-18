@@ -117,7 +117,7 @@ img, canvas, svg { max-width: 100%; }
 .claims li { counter-increment: c; display: flex; align-items: center; gap: 14px; font: 700 clamp(1.05rem, 1.7vw, 1.3rem)/1.15 var(--f-title); letter-spacing: .04em; text-transform: uppercase; }
 .claims li::before { content: counter(c); flex: none; display: grid; place-items: center; width: 32px; height: 32px; border: 2.5px solid var(--amber); border-radius: 50%; color: var(--amber); font: 700 14px/1 var(--f-mono); }
 
-.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; width: 100%; margin: 0; padding: 0; list-style: none; }
+.stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; width: 100%; margin: 0; padding: 0; list-style: none; }
 .stat { position: relative; display: grid; gap: 6px; align-content: start; padding: 12px 14px 14px; border: 2px solid var(--line); background: rgba(7, 34, 71, .55); }
 .stat::before { content: ''; position: absolute; right: -2px; bottom: -2px; width: 14px; height: 14px; border-right: 2.5px solid var(--amber); border-bottom: 2.5px solid var(--amber); }
 .stat__k { min-height: 2.5em; font: 500 11px/1.25 var(--f-mono); text-transform: uppercase; letter-spacing: .1em; color: var(--line-2); }
@@ -682,7 +682,7 @@ input:checked + .switch__ui::after { transform: translateX(22px); background: va
 .sw--downscale { border-top-style: dotted; border-color: var(--sky); }
 .sw--model { border-top-style: dashed; border-color: var(--red); }
 .data summary { cursor: pointer; font: 500 12px/1.2 var(--f-mono); color: var(--amber); }
-.data .table-wrap { margin-top: 8px; }
+.data .table-wrap, .data > .stack { margin-top: 8px; }
 .prov { padding: 12px; border: 2px dashed var(--line-3); background: var(--deep); }
 .prov .kv { grid-template-columns: 1fr; margin: 0; }
 .kv__sub { display: block; font-size: 11px; color: var(--line-3); }
