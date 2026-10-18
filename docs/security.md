@@ -47,7 +47,9 @@ the control that stops it. Every control named here has a test in `tests/` (the 
   approval database: the PRD's DynamoDB + SNS approval store was not built.
   (`test_web.py::test_one_emf_line_per_review_on_lambda_with_hashes_only`)
 - One pre-review token can be signed into conflicting decisions; each carries
-  prev_mac, and the CloudWatch review log orders them. The reviewer name is
+  `prev_token_sha256` (a hash of the token it came from, never its MAC), and the
+  CloudWatch review log orders them (both not yet live: the current build
+  predates them). The reviewer name is
   self-asserted. (`test_findings.py::test_two_decisions_forked_from_one_token_are_visible_siblings`)
 - `/api/review` and `/api/kill` share one WAF rate rule (30 per IP per 60 s);
   both are cheap and size-capped, and a review is HMAC-gated.

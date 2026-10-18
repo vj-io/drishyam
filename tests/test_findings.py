@@ -1,3 +1,4 @@
+import hashlib
 import json
 import time
 
@@ -105,15 +106,21 @@ def test_work_order_signing_and_review():
 
 def test_two_decisions_forked_from_one_token_are_visible_siblings():
     """Nothing stops one pre-review token being signed into both an approve and a reject; each order names the
-    token it came from (prev_mac), so the fork is visible, and a chained review names its own parent."""
+    token it came from (prev_token_sha256), so the fork is visible, and a chained review names its own parent.
+    The parent's MAC never appears in the child, so a child cannot be turned back into its parent token."""
+    def sha(t):
+        return hashlib.sha256(t.encode()).hexdigest()
+
     two = [make(), make("spalling", F.SPALL_CRITICAL_AREA_PX, fid="f2")]  # both critical
     token = F.sign(F.work_order("j_x", two, []), KEY)
     (ta, a), (tr, r) = (F.apply_review(token, KEY, "f1", d, "Ann") for d in ("approve", "reject"))
     assert F.verify(ta, KEY)["approvals"] == a["approvals"]  # both orders are validly signed
     assert F.verify(tr, KEY)["approvals"] == r["approvals"]
-    assert a["approvals"][0]["prev_mac"] == r["approvals"][0]["prev_mac"] == token.split(".")[1]
-    _, chained = F.apply_review(ta, KEY, "f2", "approve", "Ann")
-    assert [x["prev_mac"] for x in chained["approvals"]] == [token.split(".")[1], ta.split(".")[1]]
+    assert a["approvals"][0]["prev_token_sha256"] == r["approvals"][0]["prev_token_sha256"] == sha(token)
+    tc, chained = F.apply_review(ta, KEY, "f2", "approve", "Ann")
+    assert [x["prev_token_sha256"] for x in chained["approvals"]] == [sha(token), sha(ta)]
+    for parent, child in ((token, ta), (token, tr), (ta, tc)):
+        assert parent.split(".")[1] not in F._unb64(child.split(".")[0]).decode()
 
 
 def test_tampering_expiry_and_reviewer_validation():

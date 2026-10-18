@@ -191,9 +191,10 @@ def clean_reviewer(name: str) -> str:
 
 
 def apply_review(token: str, key: bytes, finding_id: str, decision: str, reviewer: str) -> tuple[str, dict]:
-    """Human review of a signed work order; returns the re-signed order. Each approval records `prev_mac`, the
-    MAC of the token it was applied to: one token signed into two decisions gives two orders with the same
-    `prev_mac`, visibly siblings rather than one chain."""
+    """Human review of a signed work order; returns the re-signed order. Each approval records
+    `prev_token_sha256`, the SHA-256 of the token it was applied to: one token signed into two decisions gives
+    two orders with the same value, visibly siblings rather than one chain. A hash, not the MAC: a child order
+    carrying its parent's MAC would let anyone holding it rebuild the parent token and decide it again."""
     reviewer = clean_reviewer(reviewer)
     wo = verify(token, key)
     match = [f for f in wo["findings"] if f["id"] == finding_id]
@@ -201,6 +202,6 @@ def apply_review(token: str, key: bytes, finding_id: str, decision: str, reviewe
         raise ReviewError(f"no finding {finding_id!r} in this work order")
     decide(match[0], decision, actor="human")
     wo["approvals"].append({"finding_id": finding_id, "decision": decision, "reviewer": reviewer,
-                            "at": now_iso(), "prev_mac": token.split(".")[1]})
+                            "at": now_iso(), "prev_token_sha256": hashlib.sha256(token.encode()).hexdigest()})
     wo["status"] = order_status(wo)
     return sign(wo, key), wo

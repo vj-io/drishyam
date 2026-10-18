@@ -363,7 +363,8 @@ def test_one_emf_line_per_review_on_lambda_with_hashes_only(photo, monkeypatch, 
     fid = next(f["id"] for f in done["work_order"]["findings"] if f["state"] == "pending_review")
     capsys.readouterr()
     body = {"token": done["token"], "finding_id": fid, "decision": "reject", "reviewer": " Test Engineer "}
-    out = client.post("/api/review", json=body).json()["token"]
+    reviewed = client.post("/api/review", json=body).json()
+    out = reviewed["token"]
     assert client.post("/api/review", json={**body, "token": out}).status_code == 409  # refused: not logged
     printed = capsys.readouterr().out
     (m,) = [json.loads(x) for x in printed.splitlines() if x.startswith('{"_aws"')]
@@ -374,6 +375,7 @@ def test_one_emf_line_per_review_on_lambda_with_hashes_only(photo, monkeypatch, 
     assert (m["Reviews"], m["Decision"], m["wo"], m["finding"]) == (1, "reject", wo_id, fid)
     assert (m["reviewer_sha256"], m["token_in_sha256"], m["token_out_sha256"]) == (
         sha("Test Engineer"), sha(done["token"]), sha(out))
+    assert reviewed["work_order"]["approvals"][-1]["prev_token_sha256"] == m["token_in_sha256"]  # joinable
     assert "Test Engineer" not in printed and done["token"] not in printed and out not in printed
 
 

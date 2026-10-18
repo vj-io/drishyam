@@ -9,7 +9,8 @@ Behind CloudFront with Origin Access Control (the AWS deployment), every `POST` 
 `x-amz-content-sha256`: the hex SHA-256 of the exact request body. Lambda refuses unsigned payloads
 through OAC with a 403. Locally the header is ignored. When one of AWS WAF's per-IP rate rules blocks a
 request, CloudFront answers `429` with `Content-Type: application/json` and a body such as
-`{"error": "rate limited: 10 job starts per 2 min per IP; wait and retry"}`. Lambda also answers 429, with
+`{"error": "rate limited: 10 job starts per 2 min per IP; wait and retry"}` (not yet live: the current
+deployment answers 403 with CloudFront's default page). Lambda also answers 429, with
 its own body (do not count on an `error` field), when every function environment is busy (docs/aws.md, "Limits"). The
 app itself never sends 429.
 
@@ -204,7 +205,7 @@ A wrong token is accepted and kills nothing (no oracle). Returns `{"ok": true, "
  "gaze_path": [[2210, 1480, 1], [2210, 1480, 0]],
  "not_assessed": [{"step": 4, "box": [0, 1024, 1024, 1024], "reason": "glare", "action": "re-shoot"}],
  "approvals": [{"finding_id": "f2", "decision": "approve", "reviewer": "A. Engineer", "at": "2026-10-24T17:05:00Z",
-                "prev_mac": "<the MAC part of the token this decision was applied to>"}],
+                "prev_token_sha256": "<SHA-256 hex of the token this decision was applied to>"}],
  "disclaimer": "AI-assisted, not an inspection. Measurements are image pixels, not millimetres."}
 ```
 
@@ -234,10 +235,12 @@ matches its token, and `/api/review` refuses an edited token with 403.
 
 `decision` is `approve` or `reject`; `reviewer` is 1–64 printable characters, taken as given (it is not
 authenticated). Returns `{"token": "<new signed work order>", "work_order": {...}}`; the decision is appended
-to `approvals` with `prev_mac`, the part after the dot of the request's `token`. Nothing stops one token
-being signed into two conflicting decisions, but their orders then share one `prev_mac`, and a chained
-review's `prev_mac` is the MAC of the token the previous review returned. (`drishyam review` edits an
-unsigned `work_order.json` and writes no `prev_mac`.)
+to `approvals` with `prev_token_sha256`, the SHA-256 hex digest of the request's `token` (the same value
+as the review log's `token_in_sha256`). Nothing stops one token being signed into two conflicting decisions,
+but their orders then share one `prev_token_sha256`, and a chained review's `prev_token_sha256` is the hash
+of the token the previous review returned. It is a hash, not the token's MAC, so an order cannot be turned
+back into the token it came from. (`drishyam review` edits an unsigned `work_order.json` and writes no
+`prev_token_sha256`.)
 Errors: 400 malformed, 403 bad or expired signature, 409 finding not pending.
 
 Each accepted review prints one log line; a refused one prints none. On AWS it is a CloudWatch EMF
