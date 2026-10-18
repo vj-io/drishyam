@@ -267,7 +267,7 @@ def test_a_clean_set_is_scored_as_false_alarms(tmp_path):
     assert s["headline"].endswith("Every one of them is a false alarm.")
     box = {"cls": "exposed_rebar", "box": [0, 0, 9, 9], "area": 81, "conf": 0.9}
     one = harness.false_alarms([{"id": "bridge_08"}], [{"configs": {"downscale": {"preds": [box]}}}], ["downscale"], "components")
-    assert one["downscale"]["critical_per_image"] == 1.0 and one["classes_reported"] == {"bridge_08": {"downscale": ["exposed_rebar"]}}
+    assert one["downscale"]["critical_per_image"] == 1.0 and one["classes_reported"] == {"bridge_08": {"downscale": {"exposed_rebar": 1}}}
 
 
 def test_thread_count_is_read_back_and_build_lines_quoted(monkeypatch):

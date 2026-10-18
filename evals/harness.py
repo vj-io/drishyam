@@ -684,7 +684,7 @@ def false_alarms(records: list[dict], results: list[dict], keys: list[str], prim
             out[k]["findings_per_image"] = _r(sum(len(c["preds_union"]) for c in cs) / n, 2)
         for rec, b in zip(records, boxes, strict=True):
             if rec["id"] == "bridge_08":
-                named.setdefault(rec["id"], {})[k] = sorted(p["cls"] for p in b)
+                named.setdefault(rec["id"], {})[k] = dict(collections.Counter(p["cls"] for p in b))
     return {**out, **({"classes_reported": named} if named else {})}
 
 
