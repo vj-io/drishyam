@@ -173,8 +173,8 @@
     "usd": 1.2e-05
    },
    {
-    "pixels_frac": 0.253,
-    "net_pixels_frac": 0.2374,
+    "pixels_frac": 0.2497,
+    "net_pixels_frac": 0.2341,
     "recall": null,
     "recall_ci": [
      null,
@@ -188,14 +188,14 @@
     "chance_recall": null,
     "chance_recall_iou_only": null,
     "precision": 0.0,
-    "fp_per_image": 6.4,
-    "boxes_per_image": 6.4,
+    "fp_per_image": 7.1,
+    "boxes_per_image": 7.1,
     "hits_per_matched_gt": null,
-    "usd": 1.8e-05
+    "usd": 1.7e-05
    },
    {
-    "pixels_frac": 0.364,
-    "net_pixels_frac": 0.3484,
+    "pixels_frac": 0.351,
+    "net_pixels_frac": 0.3354,
     "recall": null,
     "recall_ci": [
      null,
@@ -209,14 +209,14 @@
     "chance_recall": null,
     "chance_recall_iou_only": null,
     "precision": 0.0,
-    "fp_per_image": 7.5,
-    "boxes_per_image": 7.5,
+    "fp_per_image": 9.4,
+    "boxes_per_image": 9.4,
     "hits_per_matched_gt": null,
-    "usd": 2.5e-05
+    "usd": 2.4e-05
    },
    {
-    "pixels_frac": 0.4588,
-    "net_pixels_frac": 0.4431,
+    "pixels_frac": 0.4017,
+    "net_pixels_frac": 0.386,
     "recall": null,
     "recall_ci": [
      null,
@@ -230,10 +230,10 @@
     "chance_recall": null,
     "chance_recall_iou_only": null,
     "precision": 0.0,
-    "fp_per_image": 8.6,
-    "boxes_per_image": 8.6,
+    "fp_per_image": 10.9,
+    "boxes_per_image": 10.9,
     "hits_per_matched_gt": null,
-    "usd": 3.2e-05
+    "usd": 2.8e-05
    }
   ]
  },
@@ -288,23 +288,23 @@
    "images_with_critical": 0.0196
   },
   "drishyam@0.3": {
-   "boxes_per_image": 6.35,
+   "boxes_per_image": 7.08,
    "critical_per_image": 0.02,
-   "union_per_image": 1.04,
+   "union_per_image": 1.08,
    "images_with_any": 0.6667,
    "images_with_critical": 0.0196
   },
   "drishyam@0.5": {
-   "boxes_per_image": 7.49,
+   "boxes_per_image": 9.39,
    "critical_per_image": 0.02,
-   "union_per_image": 1.18,
+   "union_per_image": 1.35,
    "images_with_any": 0.6863,
    "images_with_critical": 0.0196
   },
   "drishyam@1.0": {
-   "boxes_per_image": 8.65,
+   "boxes_per_image": 10.9,
    "critical_per_image": 0.02,
-   "union_per_image": 1.25,
+   "union_per_image": 1.47,
    "images_with_any": 0.7059,
    "images_with_critical": 0.0196
   },
@@ -455,7 +455,7 @@
  },
  "agent_metrics": {
   "headline_budget": 0.3,
-  "escalation_rate": 0.3154,
+  "escalation_rate": 0.3197,
   "steps_per_image": {
    "p50": 3.0,
    "p95": 3.0
@@ -508,8 +508,8 @@
     }
    },
    "0.3": {
-    "escalation_rate": 0.3154,
-    "verify_rate": 0.2013,
+    "escalation_rate": 0.3197,
+    "verify_rate": 0.2041,
     "steps_p50": 3.0,
     "steps_p95": 3.0,
     "pixels_frac_p50": 0.2656,
@@ -517,14 +517,14 @@
     "pixels_p50": 835505,
     "pixels_p95": 835505,
     "halt_causes": {
-     "cap-hit": 43,
+     "cap-hit": 41,
      "exhausted": 7,
-     "stop-rule": 1
+     "stop-rule": 3
     }
    },
    "0.5": {
-    "escalation_rate": 0.3486,
-    "verify_rate": 0.156,
+    "escalation_rate": 0.3349,
+    "verify_rate": 0.177,
     "steps_p50": 5.0,
     "steps_p95": 5.0,
     "pixels_frac_p50": 0.4323,
@@ -532,24 +532,23 @@
     "pixels_p50": 1359898,
     "pixels_p95": 1359898,
     "halt_causes": {
-     "cap-hit": 29,
-     "exhausted": 10,
-     "stop-rule": 12
+     "cap-hit": 27,
+     "exhausted": 8,
+     "stop-rule": 16
     }
    },
    "1.0": {
-    "escalation_rate": 0.3696,
-    "verify_rate": 0.1341,
+    "escalation_rate": 0.3542,
+    "verify_rate": 0.1708,
     "steps_p50": 5.0,
-    "steps_p95": 9.0,
+    "steps_p95": 7.5,
     "pixels_frac_p50": 0.4323,
-    "pixels_frac_p95": 0.7656,
+    "pixels_frac_p95": 0.6406,
     "pixels_p50": 1359898,
-    "pixels_p95": 2408369,
+    "pixels_p95": 2043478,
     "halt_causes": {
-     "cap-hit": 1,
-     "exhausted": 28,
-     "stop-rule": 22
+     "exhausted": 10,
+     "stop-rule": 41
     }
    }
   },
@@ -598,13 +597,13 @@
     "accurate": 104
    },
    "drishyam@0.3": {
-    "accurate": 149
+    "accurate": 147
    },
    "drishyam@0.5": {
-    "accurate": 218
+    "accurate": 209
    },
    "drishyam@1.0": {
-    "accurate": 276
+    "accurate": 240
    }
   },
   "timing": {
@@ -791,9 +790,9 @@
      "drishyam@0.05": 0.0,
      "drishyam@0.1": 2.4,
      "drishyam@0.2": 4.7,
-     "drishyam@0.3": 6.4,
-     "drishyam@0.5": 7.5,
-     "drishyam@1.0": 8.6
+     "drishyam@0.3": 7.1,
+     "drishyam@0.5": 9.4,
+     "drishyam@1.0": 10.9
     },
     "union": {
      "downscale": 1.2,
@@ -803,9 +802,9 @@
      "drishyam@0.05": 0.0,
      "drishyam@0.1": 0.5,
      "drishyam@0.2": 0.9,
-     "drishyam@0.3": 1.0,
-     "drishyam@0.5": 1.2,
-     "drishyam@1.0": 1.3
+     "drishyam@0.3": 1.1,
+     "drishyam@0.5": 1.4,
+     "drishyam@1.0": 1.5
     },
     "as_specified": {
      "downscale": 3.0,
@@ -815,9 +814,9 @@
      "drishyam@0.05": 0.0,
      "drishyam@0.1": 0.5,
      "drishyam@0.2": 0.9,
-     "drishyam@0.3": 1.0,
-     "drishyam@0.5": 1.2,
-     "drishyam@1.0": 1.3
+     "drishyam@0.3": 1.1,
+     "drishyam@0.5": 1.4,
+     "drishyam@1.0": 1.5
     }
    }
   }
@@ -833,26 +832,26 @@
   "machine": "Darwin 25.6.0 x86_64, 16 logical CPUs; eval ran 8 worker(s) x 1 cv2 thread(s); micro arm linux-aarch64",
   "cpu": "Intel(R) Core(TM) i9-9880H CPU @ 2.30GHz",
   "python": "3.13.16",
-  "timestamp": "2026-10-18T08:14:25Z",
+  "timestamp": "2026-10-18T22:19:30Z",
   "build": "stock (not COOL)",
   "load_avg": [
-   22.55,
-   26.98,
-   30.74
+   64.78,
+   104.22,
+   149.68
   ],
   "load_avg_start": [
-   22.55,
-   26.98,
-   30.74
+   64.78,
+   104.22,
+   149.68
   ],
   "load_avg_end": [
-   17.3,
-   24.41,
-   29.25
+   101.01,
+   105.71,
+   144.9
   ],
   "dataset_gt_sha256": "fe0c373a8234d10c5a7b24f1dddfca19dc3f507aadcfc420dc1388f58de9d8e7",
   "dataset_images_sha256": "30d76c2d1bc7ae5d4ae4432e7b3c9abe08cd1b6798b8a2969735c76e35323a65",
   "dataset_generator_version": 2
  },
- "headline": "On 51 synthetic images with no damage (distractors only), every box is a false alarm. In per-component boxes per image, Drishyam at a 30% pixel cap reported 6.35 (0.02 critical), a single 1024-px downscale 3.00 (0.00 critical) and 20%-overlap tiling 36.80 (0.04 critical); with one box per class per view (a Drishyam finding), 1.04, 1.16 and 12.69. Drishyam reported some damage on 67% of the images."
+ "headline": "On 51 synthetic images with no damage (distractors only), every box is a false alarm. In per-component boxes per image, Drishyam at a 30% pixel cap reported 7.08 (0.02 critical), a single 1024-px downscale 3.00 (0.00 critical) and 20%-overlap tiling 36.80 (0.04 critical); with one box per class per view (a Drishyam finding), 1.08, 1.16 and 12.69. Drishyam reported some damage on 67% of the images."
 }

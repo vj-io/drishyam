@@ -17,30 +17,38 @@
  },
  {
   "image": "failures/f03.jpg",
-  "id": "s0147",
+  "id": "s0139",
   "class": "crack",
   "category": "Formwork line read as crack",
-  "what_happened": "s0147, drishyam@0.3: a crack finding (confidence 0.88, step 1 at L2) lies within the bounding box of a formwork line patch and matches no ground-truth box of any class.",
-  "rule_that_would_catch_it": "Straightness test on the crack mask: a centreline that fits one straight line within about 1.5 px over a length of 20x its width is a formwork seam, not a crack, because real cracks meander (cv2.fitLine residual, minAreaRect aspect). Not implemented."
+  "what_happened": "s0139, drishyam@1.0: a crack finding (confidence 0.93, step 5 at L1) lies within the bounding box of a formwork line patch and matches no ground-truth box of any class. The straight-line test kept it at the look that drafted it (step 5, L1, where a residual counts 2x in L0 px); a later full-resolution look covered it, but a later look never withdraws a drafted finding.",
+  "rule_that_would_catch_it": "Implemented (drishyam/segment.py drop_straight_lines): a crack component whose centreline lies within 1.5 L0 px (RMS) of its cv2.fitLine line, over a length of at least 20x its mean width, is logged as a straight line and never drafted. Each case says at which look the test kept the line. It reads the residual in L0 px, so a look at level L must find the line within 1.5 / 2^L view px of its fit (0.375 px at L2), and a later look never withdraws a crack an earlier look drafted. Not implemented: a full-resolution check of a long, thin crack drafted from a coarse look."
  },
  {
   "image": "failures/f04.jpg",
-  "id": "s0040",
-  "class": null,
-  "category": "Glare caught by the quality gate",
-  "what_happened": "s0040, drishyam@0.3: step 3 (L0) was refused by the quality gate (glare, sharpness 20.9) because the window covers a blown-out highlight. 0 ground-truth box(es) have their centre in that window. The gate did what it should; the cost is an area the work order silently leaves unassessed.",
-  "rule_that_would_catch_it": "The gate (more than 20% blown-out pixels) works. The missing rule is bookkeeping: a refused window is written to the work order as 'not assessed' with a re-shoot suggestion, so the area never reads as clean. Not implemented."
+  "id": "s0147",
+  "class": "crack",
+  "category": "Formwork line read as crack",
+  "what_happened": "s0147, drishyam@1.0: a crack finding (confidence 0.89, step 5 at L1) lies within the bounding box of a formwork line patch and matches no ground-truth box of any class. The straight-line test kept it at the look that drafted it (step 5, L1, where a residual counts 2x in L0 px), and no later look covered it.",
+  "rule_that_would_catch_it": "Implemented (drishyam/segment.py drop_straight_lines): a crack component whose centreline lies within 1.5 L0 px (RMS) of its cv2.fitLine line, over a length of at least 20x its mean width, is logged as a straight line and never drafted. Each case says at which look the test kept the line. It reads the residual in L0 px, so a look at level L must find the line within 1.5 / 2^L view px of its fit (0.375 px at L2), and a later look never withdraws a crack an earlier look drafted. Not implemented: a full-resolution check of a long, thin crack drafted from a coarse look."
  },
  {
   "image": "failures/f05.jpg",
-  "id": "s0082",
+  "id": "s0040",
   "class": null,
   "category": "Glare caught by the quality gate",
-  "what_happened": "s0082, drishyam@0.3: step 3 (L0) was refused by the quality gate (glare, sharpness 19.2) because the window covers a blown-out highlight. 0 ground-truth box(es) have their centre in that window. The gate did what it should; the cost is an area the work order silently leaves unassessed.",
-  "rule_that_would_catch_it": "The gate (more than 20% blown-out pixels) works. The missing rule is bookkeeping: a refused window is written to the work order as 'not assessed' with a re-shoot suggestion, so the area never reads as clean. Not implemented."
+  "what_happened": "s0040, drishyam@0.3: step 3 (L0) was refused by the quality gate (glare, sharpness 20.9) because the window covers a blown-out highlight. 0 ground-truth box(es) have their centre in that window. The gate did what it should: the work order lists that window as not assessed (action re-shoot), and the region it was looking at got no further look.",
+  "rule_that_would_catch_it": "Implemented (drishyam/agent.py quality gate): a view with more than 20% blown-out pixels is refused, that region gets no further look, and the work order lists the window under not_assessed with action re-shoot, so the area never reads as clean. What it still costs: nothing under the highlight is assessed from this photo. Not implemented: a retry with the window shifted off the highlight."
  },
  {
   "image": "failures/f06.jpg",
+  "id": "s0082",
+  "class": null,
+  "category": "Glare caught by the quality gate",
+  "what_happened": "s0082, drishyam@0.3: step 3 (L0) was refused by the quality gate (glare, sharpness 19.2) because the window covers a blown-out highlight. 0 ground-truth box(es) have their centre in that window. The gate did what it should: the work order lists that window as not assessed (action re-shoot), and the region it was looking at got no further look.",
+  "rule_that_would_catch_it": "Implemented (drishyam/agent.py quality gate): a view with more than 20% blown-out pixels is refused, that region gets no further look, and the work order lists the window under not_assessed with action re-shoot, so the area never reads as clean. What it still costs: nothing under the highlight is assessed from this photo. Not implemented: a retry with the window shifted off the highlight."
+ },
+ {
+  "image": "failures/f07.jpg",
   "id": "s0085",
   "class": "crack",
   "category": "Crack hidden in blur",
@@ -48,43 +56,43 @@
   "rule_that_would_catch_it": "A local sharpness map: where Laplacian variance falls below the gate, report the area as unreadable and ask for a re-shoot; where the gate accepted the view, scale the sharpness threshold to the expected crack width. Not implemented."
  },
  {
-  "image": "failures/f07.jpg",
-  "id": "s0008",
+  "image": "failures/f08.jpg",
+  "id": "s0004",
   "class": "crack",
   "category": "Crack hidden in blur",
-  "what_happened": "s0008, drishyam@1.0: a 361x385 px crack inside a blurred patch was not found; it was looked at (step 1, L2) and the quality gate refused the view (blur, sharpness 10.1).",
+  "what_happened": "s0004, drishyam@1.0: a 283x366 px crack inside a blurred patch was not found; it was looked at (step 1, L2, sharpness 43.2), the gate accepted the view, and no crack mask came out of it.",
   "rule_that_would_catch_it": "A local sharpness map: where Laplacian variance falls below the gate, report the area as unreadable and ask for a re-shoot; where the gate accepted the view, scale the sharpness threshold to the expected crack width. Not implemented."
  },
  {
-  "image": "failures/f08.jpg",
-  "id": "s0032",
-  "class": "crack",
-  "category": "Crack missed under a small budget",
-  "what_happened": "s0032, drishyam@0.3: a 354x164 px crack box is missed under the 30% cap but found by drishyam@1.0 and tiling@L0; it was looked at (step 1, L2) but no crack mask survived.",
-  "rule_that_would_catch_it": "Reserve a small share of the pixel cap for a coarse sweep of low-saliency regions, or lower the stop-rule epsilon so the job does not stop while unvisited candidates remain. Both trade pixels for recall. Not implemented."
- },
- {
   "image": "failures/f09.jpg",
-  "id": "s0085",
+  "id": "s0094",
   "class": "crack",
   "category": "Crack missed under a small budget",
-  "what_happened": "s0085, drishyam@0.3: a 267x168 px crack box is missed under the 30% cap but found by drishyam@1.0 and tiling@L0; it was looked at (step 1, L2) but no crack mask survived.",
+  "what_happened": "s0094, drishyam@0.3: a 44x96 px crack box is missed under the 30% cap but found by drishyam@1.0 and tiling@L0; it was looked at (step 1, L2) but no crack mask survived.",
   "rule_that_would_catch_it": "Reserve a small share of the pixel cap for a coarse sweep of low-saliency regions, or lower the stop-rule epsilon so the job does not stop while unvisited candidates remain. Both trade pixels for recall. Not implemented."
  },
  {
   "image": "failures/f10.jpg",
-  "id": "s0051",
-  "class": "spalling",
-  "category": "Rebar, spall and stain confusion",
-  "what_happened": "s0051, drishyam@1.0: ground truth is spalling, the job reported exposed_rebar there (confidence 0.93, step 4 at L0) and no spalling finding overlaps the box.",
-  "rule_that_would_catch_it": "Shape and co-occurrence rule: exposed bars need rust inside a spall rim and a linear shape (minAreaRect aspect above 3); rust with no spall rim is corrosion. Where two classes clear the threshold on one region, send it to human review instead of choosing. The rust-near-spall part exists; the review-on-ambiguity step does not."
+  "id": "s0072",
+  "class": "crack",
+  "category": "Crack missed under a small budget",
+  "what_happened": "s0072, drishyam@0.3: a 131x306 px crack box is missed under the 30% cap but found by drishyam@1.0 and tiling@L0; it was looked at (step 1, L2) but no crack mask survived.",
+  "rule_that_would_catch_it": "Reserve a small share of the pixel cap for a coarse sweep of low-saliency regions, or lower the stop-rule epsilon so the job does not stop while unvisited candidates remain. Both trade pixels for recall. Not implemented."
  },
  {
   "image": "failures/f11.jpg",
-  "id": "s0171",
+  "id": "s0051",
   "class": "spalling",
   "category": "Rebar, spall and stain confusion",
-  "what_happened": "s0171, drishyam@1.0: ground truth is spalling, the job reported exposed_rebar there (confidence 0.93, step 4 at L0) and no spalling finding overlaps the box.",
-  "rule_that_would_catch_it": "Shape and co-occurrence rule: exposed bars need rust inside a spall rim and a linear shape (minAreaRect aspect above 3); rust with no spall rim is corrosion. Where two classes clear the threshold on one region, send it to human review instead of choosing. The rust-near-spall part exists; the review-on-ambiguity step does not."
+  "what_happened": "s0051, drishyam@1.0: ground truth is spalling, the job reported exposed_rebar there (confidence 0.93, step 4 at L0) and no spalling finding overlaps the box. Review on ambiguity cannot flag it: it fires when a class is absorbed into a dominating finding, and spalling is never absorbed into exposed rebar.",
+  "rule_that_would_catch_it": "Implemented: rust near a spall is exposed rebar and rust with no spall near it is corrosion (the classical segmenter), and review on ambiguity (drishyam/agent.py): when a second class clears A_min mostly inside a finding that dominates it (corrosion inside exposed rebar; crack or efflorescence inside spalling or exposed rebar), the agent keeps one finding and sends it to a person. It cannot catch a spall reported as exposed rebar, because spalling is never absorbed: each case says whether the rule could apply. Not implemented: the shape test (exposed bars as thin strips, minAreaRect aspect above 3) that would keep a rust-stained spall floor as spalling."
+ },
+ {
+  "image": "failures/f12.jpg",
+  "id": "s0100",
+  "class": "spalling",
+  "category": "Rebar, spall and stain confusion",
+  "what_happened": "s0100, drishyam@1.0: ground truth is spalling, the job reported exposed_rebar there (confidence 0.93, step 4 at L0) and no spalling finding overlaps the box. Review on ambiguity cannot flag it: it fires when a class is absorbed into a dominating finding, and spalling is never absorbed into exposed rebar.",
+  "rule_that_would_catch_it": "Implemented: rust near a spall is exposed rebar and rust with no spall near it is corrosion (the classical segmenter), and review on ambiguity (drishyam/agent.py): when a second class clears A_min mostly inside a finding that dominates it (corrosion inside exposed rebar; crack or efflorescence inside spalling or exposed rebar), the agent keeps one finding and sends it to a person. It cannot catch a spall reported as exposed rebar, because spalling is never absorbed: each case says whether the rule could apply. Not implemented: the shape test (exposed bars as thin strips, minAreaRect aspect above 3) that would keep a rust-stained spall floor as spalling."
  }
 ]
