@@ -51,6 +51,9 @@ async function* ndjson(body) {
   if ((buf += dec.decode()).trim()) yield JSON.parse(buf);
 }
 
+// 429 is the WAF's custom response to its rate rule (infra/drishyam_stack.py): 10 job starts per 2 minutes per IP.
+const JOB_ERRORS = { 429: 'Too many jobs from this address: 10 starts per 2 minutes. Wait a minute and retry.' };
+
 /** Async generator of job events. `replay` is a list of [action, x, y, level] to resume from; `params` may carry pace_ms. */
 export async function* streamJob({ blob, params, replay, signal }) {
   if (MOCK) return yield* mockStream(replay?.length ?? 0, signal);
@@ -59,7 +62,7 @@ export async function* streamJob({ blob, params, replay, signal }) {
   const res = await post(`/api/jobs?${new URLSearchParams(params)}`, blob, headers, { signal });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(`${res.status}: ${body.error ?? 'the server refused the job'}`);
+    throw Object.assign(new Error(JOB_ERRORS[res.status] ?? `${res.status}: ${body.error ?? 'the server refused the job'}`), { status: res.status });
   }
   yield* ndjson(res.body);
 }
@@ -68,6 +71,7 @@ const REVIEW_ERRORS = {
   400: 'The review request was malformed.',
   403: 'The signature is bad or expired. Run the job again.',
   409: 'This finding is no longer pending review.',
+  429: 'Too many requests from this address. Wait a minute and retry.',
 };
 
 export async function postReview(body) {
