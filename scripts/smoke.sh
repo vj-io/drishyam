@@ -115,11 +115,11 @@ if [ "${WAF_LOOP:-}" = 1 ]; then  # empty bodies: the app answers 400 at once, s
   for i in $(seq 40); do
     c=$(post /api/jobs text/plain "$TMP/empty" -o /dev/null -w '%{http_code}' --max-time 30) || true
     codes="$codes $c"
-    [ "$c" = 403 ] && break
+    [ "$c" = 429 ] && break  # the stack's WAF block response (an older deploy answered 403)
     sleep 1.5
   done
   # The job starts above count too, so the block can come a few requests early; never on the first.
-  if [ "$c" = 403 ] && [ "$i" -gt 1 ]; then pass waf "blocked at request $i:$codes"
+  if [ "$c" = 429 ] && [ "$i" -gt 1 ]; then pass waf "blocked at request $i:$codes"
   else fail waf "codes:$codes"; fi
 fi
 
