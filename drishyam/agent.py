@@ -56,6 +56,7 @@ class JobConfig:
     seconds_cap: float = 20.0
     size: int = 512
     first_level: int = 1
+    min_level: int = 0  # the finest level an escalation or a verify look may go to
     tau: float = 0.5  # entropy above this escalates
     a_min: int = 64  # crop px; a smaller mask escalates
     eps: float = 0.25  # stop-rule slope factor
@@ -257,10 +258,12 @@ class Job:
             self.settings.batch = True
         elif strategy in ("change_level", "reverify"):
             r = self.regions[p["region_id"]]
-            level = p.get("level", max(0, (r.looks[-1].level if r.looks else r.next_level) - 1))
+            asked = p.get("level", (r.looks[-1].level if r.looks else r.next_level) - 1)
+            level = max(self.min_level, asked)
+            why = proposal["rationale"][:120] + (f" (L{asked} is finer than this segmenter's finest L{level})"
+                                                 if level > asked else "")
             r.done = False
-            self.forced.appendleft(("verify" if strategy == "reverify" else "gaze", r, level,
-                                    f"planner:{strategy}", proposal["rationale"][:120]))
+            self.forced.appendleft(("verify" if strategy == "reverify" else "gaze", r, level, f"planner:{strategy}", why))
         elif strategy == "stop":
             return event, True
         # change_level / reverify queue their own look, which carries planner:<strategy> as its cause.
@@ -315,7 +318,7 @@ class Job:
         a finding measures it, which say whether a class change is critical."""
         cfg = self.cfg
         if chk is None:
-            if drafted and level > 0 and not self.settings.batch and not r.verified and cfg.verify:
+            if drafted and level > self.min_level and not self.settings.batch and not r.verified and cfg.verify:
                 return ("verify", r, level - 1, "verify-new-mask",
                         f"new {best} mask at L{level}; confirming at L{level - 1}")
             r.done = True
@@ -349,7 +352,7 @@ class Job:
         if target is not None and target.critical:  # a critical finding goes to a human at once
             new_events.append(review(target.id, disagree, level, [k, k], iou, a, kind="disagree"))
             r.done = True
-        elif not r.extra_used and level > 0 and cfg.verify and critical is None:  # (a critical finding here: a human
+        elif not r.extra_used and level > self.min_level and cfg.verify and critical is None:  # (a critical finding here: a human
             r.extra_used = True  # reviews this region anyway, so no look is spent to settle the disagreement)
             return ("verify", r, level - 1, "iou<0.5", disagree)
         else:
@@ -370,6 +373,7 @@ class Job:
         self.budget = Budget(int(cfg.pixel_cap * W * H), cfg.usd_cap, cfg.seconds_cap, usd_per_hour=cfg.usd_per_hour)
         self.settings = Settings(size=cfg.size)
         first = max(0, min(cfg.first_level, int(math.log2(max(W, H) / cfg.size)) if max(W, H) > cfg.size else 0))
+        self.min_level = min(cfg.min_level, first)
         yield {"type": "job", "job": self.id, "width": W, "height": H,
                "levels": [[p.shape[1], p.shape[0]] for p in pyr],
                "budget": {"pixel_cap_frac": cfg.pixel_cap, "pixels_cap": self.budget.pixels_cap,
@@ -524,9 +528,9 @@ class Job:
                 r.done = True
                 self.not_assessed.append({"step": self.step, "box": imaging.l0_box((0, 0, size, size), to_l0, (W, H)),
                                           "reason": q["reason"], "action": "re-shoot"})
-            elif level > 0 and not batch and seg.entropy > cfg.tau:
+            elif level > self.min_level and not batch and seg.entropy > cfg.tau:
                 follow = ("escalate", r, level - 1, "entropy>tau", f"entropy {seg.entropy:.2f} > {cfg.tau} at L{level}")
-            elif level > 0 and not batch and best and area < cfg.a_min:
+            elif level > self.min_level and not batch and best and area < cfg.a_min:
                 follow = ("escalate", r, level - 1, "area<A_min", f"{best} area {area} px < {cfg.a_min} at L{level}")
             else:
                 if best and (present := self._present(seg, to_l0, level, rejected)):
