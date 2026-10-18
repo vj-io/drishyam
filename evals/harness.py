@@ -426,12 +426,15 @@ CONVENTIONS = {"components": lambda key: "preds", "union": lambda key: "preds_un
                "as_specified": lambda key: "preds_union" if key.startswith("drishyam") else "preds"}
 
 
-def load_records(data_dir, n: int, kind: str = "auto", seed: int = 7, size=(2048, 1536)) -> tuple[list[dict], str]:
+def load_records(data_dir, n: int, kind: str = "auto", seed: int = 7, size=(2048, 1536),
+                 list_file=None) -> tuple[list[dict], str]:
     """Records and a dataset label. A missing synthetic set is built with `seed` and `size` (w, h); an existing one
-    must have been built with `seed`."""
+    must have been built with `seed`. `list_file`: the CODEBRIM image list to score (default <data_dir>/eval200.txt;
+    evals/codebrim_dev100.txt is the dev split tuning may read)."""
     d = Path(data_dir)
     if kind == "auto":
-        kind = "synth" if (d / "annotations.json").exists() or not (d / "eval200.txt").exists() else "codebrim"
+        kind = "codebrim" if list_file or (
+            (d / "eval200.txt").exists() and not (d / "annotations.json").exists()) else "synth"
     if kind == "synth":
         if not (d / "annotations.json").exists():
             print(f"{d}/annotations.json missing: building synthetic-{n} at {size[0]}x{size[1]}, seed {seed}", flush=True)
@@ -447,6 +450,9 @@ def load_records(data_dir, n: int, kind: str = "auto", seed: int = 7, size=(2048
         if ann.get("clean"):
             return recs, f"synthetic clean set, {len(recs)} images with distractors and no damage (labelled synthetic)"
         return recs, f"synthetic-{len(recs)} at {recs[0]['width']}x{recs[0]['height']} (labelled synthetic)"
+    if list_file:
+        recs = codebrim.load_eval(d, Path(list_file))[:n]
+        return recs, f"CODEBRIM {Path(list_file).stem} subset ({len(recs)} images)"
     recs = codebrim.load_eval(d, d / "eval200.txt")[:n]
     return recs, f"CODEBRIM eval subset ({len(recs)} images)"
 
@@ -733,12 +739,12 @@ def segmenter_id(seg) -> str:
 def run(data_dir="data/synth200", n=200, out_dir="public/results", results_dir="results", workers=None,
         chaos=(20, 20, 10), kind="auto", micro_arm="local-macos-x86", primary_boxes="components", reuse=False,
         log=lambda msg: print(msg, flush=True), cost_model="fixed", seed=7, size=(2048, 1536), governor=False,
-        max_load=None) -> dict:
+        max_load=None, list_file=None) -> dict:
     from evals import failures
 
     t_start, load_start = time.time(), check_load(max_load)
     workers = max(1, min(8, (mp.cpu_count() or 2) // 2)) if workers is None else workers
-    records, label = load_records(data_dir, n, kind, seed, size)
+    records, label = load_records(data_dir, n, kind, seed, size, list_file)
     synthetic, data_id = label.startswith("synthetic"), dataset_sha256(records)
     out, repo = Path(out_dir).resolve(), REPO
     kept_local = [repo / "results" / "codebrim", repo / "runs"]  # git-ignored, and outside public/, which is all the site serves
@@ -929,12 +935,12 @@ def random_order_note(rows: dict, cap: float, pooled_ci: list, n: int) -> str:
 
 def run_ablations(data_dir="data/synth200", n=200, out_dir="public/results", results_dir="runs/ablations", workers=None,
                   kind="auto", micro_arm="local-macos-x86", primary_boxes="components", caps=ABLATION_CAPS,
-                  log=lambda msg: print(msg, flush=True), seed=7, size=(2048, 1536), max_load=None) -> dict:
+                  log=lambda msg: print(msg, flush=True), seed=7, size=(2048, 1536), max_load=None, list_file=None) -> dict:
     """The ABLATIONS variants at `caps` on fixed costs, each against the full agent (paired bootstrap) and its own
     chance baseline. Merges this dataset's entry into <out_dir>/ablations.json; writes no image."""
     t_start, load_start = time.time(), check_load(max_load)
     workers = max(1, min(8, (mp.cpu_count() or 2) // 2)) if workers is None else workers
-    records, label = load_records(data_dir, n, kind, seed, size)
+    records, label = load_records(data_dir, n, kind, seed, size, list_file)
     data_id, seg = dataset_sha256(records), default_segmenter()
     rows = cost_rows(micro_arm, seg.name)
     log(f"{len(records)} images, {workers} worker(s); ablations {list(ABLATIONS)} at caps {caps}")
@@ -993,6 +999,7 @@ def main(argv=None) -> None:
     ap.add_argument("--workers", type=int, default=None, help="default: min(8, cpus/2); 1 runs inline")
     ap.add_argument("--chaos", default="20,20,10", help="planner_timeout,planner_malformed,p95_spike job counts")
     ap.add_argument("--kind", choices=("auto", "synth", "codebrim"), default="auto")
+    ap.add_argument("--list", help="CODEBRIM image list to score (default <data>/eval200.txt)")
     ap.add_argument("--micro-arm", default="local-macos-x86", help="results/<arm>/micro.json to embed")
     ap.add_argument("--reuse", action="store_true", help="re-score and re-draw from results/eval_per_image.json (last run)")
     ap.add_argument("--primary-boxes", choices=tuple(CONVENTIONS), default="components",
@@ -1013,10 +1020,12 @@ def main(argv=None) -> None:
         if a.cost_model != "fixed" or a.governor or a.reuse:
             ap.error("--ablation runs on fixed costs, with the governor as each variant says, and never --reuse")
         run_ablations(a.data, a.n, a.out, a.results_dir, a.workers, a.kind, a.micro_arm, a.primary_boxes,
-                      tuple(float(c) for c in a.ablation_caps.split(",")), seed=a.seed, size=size, max_load=a.max_load)
+                      tuple(float(c) for c in a.ablation_caps.split(",")), seed=a.seed, size=size, max_load=a.max_load,
+                      list_file=a.list)
         return
     run(a.data, a.n, a.out, a.results_dir, a.workers, tuple(int(x) for x in a.chaos.split(",")), a.kind, a.micro_arm,
-        a.primary_boxes, a.reuse, cost_model=a.cost_model, seed=a.seed, size=size, governor=a.governor, max_load=a.max_load)
+        a.primary_boxes, a.reuse, cost_model=a.cost_model, seed=a.seed, size=size, governor=a.governor, max_load=a.max_load,
+        list_file=a.list)
 
 
 if __name__ == "__main__":

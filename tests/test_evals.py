@@ -601,3 +601,15 @@ def test_parity_compare_saved_files(tmp_path):
     assert res["class_iou"]["crack"] == pytest.approx(48 / 64) and res["class_iou"]["spalling"] is None
     with pytest.raises(ValueError):
         parity.compare(a, b[:1])
+
+
+def test_codebrim_dev_split_is_disjoint_from_the_held_out_list():
+    """Tuning reads evals/codebrim_dev100.txt only: 100 images, none of them in the held-out eval200 list."""
+    evals_dir = Path(codebrim.__file__).parent
+    dev = (evals_dir / "codebrim_dev100.txt").read_text().split()
+    held = set((evals_dir / "codebrim_eval200.txt").read_text().split())
+    assert len(dev) == len(set(dev)) == 100 and not held & set(dev)
+    records = [{"id": f"image_{i}", "path": f"/x/image_{i}.jpg", "boxes": []} for i in range(10)]
+    picked = codebrim.select_dev(records, ["image_1.jpg", "image_2.jpg"], n=5, seed=3)
+    assert len(picked) == 5 and not {"image_1", "image_2"} & {r["id"] for r in picked}
+    assert picked == codebrim.select_dev(records, ["image_1.jpg", "image_2.jpg"], n=5, seed=3)
