@@ -37,7 +37,7 @@ eval-live:  ## deployment behaviour: measured wall time and the governor on (loa
 	mkdir -p public/results/live && cp runs/eval-live/summary.json public/results/live/summary.json
 
 eval-model:  ## after scripts/install_model.sh: leakage check, then the ONNX on CODEBRIM and synth200 vs the classical runs
-	$(PY) -m evals.model_eval --publish --onnx $(or $(ONNX),models/drishyam_dacl10k.onnx) --codebrim $(CODEBRIM) $(if $(DACL10K),--dacl10k $(DACL10K))
+	$(PY) -m evals.model_eval --publish --onnx $(or $(ONNX),models/drishyam_dacl10k.onnx) --codebrim $(CODEBRIM) $(if $(DACL10K),--dacl10k $(DACL10K)) $(if $(MAX_LOAD),--max-load $(MAX_LOAD))
 
 eval-ablations:  ## FR-21 ablations (7 variants vs the full agent, caps 0.3 and 1.0, fixed costs) on synth200 and the 4608 set -> public/results/ablations.json
 	$(EVAL) --ablation --data $(DATA) --n $(N) --seed 7 --out $(OUT) --results-dir runs/ablations/synth

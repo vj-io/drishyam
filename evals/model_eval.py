@@ -91,6 +91,7 @@ def main(argv=None) -> None:
     ap.add_argument("--dacl10k", help="the dacl10k folder (kagglehub), for the leakage check")
     ap.add_argument("--n", type=int, default=200)
     ap.add_argument("--workers", type=int)
+    ap.add_argument("--max-load", type=float, help="bench.micro exits before timing the ONNX's job ops at or above this load")
     ap.add_argument("--micro-arm", default="local-macos-x86")
     ap.add_argument("--publish", action="store_true", help="copy the ONNX summaries to public/results/*_dacl10k/")
     ap.add_argument("--skip-codebrim", action="store_true", help="synthetic set only (scripts/install_model.sh's quick check)")
@@ -113,7 +114,8 @@ def main(argv=None) -> None:
         subprocess.run([sys.executable, "-m", "evals.leakage", "--dacl10k", a.dacl10k, "--codebrim", a.codebrim,
                         "--out", str(runs / "leakage.json")], cwd=REPO, check=True)
     leak = leakage_block(runs / "leakage.json") if a.publish and sets[0][0] == "codebrim" else None
-    subprocess.run([sys.executable, "-m", "bench.micro", "--arm", arm, "--job-ops-only"], env=env, cwd=REPO, check=True)
+    subprocess.run([sys.executable, "-m", "bench.micro", "--arm", arm, "--job-ops-only",
+                    *(["--max-load", str(a.max_load)] if a.max_load is not None else [])], env=env, cwd=REPO, check=True)
     for name, data, published in sets:
         after = check(harness(data, runs / f"onnx-{name}", a.n, env, arm, a.workers), label, runs / f"onnx-{name}")
         pub = json.loads((published / "summary.json").read_text()) if (published / "summary.json").exists() else None
