@@ -97,8 +97,9 @@ limits and the cost table, is [aws.md](aws.md).
   AppErrors) and X-Ray tracing. The alarms and a 20 USD monthly budget publish to one SNS topic, which has no
   subscriber yet, so today they reach nobody.
 - **Smoke test** (`scripts/aws.sh smoke`, `scripts/smoke.sh`): `smoke 2026-10-17T23:12:36Z result=pass`: a job ran
-  to `awaiting_review`, KILL halted the second job at step 3 with cause `kill-switch`, a `POST` without the body hash
-  and a direct Function URL call both got 403, and the step p95 was 88 ms on aarch64, over the 6 steps of one job.
+  to `awaiting_review`; KILL, sent after step 2 streamed, halted the second job after 3 steps (before step 4) with
+  cause `kill-switch`; a `POST` without the body hash and a direct Function URL call both got 403; and the step p95
+  was 88 ms on aarch64, over the 6 steps of one job.
   That run was against a build of commit d34f74b from a tree with uncommitted changes.
 - **Cost.** Spent so far: not measured yet; the month-to-date figure from AWS Billing is still to be added. The
   list-price estimate is about 10 USD a month at 1,000 jobs a month, 8 of it the WAF ([aws.md](aws.md)). The $ shown
@@ -106,7 +107,8 @@ limits and the cost table, is [aws.md](aws.md).
   Marketplace fee the PRD planned for. It is not the Lambda bill, and decode and the privacy blur, which run before
   the job starts, are not in it.
 - **Operate.** `scripts/aws.sh stop` sets the function's reserved concurrency to 0 (nothing runs, nothing bills);
-  `start` undoes it; `destroy` deletes the stack and the site bucket.
+  `start` undoes it (on the live deployment, which has no reservation, run `RESERVED=none scripts/aws.sh start`);
+  `destroy` deletes the stack and the site bucket.
 
 ## 6. OpenCV 5 implementation
 
