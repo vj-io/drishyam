@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Drishyam on AWS (docs/aws.md): one command per operation. Account 242441136319 through the
-# CLI profile drishyam (override with AWS_PROFILE), region us-east-1 (CloudFront's WAF scope lives there).
+# Drishyam on AWS (docs/aws.md): one command per operation. Account 242441136319 through the CLI profile
+# drishyam (yours: ACCOUNT=<id> AWS_PROFILE=<profile>), region us-east-1 (CloudFront's WAF scope lives there).
 #
 #   scripts/aws.sh deploy    build the Lambda package, bootstrap CDK if needed, deploy, print the URLs
 #   scripts/aws.sh smoke     scripts/smoke.sh against the deployed URL, plus the raw Function URL check;
@@ -15,7 +15,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 export AWS_PROFILE=${AWS_PROFILE:-drishyam} AWS_REGION=us-east-1 CDK_DISABLE_CLI_TELEMETRY=true
-ACCOUNT=242441136319 STACK=Drishyam FN=drishyam-web RESERVED=${RESERVED:-5}
+ACCOUNT=${ACCOUNT:-242441136319} STACK=Drishyam FN=drishyam-web RESERVED=${RESERVED:-5}
 CDK="npx --yes aws-cdk@2.1145.0"
 
 out() {
