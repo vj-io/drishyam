@@ -199,7 +199,7 @@ export function reviewText(reason) {
   // "class change: spalling at L1, corrosion at L0 (same place, iou 0.62)": the closer look is the lower level
   if ((m = reason.match(/^class change: (\w+) at L(\d), (\w+) at L(\d)(?: \(same place, iou ([\d.]+)\))?/))) {
     const [near, far] = +m[2] < +m[4] ? [m[1], m[3]] : [m[3], m[1]];
-    return `the closer look saw ${words(near)} where the coarser one saw ${words(far)}: a person decides`
+    return `the closer look saw ${words(near)} where the coarser one saw ${words(far)}`
       + `${m[5] ? ` (same place: the two looks' masks overlap ${pct(m[5])})` : ''}`;
   }
   if ((m = reason.match(/^ambiguous: (\w+) (\d+) px .* inside (\w+) \w+; recorded as/))) {

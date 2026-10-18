@@ -29,6 +29,7 @@ const el = {
 const S = {
   image: null, sample: null, ready: null, ctl: null, mode: 'idle', opts: {}, job: null, overview: null, steps: [], done: null,
   token: null, order: null, ui: null, timer: 0, rev: 0, events: [], planners: new Map(), arrived: null, note: null, critSeen: false, killTimer: 0, killPending: false,
+  killAhead: '',  // how far the server was ahead of a paced replay when KILL was sent, in words ('' when it was not)
   found: [], sent: [], crit: null, slow: false,  // what the step on screen found and sent to a person, its critical NOTE; replayed slowly?
 };
 // The presentation queue: stream events wait here and are shown one decision at a time. A step's findings and
@@ -53,10 +54,13 @@ const GOVERNOR_TEXT = {
 };
 const STOPPED = {
   'stop-rule': 'the next look was worth less than its cost', exhausted: 'every candidate region was looked at',
-  'cap-hit': 'budget spent', 'kill-switch': 'you pressed KILL', 'planner:stop': 'the planner proposed stopping',
+  'cap-hit': 'a budget cap was reached', 'kill-switch': 'you pressed KILL', 'planner:stop': 'the planner proposed stopping',
 };
 // a kill-switch halt before any look can only be the operator-wide switch: the server reads a page's KILL after a look
 const stopWords = (cause, looks) => (cause === 'kill-switch' && !looks ? 'the kill switch was already set' : STOPPED[cause] ?? cause);
+
+/** The looks a Resume replays: every gaze, escalate and verify step with a centre (never a halt record). */
+const moves = () => S.steps.filter((s) => ['gaze', 'escalate', 'verify'].includes(s.decision?.action) && pointOf(s));
 
 // ---- the four steps: Waiting / Running / Done, each with a sentence in plain words -------------------
 const pendingCount = () => (S.order?.findings ?? []).filter((f) => f.critical && f.state === 'pending_review').length;
@@ -106,12 +110,12 @@ function setMode(mode, text) {
   el.kill.hidden = !running;
   el.skip.hidden = !running || Q.skip;
   el.runBar.hidden = running;
-  el.resume.hidden = !(['killed', 'stopped'].includes(mode) || (mode === 'error' && S.steps.length > 0)
+  el.resume.hidden = !((['killed', 'stopped', 'error'].includes(mode) && moves().length > 0)  // nothing to replay: Run
     || (mode === 'done' && S.done?.cause === 'kill-switch' && S.done.summary?.steps > 0));  // a halt before any look has nothing to resume
   el.look.disabled = el.runBar.disabled = running || !S.image;
   el.guided.disabled = running;
   if (!running) el.count.textContent = '';
-  if (['error', 'killed'].includes(mode) && !S.events.length) narrate(el.text.textContent);  // nothing arrived: the NOTE still says "Sending"
+  if (['error', 'killed', 'stopped'].includes(mode) && !S.events.length) narrate(el.text.textContent);  // nothing arrived: the NOTE still says "Sending"
   if (onBar && !running) (el.resume.hidden ? el.look : el.resume).focus({ preventScroll: true });
   showCam(viewport.cursor);  // its caption says whether a job is on its way
   syncSteps();
@@ -244,7 +248,11 @@ function causeFrom(s) {
     const prev = S.steps.slice(0, -1).reverse().find((p) => p.region === s.region && p.decision?.action !== 'halt');
     return prev ? pad(prev.step) : null;
   }
-  return s.cause === 'survey' || /^(?:.*; )?argmax/.test(s.rationale ?? '') ? 'the overview' : null;
+  if (s.cause === 'survey') return 'the overview';
+  if (!/^(?:.*; )?argmax/.test(s.rationale ?? '')) return null;
+  // its severity and uncertainty came from the latest earlier look that seeded this region, when one did
+  const seed = S.steps.slice(0, -1).reverse().find((p) => Array.isArray(p.seeded) && p.seeded.some((c) => c?.region === s.region));
+  return seed ? `the overview and ${pad(seed.step)}` : 'the overview';
 }
 
 function scrollToViewer() {
@@ -318,10 +326,10 @@ function handle(ev) {
       findings.addReason(ev.finding_id, reason, plain);
       if (kind !== 'critical') {  // that one is said by the finding's own line
         const f = findings.cards.get(ev.finding_id)?.finding;
-        const decides = / a person decides\b/.test(plain);
+        // a draft (a class change can name one) is flagged, never signed: the work order does not wait for it
         const ask = f && !f.critical ? 'so it is flagged for a person to look at (a draft: no sign-off)' : 'so a person must check it';
         trace.addNote('review', S.steps.at(-1)?.step ?? 0, ev.finding_id, `${f ? label(f.cls) : 'Finding'} ${ev.finding_id} → human`,
-          decides ? plain : `${plain}, ${ask}`, () => findings.focus(ev.finding_id), reason, kind.replace(/[-_]/g, ' '));
+          `${plain}, ${ask}`, () => findings.focus(ev.finding_id), reason, kind.replace(/[-_]/g, ' '));
         S.sent.push(`${f ? label(f.cls) : 'Finding'} ${ev.finding_id} goes to a person: ${plain}.`);
         sayStep();
       }
@@ -338,7 +346,7 @@ function handle(ev) {
       setMode('error', ev.message ?? 'The job failed.');
       return 0;
     case 'end':  // the stream closed without a done record
-      if (S.mode === 'running') setMode('killed', `The stream ended at step ${S.steps.length} before the job finished. Resume to continue.`);
+      if (S.mode === 'running') setMode('stopped', `The stream ended at step ${S.steps.length} before the job finished. Resume to continue.`);
       return 0;
     default:
       return 0;
@@ -412,6 +420,7 @@ function skip() {
   if (document.activeElement === el.skip) el.kill.focus({ preventScroll: true });
   el.skip.hidden = true;
   pump();
+  $('#toasts').replaceChildren();  // a burst of steps: its revision notes would cover the lines it just showed
 }
 
 const paced = () => (paceMs() > 0 ? ' (not counting the paced waits)' : '');
@@ -570,14 +579,26 @@ function finish(ev) {
   S.order = ev.work_order;
   const sm = ev.summary;
   const n = sm.critical_pending;
+  // sm.steps counts looks (the work order's); the halt record is numbered after the last look, as the trace shows it
+  const halt = S.steps.findLast((s) => s.decision?.action === 'halt');
+  const at = halt ? ` (trace ${pad(halt.step)})` : '';
+  const looks = `${sm.steps} look${sm.steps === 1 ? '' : 's'}`;
   setMode('done', S.note ?? (ev.cause === 'kill-switch'
-    ? (sm.steps ? `Halted by KILL at step ${sm.steps}: the trace shows kill-switch and the state is kept. Resume carries on.`
+    ? (sm.steps ? `Halted by KILL after ${looks}${at}: the state is kept. Resume carries on.${S.killAhead}`
       : 'Halted before its first look: the kill switch was already set, so there is no look to resume. Run starts it again.')
     : S.slow && !Q.skip ? `The agent took ${sm.seconds} s${paced()}; we replayed it slowly so you can read it${serverTotal(sm.seconds)}.`
-      : `Done in ${sm.seconds} s of agent time: ${sm.steps} looks, ${(sm.pixels_frac * 100).toFixed(1)} % of the pixels${serverTotal(sm.seconds)}.`));
-  narrate(n ? `${n} critical finding${n === 1 ? ' needs' : 's need'} you. Sign ${n === 1 ? 'it' : 'them'} off in step 4: the agent cannot.`
-    : 'Nothing critical was found, so nothing needs your sign-off.',
-  `It stopped because ${stopWords(ev.cause, sm.steps)}${S.steps.length ? `: step ${S.steps.at(-1).step} says why` : ''}.`);
+      : `Done in ${sm.seconds} s of agent time: ${looks}, ${(sm.pixels_frac * 100).toFixed(1)} % of the pixels${serverTotal(sm.seconds)}.`));
+  const need = n ? `${n} critical finding${n === 1 ? ' needs' : 's need'} you. Sign ${n === 1 ? 'it' : 'them'} off in step 4: the agent cannot.` : '';
+  // a KILL or a cap stopped it short: the main sentence says so, since a phone shows only that one
+  const short = ev.cause === 'kill-switch' ? (sm.steps ? `Halted by KILL after ${looks}${at}` : `Halted before its first look${at}`)
+    : ev.cause === 'cap-hit' ? `A budget cap stopped it after ${looks}${at}` : null;
+  if (short && !sm.steps) narrate(`${short}: the kill switch was already set. Nothing was looked at, so there is nothing to resume.`);
+  else if (short) {
+    narrate(`${short}: ${need || 'nothing critical in what it saw, so nothing needs your sign-off.'}`
+      + `${ev.cause === 'kill-switch' ? ' Resume carries on.' : ''}`);
+  }
+  else narrate(need || 'Nothing critical was found, so nothing needs your sign-off.', `Stopped: ${stopWords(ev.cause, sm.steps)}${at}.`);
+  $('#toasts').replaceChildren();  // the trace, the NOTE and the work order say it all now: no revision note over them
   findings.setReady();
   findings.refresh();
   el.tiles.disabled = false;
@@ -618,7 +639,7 @@ async function run(opts = {}) {
   S.opts = opts;
   S.ctl = new AbortController();
   clearTimeout(S.killTimer);
-  Object.assign(S, { events: [], arrived: null, note: null, slow: false, killPending: false });
+  Object.assign(S, { events: [], arrived: null, note: null, slow: false, killPending: false, killAhead: '' });
   clearTimeout(Q.timer);
   Object.assign(Q, { items: [], timer: 0, skip: Boolean(opts.killHint) });  // a KILL drill is shown live: never behind the job it asks to stop
   const active = document.activeElement;  // all hidden or disabled while running
@@ -652,33 +673,39 @@ async function run(opts = {}) {
 }
 
 /** Abort the stream here, show what arrived, and say so. `unconfirmed`: the server never confirmed a KILL, so this is the
-    page stopping its view of the job, not a kill (behind a Lambda Function URL the job may run on to its cap). */
+    page stopping its view of the job, never a kill (behind a Lambda Function URL the job may run on to its cap), and
+    `why` says so. Only a recording, with no server to tell, is called killed here. */
 function stop(why, unconfirmed = false) {
   S.ctl.abort();
   skip();
-  const n = S.steps.length;
+  const n = moves().length;
+  const s = n === 1 ? '' : 's';
   if (!n) {  // no look had been shown: there is no state to keep and nothing to resume
-    setMode('idle', `Stopped before the agent’s first look${why}. No look had arrived, so the page keeps nothing; Run starts it again.`);
-    narrate(el.text.textContent);
-    return;
+    setMode(unconfirmed ? 'stopped' : 'idle', `Stopped before the agent’s first look${why}. No look had arrived, so the page keeps nothing; Run starts it again.`);
   }
-  if (unconfirmed) {
-    setMode('stopped', `The page stopped showing the job at step ${n}${why}; the server may still be running it, up to its time cap. `
-      + `What arrived is kept: Resume re-sends the photo and replays your ${n} moves.`);
-    narrate(el.text.textContent);
-    return;
+  else if (S.opts.replay && !S.events.length) {  // a Resume whose first record never came: the steps shown are the earlier run's
+    setMode('stopped', `Stopped before the resumed job’s first record${why}. The earlier run is still kept: Resume re-sends the photo and replays its ${n} move${s}.`);
   }
-  setMode('killed', `Killed at step ${n}${why} — state preserved. Resume re-sends the photo and replays your ${n} moves.`);
+  else if (unconfirmed) {
+    setMode('stopped', `The page stopped showing the job at step ${S.steps.at(-1).step}${why}. `
+      + `What arrived is kept: Resume re-sends the photo and replays your ${n} move${s}.`);
+  }
+  else return setMode('killed', `Killed at step ${S.steps.at(-1).step}${why} — state preserved. Resume re-sends the photo and replays your ${n} move${s}.`);
+  narrate(el.text.textContent);
 }
 
 /** POST /api/kill for `job` (its first record): the server halts before its next look and sends the kill-switch record. */
 function sendKill(job) {
+  const arrived = S.events.filter((e) => e.type === 'step');
+  const ahead = arrived.length - S.steps.length;  // a paced replay lags the server: these had arrived, not yet shown
   postKill(job.job, job.kill_token);
   skip();
-  el.text.textContent = 'KILL sent: the agent halts before its next look…';
+  S.killAhead = ahead > 0 ? ` When you pressed KILL the server was ${ahead} step${ahead === 1 ? '' : 's'} ahead of this replay `
+    + `(up to ${pad(arrived.at(-1).step)}, all shown now).` : '';
+  el.text.textContent = `KILL sent: the agent halts before its next look…${S.killAhead}`;
   clearTimeout(S.killTimer);
   S.killTimer = setTimeout(() => {
-    if (S.mode === 'running' && !S.arrived) stop(': the server did not confirm KILL within 6 s', true);
+    if (S.mode === 'running' && !S.arrived) stop(': the server did not confirm KILL within 6 s; the server may still be running it, up to its time cap', true);
   }, 6000);
 }
 
@@ -696,7 +723,7 @@ function kill() {
     S.killTimer = setTimeout(() => {  // no answer at all: cancel the upload rather than leave KILL doing nothing
       if (S.mode === 'running' && S.killPending) {
         stop(`: the server had not answered ${KILL_WAIT_S} s after KILL, so the page cancelled the upload (if the server had `
-          + 'already started the job, it may run on, unseen, up to its time cap)');
+          + 'already started the job, it may run on, unseen, up to its time cap)', true);
       }
     }, KILL_WAIT_S * 1000);
     return;
@@ -706,10 +733,9 @@ function kill() {
 }
 
 function resume() {
-  const moves = S.steps.filter((s) => ['gaze', 'escalate', 'verify'].includes(s.decision?.action) && pointOf(s))
-    .map((s) => [s.decision.action, s.decision.args.x, s.decision.args.y, s.decision.args.level, s.decision.args.size]
-      .filter((v) => v !== undefined));
-  run({ pace: S.opts.pace, chaos: S.opts.chaos, replay: moves.slice(0, 200) });
+  const replay = moves().map((s) => [s.decision.action, s.decision.args.x, s.decision.args.y, s.decision.args.level, s.decision.args.size]
+    .filter((v) => v !== undefined));
+  run({ pace: S.opts.pace, chaos: S.opts.chaos, replay: replay.slice(0, 200) });
 }
 
 async function guided() {
@@ -879,7 +905,7 @@ health().then((hl) => {
   if (b) {
     $('#api-build').textContent = [b.hal && `Custom HAL: ${b.hal}`, b.parallel && `parallel framework: ${b.parallel}`,
       b.cpu_baseline && `CPU baseline: ${b.cpu_baseline}`, b.cpu_dispatch && `dispatched: ${b.cpu_dispatch}`,
-      Array.isArray(b.dnn_engines) && b.dnn_engines.length && `cv2.dnn engines built in: ${b.dnn_engines.join(', ')}`,
+      Array.isArray(b.dnn_engines) && b.dnn_engines.length && `cv2.dnn engine names: ${b.dnn_engines.join(', ')}`,
       b.onnx_runtime && `ONNX Runtime: ${b.onnx_runtime}`].filter(Boolean).join(' · ');
     $('#api-build').hidden = false;
   }

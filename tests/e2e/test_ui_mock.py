@@ -18,7 +18,8 @@ Scenarios (a real Chromium, the document served with the production CSP header):
      x-amz-content-sha256 on every POST, /api/review tokens, /api/kill {job, kill_token} answered by a kill-switch
      halt, privacy.boxes blur, halt step.
   3. guided run: pace_ms on the request, the paced-for-viewing label, the viewer in view, the critical NOTE held,
-     the recap in view, hand-off to the reviewer, and Try KILL (planner_timeout, shown live) halted by KILL.
+     the recap in view, hand-off to the reviewer, and Try KILL (planner_timeout, shown live) halted by KILL; and KILL
+     during the paced replay, which says how far ahead of the page the server was.
   4. photo, NOTE and newest trace line on one screen (1440x900; 375x812 with the crop, never over the photo, and the replay label),
   5. keyboard only, 6. KILL after the job had finished, 7. mobile 375 px, 8. prefers-reduced-motion,
   9. heading names, 10. pending states (no video, no results), 11. halt governor note, 12. planner_status chip,
@@ -169,8 +170,10 @@ def contract_events():
     its L1 look drafted is exposed rebar at L0, same place) whose review names critical f1 in place of the old
     disagreement; an ambiguity on draft f4; step 6's verify an agreement although the finer look's best class differs;
     `seeded` candidates on the survey look (crack is all it saw) and argmax rationales in the agent's format that read
-    them; a stop-rule halt bound by its floor; and draft f2 re-measured past the critical area rule, with the done
-    record to match. Once the fixture is regenerated from the agent that sends them, these patches can go."""
+    them; a stop-rule halt bound by its floor; draft f2 re-measured past the critical area rule (52,000 px²), with the
+    done record to match; and a class change that names draft f5, as the agent sends when the coarser look saw a
+    critical class but drafted nothing. Once the fixture is regenerated from the agent that sends them, these patches
+    can go."""
     events = [json.loads(ln) for ln in JOB_LINES]
     for e in events:
         if e["type"] == "review_request":
@@ -201,9 +204,14 @@ def contract_events():
     f2 = [e for e in events if e["type"] == "finding" and e["finding"]["id"] == "f2"][-1]["finding"]
     assert not f2["critical"] and f2["cls"] == "spalling"
     f2.update(critical=True, state="pending_review", critical_step=f2["steps"][-1], critical_area_px=52000,
-              critical_rule="spalling 52,000 px² >= 40,000 px²")
+              critical_rule="spalling 52,000 px² >= 40,000 px²", measure={**f2["measure"], "area_px": 52000})
+    f5 = next(i for i, e in enumerate(events) if e["type"] == "finding" and e["finding"]["id"] == "f5")
+    assert not events[f5]["finding"]["critical"] and events[f5]["finding"]["cls"] == "crack"
+    events.insert(f5 + 1, {"type": "review_request", "kind": "class-change", "finding_id": "f5", "iou": 0.71, "level_a": 1,
+                           "level_b": 0, "classes": ["exposed_rebar", "crack"],
+                           "reason": "class change: exposed_rebar at L1, crack at L0 (same place, iou 0.71)"})
     done = events[-1]
-    done["work_order"]["findings"] = [{**f, **({k: f2[k] for k in ("critical", "state", "critical_step", "critical_area_px")}
+    done["work_order"]["findings"] = [{**f, **({k: f2[k] for k in ("critical", "state", "critical_step", "critical_area_px", "measure")}
                                              if f["id"] == "f2" else {})} for f in done["work_order"]["findings"]]
     done["summary"]["critical_pending"] = sum(f["critical"] and f["state"] == "pending_review" for f in done["work_order"]["findings"])
     return events
@@ -572,10 +580,7 @@ def test_desktop_mock(browser, base):
     expect(p.locator("#job-pill")).to_have_text(DONE_LABEL, timeout=T)
     live_causes = [c for st in STEPS if st["step"] > replayed       # a halt record may also carry a governor note
                    for c in (st["cause"], st.get("governor", {}).get("cause")) if c]
-    if any(c in GOVERNOR for c in live_causes):
-        expect(p.locator(".win--toast")).to_have_count(1)            # one revision note at a time
-        toast, trace = p.locator(".win--toast").bounding_box(), p.locator("#step-why").bounding_box()
-        assert toast["y"] + toast["height"] <= trace["y"] or toast["x"] >= trace["x"] + trace["width"], "the note covers the trace"
+    expect(p.locator(".win--toast")).to_have_count(0)                # the run is over: no revision note over its result
     expect(p.locator(".trace__line")).to_have_count(N_TRACE)
     expect(p.locator(".trace__line--planner")).to_have_count(N_PLANNER)
     expect(p.locator(".trace__line[data-step]")).to_have_count(N_STEPS)
@@ -749,7 +754,7 @@ def test_live_api_contract(browser, base):
     expect(p.locator("#live-where")).to_contain_text("on local (x86_64)")
     expect(p.locator("#api-build")).to_have_text(  # the OpenCV build facts /api/health reads from cv2.getBuildInformation()
         "Custom HAL: YES (carotene (ver 0.0.1) KleidiCV (ver 0.6.0)) · parallel framework: pthreads · CPU baseline: NEON FP16"
-        " · dispatched: NEON_DOTPROD NEON_FP16 · cv2.dnn engines built in: auto, classic, new · ONNX Runtime: NO")
+        " · dispatched: NEON_DOTPROD NEON_FP16 · cv2.dnn engine names: auto, classic, new · ONNX Runtime: NO")
     expect(p.locator("#recorded")).to_be_hidden()
     expect(p.locator("#look")).to_be_enabled(timeout=T)        # the first sample is preselected
     expect(p.locator(".thumb[aria-pressed='true']")).to_have_count(1)
@@ -760,7 +765,7 @@ def test_live_api_contract(browser, base):
     p.locator("label.toggle", has_text="p95_spike").click()
     p.locator("#cap-px").fill("45")
     s.fast("#run-bar")                                    # the Run button in the job bar runs the same job
-    expect(p.locator("#job-pill")).to_have_text("killed", timeout=T)
+    expect(p.locator("#job-pill")).to_have_text("stopped", timeout=T)        # nobody pressed KILL: never "killed"
     expect(p.locator("#job-text")).to_contain_text("stream ended")
     p.locator("label.switch:has(#heat)").click()           # heatmap off: photo, candidate boxes and nothing else
     p.locator("#replay").fill("0")
@@ -871,6 +876,36 @@ def test_guided(browser, base):
     s.check_clean()
     s.context.close()
     print("ok  guided run: pace_ms sent, labelled paced, viewer in view, critical NOTE held, recap in view, hand-off, Try KILL halts")
+
+
+def test_kill_during_a_paced_replay(browser, base):
+    """The guided run is paced: the page shows a decision every few seconds while the server runs ahead. KILL then shows
+    every step that had arrived and says how far ahead the server was, so a halt several looks after the one on screen
+    is explained; the halt's trace number is the one the bar names."""
+    job = json.loads(JOB_LINES[0])
+    job["pace_ms"] = 1000
+    reset_live([{"lines": [json.dumps(job), *JOB_LINES[1:]], "delay": 0.3, "killable": True}])
+    s = Session(browser, "kill-paced", viewport={"width": 1440, "height": 900})
+    p = s.page
+    p.goto(f"{base}/")
+    expect(p.locator("#look")).to_be_enabled(timeout=T)
+    p.click("#guided")
+    expect(p.locator(".trace__line[data-step='1']")).to_be_visible(timeout=T)
+    p.wait_for_timeout(2500)                               # the server streams on; the page is still reading step 1 or 2
+    assert p.locator(".trace__line[data-step]").count() <= 2, "the paced replay should lag the server here"
+    p.click("#kill")
+    expect(p.locator("#job-text")).to_contain_text("ahead of this replay", timeout=T)
+    expect(p.locator("#job-pill")).to_have_text("halted", timeout=T)
+    text = p.locator("#job-text").inner_text()
+    m = re.search(r"Halted by KILL after \d+ looks? \(trace #(\d+)\): the state is kept\. Resume carries on\. When you pressed KILL "
+                  r"the server was (\d+) steps? ahead of this replay \(up to #(\d+), all shown now\)\.", text)
+    assert m, text
+    halt = p.locator(".trace__line[data-step]").last
+    expect(halt).to_have_attribute("data-step", str(int(m[1])))
+    assert int(m[2]) >= 1 and int(m[3]) < int(m[1]), text
+    s.check_clean()
+    s.context.close()
+    print("ok  KILL during a paced replay: every arrived step shown, how far the server was ahead said, the halt named by its trace number")
 
 
 def test_fits_on_screen(browser, base):
@@ -1158,7 +1193,8 @@ def test_kill_before_the_first_record(browser, base):
     Meanwhile the camera panel says a job is on its way, never "No look yet. Press Run.". The operator-wide switch,
     set before the job began, halts it before any look: then nothing on the page says a state is kept or can be
     resumed, and the done state counts no looks and no findings. In a recording, KILL before its first record says
-    nothing had started, and nothing is called preserved."""
+    nothing had started, and nothing is called preserved. The bar and the NOTE count looks and name the halt record by
+    its trace number, and on a phone (where the NOTE shows only its main sentence) the NOTE says the job was halted."""
     reset_live([{"lines": JOB_LINES, "delay": 0.25, "killable": True, "lead": 2.5}])
     s = Session(browser, "kill-early", viewport={"width": 1440, "height": 900})
     p = s.page
@@ -1175,8 +1211,11 @@ def test_kill_before_the_first_record(browser, base):
     assert [{k: v for k, v in r.items() if k != "signed"} for r in LIVE["kills"]] == [{"job": JOB["job"], "kill_token": JOB["kill_token"]}]
     expect(p.locator("#job-pill")).to_have_text("halted", timeout=T)
     expect(p.locator(".trace__line .chip", has_text=re.compile("^kill-switch$"))).to_have_count(1)
-    expect(p.locator("#job-text")).to_contain_text("Halted by KILL at step 1: the trace shows kill-switch and the state is kept.")
+    expect(p.locator("#job-text")).to_contain_text("Halted by KILL after 1 look (trace #02): the state is kept. Resume carries on.")
     expect(p.locator(".trace__line[data-step]")).to_have_count(2)            # look 1, then the halt
+    expect(p.locator(".trace__line[data-step]").last).to_have_attribute("data-step", "2")   # the number the bar names
+    expect(p.locator("#narrator")).to_have_text("Halted by KILL after 1 look (trace #02): nothing critical in what it saw, "
+                                                "so nothing needs your sign-off. Resume carries on.")
     expect(p.locator("#resume")).to_be_visible()
     expect(p.locator("#recap")).to_contain_text("2 decisions (1 look and the stop KILL asked for), every one with a recorded cause")
     expect(p.locator("#recap")).to_contain_text("1 from the kill switch")
@@ -1196,7 +1235,8 @@ def test_kill_before_the_first_record(browser, base):
     halt = p.locator(".trace__line[data-step='1']")
     expect(halt.locator(".trace__why")).to_have_text(
         "because: The kill switch was already set before its first look, but nothing was looked at, so there is nothing to resume.")
-    expect(p.locator(".win--toast")).to_contain_text("it stopped before its first look, so there is nothing to resume")
+    expect(p.locator("#narrator")).to_have_text(
+        "Halted before its first look (trace #01): the kill switch was already set. Nothing was looked at, so there is nothing to resume.")
     halt.locator("button").click()
     expect(p.locator("#step-detail .detail__why").first).to_have_text(
         "The kill switch was already set, so it stopped before its first look. Nothing was looked at, so there is nothing to resume.")
@@ -1234,15 +1274,34 @@ def test_kill_before_the_first_record(browser, base):
         s.context.close()
     finally:
         LIVE["fixture_delay"] = 0
-    print("ok  KILL before the first record: queued, sent once the job id arrives, halts after look 1; the operator switch "
-          "before any look keeps nothing; a recording says nothing had started")
+
+    reset_live([{"lines": JOB_LINES, "delay": 0.25, "killable": True, "lead": 2.5}])
+    s = Session(browser, "kill-early-phone", viewport={"width": 375, "height": 812}, device_scale_factor=2, is_mobile=True, has_touch=True)
+    p = s.page
+    p.goto(f"{base}/")
+    expect(p.locator("#look")).to_be_enabled(timeout=T)
+    p.click("#look")
+    until(lambda: LIVE["jobs"], "the upload to reach the server", page=p)
+    p.click("#kill")
+    expect(p.locator("#job-pill")).to_have_text("halted", timeout=T)
+    narrator = p.locator("#narrator")
+    expect(narrator).to_contain_text("Halted by KILL after 1 look (trace #02): nothing critical in what it saw")
+    expect(p.locator("#narrator-sub")).to_be_hidden()                      # a phone shows the main sentence only
+    narrator.scroll_into_view_if_needed()
+    box = narrator.bounding_box()
+    assert box and 0 <= box["y"] and box["y"] + box["height"] <= 812, f"the halted NOTE is not on screen: {box}"
+    s.check_clean()
+    s.context.close()
+    print("ok  KILL before the first record: queued, sent once the job id arrives, halts after look 1 (bar, NOTE and trace "
+          "agree on #02, a phone's NOTE says halted); the operator switch before any look keeps nothing; a recording says nothing had started")
 
 
 def test_kill_the_server_never_confirms(browser, base):
     """KILL is never reported as a kill the server did not make. No job record within 8 s of a KILL pressed before it:
-    the page cancels the upload and says the server may run the job on. A KILL sent but never confirmed within 6 s:
-    the page stops showing the job (pill "stopped", not "killed"), says the server may still be running it, and
-    keeps what arrived for Resume."""
+    the page cancels the upload and says the server may run the job on (pill "stopped"); during a Resume, it says the
+    earlier run is still kept and counts the moves Resume replays. A KILL sent but never confirmed within 6 s: the
+    page stops showing the job (pill "stopped", not "killed") and says the server may still be running it, whether or
+    not a look had arrived; what arrived is kept for Resume."""
     reset_live([{"lines": JOB_LINES, "delay": 0.25, "lead": 15}])
     s = Session(browser, "kill-unanswered", viewport={"width": 1440, "height": 900})
     p = s.page
@@ -1251,11 +1310,52 @@ def test_kill_the_server_never_confirms(browser, base):
     p.click("#look")
     until(lambda: LIVE["jobs"], "the upload to reach the server", page=p)
     p.click("#kill")
-    expect(p.locator("#job-pill")).to_have_text("ready", timeout=12_000)
+    expect(p.locator("#job-pill")).to_have_text("stopped", timeout=12_000)
     expect(p.locator("#job-text")).to_contain_text("the server had not answered 8 s after KILL, so the page cancelled the upload")
     expect(p.locator("#job-text")).to_contain_text("it may run on, unseen, up to its time cap")
     expect(p.locator("#look")).to_be_enabled()
+    expect(p.locator("#resume")).to_be_hidden()                              # no look arrived: nothing to replay
     assert not LIVE["kills"], "no job id ever arrived, so nothing could be sent"
+    s.check_clean()
+    s.context.close()
+
+    # a Resume whose upload the server never answers: the shown steps are the earlier run's, and nothing was killed
+    reset_live([{"lines": JOB_LINES, "delay": 0.4, "killable": True}, {"lines": JOB_LINES, "delay": 0, "lead": 20}])
+    s = Session(browser, "kill-unanswered-resume", viewport={"width": 1440, "height": 900})
+    p = s.page
+    p.goto(f"{base}/")
+    expect(p.locator("#look")).to_be_enabled(timeout=T)
+    s.fast()
+    expect(p.locator(".trace__line[data-step='2']")).to_be_visible(timeout=T)
+    p.click("#kill")
+    expect(p.locator("#job-pill")).to_have_text("halted", timeout=T)
+    looks = p.locator(".trace__line[data-step]").count() - 1                 # the halt record is not a move
+    p.click("#resume")
+    until(lambda: len(LIVE["jobs"]) == 2, "the Resume upload to reach the server", page=p)
+    p.click("#kill")
+    expect(p.locator("#job-pill")).to_have_text("stopped", timeout=12_000)
+    expect(p.locator("#job-text")).to_contain_text("Stopped before the resumed job’s first record: the server had not answered 8 s")
+    expect(p.locator("#job-text")).to_contain_text(f"The earlier run is still kept: Resume re-sends the photo and replays its {looks} move")
+    expect(p.locator("#job-text")).not_to_contain_text("Killed")
+    expect(p.locator("#resume")).to_be_visible()
+    assert len(LIVE["kills"]) == 1, "only the first run's KILL could be sent"
+    s.check_clean()
+    s.context.close()
+
+    # the job record came, KILL was sent, and no look arrives within 6 s (a cold Lambda, a loaded host)
+    reset_live([{"lines": JOB_LINES, "delay": 10}])
+    s = Session(browser, "kill-unconfirmed-early", viewport={"width": 1440, "height": 900})
+    p = s.page
+    p.goto(f"{base}/")
+    expect(p.locator("#look")).to_be_enabled(timeout=T)
+    p.click("#look")
+    expect(p.locator("#stages [data-stage='photo']")).to_have_class(re.compile("is-on"), timeout=T)   # the job record is in
+    p.click("#kill")
+    until(lambda: LIVE["kills"], "POST /api/kill", page=p)
+    expect(p.locator("#job-pill")).to_have_text("stopped", timeout=10_000)
+    expect(p.locator("#job-text")).to_contain_text("Stopped before the agent’s first look: the server did not confirm KILL within 6 s; "
+                                                   "the server may still be running it, up to its time cap.")
+    expect(p.locator("#resume")).to_be_hidden()
     s.check_clean()
     s.context.close()
 
@@ -1276,7 +1376,8 @@ def test_kill_the_server_never_confirms(browser, base):
     expect(p.locator("#resume")).to_be_visible()
     s.check_clean()
     s.context.close()
-    print("ok  KILL never confirmed: the upload is cancelled after 8 s, or the page stops showing the job after 6 s; neither is called a kill")
+    print("ok  KILL never confirmed: the upload is cancelled after 8 s (a Resume keeps the earlier run), or the page stops "
+          "showing the job after 6 s, with or without a look; none is called a kill")
 
 
 def test_contract_fields_in_words(browser, base):
@@ -1293,13 +1394,26 @@ def test_contract_fields_in_words(browser, base):
     expect(p.locator("#look")).to_be_enabled(timeout=T)
     s.fast()
     expect(p.locator("#job-pill")).to_have_text(DONE_LABEL, timeout=T)
-    expect(p.locator("#narrator-sub")).to_have_text("It stopped because the next look was worth less than its cost: step 9 says why.")
-    said = "the closer look saw exposed rebar where the coarser one saw crack: a person decides"
-    change = p.locator(".trace__line--review", has_text="class change")
-    expect(change).to_have_count(1)
+    sub = p.locator("#narrator-sub")
+    expect(sub).to_have_text("Stopped: the next look was worth less than its cost (trace #09).")
+    expect(p.locator(".trace__line[data-step]").last).to_have_attribute("data-step", "9")
+    assert sub.evaluate("e => e.scrollWidth <= e.clientWidth"), "the NOTE's stop line is cut off"
+    said = "the closer look saw exposed rebar where the coarser one saw crack"
+    change = p.locator(".trace__line--review", has_text="class change").filter(has_text="f1")
+    expect(p.locator(".trace__line--review", has_text="class change")).to_have_count(2)
     expect(change.locator(".chip")).to_have_text("class change")
-    expect(change.locator(".trace__why")).to_contain_text(f"{said} (same place: the two looks' masks overlap 62 %)")
+    expect(change.locator(".trace__why")).to_contain_text(f"{said} (same place: the two looks' masks overlap 62 %), so a person must check it")
     expect(card(p, "f1").locator(".review__why")).to_contain_text(said)
+    # a class change that names a draft: flagged for a person, never "a person decides", and the work order does not wait
+    draft = p.locator(".trace__line--review", has_text="class change").filter(has_text="f5")
+    expect(draft.locator(".trace__why")).to_have_text(
+        "because: the closer look saw crack where the coarser one saw exposed rebar (same place: the two looks' masks overlap 71 %), "
+        "so it is flagged for a person to look at (a draft: no sign-off)")
+    expect(card(p, "f5").locator(".finding__ask")).to_have_text(
+        "Flagged for a person to look at: the closer look saw crack where the coarser one saw exposed rebar (same place: the two "
+        "looks' masks overlap 71 %). No sign-off is needed for a draft, so the work order does not wait for it.")
+    expect(card(p, "f5").locator(".review")).to_have_count(0)
+    assert "a person decides" not in p.locator("#demo").inner_text()
     expect(p.locator(".trace__line--review .chip", has_text=re.compile("^disagree$"))).to_have_count(2)
     ambiguous = p.locator(".trace__line--review", has_text="ambiguous")
     expect(ambiguous.locator(".trace__why")).to_contain_text(
@@ -1311,7 +1425,8 @@ def test_contract_fields_in_words(browser, base):
     expect(card(p, "f2").locator(".review")).to_be_visible()                   # re-measured past the critical rule
     expect(card(p, "f2").get_by_role("button", name="Approve")).to_be_enabled()
     expect(p.locator(".trace__line--finding[data-finding='f2']")).to_have_count(2)   # drafted, then sent to a person
-    expect(p.locator(".trace__line--finding[data-finding='f2']").last).to_contain_text("human sign-off requested (re-measured: now critical)")
+    expect(p.locator(".trace__line--finding[data-finding='f2']").last).to_contain_text(
+        "Spalling · 52,000 px² → human sign-off requested (re-measured: now critical)")    # the measure and the rule agree
     expect(p.locator("#done .tile", has_text="critical, waiting for you").locator(".tile__v")).to_have_text("4")  # the done record agrees
     detail = p.locator("#step-detail")
     p.locator(".trace__line[data-step='4'] button").click()
@@ -1336,6 +1451,7 @@ def test_contract_fields_in_words(browser, base):
     seven = p.locator(".trace__line[data-step='7']")
     expect(seven.locator(".trace__why")).to_contain_text(
         "severity 1.5 (crack, seen at 1:4), unsure 0.58, 1 % not seen yet, a look costs about 26 ms")
+    expect(seven.locator(".trace__why")).to_contain_text("because (from the overview and #01): ")   # step 1 seeded r1
     expect(p.locator(".trace__line[data-step='5'] .trace__why")).to_contain_text(
         "severity 1 (the default: no class seen there at 1:4), unsure 0.31")
     seven.locator("button").click()
@@ -1458,6 +1574,7 @@ if __name__ == "__main__":
             test_desktop_mock(browser, base)
             test_live_api_contract(browser, base)
             test_guided(browser, base)
+            test_kill_during_a_paced_replay(browser, base)
             test_fits_on_screen(browser, base)
             test_phone_tools_never_overlap(browser, base)
             test_keyboard(browser, base)
