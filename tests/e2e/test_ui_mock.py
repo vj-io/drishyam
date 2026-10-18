@@ -425,7 +425,8 @@ def test_desktop_mock(browser, base):
     expect(p.locator("#bench details.data summary").last).to_have_text("Micro-benchmarks and provenance: test rig")  # folded away
     expect(p.locator("#bench .tbl caption")).to_be_hidden()
     expect(p.locator("#fail .fail")).to_have_count(1)
-    expect(p.locator("#bench-cool")).to_contain_text("COOL on Graviton: not run.")  # FIG. 4.3 and the banner say why, nothing pending
+    expect(p.locator("#t-bench-cool")).to_have_text("COOL on Graviton: not run")  # FIG. 4.3 and the banner say why, nothing pending
+    expect(p.locator("#bench-cool")).to_contain_text("The COOL Marketplace AMI could not be subscribed")
     expect(p.locator("#cool-status")).to_contain_text("COOL on Graviton: not run.")
     expect(p.locator("#video")).to_be_hidden()                    # no video shipped yet: no player, no link
     expect(p.locator("#video-link")).to_be_hidden()
@@ -924,7 +925,8 @@ def test_pending_states(browser, base):
     p.goto(f"{base}/")
     expect(p.locator("#bench")).to_contain_text("benchmarks pending", timeout=T)
     expect(p.locator("#fail")).to_contain_text("failure gallery pending")
-    expect(p.locator("#bench-cool")).to_contain_text("COOL on Graviton: not run.")   # static: it does not wait for a file
+    expect(p.locator("#t-bench-cool")).to_have_text("COOL on Graviton: not run")   # static: it does not wait for a file
+    expect(p.locator("#bench-cool")).to_contain_text("The COOL Marketplace AMI could not be subscribed")
     expect(p.locator("#cool-status")).to_contain_text("COOL on Graviton: not run.")
     expect(p.locator("#video")).to_be_hidden()                    # no video shipped yet: no player, no link
     expect(p.locator("#video-link")).to_be_hidden()
