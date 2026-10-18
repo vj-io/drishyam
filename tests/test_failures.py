@@ -34,7 +34,30 @@ def test_a_formwork_crack_says_which_look_kept_it(tmp_path):
     (row,) = gallery(tmp_path, rec, {"drishyam@0.3": {"preds": [pred], "trace": trace}})
     assert row["category"] == "Formwork line read as crack"
     assert "kept it at the look that drafted it (step 1, L2, where a residual counts 4x in L0 px)" in row["what_happened"]
-    assert "no full-resolution look covered it afterwards (finest: L2)" in row["what_happened"]
+    assert "and no later look covered it." in row["what_happened"]  # step 2's window misses the line's centre
+
+
+def test_a_formwork_crack_counts_only_the_looks_after_its_draft(tmp_path):
+    """The look that drafted the crack, and any look before it, are not 'a later look'."""
+    rec = {"id": "s0004", "boxes": [], "distractors": [{"kind": "formwork_line", "box": [1200, 400, 640, 48]}]}
+    pred = {"cls": "crack", "box": [1216, 412, 624, 40], "area": 5744, "conf": 0.88, "step": 3, "level": 1, "region": "s0"}
+    window = [1016, -80, 1024, 1024]
+    early = [look(1, 2, [0, -256, 2048, 2048]), look(2, 0, [1272, 176, 512, 512]), look(3, 1, window)]
+    (row,) = gallery(tmp_path, rec, {"drishyam@0.3": {"preds": [pred], "trace": early}})
+    assert "(step 3, L1, where a residual counts 2x in L0 px), and no later look covered it." in row["what_happened"]
+    assert "a later full-resolution look" not in row["what_happened"]
+    late = early + [look(4, 0, [1272, 176, 512, 512])]
+    (row,) = gallery(tmp_path, rec, {"drishyam@0.3": {"preds": [pred], "trace": late}})
+    assert "; a later full-resolution look covered it, but a later look never withdraws" in row["what_happened"]
+
+
+def test_a_formwork_crack_drafted_at_full_resolution_says_the_test_ran_there(tmp_path):
+    rec = {"id": "s0005", "boxes": [], "distractors": [{"kind": "formwork_line", "box": [1200, 400, 640, 48]}]}
+    pred = {"cls": "crack", "box": [1216, 412, 624, 40], "area": 5744, "conf": 0.88, "step": 3, "level": 0, "region": "s0"}
+    trace = [look(1, 2, [0, -256, 2048, 2048]), look(3, 0, [1272, 176, 512, 512])]
+    (row,) = gallery(tmp_path, rec, {"drishyam@0.3": {"preds": [pred], "trace": trace}})
+    assert "ran at full resolution on the look that drafted it (step 3, L0) and kept it" in row["what_happened"]
+    assert "later" not in row["what_happened"]
 
 
 def test_a_glare_case_says_the_window_is_listed_not_assessed(tmp_path):

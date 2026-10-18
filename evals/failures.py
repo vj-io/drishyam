@@ -50,14 +50,20 @@ def _visits(trace, gt_box):
 
 def _straight_line_miss(trace, p) -> str:
     """Why a crack finding on a formwork line got past the straight-line test, from the run's own record. The test
-    judges a centreline's residual in L0 px (drishyam/segment.py), so a look at L kept the line if its residual
-    was under 1.5 / 2**L view px; a later look never withdraws a finding an earlier look drafted."""
-    fine = min((t["level"] for t in _visits(trace, p["box"]) if t.get("q_ok", True) and t["level"] is not None), default=None)
+    judges a centreline's residual in L0 px (drishyam/segment.py), so a look at L removes the line only if its
+    residual is under 1.5 / 2**L view px, and keeps it otherwise; a later look never withdraws a finding an
+    earlier look drafted. Only looks after the drafting one (p's step) count as later."""
+    if p["level"] == 0:
+        return (f" The straight-line test ran at full resolution on the look that drafted it (step {p['step']}, L0) and kept it: "
+                "its centreline was not within 1.5 px (RMS) of one straight line over at least 20x its width.")
+    later = [t["level"] for t in _visits(trace, p["box"])
+             if t["step"] > p["step"] and t.get("q_ok", True) and t["level"] is not None]
     drafted = (f" The straight-line test kept it at the look that drafted it (step {p['step']}, L{p['level']}, where a residual "
                f"counts {2 ** p['level']}x in L0 px)")
-    if fine is None or fine > 0:
-        return drafted + f", and no full-resolution look covered it afterwards (finest: L{fine if fine is not None else p['level']})."
-    return drafted + "; a later full-resolution look covered it, but a later look never withdraws a drafted finding."
+    if 0 in later:
+        return drafted + "; a later full-resolution look covered it, but a later look never withdraws a drafted finding."
+    return drafted + (f", and no later look was at full resolution (finest later look: L{min(later)})." if later
+                      else ", and no later look covered it.")
 
 
 # ---------------------------------------------------------------- finders: each yields cases for one image
