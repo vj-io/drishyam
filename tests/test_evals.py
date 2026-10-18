@@ -20,7 +20,9 @@ class BlankSegmenter:
         h, w = crop.shape[:2]
         probs = np.zeros((len(CLASSES), h, w), np.float32)
         probs[0] = 1
-        return finish(probs, 0.0, model)
+        out = finish(probs, 0.0, model)
+        out.net_px = None  # an engine that does not say what it computed on: costs fall back to pixels read
+        return out
 
 
 class NetSegmenter(BlankSegmenter):
