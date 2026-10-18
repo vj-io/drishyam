@@ -127,8 +127,9 @@ function railcall(n, big, label, t0, t1) { CALLS.push({ n, big, label, t0, t1 })
 const ORDER = F.order, SC = F.scenes;
 const TITLES = { open: 'Cold open', team: 'Team', problem: 'Problem and user', live: 'Live demo on AWS', break: 'Failure drills, human control', mcp: 'An LLM over MCP',
   arch: 'Architecture', results: 'Principal results', failures: 'Failure cases', limits: 'Limits', repro: 'Reproduce', end: 'Links' };
-const STRIPB = { open: 'live recording, synthetic sample photo bridge_03', team: 'OpenCV AI Competition 2026, powered by AWS · Agentic Vision entry',
-  problem: 'sources: docs/impact-sources.md', live: `recorded on ${D.urls.live.replace('https://', '')}, 2026-10-18`, break: 'live: drills injected on purpose',
+const LIT = D.lit, ENTRY = `${LIT.competition} · ${LIT.award} entry`;
+const STRIPB = { open: 'live recording, synthetic sample photo bridge_03', team: ENTRY,
+  problem: 'sources: docs/impact-sources.md', live: `recorded on ${D.urls.live.replace('https://', '')}, ${LIT.recorded}`, break: 'live: drills injected on purpose',
   mcp: 'docs/mcp-session: a recorded Claude session', arch: 'docs/architecture.png · docs/agent-loop.svg · public/docs/aws-simple.svg',
   results: 'public/results/*.json, final classical-engine run', failures: 'public/results/failures.json', limits: 'pixels, not millimetres', repro: D.urls.repo.replace('https://', ''), end: '' };
 
@@ -169,7 +170,7 @@ const RAILNOTE = {
   live: () => `Live job <b>${D.guided.job}</b> on ${D.health.host}, ${D.health.arch}, OpenCV ${D.health.opencv}. Retimed to the voice: the speed is shown in the window bar.`,
   break: () => 'Faults injected on purpose: a malformed planner reply, a slowed segmenter, a planner that stalls.',
   mcp: () => 'Calls, values and reasons are copied from <b>exchange.jsonl</b>.',
-  results: () => 'Classical segmenter, fixed per-call costs from the arm64 benchmark.',
+  results: () => 'Classical segmenter, governor off, fixed per-call costs from the arm64 benchmark.',
   failures: () => 'CODEBRIM photos are never shown: its licence bars sharing them.',
 };
 
@@ -190,7 +191,7 @@ function buildOpen() {
   const fw = new Footage(S.e, 1530, 836, D.urls.live.replace('https://', ''), F.warp.open, [
     KF(ev['step:1'] - 0.2, 360, 520, 760), KF(ev['step:3'], 340, 560, 640), KF(ev['step:4'] + 1.4, 330, 600, 560),
     KF(ev['click:Sign them off'] + 0.9, 340, 700, 760), KF(ev['click:Sign them off'] + 2.6, 330, 690, 700)]);
-  const big = el('div', 'title', S.e, '<div class="h1" style="font-size:120px">ONE PHOTO · A FEW LOOKS<br>ONE HUMAN</div><div class="lab" style="margin-top:26px;font-size:26px">the site’s own figure note, public/index.html</div>');
+  const big = el('div', 'title', S.e, `<div class="h1" style="font-size:120px">${LIT.title.split(', ').slice(0, 2).join(' · ')}<br>${LIT.title.split(', ')[2]}</div><div class="lab" style="margin-top:26px;font-size:26px">the site’s own figure note, public/index.html</div>`);
   css(big, { top: '230px' });
   const veil = el('div', 'abs', S.e); css(veil, { inset: 0, background: 'var(--chest)' });
   S.draws.push(async (t) => {
@@ -227,12 +228,11 @@ const typed = (text, p) => text.slice(0, Math.round(text.length * clamp(p)));
 // 2. team: two title blocks, drawn by a pen, the camera on the one being read
 function buildTeam() {
   const S = scene('team'), s = SC.team, B = boardView(S.e), H = B.board;
-  el('div', 'abs', H, '<span class="fig">FIG. 0</span> <span class="lab" style="margin-left:14px;font-size:24px">OpenCV AI Competition 2026, powered by AWS · Agentic Vision entry</span>').style.cssText = 'left:0;top:40px';
-  const cards = [['LEAD ENGINEER', 'Vaibhav Jangid', ['agent policy', 'OpenCV pipeline', 'evaluation', 'AWS deployment']],
-    ['DESIGN, DEMO AND PRESENTATION', 'Bhavya Dhoot', ['site design', 'video']]];
-  const T = [at('t1') + 0.5, at('t2') + LINE.t2.dur * 0.45];
+  el('div', 'abs', H, `<span class="fig">FIG. 0</span> <span class="lab" style="margin-left:14px;font-size:24px">${ENTRY}</span>`).style.cssText = 'left:0;top:40px';
+  const cards = LIT.team.map((x) => { const [, name, role, did] = x.match(/^([^,]+), (.+) \((.+)\)$/); return [role.toUpperCase(), name, did.split(', ')]; });   // README.md's Team lines
+  const T = [s.t0 + 0.25, at('t2') + LINE.t2.dur * 0.45];
   cards.forEach(([role, name, did], i) => {
-    const x = i * 775, y = 150, w = 740, h = 560, box = el('div', 'abs', H); css(box, { left: x + 'px', top: y + 'px', width: w + 'px', height: h + 'px' });
+    const x = i * 900, y = 150, w = 740, h = 560, box = el('div', 'abs', H); css(box, { left: x + 'px', top: y + 'px', width: w + 'px', height: h + 'px' });
     const sv = svgEl('svg', { width: w, height: h, viewBox: `0 0 ${w} ${h}`, class: 'abs' }, box);
     const r = svgEl('rect', { x: 3, y: 3, width: w - 6, height: h - 6, fill: 'rgba(11,50,100,.92)', stroke: '#E8F1FF', 'stroke-width': 3, pathLength: 1, 'stroke-dasharray': 1 }, sv);
     const rows = [92, 300].map((yy) => svgEl('path', { d: `M3 ${yy}H${w - 3}`, stroke: '#B8CDEC', 'stroke-width': 2.5, pathLength: 1, 'stroke-dasharray': 1 }, sv));
@@ -259,7 +259,7 @@ function buildTeam() {
     });
     cue(T[i], 'scribble', 1.1); cue(T[i] + 0.8, 'type', 0.8); did.forEach((_, j) => cue(T[i] + 1.6 + j * 0.35, 'tick', j + 2 * i));
   });
-  const cam = camBoard(B, [[s.t0, 765, 430, 1660], [T[0] - 0.2, 380, 430, 1180], [T[1] - 0.3, 1150, 430, 1180], [end('t2') - 0.2, 765, 430, 1660]]);
+  const cam = camBoard(B, [[s.t0, 380, 430, 1180], [T[1] - 0.3, 1330, 430, 1180], [end('t2') - 0.2, 820, 430, 1800]]);
   S.draws.unshift(cam);
 }
 
@@ -269,11 +269,11 @@ function buildProblem() {
   const col = (x, w) => { const e = el('div', 'abs', H); css(e, { left: x + 'px', top: '40px', width: w + 'px' }); return e; };
   const c1 = col(0, 560), c2 = col(600, 400), c3 = col(1040, 490);
   c1.innerHTML = `<div class="lab">US bridges</div><div class="h1 amber" style="font-size:132px;margin-top:14px" data-k="b">0</div>
-    <div class="mono" style="margin-top:10px"><span data-k="p">0</span> in poor condition</div><div class="src" style="margin-top:12px">FHWA, Bridge Condition by Highway System 2026</div>`;
+    <div class="mono" style="margin-top:10px"><span data-k="p">0</span> in poor condition</div><div class="src" style="margin-top:12px">${LIT.cites[0]}</div>`;
   c2.innerHTML = `<div class="lab">Routine inspection</div><div class="h1 amber" style="font-size:132px;margin-top:14px">≤ <span data-k="m">0</span></div>
-    <div class="mono" style="margin-top:10px">months apart</div><div class="src" style="margin-top:12px">23 CFR 650.311</div>`;
-  c3.innerHTML = `<div class="lab">One drone inspection, one bridge</div><div class="h1 amber" style="font-size:132px;margin-top:14px" data-k="h">0</div>
-    <div class="mono" style="margin-top:10px">photos</div><div class="src" style="margin-top:12px">ODOT/FHWA SPR 787, St. Johns Bridge</div>`;
+    <div class="mono" style="margin-top:10px">months apart</div><div class="src" style="margin-top:12px">${LIT.cites[1]}</div>`;
+  c3.innerHTML = `<div class="lab">Largest of ${I.n_bridges} drone inspections</div><div class="h1 amber" style="font-size:132px;margin-top:14px" data-k="h">0</div>
+    <div class="mono" style="margin-top:10px">photos, one bridge (others: ${I.others[0]}–${I.others[1]})</div><div class="src" style="margin-top:12px">ODOT/FHWA ${LIT.cites[2]}, ${LIT.cites[3]}</div>`;
   const q = (k) => H.querySelector(`[data-k="${k}"]`);
   const cv = el('canvas', 'abs', H); cv.width = 1530; cv.height = 300; css(cv, { left: '0px', top: '420px' });
   const g = cv.getContext('2d');
@@ -286,14 +286,14 @@ function buildProblem() {
     const p1 = eo(seg(t, T1, T1 + 2.2)), p2 = eo(seg(t, T2, T2 + 1.2)), p3 = seg(t, T3, T3 + D3);
     q('b').textContent = Math.round(nb * p1).toLocaleString('en-US'); q('p').textContent = Math.round(np * p1).toLocaleString('en-US');
     q('m').textContent = Math.round(nm * p2); q('h').textContent = Math.round(nh * p3).toLocaleString('en-US');
-    c1.style.opacity = seg(t, T1 - 0.3, T1); c2.style.opacity = seg(t, T2 - 0.3, T2); c3.style.opacity = seg(t, T3 - 0.3, T3);
+    c1.style.opacity = seg(t, s.t0, s.t0 + 0.3); c2.style.opacity = seg(t, T2 - 0.3, T2); c3.style.opacity = seg(t, T3 - 0.3, T3);
     g.clearRect(0, 0, 1530, 300); const n = Math.round(nh * p3), cols = 127, sz = 10, gap = 2;   // one small square per photo
     g.fillStyle = 'rgba(232,241,255,.12)'; if (t > T3 - 0.3) for (let i = 0; i < nh; i++) g.fillRect((i % cols) * (sz + gap), Math.floor(i / cols) * (sz + gap) + 30, sz, sz);
     g.fillStyle = '#FFC857'; for (let i = 0; i < n; i++) g.fillRect((i % cols) * (sz + gap), Math.floor(i / cols) * (sz + gap) + 30, sz, sz);
     const u = eo(seg(t, T4, T4 + 0.6)); css(user, { opacity: u, transform: `translateX(${((1 - u) * -30).toFixed(1)}px)` });
   });
-  S.draws.unshift(camBoard(B, [[s.t0, 765, 418, 1660], [T1 - 0.2, 420, 260, 1060], [T2 - 0.2, 820, 260, 1060], [T3 - 0.2, 1080, 320, 1100],
-    [T3 + D3 * 0.55, 765, 560, 1450], [T4 + 0.2, 765, 620, 1660], [end('p3') - 0.6, 700, 660, 1400]]));
+  S.draws.unshift(camBoard(B, [[s.t0, 765, 418, 1700], [T1 - 0.2, 490, 260, 1100], [T2 - 0.2, 490, 250, 1100], [T3 - 0.2, 1090, 300, 1080],
+    [T3 + D3 * 0.55, 765, 440, 1760], [T4 + 0.2, 765, 450, 1760], [end('p3') - 0.6, 765, 460, 1740]]));   // full shots: the figures stay whole over the waffle
   cue(T1, 'count', 2.2); cue(T2, 'count', 1.2); cue(T3, 'count', D3); cue(T4, 'switch');
 }
 
@@ -311,10 +311,12 @@ function buildLive() {
     css(this.cam, { transform: `translate(${(this.sw / 2 - c[0] * z).toFixed(2)}px,${(this.sh / 2 - c[1] * z).toFixed(2)}px) scale(${z.toFixed(4)})` });
     this.tag.textContent = 'GET /api/health'; this.tag.className = 'tag'; this.A.style.opacity = 1; this.B.style.opacity = 0; css(this.cur, { opacity: 0 });
   };
-  const keys = [['"opencv":"5.0.0"', 'opencv', D.health.opencv, `build: ${D.health.build}`], ['"host":"aws-lambda"', 'host', D.health.host, 'behind CloudFront'], ['"arch":"aarch64"', 'arch', D.health.arch, 'arm64 (Graviton)']];
+  const keys = [['"opencv":"5.0.0"', 'opencv', D.health.opencv, `build: ${D.health.build}`], ['"host":"aws-lambda"', 'host', D.health.host, 'behind CloudFront'], ['"arch":"aarch64"', 'arch', D.health.arch, LIT.graviton]];
   const lead = svgEl('svg', { width: 1530, height: 836, class: 'abs', style: 'left:0;top:0;z-index:2' }, hw);
+  const JSON_BOTTOM = Math.max(...Object.values(F.health_boxes).map(([r]) => r[1] + r[3]));   // the last line of the response
   const hls = keys.map(([k, name, val, sub], i) => {
     const e = el('div', 'hl', H.overlays), r = F.health_boxes[k][0], T = at('l1') + 0.7 + i * 0.75;
+    css(e, { border: '0', boxShadow: 'none', background: 'rgba(255,200,87,.42)' });
     const box = el('div', 'box amb', hw, `<div class="lab">${name}</div><div class="h1 amber" style="font-size:66px;margin:14px 0 12px;white-space:nowrap">${val}</div><div class="mono" style="font-size:24px">${sub}</div>`);
     css(box, { left: 30 + i * 490 + 'px', top: '440px', width: '470px', height: '250px', padding: '22px 26px' });
     const path = svgEl('path', { fill: 'none', stroke: '#FFC857', 'stroke-width': 3.5, pathLength: 1, 'stroke-dasharray': 1 }, lead);
@@ -333,21 +335,22 @@ function buildLive() {
     KF(ev['step:5'] + 0.3, 420, 560, 1000), KF(ev['done:guided'] + 0.3, 560, 330, 1080),
     KF(ev['click:Sign them off'], 640, 560, 1240), KF(ev['click:Sign them off'] + 2.6, 330, 720, 840),
     KF(ev['click:Approve#0'] + 0.6, 330, 760, 720), KF(ev['approved:1'] - 1.6, 330, 560, 760), KF(ev['approved:2'] + 0.4, 640, 470, 1240), KF(ev['approved:2'] + 2.2, 940, 420, 900)]);
-  railcall(2, `${fmt(D.guided.entropy1)} &gt; 0.5`, 'entropy at L3: unsure, so it zooms in', at('l4') + 0.3, end('l4') + 0.3);
-  railcall(4, `IoU ${fmt(D.guided.iou, 3)}`, 'L1 vs L0, under 0.5: the looks disagree, a person decides', at('l6') + 0.3, end('l6') + 0.3);
+  railcall(2, `${fmt(D.guided.entropy1)} &gt; ${D.guided.tau}`, 'entropy at L3: unsure, so it zooms in', at('l4') + 0.3, end('l4') + 0.3);
+  railcall(4, `IoU ${fmt(D.guided.iou, 3)}`, `mask IoU, L1 vs L0, under ${D.guided.iou_min}: unconfirmed. Exposed rebar always goes to a person`, at('l6') + 0.3, end('l6') + 0.3);
+  railcall('×', `${D.guided.missed.join(', ')} missed`, `the stop left regions ${D.guided.unvisited.join(' and ')} unvisited; the ${D.guided.missed[0]} in ${D.guided.unvisited[0]} was never seen`, at('l7') + LINE.l7.dur * 0.4, end('l7') + 0.3);
   railcall('✓', 'a person', 'approves each critical finding; the server signs', at('l9') + 0.3, end('l9') + 0.3);
   railcall('!', `HTTP ${D.tamper.status}`, D.tamper.error, at('l11') + 1.4, end('l11') + 0.6);
   // c. the tampered token, answered by the server
   const term = el('div', 'term', S.e); css(term, { right: '28px', bottom: '28px', width: '980px', zIndex: 9 });
-  const L1 = `<span class="p">POST</span> /api/review   token: the work order's, one character`, L2 = '     of its HMAC-SHA256 signature changed',
+  const L1 = `<span class="p">POST</span> /api/review   token: the work order's, one character`, L2 = `     of its ${D.aws.hmac} signature changed`,
     L3 = `<span class="no">HTTP ${D.tamper.status}</span>  {"error": "${D.tamper.error}"}`;
   S.draws.push(async (t) => {
     const x = seg(t, F.warp.live.t0 - 0.2, F.warp.live.t0 + 0.25);
     hw.style.opacity = 1 - x; fw2.style.opacity = x;
-    if (t < F.warp.live.t0 + 0.3) { H.draw(t); hls.forEach((h) => { const p = seg(t, h.T, h.T + 0.3); const [sx, sy] = H.toScreen(h.r[0] - 6, h.r[1] - 5, H.c);
-      const bw = (h.r[2] + 12) * H.c[2], bh = (h.r[3] + 10) * H.c[2];
-      css(h.e, { opacity: p, left: sx + 'px', top: sy + 'px', width: bw + 'px', height: bh + 'px', transform: `scale(${(1.25 - 0.25 * eo(p)).toFixed(3)})` });
-      const x0 = 3 + sx + bw / 2, y0 = 49 + sy + bh, x1 = 30 + h.i * 490 + 235, y1 = 440, q = eio(seg(t, h.T + 0.15, h.T + 0.6));
+    if (t < F.warp.live.t0 + 0.3) { H.draw(t); hls.forEach((h) => { const p = seg(t, h.T, h.T + 0.3); const [sx, sy] = H.toScreen(h.r[0] - 3, h.r[1], H.c);
+      const bw = (h.r[2] + 6) * H.c[2], bh = h.r[3] * H.c[2], below = H.toScreen(0, JSON_BOTTOM + 4, H.c)[1];
+      css(h.e, { opacity: p, left: sx + 'px', top: sy + 'px', width: bw + 'px', height: bh + 'px', transform: `scale(${(1.15 - 0.15 * eo(p)).toFixed(3)})` });
+      const x0 = 3 + sx + bw / 2, y0 = 49 + below, x1 = 30 + h.i * 490 + 235, y1 = 440, q = eio(seg(t, h.T + 0.15, h.T + 0.6));
       h.path.setAttribute('d', `M${x0.toFixed(1)} ${y0.toFixed(1)} V${((y0 + y1) / 2).toFixed(1)} H${x1} V${y1}`); h.path.setAttribute('stroke-dashoffset', 1 - q);
       h.dot.setAttribute('cx', x0); h.dot.setAttribute('cy', y0); h.dot.setAttribute('opacity', p);
       const bq = seg(t, h.T + 0.5, h.T + 0.8); css(h.box, { opacity: bq, transform: `translateY(${((1 - eo(bq)) * 24).toFixed(1)}px)` }); });
@@ -382,39 +385,39 @@ function buildBreak() {
 // 6. an LLM over MCP: the recorded call table, one call at a time, and the crops Claude looked at
 function buildMcp() {
   const S = scene('mcp'), s = SC.mcp, m = D.mcp, B = boardView(S.e), H = B.board;
-  el('div', 'abs lab', H, 'docs/mcp-session · Claude (Opus 5.5) in Claude Code → drishyam mcp over stdio · job j_90a925').style.cssText = 'left:0;top:0;font-size:21px';
-  const crops = [['../docs/mcp-session/crops/img-004-1.jpg', 'call 4 · gaze L1: three rust bars'], ['../docs/mcp-session/crops/img-016-1.jpg', 'call 16 · gaze L1: a spall']];
+  el('div', 'abs lab', H, `docs/mcp-session · ${LIT.client} → drishyam mcp over stdio · job ${m.job}`).style.cssText = 'left:0;top:0;font-size:21px';
+  const crops = [['crops/img-004-1.jpg', 'three rust bars'], ['crops/img-016-1.jpg', 'a spall']].map(([f, lab]) => ['../docs/mcp-session/' + f, `call ${m.crops[f][0]} · gaze L${m.crops[f][1]}: ${lab}`]);
   const cx = crops.map(([src, lab], i) => { const b = el('div', 'abs', H); css(b, { left: '0px', top: 52 + i * 394 + 'px', width: '340px', height: '380px' });
     const im = img(src, b); css(im, { position: 'absolute', left: 0, top: 0, width: '340px', height: '340px', border: '3px solid var(--line)' });
     el('div', 'src', b, lab).style.cssText = 'position:absolute;left:0;top:350px;width:340px;color:var(--line-2)'; return b; });
-  railcall(m.call_a, `IoU ${fmt(m.iou_a)}`, `L1 vs L0 at call ${m.call_a}: the rebar goes to a human`, at('m2') + 0.3, end('m2') + 0.3);
+  railcall(m.call_a, `IoU ${fmt(m.iou_a)}`, `mask IoU, L1 vs L0 at call ${m.call_a}: they disagree; exposed rebar is always critical`, at('m2') + 0.3, end('m2') + 0.3);
   railcall(m.call_b, `IoU ${fmt(m.iou_b)}`, `at call ${m.call_b}: the spall is confirmed`, at('m3') + 0.3, at('m3') + LINE.m3.dur * 0.55);
   const box = el('div', 'abs', H); css(box, { left: '380px', top: '52px', width: '1150px', height: '650px', overflow: 'hidden', border: '3px solid var(--line)', background: 'rgba(8,42,85,.95)' });
   const tbl = el('table', 't', box); css(tbl, { position: 'absolute', left: 0, top: 0, width: '1144px', fontSize: '23px' });
   tbl.innerHTML = '<tr><th>#</th><th>call</th><th>what came back</th></tr>' + m.rows.map((r) => `<tr data-n="${r.n}"><td class="n">${r.n}</td><td>${r.call}</td><td style="white-space:normal">${r.got}</td></tr>`).join('');
-  const why = el('div', 'box amb', H); css(why, { left: '380px', top: '722px', width: '1150px', height: '110px', padding: '14px 20px', font: '400 23px/1.4 var(--fm)', whiteSpace: 'normal' });
+  const why = el('div', 'box amb', H); css(why, { left: '380px', top: '714px', width: '1150px', minHeight: '104px', padding: '12px 20px', font: '400 21px/1.38 var(--fm)', whiteSpace: 'normal' });
   const R = (n) => m.rows.find((r) => r.n === n);
   // m1: the 23 calls stream in, one at a time; then the camera goes back to the three that decided something
-  const T0 = at('m1') + 0.3, T1 = end('m1') + 0.2, N = m.rows.length;
+  const T0 = at('m1') + 0.3, T1 = end('m1') + 0.2, N = m.rows.length, IA = m.rows.findIndex((r) => r.n === m.call_a);
   const beats = [{ n: m.call_a, T: at('m2') + 0.2, cls: 'bad', why: R(m.call_a + 1).why },
     { n: m.call_b, T: at('m3') + 0.2, cls: 'good', why: R(m.call_b).why }, { n: m.call_c, T: at('m3') + LINE.m3.dur * 0.55, cls: 'good', why: R(m.call_c).why },
-    { n: m.rows[N - 1].n, T: at('m4') + 0.2, why: 'Missed: the large spall around the rebar (box 1326,1296,570,529). Logged: the rebar, the crack and the small spall (transcript.md).' }];
-  for (let k = 0; k < N; k++) cue(T0 + (T1 - T0) * k / N, 'tick', k % 9);
+    { n: m.rows[N - 1].n, T: at('m4') + 0.2, why: `Missed: the large spall around the rebar (box ${m.missed_box}). Logged: the rebar, the crack and the small spall (transcript.md).` }];
+  for (let k = 0; k <= IA; k++) cue(T0 + (T1 - T0) * k / (IA + 1), 'tick', k % 9);
   beats.forEach((b) => cue(b.T, 'switch'));
   const rows = () => [...tbl.querySelectorAll('tr[data-n]')];
   S.draws.push((t) => {
     const rs = rows(); let i, cls = '', w;
     if (t < beats[0].T - 0.4) {                                        // streaming
-      const k = clamp(Math.floor(seg(t, T0, T1) * N), 0, N - 1);
+      const k = clamp(Math.floor(seg(t, T0, T1) * (IA + 1)), 0, IA);
       rs.forEach((r, j) => { r.style.opacity = j <= k ? 1 : 0.08; });
       i = k; w = R(m.rows[k].n).why;
       const y = rs[k].offsetTop; tbl.style.transform = `translateY(${(-clamp(y - 470, 0, tbl.offsetHeight - 644)).toFixed(1)}px)`;
     } else {
-      rs.forEach((r) => { r.style.opacity = 1; });
       let b = beats[0]; for (const x of beats) if (t >= x.T) b = x;
       const prev = beats[Math.max(0, beats.indexOf(b) - 1)];
-      i = m.rows.findIndex((r) => r.n === b.n); const ip = b === beats[0] ? N - 1 : m.rows.findIndex((r) => r.n === prev.n);
-      const p = eio(seg(t, b.T - 0.5, b.T + 0.3)), y = lerp(rs[ip].offsetTop, rs[i].offsetTop, p);
+      i = m.rows.findIndex((r) => r.n === b.n); const ip = b === beats[0] ? IA : m.rows.findIndex((r) => r.n === prev.n);
+      const p = eio(seg(t, b.T - 0.5, b.T + 0.3)), y = lerp(rs[ip].offsetTop, rs[i].offsetTop, p), shown = lerp(ip, i, p);
+      rs.forEach((r, j) => { r.style.opacity = j <= shown + 0.5 ? 1 : 0.08; });
       tbl.style.transform = `translateY(${(-clamp(y - 250, 0, tbl.offsetHeight - 644)).toFixed(1)}px)`;
       cls = b.cls || ''; w = b.why;
     }
@@ -423,7 +426,7 @@ function buildMcp() {
     cx.forEach((c, k) => { const qq = k === 0 ? seg(t, at('m2') - 0.2, at('m2') + 0.3) * (1 - seg(t, at('m3') - 0.2, at('m3'))) : seg(t, at('m3') - 0.2, at('m3') + 0.3);
       css(c, { opacity: 0.35 + 0.65 * qq, transform: `scale(${(0.96 + 0.04 * qq).toFixed(3)})` }); });
   });
-  S.draws.unshift(camBoard(B, [[s.t0, 765, 418, 1680], [T0 + 0.5, 780, 418, 1620], [at('m2') - 0.1, 750, 410, 1600], [at('m3') - 0.1, 780, 430, 1600], [at('m4'), 765, 418, 1680]], 0.04));
+  S.draws.unshift(camBoard(B, [[s.t0, 765, 418, 1720], [T0 + 0.5, 765, 418, 1700], [at('m2') - 0.1, 765, 410, 1690], [at('m3') - 0.1, 765, 430, 1690], [at('m4'), 765, 418, 1720]], 0.04));
 }
 
 // 7. architecture: one board, a camera flying across the three diagrams
@@ -432,23 +435,24 @@ function buildArch() {
   const view = el('div', 'abs', S.e); css(view, { inset: 0, overflow: 'hidden', border: '3px solid var(--line)', background: '#0b2e5c' });
   const board = el('div', 'abs', view); css(board, { left: 0, top: 0, transformOrigin: '0 0' });
   const A = img('../docs/architecture.png', board); css(A, { position: 'absolute', left: '0px', top: '0px', width: '2680px', height: '3280px' });
-  const L = img('../docs/agent-loop.svg', board); css(L, { position: 'absolute', left: '2900px', top: '0px', width: '2680px', height: '2472px' });
-  const W = img('../public/docs/aws-simple.svg', board); css(W, { position: 'absolute', left: '5800px', top: '0px', width: '900px', height: '1650px', background: '#0F3B73' });
-  const chip = el('div', 'callout', S.e, `<span class="n">★</span><span>step p95 on Lambda <em>${D.aws.p95} ms</em> · runs/aws-smoke.log</span>`); css(chip, { left: '40px', bottom: '40px' });
-  const chip2 = el('div', 'callout', S.e, '<span class="n">!</span><span>COOL on Graviton: <em>not run</em></span>'); css(chip2, { left: '40px', bottom: '120px' });
+  // far enough apart that each diagram's whole view (its height / 0.92 for the push) shows none of the others
+  const LX = 4700, WX = 8650;
+  const L = img('../docs/agent-loop.svg', board); css(L, { position: 'absolute', left: LX + 'px', top: '0px', width: '2680px', height: '2472px' });
+  const W = img('../public/docs/aws-simple.svg', board); css(W, { position: 'absolute', left: WX + 'px', top: '0px', width: '900px', height: '1650px', background: '#0F3B73' });
+  // the Lambda numbers go on the rail, beside the diagram, never over its text
+  railcall('★', `${fmt(D.aws.p95[0], 1)}–${fmt(D.aws.p95[1], 1)} ms`, `step p95 on Lambda: ${D.aws.smoke_runs} smoke runs, ${D.aws.smoke_steps.join('/')} steps each. COOL on Graviton: not run`, at('a5') + 0.5, end('a5') + 0.4);
   const VW = 1524, VH = 830;
   const a0 = at('a0'), d = (id, f) => at(id) + LINE[id].dur * f;
-  const K = [[a0 - 0.6, 4240, 1236, 2700], [a0 + 0.9, 3400, 900, 1350], [d('a0', 0.38), 4280, 900, 1350], [d('a0', 0.62), 5140, 900, 1350], [d('a0', 0.86), 4240, 1960, 1800],
-    [at('a1') + 0.2, 6250, 430, 1150], [d('a1', 0.55), 6250, 1180, 1150],
-    [at('a2') + 0.1, 1500, 790, 950], [d('a2', 0.4), 1500, 1000, 950], [d('a2', 0.75), 1500, 1210, 950],
-    [at('a3') + 0.1, 760, 2330, 1350], [d('a3', 0.36), 1930, 2330, 1350], [d('a3', 0.7), 760, 2640, 1350],
-    [at('a4') + 0.1, 1667, 2622, 640], [d('a4', 0.55), 1560, 2622, 640], [at('a5') + 0.1, 600, 1320, 1050], [d('a5', 0.5), 600, 1190, 1250]];
+  const whole = (h) => h * VW / VH / 0.92;   // the width that shows a diagram of height h whole, even at the end of the push
+  // crops: each view's edges, at the start of the hold and after the 8 % push, fall in text-free bands of the diagram
+  // each diagram is held whole for a beat first (the agent loop, the AWS path, the system sheet), then the camera reads it box by box
+  const K = [[a0 - 0.6, LX + 1340, 1236, whole(2472)], [d('a0', 0.5), LX + 1340, 932, 2846], [d('a0', 0.8), LX + 1340, 2430, 2938],
+    [at('a1'), WX + 450, 825, whole(1650)], [d('a1', 0.5), WX + 450, 360, 1150], [d('a1', 0.78), WX + 450, 1122, 1790],   // the AWS path whole, then boxes 1-2 and 3-7 with their titles whole
+    [at('a2'), 1340, 1640, whole(3280)], [d('a2', 0.45), 1500, 850, 950], [d('a2', 0.75), 1500, 1110, 950],
+    [at('a3') + 0.1, 1975, 2427, 1300], [d('a3', 0.5), 734, 2427, 1320],   // OpenCV layer: pyramid and saliency, then the virtual PTZ, blur gate and privacy pass
+    [at('a4') + 0.1, 1668, 2601, 620], [d('a4', 0.55), 1668, 2610, 600], [at('a5') + 0.1, 600, 1230, 1120], [d('a5', 0.55), 600, 1225, 1060]];   // a4 above the full-width footnote, a5 the Function URL and Lambda boxes whole
   const cam = camBoard({ board, VW, VH }, K, 0.08);
-  S.draws.push((t) => {
-    cam(t);
-    const q = seg(t, at('a5') + 0.5, at('a5') + 0.9), q2 = seg(t, at('a5') + LINE.a5.dur * 0.6, at('a5') + LINE.a5.dur * 0.6 + 0.4);
-    css(chip, { opacity: q, transform: `scale(${(0.85 + 0.15 * spring(q)).toFixed(3)})` }); css(chip2, { opacity: q2 });
-  });
+  S.draws.push(cam);
   K.forEach((k, i) => i && cue(k[0] - 0.6, 'whoosh'));
 }
 
@@ -485,50 +489,60 @@ function chartSvg(host, P, w, h) {
 function buildResults() {
   const S = scene('results'), s = SC.results, sy = D.syn;
   const view = el('div', 'abs', S.e); css(view, { inset: 0, overflow: 'hidden' });
-  const board = el('div', 'abs', view); css(board, { left: 0, top: 0, width: '3200px', height: '1800px', transformOrigin: '0 0' });
+  const board = el('div', 'abs', view); css(board, { left: 0, top: 0, width: '3700px', height: '2300px', transformOrigin: '0 0' });
+  const P2X = 2100, P3Y = 1300;   // panels far enough apart that a zoomed view never shows a neighbour's cut edge
   // P1: the chart
   const p1 = el('div', 'abs', board); css(p1, { left: '0px', top: '0px', width: '1530px', height: '836px' });
-  el('div', 'abs', p1, `<span class="fig">FIG. 4</span><span class="lab" style="margin-left:16px;font-size:24px">${sy.n} labelled synthetic photos, 2048 × 1536 px · public/results/summary.json</span>`).style.cssText = 'left:0;top:0';
+  el('div', 'abs', p1, `<span class="fig">FIG. 4</span><span class="lab" style="margin-left:16px;font-size:24px">${sy.n} labelled synthetic photos, ${sy.size[0]} × ${sy.size[1]} px · public/results/summary.json</span>`).style.cssText = 'left:0;top:0';
   const ch = el('div', 'abs', p1); css(ch, { left: '0px', top: '56px' });
   const C = chartSvg(ch, sy.policies, 1100, 770);
-  const legend = el('div', 'abs', p1, `<div class="mono" style="font-size:24px;line-height:1.9"><span style="color:#9CC8FF">■</span> one downscale<br><span>◆</span> tiling (L2, L1, L0)<br><span class="amber">●</span> Drishyam, by pixel cap<br><span class="src">bars: 95 % CI · dashes: chance, its boxes at random</span></div>`);
-  css(legend, { left: '1130px', top: '70px', width: '400px' });
+  const legend = el('div', 'abs', p1, `<div class="mono" style="font-size:22px;line-height:1.6"><span style="color:#9CC8FF">■</span> one downscale<br><span>◆</span> tiling (L2, L1, L0)<br><span class="amber">●</span> Drishyam, by pixel cap<br><span class="src" style="font-size:18px">bars: 95 % CI · dashes: chance, its boxes at random</span></div>`);
+  css(legend, { left: '1130px', top: '56px', width: '400px' });
   const h = sy.head, tl = sy.tiling, ds = sy.ds;
-  const card = el('div', 'box amb', p1, `<div class="lab amber">30 % pixel cap</div><div class="h2 amber" style="font-size:84px;margin:8px 0">${Math.round(sy.ratio * 100)} %</div>
-    <div class="mono" style="font-size:24px">of exhaustive tiling’s recall (${fmt(h.recall)} vs ${fmt(tl.recall)}) at ${pc(h.pixels_frac)} of the pixels (tiling: ${pc(tl.pixels_frac)})</div>
-    <div class="mono" style="font-size:24px;margin-top:10px">target ${pc(sy.target)}: <b style="color:var(--red)">missed</b></div>`);
-  css(card, { left: '1130px', top: '330px', width: '400px', padding: '18px 20px' });
-  const card2 = el('div', 'box', p1, `<div class="lab">vs one downscale</div><div class="h2" style="font-size:64px;margin:6px 0">${fmt(sy.ds_ratio)}×</div><div class="mono" style="font-size:22px">95 % CI ${fmt(sy.ds_ci[0])}–${fmt(sy.ds_ci[1])}: about as well (${fmt(ds.recall)} at ${pc(ds.pixels_frac)})</div>`);
-  css(card2, { left: '1130px', top: '640px', width: '400px', padding: '14px 20px' });
+  const card = el('div', 'box amb', p1, `<div class="lab amber">${pc(sy.cap)} pixel cap</div><div class="h2 amber" style="font-size:72px;margin:6px 0">${pc(sy.ratio)}</div>
+    <div class="mono" style="font-size:21px;line-height:1.35">of exhaustive tiling’s recall (95 % CI ${pc(sy.ratio_ci[0])}–${pc(sy.ratio_ci[1])}), at ${pc(h.pixels_frac)} of the pixels (tiling: ${pc(tl.pixels_frac)})</div>
+    <div class="mono" style="font-size:21px;line-height:1.35;margin-top:6px">target ${pc(sy.target)}: <b style="color:var(--red)">missed</b>${sy.ratio_ci[1] >= sy.target ? ' (point estimate)' : ''}</div>`);
+  css(card, { left: '1130px', top: '250px', width: '400px', padding: '14px 18px' });
+  const card2 = el('div', 'box', p1, `<div class="lab">ours / one downscale</div><div class="h2" style="font-size:56px;margin:4px 0">${fmt(sy.ds_ratio)}×</div><div class="mono" style="font-size:21px;line-height:1.35">95 % CI ${fmt(sy.ds_ci[0])}–${fmt(sy.ds_ci[1])}: one downscale (${fmt(ds.recall)} at ${pc(ds.pixels_frac)}) does as well or slightly better</div>`);
+  css(card2, { left: '1130px', top: '600px', width: '400px', padding: '12px 18px' });
   // P2: 4608 px and the ablations
-  const lg = D.large, ab = D.abl, p2 = el('div', 'abs', board); css(p2, { left: '1660px', top: '0px', width: '1530px', height: '836px' });
+  const lg = D.large, ab = D.abl, p2 = el('div', 'abs', board); css(p2, { left: P2X + 'px', top: '0px', width: '1530px', height: '836px' });
   const vr = (v) => `<td class="n ${v < 0.95 ? 'bad' : v > 1.05 ? 'good' : ''}">${fmt(v)}</td>`;
   const dsl = Object.keys(ab);
-  p2.innerHTML = `<div class="lab" style="font-size:24px">${lg.n} synthetic photos at 4608 × 3456 px · public/results/large/summary.json</div>
-    <table class="t" style="margin-top:14px"><tr><th>policy</th><th>pixels</th><th>recall</th></tr>
-    <tr><td class="amber">Drishyam, 30 % cap</td><td class="n">${fmt(lg.head.pixels_frac)}</td><td class="n">${fmt(lg.head.recall)}</td></tr>
+  p2.innerHTML = `<div class="lab" style="font-size:24px">${lg.n} synthetic photos, ${lg.size[0]} × ${lg.size[1]} px</div><div class="src">public/results/large/summary.json</div>
+    <table class="t" style="margin-top:12px"><tr><th>policy</th><th>pixels</th><th>recall</th></tr>
+    <tr><td class="amber">Drishyam, ${pc(sy.cap)} cap</td><td class="n">${fmt(lg.head.pixels_frac)}</td><td class="n">${fmt(lg.head.recall)}</td></tr>
+    <tr><td>one downscale</td><td class="n">${fmt(lg.ds.pixels_frac)}</td><td class="n">${fmt(lg.ds.recall)}</td></tr>
     <tr><td>tiling at L2 (quarter size)</td><td class="n">${fmt(lg.l2.pixels_frac)}</td><td class="n">${fmt(lg.l2.recall)}</td></tr>
-    <tr><td colspan="3">vs one downscale: <b class="amber">${fmt(lg.ds_ratio)}×</b> (95 % CI ${fmt(lg.ds_ci[0])}–${fmt(lg.ds_ci[1])})</td></tr></table>
-    <div class="lab" style="font-size:24px;margin-top:34px">Ablations at the 30 % cap: recall / full agent · public/results/ablations.json</div>
-    <table class="t" style="margin-top:14px"><tr><th>variant</th>${dsl.map((d) => `<th>${ab[d].label}</th>`).join('')}</tr>
+    <tr><td colspan="3">ours / one downscale: <b class="amber">${fmt(lg.ds_ratio)}×</b> (95 % CI ${fmt(lg.ds_ci[0])}–${fmt(lg.ds_ci[1])})</td></tr></table>
+    <div class="lab" style="font-size:24px;margin-top:200px">Ablations, ${pc(sy.cap)} cap: recall / full agent</div><div class="src">public/results/ablations.json</div>
+    <table class="t" style="margin-top:12px"><tr><th>variant</th>${dsl.map((d) => `<th>${ab[d].label}</th>`).join('')}</tr>
     ${[['no-survey', 'no survey look'], ['no-verify', 'no verify'], ['no-uncertainty', 'no uncertainty term'], ['governor-on', 'governor on']].map(([k, n]) => `<tr><td>${n}</td>${dsl.map((d) => vr(ab[d][k])).join('')}</tr>`).join('')}
     <tr><td>random gaze order (95 % CI)</td>${dsl.map((d) => `<td class="n ${ab[d].random_hi < 1 ? 'bad' : ''}">${fmt(ab[d].random_lo)}–${fmt(ab[d].random_hi)}</td>`).join('')}</tr></table>`;
   // P3: CODEBRIM, false alarms, the trained segmenter
-  const cb = D.codebrim, cl = D.clean, p3 = el('div', 'abs', board); css(p3, { left: '0px', top: '960px', width: '3190px', height: '836px' });
+  const cb = D.codebrim, cl = D.clean, p3 = el('div', 'abs', board); css(p3, { left: '0px', top: P3Y + 'px', width: '1800px', height: '836px' });
   p3.innerHTML = `<div class="box" style="left:0;top:0;width:740px;height:560px;padding:26px 30px">
       <div class="lab">${cb.n} real photos · CODEBRIM</div><div class="h1 amber" style="font-size:100px;margin:12px 0;white-space:nowrap">about 1 in ${cb.one_in}</div>
-      <div class="mono" style="font-size:26px">defects found by every method, ours included (recall ${fmt(cb.range[0])}–${fmt(cb.range[1])}). Its boxes at random places: ${fmt(cb.chance)}.</div>
+      <div class="mono" style="font-size:26px">defects found by every method, ours included (recall ${fmt(cb.range[0])}–${fmt(cb.range[1])}). Drishyam’s boxes placed at random would find ${fmt(cb.chance)}.</div>
       <div class="mono amber" style="font-size:26px;margin-top:16px">The classical segmenter is the bottleneck.</div>
       <div class="src" style="margin-top:16px">public/results/codebrim/summary.json · the licence bars showing the photos</div></div>
-    <div class="box" style="left:790px;top:0;width:740px;height:560px;padding:26px 30px">
+    <div class="box" style="left:1000px;top:0;width:740px;height:560px;padding:26px 30px">
       <div class="lab">${cl.n} synthetic photos with no damage</div><div class="h1 amber" style="font-size:120px;margin:12px 0">${pc(cl.any)}</div>
-      <div class="mono" style="font-size:26px">of them got a report from Drishyam (30 % cap)</div>
+      <div class="mono" style="font-size:26px">of them got a report from Drishyam (${pc(cl.cap)} cap)</div>
       <table class="t" style="margin-top:20px"><tr><th>boxes per image</th><th></th></tr><tr><td>Drishyam</td><td class="n">${fmt(cl.boxes)}</td></tr><tr><td>one downscale</td><td class="n">${fmt(cl.ds_boxes)}</td></tr><tr><td>L0 tiling</td><td class="n">${fmt(cl.tl_boxes)}</td></tr></table>
       <div class="src" style="margin-top:14px">public/results/clean/summary.json · false_alarms</div></div>
-    <div id="pend" class="stamp" style="left:330px;top:620px;font-size:46px">${D.model ? `trained segmenter: recall ${fmt(D.model.recall)}` : 'trained segmenter: results pending'}</div>`;
+    ${D.model ? `<div id="pend" class="box amb" style="left:0;top:600px;width:1740px;padding:16px 26px"><div class="lab amber">trained segmenter (dacl10k) on the same ${cb.n} CODEBRIM photos · governor off · both charged the ${D.model.arm} cost table</div>
+      <div class="mono" style="font-size:26px;margin-top:10px">recall ${fmt(D.model.recall)} (95 % CI ${fmt(D.model.ci[0])}–${fmt(D.model.ci[1])}) vs ${fmt(D.model.classical)} classical · its boxes at random ${fmt(D.model.chance)} · ${D.model.tiling_wins.length ? 'tiling at ' + D.model.tiling_wins.join(', ') + ' still finds more' : 'no tiling level finds more'} · near-duplicates in its training set: ${D.model.near_dups}</div></div>`
+      : '<div id="pend" class="stamp" style="left:330px;top:620px;font-size:46px">trained segmenter: results pending</div>'}`;
   const VW = 1530, VH = 836;
-  const K = [[s.t0, 765, 418, 1660], [at('r1') + LINE.r1.dur * 0.3, 560, 440, 1150], [at('r1') + LINE.r1.dur * 0.7, 1330, 470, 820], [at('r3') + 0.1, 1330, 720, 820],
-    [at('r4') - 0.2, 1660 + 600, 200, 1250], [at('r5') - 0.1, 1660 + 700, 560, 1350], [at('r6') - 0.2, 380, 960 + 300, 1150], [at('r7') - 0.1, 1160, 960 + 300, 1150], [at('r8') - 0.1, 765, 960 + 420, 1640]];
+  // the whole chart while it draws and the 85 % card is read; the card alone; the whole chart again for the 0.94x card;
+  // each table framed so its first column and heading stay inside the view under the 8 % push
+  // the ablation rows as r5 says them: survey; uncertainty and governor; verify; random order (a camera stop and a row highlight each)
+  const r5 = LINE.r5.say, AB = [['survey', [6]], ['uncertainty', [8, 9]], ['verify', [7]], ['random', [10]]].map(([w, rows]) => [at('r5') + LINE.r5.dur * r5.indexOf(w) / r5.length, rows]);
+  const AX = P2X - 20 + 0.46 * 1400;
+  const K = [[s.t0, 765, 418, 1660], [at('r1') + LINE.r1.dur * 0.72, 1330, 446, 760], [at('r3') + 0.1, 765, 418, 1660],
+    [at('r4') - 0.2, P2X - 20 + 0.46 * 1300, 150, 1300], [at('r5') - 0.1, AX, 705, 1400], ...AB.slice(1).map(([T], i) => [T - 0.2, AX, 712 + 6 * i, 1400]),
+    [at('r6') - 0.2, 380, P3Y + 300, 1150], [at('r7') - 0.1, 1370, P3Y + 300, 1150], [at('r8') - 0.1, 870, P3Y + 420, 1960]];
   const cam = camBoard({ board, VW, VH }, K, 0.08);
   const pend = $('#pend', p3);
   S.draws.push((t) => {
@@ -539,9 +553,12 @@ function buildResults() {
       sr.pts.forEach((q, i) => { const tt = T0 + 1.0 + (n++) * 0.28; const p = seg(t, tt, tt + 0.3); q.q.setAttribute('opacity', p); q.q.setAttribute('transform', `translate(${q.x} ${q.y}) scale(${(0.4 + 0.6 * spring(p)).toFixed(3)}) translate(${-q.x} ${-q.y})`); });
       if (sr.line) sr.line.setAttribute('stroke-dashoffset', 1 - eio(seg(t, T0 + 1.0 + (n - sr.pts.length) * 0.28, T0 + 1.0 + n * 0.28))); }
     const cp = seg(t, at('r1') + LINE.r1.dur * 0.35, at('r1') + LINE.r1.dur * 0.35 + 0.4), cp2 = seg(t, at('r3'), at('r3') + 0.4);
+    card2.style.top = card.offsetTop + card.offsetHeight + 14 + 'px';   // stacked under the 85 % card, never over it
     css(card, { opacity: cp, transform: `scale(${(0.9 + 0.1 * spring(cp)).toFixed(3)})` }); css(card2, { opacity: cp2, transform: `scale(${(0.9 + 0.1 * spring(cp2)).toFixed(3)})` });
-    const sp = seg(t, at('r8') + 0.2, at('r8') + 0.45); css(pend, { opacity: sp, transform: `rotate(-6deg) scale(${(1.6 - 0.6 * eo(sp)).toFixed(3)})` });
-    [...p2.querySelectorAll('tr')].forEach((r, i) => { const T = i < 4 ? at('r4') + 0.3 + i * 0.25 : at('r5') + 0.2 + (i - 4) * 0.3; r.style.opacity = 0.15 + 0.85 * seg(t, T, T + 0.25); });
+    const sp = seg(t, at('r8') + 0.2, at('r8') + 0.45); css(pend, { opacity: sp, transform: `${D.model ? '' : 'rotate(-6deg) '}scale(${((D.model ? 1.1 : 1.6) - (D.model ? 0.1 : 0.6) * eo(sp)).toFixed(3)})` });
+    const hot = t < end('r5') + 0.3 ? (AB.filter(([T]) => t >= T - 0.1).pop() || [0, []])[1] : [];
+    [...p2.querySelectorAll('tr')].forEach((r, i) => { const T = i < 5 ? at('r4') + 0.3 + i * 0.25 : at('r5') + 0.2 + (i - 5) * 0.3; r.style.opacity = 0.15 + 0.85 * seg(t, T, T + 0.25);
+      css(r, { background: hot.includes(i) ? 'rgba(255,200,87,.16)' : 'transparent', outline: hot.includes(i) ? '3px solid var(--amber)' : 'none' }); });
   });
   let n = 0; for (const key of ['downscale', 'tiling', 'drishyam']) for (const _ of sy.policies[key]) cue(s.t0 + 1.4 + (n++) * 0.28, 'pop', n);
   cue(s.t0 + 0.4, 'scribble', 0.9); cue(at('r8') + 0.25, 'stamp'); [at('r4'), at('r6'), at('r7')].forEach((T) => cue(T - 0.9, 'whoosh'));
@@ -551,7 +568,7 @@ function buildResults() {
 function buildFailures() {
   const S = scene('failures'), s = SC.failures, B = boardView(S.e), H = B.board;
   const cells = D.fails.map((f, i) => {
-    const b = el('div', 'box', H); css(b, { left: (i % 2) * 775 + 'px', top: Math.floor(i / 2) * 340 + 'px', width: '755px', height: '322px', overflow: 'hidden' });
+    const b = el('div', 'box', H); css(b, { left: (i % 2) * 900 + 'px', top: Math.floor(i / 2) * 400 + 'px', width: '755px', height: '322px', overflow: 'hidden' });
     const im = img(f.img, b); css(im, { position: 'absolute', left: '0px', top: '0px', height: '316px', width: '330px', objectFit: 'cover', borderRight: '3px solid var(--line)' });
     el('div', 'abs', b, `<div class="lab" style="color:var(--line-3)">FIG. 5.${i + 1} · ${f.id}</div><div class="h2 amber" style="font-size:40px;margin:10px 0 12px;white-space:normal">${f.cat}</div>
       <div class="mono" style="font-size:22px;line-height:1.35;white-space:normal"><span style="color:var(--line-2)">rule that would catch it:</span> ${f.ruleShort}</div>
@@ -559,30 +576,30 @@ function buildFailures() {
     return b;
   });
   const rf = D.real_fail, txt = el('div', 'box amb', H, `<span class="lab amber">CODEBRIM ${rf.id}, in words only</span><span class="mono" style="margin-left:18px;font-size:26px">ground truth <b>${rf.gt}</b> · reported <b>${rf.got}</b></span>`);
-  css(txt, { left: '0px', top: '700px', width: '1530px', height: '96px', padding: '28px 26px' });
-  const d1 = LINE.f1.dur, T = [at('f1') + 0.2, at('f1') + d1 * 0.42, at('f1') + d1 * 0.68, at('f1') + d1 * 0.86];
+  css(txt, { left: '0px', top: '800px', width: '1655px', height: '96px', padding: '28px 26px' });
+  const say = LINE.f1.say, T = ['graffiti', 'formwork', 'glare', 'blur'].map((w, i) => at('f1') + (i ? LINE.f1.dur * say.indexOf(w) / say.length : 0.2));
   S.draws.push((t) => {
     cells.forEach((c, i) => { const p = seg(t, T[i] - 0.5, T[i] - 0.15), cur = t < at('f2') && i === T.filter((x) => t >= x - 0.3).length - 1;
       css(c, { opacity: p, transform: `translateY(${((1 - eo(p)) * 30).toFixed(1)}px)`, borderColor: cur ? 'var(--amber)' : 'var(--line)' }); });
     const q = seg(t, at('f3') - 0.1, at('f3') + 0.3); css(txt, { opacity: q, transform: `translateX(${((1 - eo(q)) * -40).toFixed(1)}px)` });
   });
-  S.draws.unshift(camBoard(B, [[s.t0, 765, 400, 1660], [T[0] - 0.2, 380, 165, 900], [T[1] - 0.2, 1150, 165, 900], [T[2] - 0.2, 380, 505, 900], [T[3] - 0.2, 1150, 505, 900],
-    [at('f2') + 0.2, 765, 340, 1660], [at('f3') - 0.1, 765, 560, 1350]]));
+  S.draws.unshift(camBoard(B, [[s.t0, 828, 448, 1800], [T[0] - 0.2, 380, 165, 900], [T[1] - 0.2, 1277, 165, 900], [T[2] - 0.2, 380, 561, 900], [T[3] - 0.2, 1277, 561, 900],
+    [at('f2') + 0.2, 828, 440, 1800], [at('f3') - 0.1, 828, 452, 1800]]));
   T.forEach((x) => cue(x - 0.3, 'drop')); cue(at('f3'), 'switch');
 }
 
-// 10. limits: the site's general notes, ticked off as they are said
+// 10. limits: the site's own wording (footer note, Human sign-off, the CODEBRIM citation), ticked off as they are said
 function buildLimits() {
   const S = scene('limits'), s = SC.limits, B = boardView(S.e), H = B.board;
-  el('div', 'abs', H, '<span class="fig">GENERAL NOTES</span><span class="src" style="margin-left:16px">as on the site (public/index.html)</span>').style.cssText = 'left:0;top:40px';
-  const notes = ['Pixels, not millimetres', 'AI-assisted, not an inspection', 'Only a person can approve a critical finding', 'CODEBRIM photos are not redistributed'];
+  el('div', 'abs', H, '<span class="fig">LIMITS</span><span class="src" style="margin-left:16px">in the site’s words (public/index.html: footer note, Human sign-off, the CODEBRIM citation)</span>').style.cssText = 'left:60px;top:40px';
+  const notes = LIT.limits.map((n, i) => (i === 3 ? 'CODEBRIM: ' + n[0].toLowerCase() + n.slice(1) : n));   // checked against public/index.html by build.py
   const L = at('x1'), d = LINE.x1.dur;
-  const rows = notes.map((n, i) => { const r = el('div', 'abs', H, `<span style="display:inline-grid;place-items:center;width:64px;height:64px;border:4px solid var(--amber);border-radius:50%;color:var(--amber);font:700 30px/1 var(--fm);margin-right:30px">${i + 1}</span><span class="h2" style="font-size:66px"></span>`);
-    css(r, { left: '0px', top: 150 + i * 150 + 'px', display: 'flex', alignItems: 'center' }); return r; });
-  const T = [L + 0.1, L + d * 0.3, L + d * 0.6, L + d * 0.85];
+  const rows = notes.map((n, i) => { const r = el('div', 'abs', H, `<span style="display:inline-grid;place-items:center;width:64px;height:64px;border:4px solid var(--amber);border-radius:50%;color:var(--amber);font:700 30px/1 var(--fm);margin-right:30px">${i + 1}</span><span class="h2" style="font-size:46px;white-space:nowrap"></span>`);
+    css(r, { left: '60px', top: 150 + i * 150 + 'px', display: 'flex', alignItems: 'center' }); return r; });
+  const T = [L + 0.1, L + d * 0.28, L + d * 0.56, L + d * 0.72];
   S.draws.push((t) => rows.forEach((r, i) => { const p = eo(seg(t, T[i], T[i] + 0.35)); css(r, { opacity: p, transform: `translateX(${((1 - p) * -40).toFixed(1)}px)` });
     r.lastChild.textContent = typed(notes[i], seg(t, T[i], T[i] + 0.7)); }));
-  S.draws.unshift(camBoard(B, [[s.t0, 765, 418, 1660], ...T.map((x, i) => [x - 0.1, 700, 200 + i * 150, 1350 - i * 20])]));
+  S.draws.unshift(camBoard(B, [[s.t0, 765, 418, 1720], ...T.map((x, i) => [x - 0.1, 765, 380 + i * 24, 1700])]));   // full width: every line stays whole under the push
   T.forEach((x, i) => cue(x, 'tick', i + 2));
 }
 
@@ -590,7 +607,7 @@ function buildLimits() {
 function buildRepro() {
   const S = scene('repro'), s = SC.repro, B = boardView(S.e), H = B.board;
   const term = el('div', 'term', H); css(term, { left: '0px', top: '60px', width: '1530px', height: '560px', fontSize: '34px', lineHeight: '1.75' });
-  const cmds = [['uv sync --all-extras && make test', 'unit, API, MCP, CLI and eval tests (same as CI)'], ['make eval', '200 synthetic images → public/results'], ['scripts/aws.sh deploy | smoke | destroy', 'the CDK stack: CloudFront, WAF, Lambda arm64, ...']];
+  const cmds = [['uv sync --all-extras && make test', LIT.test_note], ['make eval', `${D.syn.n} synthetic images → public/results`], ['scripts/aws.sh deploy | smoke | destroy', 'the CDK stack: CloudFront, WAF, Lambda arm64, ...']];
   const repo = el('div', 'abs mono', H, `<span class="lab">source</span> ${D.urls.repo}`); css(repo, { left: '0px', top: '680px', fontSize: '38px' });
   const L = at('y1') - 0.2, d = LINE.y1.dur + 0.4, Ts = [L, L + d * 0.32, L + d * 0.6];
   S.draws.push((t) => {
@@ -598,17 +615,17 @@ function buildRepro() {
       return t < T ? '' : `<span class="p">$</span> ${c.slice(0, n)}${n < c.length ? '<span class="caret"></span>' : `\n  <span class="ok"># ${note}</span>`}`; }).filter(Boolean).join('\n');
     repo.style.opacity = seg(t, L + d * 0.85, L + d * 0.85 + 0.3);
   });
-  S.draws.unshift(camBoard(B, [[s.t0, 765, 418, 1660], [Ts[0], 600, 200, 1100], [Ts[1], 600, 330, 1100], [Ts[2], 700, 450, 1200], [L + d * 0.85, 765, 418, 1660]]));
+  S.draws.unshift(camBoard(B, [[s.t0, 765, 418, 1660], [Ts[0], 640, 200, 1360], [Ts[1], 640, 330, 1360], [Ts[2], 640, 420, 1360], [L + d * 0.85, 765, 418, 1660]]));
   Ts.forEach((T) => cue(T, 'type', d * 0.24));
 }
 
 // 12. end card
 function buildEnd() {
   const S = scene('end'), s = SC.end;
-  const e = el('div', 'abs', S.e, `<div class="h1" style="font-size:190px">DRISHYAM</div><div class="lab" style="font-size:26px;margin-top:6px">Sanskrit: that which is seen</div>
+  const e = el('div', 'abs', S.e, `<div class="h1" style="font-size:190px">DRISHYAM</div><div class="lab" style="font-size:26px;margin-top:6px">${LIT.sanskrit}</div>
     <div class="h2 amber" style="font-size:60px;margin-top:40px">Look where it matters. Ask a human first.</div>
     <div class="mono" style="font-size:40px;margin-top:46px">${D.urls.live.replace('https://', '')}</div><div class="mono" style="font-size:40px;margin-top:8px">${D.urls.repo.replace('https://', '')}</div>
-    <div class="lab" style="font-size:26px;margin-top:44px;color:var(--line)">Vaibhav Jangid · Bhavya Dhoot</div><div class="lab" style="font-size:22px;margin-top:10px">OpenCV AI Competition 2026, powered by AWS · Agentic Vision entry</div>`);
+    <div class="lab" style="font-size:26px;margin-top:44px;color:var(--line)">${LIT.team.map((x) => x.split(',')[0]).join(' · ')}</div><div class="lab" style="font-size:22px;margin-top:10px">${ENTRY}</div>`);
   css(e, { left: '0px', top: '40px', width: '1530px' });
   const kids = [...e.children];
   S.draws.push((t) => kids.forEach((k, i) => { const p = eo(seg(t, s.t0 + 0.15 + i * 0.22, s.t0 + 0.5 + i * 0.22)); css(k, { opacity: p, transform: `translateY(${((1 - p) * 24).toFixed(1)}px)` }); }));
@@ -619,17 +636,19 @@ function buildEnd() {
 function buildShort() {
   document.body.classList.add('short'); css(document.documentElement, { width: '1080px', height: '1920px' }); css(document.body, { width: '1080px', height: '1920px' });
   const Sh = window.SHORT, ev = F.ev, dur = Math.max(15.5, Sh.dur);
+  // it ends on the settled APPROVED stamp: the last recorded frame before the page scrolls on to the next finding
+  const SETTLED = Math.max(...F.frames.filter((x) => x.t <= ev['approved:0'] + 1.5 && x.sy === F.frames.find((y) => y.t >= ev['approved:0']).sy).map((x) => x.t)) - ev['approved:0'];
   el('div', 'sheetframe', stage);
   const top = el('div', 'abs', stage, `<div class="h1" style="font-size:118px">DRISHYAM</div><div class="lab" style="font-size:26px;margin-top:10px">one photo · a few looks · one human</div>`);
   css(top, { left: '108px', top: '150px', width: '864px' });
   const l0 = Sh.lines[0], l1 = Sh.lines[1];
-  const warp = { t0: 0, t1: dur, pts: [{ t: 0.2, f: ev['step:1'] - 0.3 }, { t: l0.t + l0.dur + 0.3, f: ev['step:4'] + 1.0 }, { cut: true, a: ev['step:4'] + 1.1, b: ev['click:Reviewer'] - 0.8 }, { t: dur, f: ev['approved:0'] + 2.4 }] };
+  const warp = { t0: 0, t1: dur, pts: [{ t: 0.2, f: ev['step:1'] - 0.3 }, { t: l0.t + l0.dur + 0.3, f: ev['step:4'] + 1.0 }, { cut: true, a: ev['step:4'] + 1.1, b: ev['click:Reviewer'] - 0.8 }, { t: dur, f: ev['approved:0'] + SETTLED }] };
   const host = el('div', 'abs', stage); css(host, { left: '60px', top: '420px', width: '960px', height: '1000px' });
-  const fw = new Footage(host, 960, 1000, D.urls.live.replace('https://', ''), warp, [KF(ev['step:1'] - 0.3, 340, 560, 620), KF(ev['step:4'] + 0.6, 330, 600, 520), KF(ev['click:Reviewer'] - 0.6, 330, 700, 640), KF(ev['approved:0'] + 1.0, 340, 640, 660)]);
+  const fw = new Footage(host, 960, 1000, D.urls.live.replace('https://', ''), warp, [KF(ev['step:1'] - 0.3, 340, 560, 620), KF(ev['step:4'] + 0.6, 330, 600, 520), KF(ev['click:Reviewer'] - 0.6, 330, 700, 640), KF(ev['approved:0'] + 0.5, 340, 640, 660)]);
   const cap = el('div', 'abs', stage); css(cap, { left: '108px', top: '1450px', width: '864px', textAlign: 'center' }); const cs = el('span', '', cap);
   css(cs, { display: 'inline-block', padding: '12px 22px', background: 'rgba(4,20,44,.94)', border: '2.5px solid var(--line-3)', borderLeft: '8px solid var(--amber)', font: '500 36px/1.3 var(--fm)', color: 'var(--line)' });
   const url = el('div', 'abs lab', stage, D.urls.live.replace('https://', '')); css(url, { left: '108px', top: '1440px', width: '864px', textAlign: 'center', fontSize: '28px', color: 'var(--amber)' });
-  const caps = [[l0.t, l0.t + l0.dur, `It read ${(D.guided.pixels_frac * 100).toFixed(1)} % of this photo's pixels and found ${D.guided.critical} critical findings.`], [l1.t, l1.t + l1.dur, 'Only a person can approve a critical finding.']];
+  const caps = [[l0.t, l0.t + l0.dur, LINE.o1.cap], [l1.t, l1.t + l1.dur, l1.text]];   // the captions of the two lines the short speaks
   window.DURATION = dur;
   window.render = async (t) => {
     const c = caps.find(([a, b]) => t >= a - 0.05 && t <= b + 0.3); cs.textContent = c ? c[2] : ''; cap.style.opacity = c ? 1 : 0;
