@@ -173,13 +173,10 @@ def test_reflection_does_not_inflate_spall_area_to_critical(monkeypatch):
     assert all(f.measure["area_px"] <= 1.02 * true_area and inside_image(f.box, img.shape) for f in found)
 
 
-def test_seconds_and_usd_caps_halt():
-    from .conftest import concrete
-
-    img = concrete(1200, 1600, 1)
-    _, ev = run(img, clock=SlowClock(), seconds_cap=1.0, pixel_cap=1.0)
+def test_seconds_and_usd_caps_halt(scene):
+    _, ev = run(scene, clock=SlowClock(), seconds_cap=1.0, pixel_cap=1.0)
     assert ev[-1]["cause"] == "cap-hit" and ev[-1]["summary"]["seconds"] >= 1.0
-    _, ev = run(img, clock=SlowClock(), usd_cap=0.0001, pixel_cap=1.0, seconds_cap=30)
+    _, ev = run(scene, clock=SlowClock(), usd_cap=0.0001, pixel_cap=1.0, seconds_cap=30)
     assert ev[-1]["cause"] == "cap-hit" and ev[-1]["summary"]["usd"] >= 0.0001
 
 
@@ -211,9 +208,9 @@ def test_forced_p95_spike_changes_next_steps_model(scene):
 
 
 def test_governor_override_on_a_halting_step_reaches_the_trace(scene):
-    """PRD rule 5: every override writes a cause. With eps = 1 the stop rule ends the job on the step right
+    """PRD rule 5: every override writes a cause. With eps = 0.7 the stop rule ends the job on the step right
     after the spike, the same step on which the governor switched the model; the halt record carries it."""
-    job, events = run(scene, pixel_cap=1.0, chaos=("p95_spike",), eps=1.0)
+    job, events = run(scene, pixel_cap=1.0, chaos=("p95_spike",), eps=0.7)
     spike = next(s for s in steps(events) if s.get("injected") == "p95_spike")
     halt = steps(events)[-1]
     assert halt["step"] == spike["step"] + 1 and halt["cause"] == "stop-rule"  # the case this test exists for

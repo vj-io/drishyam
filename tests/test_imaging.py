@@ -7,6 +7,8 @@ import pytest
 
 from drishyam import imaging
 
+from .conftest import concrete
+
 
 def png_header(w, h):
     ihdr = struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0)
@@ -101,6 +103,17 @@ def test_overview_finds_the_salient_spot(scene):
     assert all(0 <= c.prior <= 1 for c in cands)
     # The rebar spall (around x=1500, y=450) is the most salient thing in the scene.
     assert any(abs(c.cx - 1500) < 400 and abs(c.cy - 450) < 400 for c in cands[:3])
+
+
+def test_sound_concrete_is_not_salient_but_glare_still_gets_a_look():
+    """The absolute null: a sound surface's texture is not stretched to full scale (with plain p99.5 scaling about
+    a quarter of this overview scored >= 0.5, the candidate threshold). A blown-out patch stays salient, so the
+    quality gate gets to refuse it and the work order marks it not assessed."""
+    img = concrete(1536, 2048, 0)
+    assert (imaging.saliency(imaging.build_pyramid(img)[3]) >= 0.5).mean() < 0.01
+    cv2.circle(img, (1000, 700), 120, (255, 255, 255), -1)
+    cands = imaging.find_candidates(imaging.saliency(imaging.build_pyramid(img)[3]), 3, 1024, (2048, 1536))
+    assert abs(cands[0].cx - 1000) < 150 and abs(cands[0].cy - 700) < 150
 
 
 def test_decoded_bytes_budget():
