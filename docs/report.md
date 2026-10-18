@@ -129,9 +129,10 @@ Only one call is specific to OpenCV 5: the `engine=cv2.dnn.ENGINE_NEW` argument 
 ONNX path, which `tests/test_segment.py` exercises with a tiny ONNX model. The live demo runs the classical engine,
 so it uses no OpenCV-5-only API; it runs on the stock OpenCV 5.0.0 wheel.
 
-That wheel's aarch64 build already includes Arm's KleidiCV and carotene: `cv2.getBuildInformation()` in the
-`opencv-python-headless` 5.0.0.93 package built for Lambda reads "Custom HAL: YES (carotene (ver 0.0.1) KleidiCV
-(ver 26.03))" and "Baseline: NEON FP16". The camera moves use ops KleidiCV covers in some formats (`pyrDown`,
+That wheel's aarch64 build already includes Arm's KleidiCV and carotene: the Lambda package pins the same
+`opencv-python-headless` 5.0.0.93 wheel (`pyproject.toml`), whose `cv2.getBuildInformation()` on GitHub's arm64
+runner reads "Custom HAL: YES (carotene (ver 0.0.1) KleidiCV (ver 26.03))" and "Baseline: NEON FP16"
+(`results/linux-aarch64/micro.json`); the Lambda's own build information is not recorded. The camera moves use ops KleidiCV covers in some formats (`pyrDown`,
 `resize`, `warpPerspective`), so a COOL gain would have to come on top of the KleidiCV the wheel already has.
 Whether the 3-channel `BORDER_REFLECT_101` `warpPerspective` used here takes the HAL path has not been measured. There is no `filter2D` and no NumPy pixel loop on the gaze path; the classical
 segmenter adds `connectedComponentsWithStats` and a NumPy softmax, and measurement adds `findContours`.
@@ -198,8 +199,10 @@ Drishyam combines old ideas; this section says which, and what it adds.
 5. A human gate: critical findings wait in `pending_review`, and no agent, MCP or planner call can approve them.
 
 **What is not new:** coarse-to-fine pyramids, saliency priors, steering a high-resolution window from a
-low-resolution map, and tiling. On these images a single downscale and a coarse tiling grid match or beat
-Drishyam's recall at similar or lower pixel cost (section 8), so the combination has not yet paid off in recall.
+low-resolution map, and tiling. On every set at least one simple baseline matches or beats Drishyam's recall at
+similar or lower pixel cost (section 8): one downscale on the 2048×1536 set and on CODEBRIM, the L2 tiling grid at
+4608×3456 and on CODEBRIM. Only at 4608×3456 does zooming beat one downscale, narrowly. So the combination has not
+yet paid off in recall.
 
 1. P. J. Burt and E. H. Adelson, "The Laplacian Pyramid as a Compact Image Code", *IEEE Transactions on
    Communications*, vol. COM-31, no. 4, pp. 532–540, April 1983.
@@ -259,8 +262,9 @@ The FR-21 ablations (random gaze order, no uncertainty term, no survey look, no 
   confident one, as in Canny), lifted every baseline too, so it is not a Drishyam-only gain.
 - Critical false-accept rate (critical prediction with no critical ground truth): Drishyam at 30 % 0.51 against
   exhaustive tiling 0.79 (the PRD asks for ≤ tiling); a single downscale (0.49) and L2 tiling (0.42) are lower still.
-- Agent: 100 % of steps carry a cause; escalation rate 19 %; at the 30 % cap, 3 looks and 0.27 of the pixels per
-  image (p50 = p95).
+- Agent: 100 % of steps carry a cause; escalation rate 19 %; at the 30 % cap, 3 looks per image (p50 = p95) and
+  0.23 of the pixels on average: the 125 of 200 jobs that hit the cap each use 0.27 (so p50 = p95 = 0.27), and the
+  other 75 stop earlier, at 0.18 (71 on the stop rule, 4 with every candidate looked at).
 
 The images are procedural (`evals/synth.py`): 2048×1536 weathered concrete with drawn cracks, spalls, efflorescence, exposed rebar and rust run-off, plus graffiti, formwork lines, water stains, blur and glare as distractors. The eight bundled samples in `public/samples/` come from the same generator.
 
@@ -270,7 +274,7 @@ The images are procedural (`evals/synth.py`): 2048×1536 weathered concrete with
 
 Full numbers: [public/results/summary.json](../public/results/summary.json); every prediction and trace: [public/results/per_image.json.gz](../public/results/per_image.json.gz).
 
-**Fixed costs against measured wall time.** `make eval-live` reruns the synthetic set the way the app runs, on measured wall time ([public/results/live/summary.json](../public/results/live/summary.json)), here with the machine's load average near 39 from other jobs: Drishyam at 30 % found 0.48 (0.45–0.52) at 0.25 of the pixels, 0.88× tiling (0.82–0.94), and the governor never switched the model but shrank the gaze and batched on 6 warp spikes. The stop rule ended fewer jobs at the 30 % cap (29 of 200, against 71 with fixed costs), because a measured step includes the Python around each look while the fixed model charges only the timed ops; this run also timed the x86 laptop, while the fixed table is the arm64 runner's. Live numbers move with the machine; the fixed ones are the comparison.
+**Fixed costs against measured wall time.** `make eval-live` reruns the synthetic set the way the app runs, on measured wall time ([public/results/live/summary.json](../public/results/live/summary.json)), here with the machine's load average near 39 from other jobs. It was not re-run: it dates from 2026-10-17 21:37 UTC, before segmenter, agent and imaging changes that the fixed-cost runs above include (among them: straight crack components dropped, cracks drafted only if elongated, blown-out or black areas given no looks), so it differs from them in code as well as in costs. On that older code Drishyam at 30 % found 0.48 (0.45–0.52) at 0.25 of the pixels, 0.88× tiling (0.82–0.94), and the governor never switched the model but shrank the gaze and batched on 6 warp spikes. The stop rule ended 29 of 200 jobs at the 30 % cap, against 71 in the fixed-cost run; with both the code and the cost model changed, the files do not say how much of that gap each change causes. Live numbers move with the machine; the fixed ones are the comparison.
 
 ### Synthetic at CODEBRIM's size, 4608×3456 (100 images)
 
@@ -287,7 +291,7 @@ Full numbers: [public/results/summary.json](../public/results/summary.json); eve
 
 - Against one downscale, zooming now wins, narrowly: Drishyam at 30 % finds 0.51 against 0.45, 1.12× (95 % CI 1.02–1.22), where on the 2048×1536 set it was 0.94× (0.89–1.00). The downscale shrinks these images 4.5× instead of 2×.
 - A coarse tiling grid still does better: L2 tiling finds 0.53 at 0.10 of the pixels, about a third of Drishyam's. Exhaustive L0 tiling falls to 0.32 (spalling 0.16, exposed rebar 0.00): the generator scales spalls with the image, so here they are about 225 to 860 px across and a 512-px full-resolution tile often holds only part of one. The headline ratio against L0 tiling (1.60×, which formally "meets" the 0.9× target) says more about L0 tiling than about Drishyam.
-- Hairline cracks (39 boxes) stay nearly invisible to every policy: 0.15 for L0 tiling, 0.10 for L1, 0.03 to 0.05 for Drishyam, 0.03 for one downscale. Uncapped, the stop rule ends 88 of 100 jobs by itself (the other 12 end when every candidate has been looked at).
+- Hairline cracks (39 boxes) stay nearly invisible to every policy: 0.15 for L0 tiling, 0.10 for L1, 0.03 to 0.05 for Drishyam from the 10 % cap up (0.00 at 5 %), 0.03 for one downscale. Uncapped, the stop rule ends 88 of 100 jobs by itself (the other 12 end when every candidate has been looked at).
 
 ### Real bridge photos: CODEBRIM (200 images)
 
@@ -353,9 +357,9 @@ boxes and exhaustive tiling 53.
 ### The trained segmenter (results pending)
 
 These numbers call for a trained segmenter. A dacl10k-trained UNet ([training/](../training/README.md),
-[models/README.md](../models/README.md)) exists: its validation mIoU over Drishyam's five defect classes is 0.359,
-on the split that also chose its epoch, so no held-out number exists. Its CODEBRIM and synthetic results are pending
-and not published here, and it is not the live segmenter. After `scripts/install_model.sh`, `make eval-model
+[models/README.md](../models/README.md)) exists: its mIoU on the dacl10k validation split over Drishyam's five defect
+classes is 0.359, on the split that also chose its epoch, so no held-out number exists. Its CODEBRIM and synthetic
+results are pending and not published here, and it is not the live segmenter. After `scripts/install_model.sh`, `make eval-model
 DACL10K=<the dacl10k folder> CODEBRIM=data/codebrim` first runs the leakage check between dacl10k and this subset
 (`evals/leakage.py`), then both comparisons with `DRISHYAM_ONNX` set. It refuses to compare unless each summary
 names the segmenter it should, and publishes the model's numbers next to these (`public/results/codebrim_dacl10k/`),
