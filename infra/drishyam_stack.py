@@ -15,7 +15,7 @@ import json
 import re
 from pathlib import Path
 
-from aws_cdk import CfnOutput, Duration, RemovalPolicy, Stack
+from aws_cdk import CfnOutput, Duration, RemovalPolicy, Size, Stack
 from aws_cdk import aws_budgets as budgets
 from aws_cdk import aws_cloudfront as cf
 from aws_cdk import aws_cloudfront_origins as origins
@@ -175,9 +175,11 @@ class DrishyamStack(Stack):
                 allowed_methods=cf.AllowedMethods.ALLOW_ALL, cache_policy=cf.CachePolicy.CACHING_DISABLED,
                 origin_request_policy=cf.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER, compress=False)})
         # Uploads public/ on each deploy that changes it, deletes files no longer there and invalidates /*.
+        # 1 GiB of memory and 2 GiB of /tmp: the asset holds the video (public/video/drishyam.mp4, git-ignored).
         s3deploy.BucketDeployment(
             self, "SiteFiles", sources=[s3deploy.Source.asset(str(ROOT / "public"))], destination_bucket=site,
-            distribution=dist, distribution_paths=["/*"],
+            distribution=dist, distribution_paths=["/*"], memory_limit=1024,
+            ephemeral_storage_size=Size.mebibytes(2048),
             log_group=logs.LogGroup(self, "SiteFilesLogs", retention=logs.RetentionDays.TWO_WEEKS,
                                     removal_policy=RemovalPolicy.DESTROY))
 
