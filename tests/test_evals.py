@@ -566,6 +566,8 @@ def test_model_eval_refuses_a_mislabelled_confounded_or_other_data_arm(tmp_path)
         model_eval.check(slow, "onnx:m.onnx", "runs/model-eval/onnx-synth")
     assert model_eval.same_data(ok, {**ok}) and not model_eval.same_data(ok, {**ok, "provenance": {**data, "dataset_gt_sha256": "c"}})
     assert not model_eval.same_data({"provenance": {}}, {"provenance": {}})  # unhashed summaries never match
+    arm64 = {"cost_model": {"kind": "fixed", "source": "results/linux-aarch64/micro.json job_ops (p50 ms per call)"}}
+    assert model_eval.same_costs(arm64, "linux-aarch64") and not model_eval.same_costs(arm64, "local-macos-x86")
     leak = tmp_path / "leakage.json"
     leak.write_text(json.dumps({"skipped": "no dacl10k images under x"}))
     with pytest.raises(SystemExit, match="refusing to publish a CODEBRIM number"):

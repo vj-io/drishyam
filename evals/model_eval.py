@@ -48,6 +48,12 @@ def same_data(a: dict, b: dict) -> bool:
     return None not in ka.values() and ka == kb
 
 
+def same_costs(summary: dict, micro_arm: str) -> bool:
+    """The summary was charged `micro_arm`'s fixed costs. The ONNX side is timed on this machine, so a published
+    classical summary charged another machine's table (the arm64 one, say) is not its baseline: it is re-run here."""
+    return summary.get("cost_model", {}).get("source", "").startswith(f"results/{micro_arm}/")
+
+
 def leakage_block(path: Path) -> dict:
     """The dacl10k-vs-CODEBRIM leakage counts with their calibration (copies and known-unrelated photos), which a
     published CODEBRIM number for a dacl10k-trained model must carry."""
@@ -119,8 +125,8 @@ def main(argv=None) -> None:
     for name, data, published in sets:
         after = check(harness(data, runs / f"onnx-{name}", a.n, env, arm, a.workers), label, runs / f"onnx-{name}")
         pub = json.loads((published / "summary.json").read_text()) if (published / "summary.json").exists() else None
-        if (pub and pub["n_images"] == a.n and pub.get("cost_model", {}).get("kind") == "fixed" and not confounded(pub)
-                and same_data(pub, after)):
+        if (pub and pub["n_images"] == a.n and pub.get("cost_model", {}).get("kind") == "fixed"
+                and same_costs(pub, a.micro_arm) and not confounded(pub) and same_data(pub, after)):
             before = check(pub, CLASSICAL, published / "summary.json")
         else:
             before = check(harness(data, runs / f"classical-{name}", a.n, plain, a.micro_arm, a.workers), CLASSICAL,
