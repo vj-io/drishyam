@@ -122,7 +122,7 @@ limits and the cost table, is [aws.md](aws.md).
 | Segment | classical engine: `cvtColor`, `createCLAHE`, `GaussianBlur`, `medianBlur`, `morphologyEx`, `inRange`, `dilate`, `connectedComponentsWithStats`; ONNX engine: `dnn.readNetFromONNX(path, engine=cv2.dnn.ENGINE_NEW)` | `segment.py` |
 | Measure and verify | `morphologyEx` (hit-or-miss thinning), `findContours`, `minAreaRect`, `arcLength`, `approxPolyDP`; cross-level mask IoU through `warpPerspective` and `dilate` | `measure.py`, `agent.py` |
 
-Only one call is specific to OpenCV 5: the `engine=cv2.dnn.ENGINE_NEW` argument (`segment.py:239`), on the opt-in
+Only one call is specific to OpenCV 5: the `engine=cv2.dnn.ENGINE_NEW` argument (`OnnxSegmenter._load` in `segment.py`), on the opt-in
 ONNX path, which `tests/test_segment.py` exercises with a tiny ONNX model. The live demo runs the classical engine,
 so it uses no OpenCV-5-only API; it runs on the stock OpenCV 5.0.0 wheel.
 
@@ -263,7 +263,7 @@ The images are procedural (`evals/synth.py`): 2048×1536 weathered concrete with
 
 ![Recall against pixels processed](recall_vs_pixels.png)
 
-(The live site's FIG. 4.1, rendered from the committed `public/results/summary.json`: bars are the 95 % intervals, dotted ticks the chance level.)
+(The live site's FIG. 4.1, rendered from the committed `public/results/summary.json`: bars are the 95 % intervals, dotted ticks the chance level; `scripts/render_figures.py` re-renders this image.)
 
 Full numbers: [public/results/summary.json](../public/results/summary.json); every prediction and trace: [public/results/per_image.json.gz](../public/results/per_image.json.gz).
 
