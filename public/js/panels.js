@@ -20,7 +20,12 @@ export const px = (v) => (num(v) ? v.toLocaleString('en-US', { maximumFractionDi
 
 // ---- plain words -------------------------------------------------------------------------------
 const size = (L) => (L ? `1/${2 ** L} size` : 'full resolution');
-const name = (cls) => String(cls).replace('_', ' ');
+const scale = (L) => `1:${2 ** L}`;
+const pct = (v) => `${Math.round(Number(v) * 100)}\u00a0%`;  // a no-break space: "19 %" never splits across lines
+const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
+/** A damage class in words ("exposed rebar"), and as a label ("Exposed rebar"). */
+export const words = (cls) => String(cls).replaceAll('_', ' ');
+export const label = (cls) => cap(words(cls));
 
 /** What kind of evidence a cause is: the photo itself (OpenCV), the governor, the planner drill, or a replay. */
 export const kindOf = (cause) => (cause === 'replay' ? 'replay'
@@ -63,9 +68,9 @@ function lookText(s) {
   if (s.cause === 'replay') return `Replaying look ${s.step} from before KILL; nothing new is decided.`;
   if ((m = why.match(/one L(\d) look covers all (\d+) candidates/))) return `First it looks at the whole photo at ${size(+m[1])} (L${m[1]}) to see all ${m[2]} candidate regions at once, before zooming in anywhere.`;
   if ((m = why.match(/entropy ([\d.]+) > ([\d.]+) at L\d/))) return `It was unsure what it saw (entropy ${m[1]} > ${m[2]}), so it zooms in 2× on the same spot${now}.`;
-  if ((m = why.match(/(\w+) area (\d+) px < (\d+) at L\d/))) return `The ${name(m[1])} it found is tiny (${m[2]} px < ${m[3]} px), so it zooms in 2× to measure it properly${now}.`;
+  if ((m = why.match(/(\w+) area (\d+) px < (\d+) at L\d/))) return `The ${words(m[1])} it found is tiny (${m[2]} px < ${m[3]} px), so it zooms in 2× to measure it properly${now}.`;
   if ((m = why.match(/iou ([\d.]+) < 0\.5 between L(\d) and L(\d)/))) return `Its L${m[2]} and L${m[3]} looks disagree (overlap ${m[1]} < 0.5), so it takes one more, finer look${now}.`;
-  if ((m = why.match(/new (\w+) mask at L(\d); confirming at L(\d)/))) return `A new ${name(m[1])} mask appeared at L${m[2]}, so it double-checks it one level finer (L${m[3]}) before trusting it.`;
+  if ((m = why.match(/new (\w+) mask at L(\d); confirming at L(\d)/))) return `A new ${words(m[1])} mask appeared at L${m[2]}, so it double-checks it one level finer (L${m[3]}) before trusting it.`;
   if ((m = why.match(/argmax score [^:]+: prior ([\d.]+), unseen ([\d.]+), t_hat (\d+) ms/))) {
     return `Region ${s.region} is now the best value for the time: damage looks likely there (prior ${m[1]}), ${Math.round(+m[2] * 100)} % of it is unseen, and a look costs about ${m[3]} ms. So it looks there next${now}.`;
   }
@@ -88,11 +93,63 @@ export function explain(s, planner) {
   ].filter(Boolean);
 }
 
-/** The rationale as text nodes, its deciding number (the one before a comparison, else the first) in bold. */
-function marked(text) {
-  const m = text.match(/(-?\d[\d.]*(?:e[-+]?\d+)?)(?= (?:ms |px )?[<>])/) ?? text.match(/-?\d[\d.]*(?:e[-+]?\d+)?/);
-  if (!m) return [text];
-  return [text.slice(0, m.index), h('b', { class: 't-key' }, m[0]), text.slice(m.index + m[0].length)];
+// A recorded rationale is "; "-joined clauses (governor notes, the look, the quality gate). Each clause in plain
+// words for the trace line: '' drops it, and one starting "so"/"and"/"but" carries on the sentence before it.
+const CLAUSES = [
+  [/^one L(\d) look covers all (\d+) candidates before zooming$/, (m) => `the whole photo first, at ${size(+m[1])}: all ${m[2]} candidate regions in one look`],
+  [/^(\d+) looks affordable$/, (m) => `the budget has room for ${m[1]} looks`],
+  [/^(argmax|random) score [^:]+: prior ([\d.]+), unseen ([\d.]+), t_hat (\d+) ms$/, (m) => `${m[1] === 'random' ? 'a random pick' : 'best value for the time'}: `
+    + `damage ${+m[2] >= 0.5 ? 'looks likely' : 'is possible'} (${m[2]}), ${+m[3] >= 0.995 ? 'not seen yet' : `${pct(m[3])} not seen yet`}, a look costs about ${m[4]} ms`],
+  [/^lambda /, () => ''],  // the stop line: a halt says it in words
+  [/^entropy ([\d.]+) > ([\d.]+) at L\d$/, (m) => `unsure what it saw (${m[1]}, over ${m[2]}), so it zooms in 2×`],
+  [/^(\w+) area (\d+) px < (\d+) at L\d$/, (m) => `the ${words(m[1])} is tiny (${m[2]} px, under ${m[3]} px), so it zooms in 2× to measure it`],
+  [/^iou ([\d.e+-]+) < [\d.]+ between L(\d) and L(\d)$/, (m) => `the ${scale(m[2])} and ${scale(m[3])} looks disagree (${pct(m[1])} overlap), so it takes one more, finer look`],
+  [/^new (\w+) mask at L(\d)$/, (m) => `a new ${words(m[1])} at ${scale(m[2])}`],
+  [/^confirming at L(\d)$/, (m) => `so it double-checks at ${scale(m[1])}`],
+  [/^p95\(segment\) (\d+) ms > SLA (\d+) ms$/, (m) => `the segmenter got slow (${m[1]} ms, limit ${m[2]} ms)`],
+  [/^model -> (\w+)$/, (m) => `so it switches to the ${m[1]} model`],
+  [/^one level coarser/, () => 'so it looks one level coarser'],
+  [/^p95\(warp\) ([\d.]+) ms > 2x median$/, (m) => `cutting out views got slow (${m[1]} ms, over twice the usual)`],
+  [/^gaze (\d+) px, batching$/, (m) => `so views shrink to ${m[1]} px and the rest are batched`],
+  [/^80% of the \$ cap spent$/, () => '80 % of the $ budget is spent'],
+  [/^verifying critical classes only$/, () => 'so only critical damage is double-checked'],
+  [/^quality gate: (\w+)$/, (m) => `the view failed the quality check (${m[1]}), so it does not trust this look`],
+  [/^every candidate has been looked at$/, () => 'every candidate region has been looked at'],
+  [/^best score \S+ < lambda /, () => 'the next look would be worth less than it costs'],
+  [/^kill switch set$/, () => 'you pressed KILL'],
+  [/^state preserved for resume$/, () => 'its state is kept for Resume'],
+  [/^next look needs (\d+) px$/, (m) => `the next look needs ${px(+m[1])} px`],
+  [/^(-?\d+) px left of the cap$/, (m) => `but only ${px(+m[1])} px of the pixel budget are left`],
+  [/^\$[\d.]+ spent of \$[\d.]+$/, () => 'the $ budget is spent'],
+  [/^[\d.]+ s used of [\d.]+ s$/, () => 'the time budget is used up'],
+  [/^max_steps (\d+) reached$/, (m) => `the limit of ${m[1]} steps is reached`],
+  [/^planner proposed stop$/, () => 'the planner proposed stopping'],
+  [/^validator accepted$/, () => 'and the validator accepted'],
+];
+
+/** A step's reason in one or two plain sentences, built from its recorded rationale (an unknown clause is kept as recorded). */
+export function brief(s) {
+  if (s.cause === 'replay') return 'Replayed from before KILL; nothing new is decided.';
+  if (String(s.cause).startsWith('planner:')) return `The planner asked to ${words(s.cause.slice(8))}, and the validator allowed it.`;
+  const text = String(s.rationale ?? '').split('; ').reduce((out, clause) => {
+    const rule = CLAUSES.find(([re]) => re.test(clause));
+    const said = rule ? rule[1](clause.match(rule[0])) : clause;
+    if (!said) return out;
+    return !out ? cap(said) : /^(so|and|but) /.test(said) ? `${out}, ${said}` : `${out}. ${cap(said)}`;
+  }, '');
+  return text ? `${text}.` : 'No reason was recorded.';
+}
+
+/** A review request's reason in plain words (an unknown one is kept as recorded). */
+export function reviewText(reason) {
+  let m;
+  if ((m = reason.match(/^(unconfirmed: )?iou ([\d.e+-]+) < [\d.]+ between L(\d) and L(\d)$/))) {
+    return `the ${scale(m[3])} and ${scale(m[4])} zoom levels disagree (${pct(m[2])} overlap)${m[1] ? ', and no finer look is left to settle it' : ''}`;
+  }
+  if ((m = reason.match(/^ambiguous: (\w+) (\d+) px .* inside (\w+) \w+; recorded as/))) {
+    return `it also looks like ${words(m[1])} (${px(+m[2])} px, mostly inside it), but only ${words(m[3])} was recorded`;
+  }
+  return (m = reason.match(/^(\w+) is critical$/)) ? `${words(m[1])} is critical` : reason;
 }
 
 /** What a look measured, in one line. */
@@ -101,12 +158,16 @@ function sawText(s) {
   if (!o) return null;
   const top = Object.entries(o.classes ?? {}).sort((x, y) => y[1] - x[1])[0];
   return [
-    num(o.entropy) ? `entropy ${o.entropy.toFixed(2)}` : null,
-    num(s.verify?.iou) ? `iou ${s.verify.iou.toFixed(2)} vs L${s.verify.against_level}` : null,
-    top ? `${top[0]} ${px(top[1])} px` : 'no damage mask',
-    s.quality?.ok === false ? `quality: ${s.quality.reason ?? 'rejected'}` : null,
+    top ? `${words(top[0])} ${px(top[1])} px` : 'no damage',
+    num(o.entropy) ? `uncertainty ${o.entropy.toFixed(2)}` : null,
+    num(s.verify?.iou) ? `${pct(s.verify.iou)} overlap with the ${scale(s.verify.against_level)} look` : null,
+    s.quality?.ok === false ? `failed the quality check (${s.quality.reason ?? 'rejected'})` : null,
   ].filter(Boolean).join(' · ');
 }
+
+/** The raw record behind a plain-words line, folded away. */
+const numbers = (title, ...raw) => h('details', { class: 'detail__more' }, h('summary', {}, title),
+  raw.filter(Boolean).map((t) => h('p', { class: 'detail__raw' }, t)));
 
 export class Budget {
   constructor(root) {
@@ -185,19 +246,22 @@ export class Trace {
     const saw = sawText(s);
     const btn = h('button', { type: 'button', class: 'trace__btn' },
       h('span', { class: 'trace__head' }, parts),
-      s.rationale ? h('span', { class: 'trace__why' }, h('i', {}, 'because'), from ? ` (from ${from})` : '', ': ', marked(s.rationale)) : null,
+      s.rationale ? h('span', { class: 'trace__why' }, h('i', {}, 'because'), from ? ` (from ${from})` : '', ': ', brief(s)) : null,
       saw ? h('span', { class: 'trace__saw' }, h('i', {}, 'saw'), ': ', saw) : null);
     btn.addEventListener('click', () => this.onPick(s.step));
-    this.push(h('li', { class: 'trace__line', 'data-step': s.step }, btn));
+    this.push(h('li', { class: 'trace__line', 'data-step': s.step }, btn,
+      s.rationale ? numbers('All numbers for this step', `recorded: ${s.rationale}`) : null));
   }
 
-  /** A finding or a review request: what the agent handed on, and why. Clicking it opens the finding's card. */
-  addNote(kind, stepNo, id, text, because, onOpen) {
+  /** A finding or a review request: what the agent handed on, and why (`raw`: the reason as recorded, folded away).
+      Clicking it opens the finding's card. */
+  addNote(kind, stepNo, id, text, because, onOpen, raw = null) {
     const btn = h('button', { type: 'button', class: 'trace__btn' },
       h('span', { class: 'trace__head' }, h('span', { class: 't-num' }, pad(stepNo)), h('span', { class: `t-act t-act--${kind}` }, kind), h('span', {}, text)),
       because ? h('span', { class: 'trace__why' }, h('i', {}, 'because'), ': ', because) : null);
     btn.addEventListener('click', onOpen);
-    this.push(h('li', { class: `trace__line trace__line--${kind}`, 'data-finding': id }, btn));
+    this.push(h('li', { class: `trace__line trace__line--${kind}`, 'data-finding': id }, btn,
+      raw ? numbers('All numbers', `recorded: ${raw}`) : null));
   }
 
   addPlanner(ev) {
