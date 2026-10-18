@@ -172,11 +172,11 @@ Full numbers: [public/results/codebrim/summary.json](public/results/codebrim/sum
 
 | Built and tested here | Needs the owner's AWS account |
 | --- | --- |
-| Agent loop, governor, planner fallback, findings and human approval, privacy blur, MCP server, CLI, web API + UI, evaluation harness, benchmark scripts, Kaggle training and ONNX export, CI on x86 and Arm | COOL 3.1 AMI on c8g (Graviton4) and the three-arm benchmark, DynamoDB/SNS approval store, CloudWatch, CDK stack, EC2 auto-stop |
+| Agent loop, governor, planner fallback, findings and human approval, privacy blur, MCP server, CLI, web API + UI, evaluation harness, benchmark scripts, Kaggle training and ONNX export, CI on x86 and Arm | COOL 3.1 AMI on c8g (Graviton4) and the three-arm benchmark, CloudWatch, CDK stack, EC2 auto-stop |
 
 - The demo segmenter is a classical evidence-map engine so the agent runs with zero downloads; a dacl10k ONNX model drops in with `DRISHYAM_ONNX=/path/model.onnx` (see [training/](training/README.md)).
 - Measurements are image pixels. There are no millimetres and no safety ratings.
-- The web demo is stateless: the signed `work_order.json` is the audit trail.
+- The web demo is stateless: the signed `work_order.json` is the audit trail. There is no approval database: the PRD's DynamoDB/SNS approval store was not built ([docs/security.md](docs/security.md), "Known limits").
 
 ## Licence
 
