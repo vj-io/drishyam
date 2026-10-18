@@ -9,8 +9,7 @@ Behind CloudFront with Origin Access Control (the AWS deployment), every `POST` 
 `x-amz-content-sha256`: the hex SHA-256 of the exact request body. Lambda refuses unsigned payloads
 through OAC with a 403. Locally the header is ignored. When one of AWS WAF's per-IP rate rules blocks a
 request, CloudFront answers `429` with `Content-Type: application/json` and a body such as
-`{"error": "rate limited: 10 job starts per 2 min per IP; wait and retry"}` (not yet live: the current
-deployment answers 403 with CloudFront's default page). Lambda also answers 429, with
+`{"error": "rate limited: 10 job starts per 2 min per IP; wait and retry"}`. Lambda also answers 429, with
 its own body (do not count on an `error` field), when every function environment is busy (docs/aws.md, "Limits"). The
 app itself never sends 429.
 

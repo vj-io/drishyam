@@ -4,21 +4,23 @@ The web demo (the FastAPI app and the static site) runs on AWS only, as one CDK 
 `us-east-1`: the API on Lambda arm64 (Graviton) and the static site in a private S3 bucket, both reached
 only through CloudFront and AWS WAF.
 
-**Status: deployed** on 2026-10-18 (India time) to `us-east-1` and smoke-tested. The smoke run
-(`scripts/aws.sh smoke`, checks 1 to 5 under [Smoke](#smoke)) passed: `/api/health` answered from
-`aws-lambda` on `aarch64` with OpenCV 5.0.0 (`stock (not COOL)`), a job on `bridge_03.jpg` streamed to
-`done` (`awaiting_review`, 6 steps), KILL halted a second job at step 3, an unsigned `POST` through
-CloudFront got 403, the raw Function URL got 403, and the step p95 was 88 ms over that job's 6 steps. Its
-summary line, copied here because `runs/aws-smoke.log` is git-ignored (the timestamp is UTC):
+**Status: deployed** on 2026-10-18 (India time) to `us-east-1` from commit ca69037 and smoke-tested. The latest
+smoke run (`scripts/aws.sh smoke` with `WAF_LOOP=1`: checks 1 to 5 and 7 under [Smoke](#smoke)) passed:
+`/api/health` answered from `aws-lambda` on `aarch64` with OpenCV 5.0.0 (`stock (not COOL)`) and commit ca69037, a
+job on `bridge_03.jpg` streamed to `done` (`awaiting_review`, 6 steps), KILL halted a second job at step 3, an
+unsigned `POST` through CloudFront got 403, the raw Function URL got 403, the WAF answered 429 at the 14th
+empty-bodied job start, and the step p95 was 67.7 ms over the first job's 6 steps. Its summary line, copied here
+because `runs/aws-smoke.log` is git-ignored (the timestamp is UTC):
 
 ```
-smoke 2026-10-17T23:12:36Z https://d1xg58guluup8c.cloudfront.net commit=d34f74ba70d256d3f5395bcc6abac50e339b55d9-dirty package=z4dXOG1caCf9ZFT//BBlsAQ36dRC5+4lwWAwYN5Anjk= ttfb_first=1.034778s ttfb_warm=0.983273s step_p95_ms=88.0 result=pass
+smoke 2026-10-18T07:12:25Z https://d1xg58guluup8c.cloudfront.net commit=ca690371bf3c21eb5efc61f58f9048322a41ec52 package=vSxCotfLF5Ja/atXtqO5ddXcvT9YHElpHTOQZ8woQvA= ttfb_first=1.267549s ttfb_warm=1.335864s step_p95_ms=67.7 result=pass
 ```
 
-The live build was made from a working tree with uncommitted changes (`d34f74b-dirty`), so it matches no
-public commit, and it predates the changes on this page that are marked as not yet live. It will be
-redeployed from the release commit, and this block updated with that smoke run. The costs below are
-list-price estimates until the first bill; the dashboard screenshot is not added yet.
+On the live site the WAF's 429 carries the JSON body `{"error": "rate limited: 10 job starts per 2 min per IP; wait
+and retry"}`, and a review reply carries `prev_token_sha256` (both checked on 2026-10-18). The live build's
+`public/results/` predates the arm64 re-run of the evaluations (commit 46f01b5), so until the next deploy the site's
+FIG. 4 and FIG. 5 show the earlier numbers. The costs below are list-price estimates until the first bill; the
+dashboard screenshot is not added yet.
 
 Three parts depend on app changes made outside `infra/` (all three are in):
 `drishyam/web.py` must read the signing key from the secret named by `DRISHYAM_SIGNING_KEY_SECRET_ARN`
@@ -75,11 +77,11 @@ flowchart LR
 | Function URL | `AuthType AWS_IAM`, `InvokeMode RESPONSE_STREAM` | Nobody can call it without a SigV4 signature, so the WAF cannot be bypassed |
 | CloudFront | Two origins, each with Origin Access Control. `/api/*` goes to the Function URL: not cached, all methods, all viewer headers and the query string forwarded, no compression, 60 s read timeout. Everything else goes to the S3 bucket, cached (`CachingOptimized`), `/` serves `index.html`, with a response headers policy built from `infra/headers.json` (CSP, HSTS, `X-Frame-Options`, `Referrer-Policy`, `nosniff`, `Permissions-Policy`, COOP, CORP; `web.py` serves the same file's headers in local runs, and `tests/test_infra.py` fails if the policy differs from it) | Lambda runs one request per environment, so a cold page load (about 30 files) through the function would hit the concurrency cap and get 429s; static invocations would also crowd out jobs and water down the Duration p95 alarm |
 | S3 bucket | Private (all public access blocked, TLS only, SSE-S3); only this distribution may read objects. CDK's `BucketDeployment` uploads `public/` on every deploy that changes it, deletes files no longer there and invalidates `/*`. `destroy` empties and deletes it | The static site off the function, with the same headers as in local runs |
-| AWS WAF | Web ACL (scope `CLOUDFRONT`, which must live in `us-east-1`). Rule `job-starts`: `POST /api/jobs`, 10 per IP per 120 s. Rule `kill-and-review`: `/api/kill` plus `/api/review`, 30 per IP per 60 s. Rule `all-requests`: every request, 300 per IP per 60 s (a page load is about 30). Paths are matched after URL decoding. Blocked requests get 429 with a JSON body that names the rule's limit, such as `{"error": "rate limited: 10 job starts per 2 min per IP; wait and retry"}` (not yet live: the current build answers with CloudFront's default 403) | A cap on job starts, the expensive call; one on the two other `POST` endpoints; and a ceiling on everything else, such as cache-busting `GET /api/health` floods. Trade-offs under Limits |
+| AWS WAF | Web ACL (scope `CLOUDFRONT`, which must live in `us-east-1`). Rule `job-starts`: `POST /api/jobs`, 10 per IP per 120 s. Rule `kill-and-review`: `/api/kill` plus `/api/review`, 30 per IP per 60 s. Rule `all-requests`: every request, 300 per IP per 60 s (a page load is about 30). Paths are matched after URL decoding. Blocked requests get 429 with a JSON body that names the rule's limit, such as `{"error": "rate limited: 10 job starts per 2 min per IP; wait and retry"}` | A cap on job starts, the expensive call; one on the two other `POST` endpoints; and a ceiling on everything else, such as cache-busting `GET /api/health` floods. Trade-offs under Limits |
 | DynamoDB kill table | On demand, partition key `k` (string), TTL attribute `exp` | `/api/kill` lands in a different Lambda environment from the job it stops; an in-process flag cannot reach it |
 | Secrets Manager | A 64-character key generated by CloudFormation, never in the repo or the template | Every Lambda environment signs and verifies work orders with the same key |
-| CloudWatch | Log group (14-day retention); dashboard `Drishyam` (jobs by status, job seconds, pixels used, steps and findings, reviews by decision, and the function's invocations, errors, throttles, duration and concurrency; reviews by decision not yet live); alarms on Errors (at least 1 in 5 min), Throttles (at least 1 in 5 min), Duration p95 (over 45 s) and AppErrors (at least 1 in 5 min). AppErrors is a metric filter on the log group for `ERROR drishyam` (an unhandled 500 or a failed job, which `web.py` logs from the `drishyam` logger) or uvicorn's `Exception in ASGI application` | Behind the Web Adapter a FastAPI 500, or a job that ends in an `{"type": "error"}` event inside a 200 stream, is a successful invocation, so the Errors alarm only sees timeouts, crashes and init failures |
-| SNS + Budget | Alarms and a 20 USD monthly cost budget (alerts at 50 % and 100 % of actual cost, credits not counted) publish to one topic, which has no subscribers until the owner adds one | Credits would otherwise hide real spend |
+| CloudWatch | Log group (14-day retention); dashboard `Drishyam` (jobs by status, job seconds, pixels used, steps and findings, reviews by decision, and the function's invocations, errors, throttles, duration and concurrency); alarms on Errors (at least 1 in 5 min), Throttles (at least 1 in 5 min), Duration p95 (over 45 s) and AppErrors (at least 1 in 5 min). AppErrors is a metric filter on the log group for `ERROR drishyam` (an unhandled 500 or a failed job, which `web.py` logs from the `drishyam` logger) or uvicorn's `Exception in ASGI application` | Behind the Web Adapter a FastAPI 500, or a job that ends in an `{"type": "error"}` event inside a 200 stream, is a successful invocation, so the Errors alarm only sees timeouts, crashes and init failures |
+| SNS + Budget | Alarms and a 20 USD monthly cost budget (alerts at 50 % and 100 % of actual cost, credits not counted) publish to one topic. Its one subscription, the owner's email, awaits confirmation (`ListSubscriptionsByTopic`, 2026-10-18), so until it is confirmed the alerts reach nobody | Credits would otherwise hide real spend |
 
 No VPC, no NAT, no container image (CDK's bootstrap bucket holds the zips).
 
@@ -169,8 +171,9 @@ doubles the worst-case cost below). Without `RESERVED`, `deploy` stops in such a
 ways forward: request the default quota of 1000 and deploy once it is granted (the stack then reserves
 5), or run `RESERVED=none scripts/aws.sh deploy`.
 
-**Alerts:** the topic has no subscribers. To get the alarm and budget emails, run this once and click
-the link in the confirmation email (`deploy` prints the same command with the topic ARN filled in):
+**Alerts:** the topic has one email subscription, which awaits confirmation: no alarm or budget email arrives
+until the owner clicks the link in the confirmation email. To subscribe an address, run this once and click that
+link (`deploy` prints the same command with the topic ARN filled in):
 
 ```
 aws sns subscribe --topic-arn "$(aws cloudformation describe-stacks --stack-name Drishyam --query "Stacks[0].Outputs[?OutputKey=='AlertTopicArn'].OutputValue" --output text --profile drishyam --region us-east-1)" --protocol email --notification-endpoint you@example.com --profile drishyam --region us-east-1
@@ -220,8 +223,7 @@ classical engine. Making the CC BY-NC 4.0 dacl10k model the live segmenter is an
 6. With `E2E=1`: `tests/e2e/test_ui_live.py <url>`, the browser flows (needs Playwright in `.venv`, see
    the README). It starts about 3 jobs.
 7. With `WAF_LOOP=1`: empty-bodied job starts (the app answers 400 without running a job) until the WAF
-   answers 429 with its `rate limited` JSON body (a Lambda throttle 429 does not count; not yet live: the
-   current build answers 403, so this check fails on it),
+   answers 429 with its `rate limited` JSON body (a Lambda throttle 429 does not count),
    expected after about 10 in 120 s, fewer if the checks above started jobs. Job starts from
    that IP stay blocked until its rate falls back under the limit, up to two minutes after the loop.
 
@@ -249,7 +251,7 @@ few thousand page views.
 | DynamoDB on demand | 0.125 USD per million reads, 0.625 USD per million writes | under 0.01 USD |
 | Secrets Manager | 0.40 USD per secret, 0.05 USD per 10,000 calls | 0.40 USD |
 | CloudWatch | [10 custom metrics, 10 alarms, 3 dashboards and 5 GB of logs free](https://aws.amazon.com/cloudwatch/pricing/); then 0.30 USD per metric | 4 job metrics x 3 values of `Status` (`completed`, `halted`, `awaiting_review`) = 12 metrics, plus `Reviews` x 2 values of `Decision` (`approve`, `reject`) = 14, plus `AppErrors` = 15, 5 over the free 10: 1.50 USD. 4 alarms, within the free 10 |
-| X-Ray, SNS, Budgets | 100,000 traces a month free; no subscribers; budgets without actions cost nothing | 0 USD |
+| X-Ray, SNS, Budgets | 100,000 traces a month free; one email subscription (unconfirmed); budgets without actions cost nothing | 0 USD |
 | **Total** | | **about 10.30 USD**, 8 of it the WAF |
 
 CloudFront's [flat-rate plans](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/flat-rate-pricing-plan.html)
