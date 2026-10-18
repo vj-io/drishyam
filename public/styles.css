@@ -295,10 +295,11 @@ img, canvas, svg { max-width: 100%; }
 .win--view > .win__body { padding: 12px; }
 @keyframes chest { 0% { opacity: 0; transform: translateY(28px); clip-path: inset(0 -40px 100% -40px); } 35% { opacity: 1; } 100% { opacity: 1; transform: none; clip-path: inset(-40px -40px -40px -40px); } }
 /* Hidden-until-scrolled only once app.js has wired the observer (it sets .js), and never in print:
-   a script that fails to load or throws leaves every sheet visible. */
+   a script that fails to load or throws leaves every sheet visible. The demo's own windows are never hidden: the app
+   jumps between them, and a window still sliding in read as an empty gap under the trace. */
 @media screen and (prefers-reduced-motion: no-preference) {
-  .js .win.pop:not(.is-in) { opacity: 0; }
-  .win.pop.is-in { animation: chest .75s cubic-bezier(.2, .8, .25, 1) both; animation-delay: var(--d, 0s); }
+  .js .win.pop:not(.is-in):not(#demo *) { opacity: 0; }
+  .win.pop.is-in:not(#demo *) { animation: chest .75s cubic-bezier(.2, .8, .25, 1) both; animation-delay: var(--d, 0s); }
   .strip__no.is-in b { animation: sheetstamp .6s .25s cubic-bezier(.2, 1.4, .4, 1) both; }
   .js .art:not(.is-in) .d { stroke-dasharray: 1 1; stroke-dashoffset: 1; }
   .js .art:not(.is-in) :is(.dm, .co, .fade) { opacity: 0; }
