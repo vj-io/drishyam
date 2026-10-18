@@ -194,17 +194,20 @@ export function reviewText(reason) {
 
 /** The cross-level check of a look, from its `verify` record {iou (same class), class, against_level, class_now, iou_any}. */
 function verifyText(v) {
-  if (!num(v?.iou)) return null;
+  if (!v) return null;
   const then = scale(v.against_level);
-  if (v.class && v.class_now && v.class_now !== v.class && num(v.iou_any) && v.iou_any >= 0.5) {
+  if (v.class && v.class_now && v.class_now !== v.class && num(v.iou_any) && v.iou_any >= 0.5) {  // its own class may be gone (no iou)
     return `same place, different class: ${words(v.class_now)} now, ${words(v.class)} in the ${then} look (${pct(v.iou_any)} overlap)`;
   }
-  return `${v.class ? `its ${words(v.class)} mask: ` : ''}${pct(v.iou)} overlap with the ${then} look`;
+  return num(v.iou) ? `${v.class ? `its ${words(v.class)} mask: ` : ''}${pct(v.iou)} overlap with the ${then} look` : null;
 }
+
+/** A step's `seeded` list, the entries that carry a region and an uncertainty. */
+const seededOf = (s) => (Array.isArray(s.seeded) ? s.seeded : []).filter((c) => c?.region && num(c.entropy));
 
 /** The unvisited candidates this look set the uncertainty and class of ({region, entropy, cls, from_level}), in words. */
 export function seededText(s) {
-  const list = (Array.isArray(s.seeded) ? s.seeded : []).filter((c) => c?.region && num(c.entropy));
+  const list = seededOf(s);
   if (!list.length) return null;
   const one = (c) => `${c.region} (${c.cls ? `looks like ${words(c.cls)}, ` : ''}uncertainty ${c.entropy.toFixed(2)})`;
   return `It also set what the agent expects in ${list.length} region${list.length === 1 ? '' : 's'} it has not visited: `
@@ -303,7 +306,7 @@ export class Trace {
     if (s.injected) parts.push(h('span', { class: 'chip chip--inject' }, `injected: ${INJECTED[s.injected] ?? words(s.injected)}`));
     if (num(s.latency_ms)) parts.push(h('span', { class: 't-ms' }, `${s.latency_ms} ms`));
     const saw = sawText(s);
-    const seeded = (Array.isArray(s.seeded) ? s.seeded : []).filter((c) => c?.region && num(c.entropy));
+    const seeded = seededOf(s);
     const btn = h('button', { type: 'button', class: 'trace__btn' },
       h('span', { class: 'trace__head' }, parts),
       s.rationale ? h('span', { class: 'trace__why' }, h('i', {}, 'because'), from ? ` (from ${from})` : '', ': ', brief(s)) : null,
@@ -374,7 +377,7 @@ export function renderStepDetail(root, step, planner) {
         row('mask area', num(o?.mask_area_px) ? `${px(o.mask_area_px)} px` : null),
         row('classes', o ? classes : null),
         row('verify IoU (overlap)', num(v?.iou) ? `${v.iou.toFixed(2)} vs L${v.against_level}${v.class ? `, ${words(v.class)} at both` : ''}` : null),
-        row('class then → now', num(v?.iou) && v.class && v.class_now ? `${words(v.class)} at L${v.against_level} → ${words(v.class_now)} now` : null),
+        row('class then → now', v?.class && v.class_now ? `${words(v.class)} at L${v.against_level} → ${words(v.class_now)} now` : null),
         row('best masks overlap (any class)', num(v?.iou_any) ? v.iou_any.toFixed(2) : null),
         row('sharpness / exposure', o ? `${o.sharpness ?? '–'} / ${o.exposure ?? '–'}` : null),
         row('quality', step.quality ? (step.quality.ok ? 'ok' : `rejected: ${step.quality.reason}`) : null),

@@ -145,8 +145,10 @@ function showCam(k) {
   el.camImg.hidden = el.pip.hidden = !url;
   el.stages.hidden = Boolean(url);
   if (!url) {
-    el.camCap.textContent = S.job ? 'Before the first look: the stages above light up as the server prepares the photo'
-      : S.mode === 'running' ? 'Sending the photo: the first look follows the server’s preparation' : 'No look yet. Press Run.';
+    el.camCap.textContent = S.mode === 'running'
+      ? (S.job ? 'Before the first look: the stages above light up as the server prepares the photo'
+        : 'Sending the photo: the first look follows the server’s preparation')
+      : S.job ? 'Before the first look' : 'No look yet. Press Run.';
     return;
   }
   el.camImg.src = el.pip.src = url;
