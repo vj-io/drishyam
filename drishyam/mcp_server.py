@@ -36,7 +36,15 @@ from .findings import Finding, now_iso, order_status
 from .findings import work_order as make_work_order
 from .governor import Budget, RuntimeStats, Settings, check, global_kill
 from .measure import measure as measure_px
-from .segment import DEFECTS, default_segmenter, segment_view
+from .segment import (
+    DEFECTS,
+    PORE_ASPECT,
+    PORE_CAUSE,
+    default_segmenter,
+    elongated,
+    rejected_lines,
+    segment_view,
+)
 
 MAX_LEVEL = 3
 OVERVIEW_LEVEL = imaging.OVERVIEW_LEVEL
@@ -259,7 +267,7 @@ def _look(s: Session, rec: dict, x: int, y: int, level: int, yaw: float = 0.0, p
 def _segment(s: Session, rec: dict, g: Gaze, model: str) -> tuple[object, str]:
     used = "fast" if s.settings.model == "fast" else model  # the governor may have downgraded the model
     valid = imaging.footprint(g.to_l0, s.shape[::-1], g.crop.shape[0])  # no mirrored defects past the image
-    g.seg, ms = _timed(s, f"segment:{used}", segment_view, s.segmenter, g.crop, used, valid)
+    g.seg, ms = _timed(s, f"segment:{used}", segment_view, s.segmenter, g.crop, used, valid, 2**g.level)
     s.stats.record("segment", ms)
     areas = {c: a for c, a in g.seg.areas.items() if a}
     rec["observation"] = {
@@ -269,6 +277,8 @@ def _segment(s: Session, rec: dict, g: Gaze, model: str) -> tuple[object, str]:
         "classes": areas,
     }
     rec["model"] = used
+    if g.seg.lines:  # crack components dropped as straight lines (formwork, joints): logged, never a finding
+        rec["rejected"] = rejected_lines(g.seg, g.to_l0, s.shape[::-1])
     return g.seg, used
 
 
@@ -457,6 +467,7 @@ def segment(job: JobId, gaze_id: RecordId, model: Literal["accurate", "fast"] = 
             entropy=seg.entropy,
             latency_ms=round(seg.latency_ms, 1),
             quality_ok=g.quality["ok"],
+            **({"rejected": rec["rejected"]} if "rejected" in rec else {}),
         )
 
 
@@ -509,6 +520,7 @@ def verify(job: JobId, gaze_id: RecordId, why: Why = "") -> str:
             agrees=None if iou is None else iou >= IOU_AGREE,
             quality_ok=fine.quality["ok"],
             entropy=seg.entropy,
+            **({"rejected": rec["rejected"]} if "rejected" in rec else {}),
         )
 
 
@@ -596,6 +608,9 @@ def log_finding(job: JobId, gaze_id: RecordId, cls: Defect, why: Why = "") -> st
             raise ToolError(f"no {cls} in the last segmentation of {g.id}")
         mask = seg.mask(cls)
         m = measure_px(mask, 2**g.level, linear=cls == "crack")
+        if cls == "crack" and not elongated(m):
+            raise ToolError(f"{PORE_CAUSE}: the crack in {g.id} is {m['length_px']} px long and {m['width_px']} px wide; "
+                            f"a crack is at least {PORE_ASPECT:g} widths long")
         x, y, w, h = cv2.boundingRect(cv2.findNonZero(mask))
         box = imaging.l0_box((x, y, w, h), g.to_l0, s.shape[::-1])
         same = next(
@@ -668,6 +683,8 @@ def draft_work_order(job: JobId) -> str:
              "reason": g.quality["reason"], "action": "re-shoot"}
             for g in s.gazes.values() if not g.quality["ok"]
         ]
+        if s.sal is not None:  # the overview ran: so did its blown-out or black areas too large to look at
+            refused[:0] = imaging.unseen_areas(s.pyr[OVERVIEW_LEVEL], 2**OVERVIEW_LEVEL, (W, H))
         wo = make_work_order(s.id, s.findings, s.gaze_path, refused)
         path = s.dir / "work_order.json"
         if path.exists():

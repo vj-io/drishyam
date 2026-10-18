@@ -58,7 +58,8 @@ def test_a_border_crack_is_not_mirrored_outside_the_image():
     """A view wider than the image is filled by reflection, so a crack 15 px from the edge has a twin at -15 px.
     Only pixels that map inside the image may be labelled."""
     img = concrete(600, 800, 5)
-    cv2.line(img, (15, 40), (25, 560), (55, 55, 58), 3, cv2.LINE_AA)
+    wobble = [(20 + round(5 * np.sin(y / 25)), y) for y in range(40, 561, 8)]  # a crack, not a ruler line
+    cv2.polylines(img, [np.array(wobble, np.int32)], False, (55, 55, 58), 3, cv2.LINE_AA)
     crop, to_l0 = imaging.gaze(imaging.build_pyramid(img), 400, 300, 1, size=512)  # L0 window [-112, -212, 1024, 1024]
     valid = imaging.footprint(to_l0, (800, 600), 512)
     raw = SEG.predict(crop)
@@ -73,6 +74,24 @@ def test_a_border_crack_is_not_mirrored_outside_the_image():
     ys, xs = np.nonzero(seg.mask("crack"))
     x, y = imaging.map_points(to_l0, np.stack([xs, ys], 1)).T
     assert x.min() >= 0 and y.min() >= 0 and x.max() < 800 and y.max() < 600
+
+
+def test_a_straight_groove_is_dropped_and_a_meandering_crack_is_kept():
+    """To the evidence maps both are dark lines; only the crack meanders (drop_straight_lines). A coarse view
+    smooths a crack's jitter away, so the residual is judged in L0 px: the same groove seen at L3 is kept."""
+    everywhere = np.ones((512, 512), bool)
+    groove = concrete(512, 512, 25)
+    cv2.line(groove, (250, 10), (258, 500), (50, 52, 55), 3, cv2.LINE_AA)
+    raw = SEG.predict(groove)
+    assert raw.areas["crack"] > 1000
+    seg = segment_view(SEG, groove, "accurate", everywhere)
+    assert seg.areas["crack"] == 0 and len(seg.lines) == 1
+    _box, length, width, residual = seg.lines[0]
+    assert length > 400 and length > 20 * width and residual < 1.5
+    assert segment_view(SEG, groove, "accurate", everywhere, scale=8).areas["crack"] == raw.areas["crack"]
+    crack = add_crack(concrete(512, 512, 24), (60, 200), n=120, width=3)
+    kept = segment_view(SEG, crack, "accurate", everywhere)
+    assert kept.lines == [] and kept.areas["crack"] == SEG.predict(crack).areas["crack"] > 300
 
 
 def test_fast_model_agrees_roughly_and_is_faster():
@@ -129,6 +148,37 @@ def test_onnx_engine_new_dynamic_hw(tiny_onnx, shape):
     assert seg.probs.shape == (6, *shape)
     assert np.allclose(seg.probs.sum(axis=0), 1, atol=1e-4)
     assert seg.model == "accurate"
+
+
+class BrightNet:
+    """A stand-in net that keeps its input and answers 'crack' wherever the input is bright."""
+
+    def setInput(self, blob):
+        self.blob = blob.copy()
+
+    def forward(self):
+        logits = np.zeros((1, len(CLASSES), *self.blob.shape[2:]), np.float32)
+        logits[0, CLASSES.index("crack")] = 8.0 * (self.blob[0].mean(0) > 1.0)
+        return logits
+
+
+def test_onnx_letterboxes_a_non_square_crop(tiny_onnx):
+    """A 1024 x 768 crop reaches the 512 x 512 input at one scale (512 x 384, the rest the normalised mean),
+    and comes back 768 x 1024 with its horizontal stripe where it was. Squashed, the stripe would sit at rows
+    200-226 of the input and the net would see a 4:3 view stretched to 1:1."""
+    seg = OnnxSegmenter(tiny_onnx)
+    seg.nets = {"accurate": BrightNet(), "fp16": BrightNet()}
+    crop = np.full((768, 1024, 3), 90, np.uint8)
+    crop[300:340] = 250
+    out = seg.predict(crop)
+    seen = seg.nets["accurate"].blob
+    assert seen.shape == (1, 3, 512, 512) and not seen[0, :, 384:].any()
+    rows = np.flatnonzero((seen[0].mean(0) > 1.0).any(1))
+    assert (rows.min(), rows.max()) == (150, 169)
+    assert out.probs.shape == (len(CLASSES), 768, 1024) and out.net_px == 512 * 512
+    ys, xs = np.nonzero(out.mask("crack"))
+    assert abs(ys.min() - 300) <= 2 and abs(ys.max() - 339) <= 2 and xs.min() == 0 and xs.max() == 1023
+    assert seg.predict(crop, "fast").net_px == 256 * 256 and SEG.predict(crop).net_px == 768 * 1024
 
 
 def test_onnx_class_map_merges_channels(tiny_onnx):

@@ -70,6 +70,13 @@ Event types, in order:
                  "exposure": 0.48, "classes": {"crack": 41}},
  "quality": {"ok": true, "reason": null},
  "verify": {"iou": 0.71, "against_level": 2},          // only on verify / escalate steps
+ "rejected": [{"cls": "crack", "cause": "straight line: formwork or joint", "box": [2232, 1250, 20, 320],
+               "length_px": 318.2, "width_px": 6.56, "residual_px": 1.26}],
+                                                        // only when the look dropped crack components that are
+                                                        // one straight line (centreline RMS residual < 1.5 L0 px
+                                                        // over >= 20x the mean width), or its crack measured as a
+                                                        // blob ("not elongated: pore or bug hole": length < 8x the
+                                                        // mean width, no residual_px); no finding comes from them
  "runtime": {"p50_ms": {"warp": 9, "segment": 31}, "p95_ms": {"warp": 14, "segment": 54},
              "cpu_pct": 71, "usd": 0.0031},
  "rationale": "entropy 0.62 > 0.5 at L2",
@@ -90,7 +97,8 @@ Event types, in order:
   "critical_step": null, "critical_area_px": null, "critical_rule": null,
   "verify_iou": 0.71, "verified": true, "crop_jpeg_b64": "<256 px JPEG>"}}
 
-{"type": "review_request", "finding_id": "f2", "reason": "exposed_rebar is critical"}
+{"type": "review_request", "finding_id": "f2", "reason": "exposed_rebar is critical",
+ "iou": null, "level_a": null, "level_b": 1, "classes": ["exposed_rebar"]}
 
 {"type": "planner", "step": 5, "status": "fallback", "reason": "timeout", "proposal": null}
 // status: accepted | rejected | fallback
@@ -128,6 +136,11 @@ A `review_request` asks a person to look; it changes no state (only a critical f
   level, or the region's one extra look is spent); the finding has `verified: false`;
 - `"ambiguous: crack 5232 px (>= A_min 64) is mostly inside spalling f2; recorded as spalling only"`: two classes
   cleared `A_min` on one spot and the agent kept the dominant one (once per finding and class).
+
+The same in fields, so a client need not parse `reason`: `level_b` is the level of the look that asked; for
+the two disagreements `level_a` is the coarser look it was compared with and `iou` their mask IoU, and
+`classes` is `[class at level_a, class at level_b]`; for an ambiguity `classes` is `[kept, absorbed]`, for a
+new critical finding `[class]`, with `iou` and `level_a` `null`. (The MCP server's records carry `reason` only.)
 
 A finding event repeats, with the same `id`, whenever another look sees the same
 defect. The finding is its evidence trail: `step` is the look that found it,
@@ -196,7 +209,8 @@ A wrong token is accepted and kills nothing (no oracle). Returns `{"ok": true, "
 
 `status` is `blocked` while any critical finding is `pending_review`, else `ready`.
 `not_assessed` lists every window the quality gate refused (`reason` `blur`, `glare` or `dark`;
-`box` clipped to the image), so an area the agent could not read never passes for a clean one.
+`box` clipped to the image), and, with `step` 0, every blown-out or black area the overview found larger than 5 %
+of the image, which gets no look at all, so an area the agent could not read never passes for a clean one.
 
 ### Downloaded work-order file
 

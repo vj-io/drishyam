@@ -124,8 +124,8 @@ def test_survey_window_larger_than_the_image_reports_nothing_outside_it(scene, m
 
     looks = []
 
-    def spy(segmenter, crop, model, valid):
-        looks.append((segment_view(segmenter, crop, model, valid), valid))
+    def spy(segmenter, crop, model, valid, scale):
+        looks.append((segment_view(segmenter, crop, model, valid, scale), valid))
         return looks[-1][0]
 
     monkeypatch.setattr(agent, "segment_view", spy)
@@ -173,13 +173,10 @@ def test_reflection_does_not_inflate_spall_area_to_critical(monkeypatch):
     assert all(f.measure["area_px"] <= 1.02 * true_area and inside_image(f.box, img.shape) for f in found)
 
 
-def test_seconds_and_usd_caps_halt():
-    from .conftest import concrete
-
-    img = concrete(1200, 1600, 1)
-    _, ev = run(img, clock=SlowClock(), seconds_cap=1.0, pixel_cap=1.0)
+def test_seconds_and_usd_caps_halt(scene):
+    _, ev = run(scene, clock=SlowClock(), seconds_cap=1.0, pixel_cap=1.0)
     assert ev[-1]["cause"] == "cap-hit" and ev[-1]["summary"]["seconds"] >= 1.0
-    _, ev = run(img, clock=SlowClock(), usd_cap=0.0001, pixel_cap=1.0, seconds_cap=30)
+    _, ev = run(scene, clock=SlowClock(), usd_cap=0.0001, pixel_cap=1.0, seconds_cap=30)
     assert ev[-1]["cause"] == "cap-hit" and ev[-1]["summary"]["usd"] >= 0.0001
 
 
@@ -211,9 +208,9 @@ def test_forced_p95_spike_changes_next_steps_model(scene):
 
 
 def test_governor_override_on_a_halting_step_reaches_the_trace(scene):
-    """PRD rule 5: every override writes a cause. With eps = 1 the stop rule ends the job on the step right
+    """PRD rule 5: every override writes a cause. With eps = 0.7 the stop rule ends the job on the step right
     after the spike, the same step on which the governor switched the model; the halt record carries it."""
-    job, events = run(scene, pixel_cap=1.0, chaos=("p95_spike",), eps=1.0)
+    job, events = run(scene, pixel_cap=1.0, chaos=("p95_spike",), eps=0.7)
     spike = next(s for s in steps(events) if s.get("injected") == "p95_spike")
     halt = steps(events)[-1]
     assert halt["step"] == spike["step"] + 1 and halt["cause"] == "stop-rule"  # the case this test exists for
@@ -422,6 +419,49 @@ def test_a_check_of_an_absorbed_class_counts_for_the_finding_that_absorbed_it():
                for e in after(s))
 
 
+def test_review_requests_say_their_reason_in_fields_too():
+    """bridge_03 asks for all four kinds of review; each event's iou, levels and classes match its reason."""
+    from pathlib import Path
+
+    img = cv2.imread(str(Path(__file__).resolve().parent.parent / "public" / "samples" / "bridge_03.jpg"))
+    _, events = run(img)
+    reqs = [e for e in events if e["type"] == "review_request"]
+    kinds = set()
+    for e in reqs:
+        assert 0 <= e["level_b"] <= 3
+        if e["iou"] is not None:
+            assert f"iou {e['iou']:g} < 0.5 between L{e['level_a']} and L{e['level_b']}" in e["reason"]
+            assert e["level_a"] > e["level_b"] and len(e["classes"]) == 2
+            kinds.add("unconfirmed" if e["reason"].startswith("unconfirmed: ") else "disagree")
+        elif e["reason"].startswith("ambiguous: "):
+            kept, absorbed = e["classes"]
+            assert e["reason"].startswith(f"ambiguous: {absorbed} ") and f"inside {kept} " in e["reason"]
+            kinds.add("ambiguous")
+        else:
+            assert e["level_a"] is None and e["reason"] == f"{e['classes'][0]} is critical"
+            kinds.add("critical")
+    assert kinds == {"critical", "ambiguous", "disagree", "unconfirmed"}
+
+
+def test_the_clean_concrete_sample_drafts_no_crack():
+    """bridge_08 has one straight formwork groove, which used to be drafted as a 93 % crack ([2049, 1250, 581, 798]
+    in run j_d60376), and bug holes that classical-v1 labels crack. Every look that sees the groove logs it as a
+    straight line; a bug hole is logged as not elongated (a blob, under PORE_ASPECT widths long). No crack is drafted."""
+    from pathlib import Path
+
+    from drishyam.segment import PORE_ASPECT, PORE_CAUSE, STRAIGHT_CAUSE
+
+    img = cv2.imread(str(Path(__file__).resolve().parent.parent / "public" / "samples" / "bridge_08.jpg"))
+    job, events = run(img)
+    rejected = [x for s in steps(events) for x in s.get("rejected", [])]
+    lines = [x for x in rejected if x["cause"] == STRAIGHT_CAUSE]
+    pores = [x for x in rejected if x["cause"] == PORE_CAUSE]
+    assert lines and pores and len(lines) + len(pores) == len(rejected)
+    assert all(x["residual_px"] < 1.5 and imaging.box_iou(x["box"], [2049, 1250, 581, 798]) > 0 for x in lines)
+    assert all(x["length_px"] < PORE_ASPECT * x["width_px"] and inside_image(x["box"], img.shape) for x in pores)
+    assert not any(f.cls == "crack" for f in job.findings)
+
+
 def test_review_on_ambiguity_when_a_class_is_absorbed_by_another(scene):
     """Two classes clear A_min on one spot and the agent keeps the dominant one: a human is asked, once."""
     job, events = run(scene, pixel_cap=1.0)
@@ -432,6 +472,30 @@ def test_review_on_ambiguity_when_a_class_is_absorbed_by_another(scene):
         f = ids[e["finding_id"]]
         assert f.cls in e["reason"] and f"is mostly inside {f.cls} {f.id}" in e["reason"]
     assert len({e["reason"].split(" px")[0] + e["finding_id"] for e in asked}) == len(asked)
+
+
+@pytest.mark.parametrize("band", [0.25, 0.35])
+def test_a_blown_out_band_is_not_assessed_and_takes_no_looks_from_a_crack(band):
+    """A blown-out band (sky) over a quarter or a third of the photo is marked not assessed from the overview, and
+    neither it nor its edge yields candidates: the crack below it is still found at the 30 % cap. A small glare patch
+    still gets a look, so the quality gate marks it (the 'Glare and blur' sample)."""
+    from pathlib import Path
+
+    from .conftest import add_crack, concrete
+
+    img = concrete(1536, 2048, 7)
+    img[: int(1536 * band)] = 252
+    add_crack(img, (500, 900), n=300, width=3)
+    job, events = run(img, pixel_cap=0.3)
+    assert any(f.cls == "crack" and f.box[1] > 900 for f in job.findings)
+    sky = events[-1]["work_order"]["not_assessed"][0]
+    assert sky == {"step": 0, "box": [0, 0, 2048, sky["box"][3]], "reason": "glare", "action": "re-shoot"}
+    assert abs(sky["box"][3] - 1536 * band) <= 8  # one overview px
+    assert all(c["box"][1] + c["box"][3] // 2 > 1536 * band for c in events[1]["candidates"])  # no centre in the band
+    img = cv2.imread(str(Path(__file__).resolve().parent.parent / "public" / "samples" / "bridge_07.jpg"))
+    _, events = run(img, pixel_cap=0.3)
+    (glare,) = events[-1]["work_order"]["not_assessed"]
+    assert glare["step"] > 0 and glare["reason"] == "glare"
 
 
 def test_quality_refused_windows_are_not_assessed(scene, monkeypatch):

@@ -1,7 +1,8 @@
 """Crack geometry in pixels: length, mean width, area and orientation.
 
-The centreline comes from hit-or-miss thinning (morphology ops, which KleidiCV
-accelerates); component labelling and contours are plain imgproc. Length is the smoothed arc length of that 1-px line and
+The centreline comes from hit-or-miss thinning (stock OpenCV imgproc ops; KleidiCV
+HAL coverage of these calls is not measured); component labelling and contours are
+plain imgproc. Length is the smoothed arc length of that 1-px line and
 mean width is area / length. Everything is reported in L0 image pixels; there
 are no millimetres anywhere in Drishyam.
 """

@@ -95,21 +95,21 @@ def test_replay_header_validation(photo):
     assert ok.status_code == 200 and steps[0]["cause"] == "replay"
 
 
-def test_chaos_drills_over_http(photo, monkeypatch):
+def test_chaos_drills_over_http(scene, monkeypatch):
     import functools
 
     from drishyam import agent, web
 
-    # Still needed: on this photo the stop rule ends the job after three looks (survey, two escalations), so
-    # without eps = 0 neither the spike (injected on look 4) nor the malformed planner (step 6) would fire.
+    # The drills need a job of 6+ looks: the scene (several defects) with eps = 0, so the stop rule cannot end it
+    # before the spike (injected on look 4) and the malformed planner (step 6).
     monkeypatch.setattr(web, "JobConfig", functools.partial(agent.JobConfig, eps=0.0))
-    ev = lines(post(photo, params="?pixel_cap=1&chaos=p95_spike,planner_malformed"))
+    ev = lines(post(jpeg(scene), params="?pixel_cap=1&chaos=p95_spike,planner_malformed"))
     assert any(e.get("governor", {}).get("cause") == "p95>SLA" for e in ev)
     assert any(e["type"] == "planner" and e["status"] == "rejected" for e in ev)
     assert any(e.get("planner_status", {}).get("status") == "rejected" for e in ev)
 
 
-def test_jobs_consult_the_configured_planner(photo, monkeypatch):
+def test_jobs_consult_the_configured_planner(scene, monkeypatch):
     import functools
 
     from drishyam import agent, web
@@ -122,7 +122,7 @@ def test_jobs_consult_the_configured_planner(photo, monkeypatch):
 
     monkeypatch.setattr(web, "PLANNER", planner)  # what planner.from_env() builds when DRISHYAM_PLANNER_URL is set
     monkeypatch.setattr(web, "JobConfig", functools.partial(agent.JobConfig, eps=0.0))
-    ev = lines(post(photo, params="?pixel_cap=1"))
+    ev = lines(post(jpeg(scene), params="?pixel_cap=1"))
     assert asked and asked[0] == 5
     assert any(e["type"] == "planner" and e["status"] == "accepted" for e in ev)
     step5 = next(e for e in ev if e["type"] == "step" and e["step"] == 5)

@@ -21,12 +21,12 @@ npx @modelcontextprotocol/inspector uv run --directory /abs/path/to/drishyam dri
 | `overview(job)` | At most 20 ranked candidate boxes (L0 pixels) and a saliency heatmap PNG. |
 | `gaze(job, x, y, level, yaw=0, pitch=0, why="")` | Virtual-PTZ look at an L0 pixel at pyramid level 0-3. Returns a gaze id, window, quality gate and a JPEG of the crop (at most 512 px). |
 | `enhance(job, gaze_id, why="")` | CLAHE re-look. Replaces that gaze's crop; segment again afterwards. |
-| `segment(job, gaze_id, model)` | Per-class areas, confidence, entropy, latency. `model` is `accurate` or `fast`. |
+| `segment(job, gaze_id, model)` | Per-class areas, confidence, entropy, latency. `model` is `accurate` or `fast`. Crack components that are one straight line (formwork, joints) are dropped and listed under `rejected`, as in the agent's step records. |
 | `measure(job, gaze_id, cls)` | Length, width, area, orientation of one class, in L0 pixels. |
 | `verify(job, gaze_id, why="")` | Looks one level finer at the same centre, segments, returns the mask IoU against the coarser look (below 0.5 is disagreement). |
 | `runtime_stats(job)` | p50/p95 per op, CPU %, $ so far, budget against caps, what the governor changed. |
 | `set_budget(job, pixel_cap, usd_cap, seconds_cap, why="")` | Lowers caps (0.02-1.0, 0.0001-0.05, 1-30). Raising one is refused. |
-| `log_finding(job, gaze_id, cls, why="")` | Records a class that the last segmentation shows. Critical ones become `pending_review`. |
+| `log_finding(job, gaze_id, cls, why="")` | Records a class that the last segmentation shows. Critical ones become `pending_review`. A crack shorter than 8x its mean width is refused as a pore or bug hole. |
 | `request_human_review(job, finding_id, reason)` | Records the request in the trace. Changes no state. |
 | `draft_work_order(job)` | Writes `runs/<job>/work_order.json` and `crops/` and returns the order. |
 
@@ -67,7 +67,8 @@ shape in `api-contract.md` (`decision.args` holds the centre actually used, `win
 `cause`, `pixels_used`). Other calls are `tool` records, refusals are `step` records with action `halt`, and
 failures are `error` records. `rationale` is the client's `why`; when the governor acted before a call (it changed a
 setting, or a cap was hit), the record carries `governor: {cause, rationale}` and the reply `governor: {cause, note}`. The work order's `not_assessed` lists every gaze
-whose quality gate failed and that no `enhance` repaired. `drishyam replay runs/<job>/trace.jsonl` prints the gaze path and checks it
+whose quality gate failed and that no `enhance` repaired, and, once `overview` ran, every blown-out or black area
+larger than 5 % of the image (`step` 0; the overview gives it no candidates). `drishyam replay runs/<job>/trace.jsonl` prints the gaze path and checks it
 against `work_order.json`. Calls rejected by schema validation (a level of 9, say) never reach the server code,
 so they leave no line.
 

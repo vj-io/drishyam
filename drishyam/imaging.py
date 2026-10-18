@@ -1,9 +1,8 @@
 """Image intake, pyramid, saliency overview and the virtual-PTZ gaze.
 
-The camera moves are KleidiCV-accelerated OpenCV calls (pyrDown, warpPerspective,
-resize), so the agent's own camera moves are the workload COOL speeds up on
-Graviton. Saliency and the quality gate also use CLAHE, adaptiveThreshold,
-Laplacian and connected components.
+The camera moves (pyrDown, warpPerspective, resize) are stock OpenCV imgproc ops;
+KleidiCV HAL coverage of these calls is not measured. Saliency and the quality gate
+also use CLAHE, adaptiveThreshold, Laplacian and connected components.
 """
 
 from __future__ import annotations
@@ -24,6 +23,14 @@ OVERVIEW_LEVEL = 3
 SHARPNESS_MIN = 12.0  # Laplacian variance below this is blur
 GLARE_MAX = 0.20  # fraction of blown-out pixels
 DARK_MAX = 0.50
+# Saliency's absolute null: each map is divided by max(its 99.5th percentile, floor), so the texture of a sound
+# surface is not stretched to full scale. Calibrated on bridge_08 and a 30-image seeded synthetic slice (git log).
+EDGE_FLOOR = 250.0  # Sobel magnitude of the CLAHE'd 8-bit overview
+DARK_FLOOR = 70.0  # 9x9 blackhat, grey levels
+SAL_FLOOR = 0.55  # the weighted, blurred sum
+UNSEEN_W = 0.45  # blown-out or black patches: worth a look, so the quality gate can mark the area not assessed
+UNSEEN_MAX_FRAC = 0.05  # a blown-out or black area larger than this share of the image gets no look (sky, a shadow):
+UNSEEN_RIM = 10  # it and this many overview px around it (its edge) score 0; the work order marks it not assessed
 
 _SOF = {0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7, 0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF}
 
@@ -100,8 +107,10 @@ def build_pyramid(img: np.ndarray, levels: int = LEVELS) -> list[np.ndarray]:
     return pyr
 
 
-def _norm(x: np.ndarray) -> np.ndarray:
-    hi = float(np.percentile(x, 99.5))
+def _norm(x: np.ndarray, floor: float = 0.0) -> np.ndarray:
+    """x / max(p99.5, floor), clipped to 0-1. The floor is an absolute null: without it a sound surface's own
+    texture is stretched to full scale and always yields candidates."""
+    hi = max(float(np.percentile(x, 99.5)), floor)
     return np.clip(x / hi, 0, 1) if hi > 1e-6 else np.zeros_like(x, np.float32)
 
 
@@ -117,16 +126,39 @@ def saliency(img: np.ndarray) -> np.ndarray:
     eq = cv2.GaussianBlur(_clahe().apply(gray), (3, 3), 0)
     gx = cv2.Sobel(eq, cv2.CV_32F, 1, 0, ksize=3)
     gy = cv2.Sobel(eq, cv2.CV_32F, 0, 1, ksize=3)
-    edges = _norm(cv2.magnitude(gx, gy))
+    edges = _norm(cv2.magnitude(gx, gy), EDGE_FLOOR)
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9))
-    thin_dark = _norm(cv2.morphologyEx(eq, cv2.MORPH_BLACKHAT, kernel).astype(np.float32))
+    thin_dark = _norm(cv2.morphologyEx(eq, cv2.MORPH_BLACKHAT, kernel).astype(np.float32), DARK_FLOOR)
     local_dark = cv2.adaptiveThreshold(eq, 1, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, 21, 12)
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
     rust = cv2.inRange(hsv, (3, 70, 35), (25, 255, 235)).astype(np.float32) / 255
     white = cv2.inRange(hsv, (0, 0, 205), (180, 40, 255)).astype(np.float32) / 255
-    s = 0.30 * edges + 0.40 * thin_dark + 0.10 * local_dark + 0.45 * rust + 0.15 * white
+    small, large, _ = _unseen(gray)
+    s = 0.30 * edges + 0.40 * thin_dark + 0.10 * local_dark + 0.45 * rust + 0.15 * white + UNSEEN_W * small
     s = cv2.GaussianBlur(s, (0, 0), 2.0)
-    return _norm(s).astype(np.float32)
+    if large.any():  # its edge is no defect either: zeroed out to the 21-px adaptive block's reach
+        s[cv2.dilate(large.astype(np.uint8), cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * UNSEEN_RIM + 1,) * 2)) > 0] = 0
+    return _norm(s, SAL_FLOOR).astype(np.float32)
+
+
+def _unseen(gray: np.ndarray) -> tuple[np.ndarray, np.ndarray, list]:
+    """Blown-out or black pixels (the quality gate's glare and dark), split by connected area: the patches small
+    enough to be worth a look (0/1 float), the areas over UNSEEN_MAX_FRAC of the image (bool), and those areas as
+    (x, y, w, h, reason)."""
+    m = 255 - cv2.inRange(gray, 6, 249)
+    n, lab, st, _ = cv2.connectedComponentsWithStats(m, connectivity=8)
+    big = [i for i in range(1, n) if st[i, cv2.CC_STAT_AREA] > UNSEEN_MAX_FRAC * gray.size]
+    large = np.isin(lab, big)
+    areas = [(*(int(v) for v in st[i, :4]), "glare" if gray[lab == i].mean() > 127 else "dark") for i in big]
+    return ((m > 0) & ~large).astype(np.float32), large, areas
+
+
+def unseen_areas(ov: np.ndarray, scale: int, l0_size: tuple[int, int]) -> list[dict]:
+    """Work-order `not_assessed` entries for the blown-out or black areas of the overview `ov` that are too large to
+    spend looks on (`saliency` scores them 0): step 0 (the overview), the L0 box, reason glare or dark."""
+    to_l0 = np.diag([float(scale), float(scale), 1.0])
+    return [{"step": 0, "box": l0_box((x, y, w, h), to_l0, l0_size), "reason": reason, "action": "re-shoot"}
+            for x, y, w, h, reason in _unseen(cv2.cvtColor(ov, cv2.COLOR_BGR2GRAY))[2]]
 
 
 @dataclass

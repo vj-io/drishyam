@@ -45,7 +45,7 @@ from drishyam import imaging
 from drishyam.agent import PLANNER_MALFORMED_STEP, PLANNER_TIMEOUT_STEP, Job, JobConfig
 from drishyam.findings import SPALL_CRITICAL_AREA_PX, is_critical
 from drishyam.governor import USD_PER_HOUR
-from drishyam.segment import DEFECTS, ClassicalSegmenter, default_segmenter, restrict
+from drishyam.segment import DEFECTS, ClassicalSegmenter, default_segmenter, drop_straight_lines, restrict
 from evals import codebrim, synth
 
 CLASSES = DEFECTS  # crack, spalling, efflorescence, exposed_rebar, corrosion
@@ -236,7 +236,8 @@ def finding_components(job: Job, segs: list) -> list[dict]:
         if classes:
             a = rec["decision"]["args"]
             to_l0 = gaze_to_l0(a["x"], a["y"], a["level"], a["size"])
-            seen = restrict(seg, imaging.footprint(to_l0, wh, a["size"]))  # what the job saw: no mirrored pixels
+            # what the job saw (segment_view): no mirrored pixels, no crack component it dropped as a straight line
+            seen = drop_straight_lines(restrict(seg, imaging.footprint(to_l0, wh, a["size"])), 2 ** a["level"])
             out += [{**p, "step": rec["step"], "level": a["level"]} for p in preds_from_seg(seen, to_l0) if p["cls"] in classes]
     return out
 
