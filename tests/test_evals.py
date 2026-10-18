@@ -23,6 +23,15 @@ class BlankSegmenter:
         return finish(probs, 0.0, model)
 
 
+class NetSegmenter(BlankSegmenter):
+    """Feeds every crop to a 64x64 network input, as an ONNX net resizes to its own, and says so (net_px)."""
+
+    def predict(self, crop, model="accurate"):
+        out = super().predict(crop, model)
+        out.net_px = 64 * 64
+        return out
+
+
 # ---------------------------------------------------------------- matching
 def test_match_by_iou_or_centre_and_class():
     gt = {"cls": "crack", "box": [100, 100, 100, 100]}
@@ -136,6 +145,18 @@ def test_downscale_pixel_accounting():
     assert small["pixels_frac"] == 1.0  # never upscaled
 
 
+def test_net_pixels_are_reported_and_charged_when_the_segmenter_gives_them():
+    img = np.zeros((768, 1024, 3), np.uint8)
+    costs = {"segment:accurate": 100.0, "downscale": 5.0, "pyrDown": 5.0}
+    blank, net = (harness.run_downscale(img, s, costs) for s in (BlankSegmenter(), NetSegmenter()))
+    assert blank["net_pixels_frac"] is None and blank["wall_s"] == pytest.approx(0.1 * 768 * 1024 / 512**2)  # by pixels read
+    assert net["pixels_frac"] == 1.0 and net["net_pixels_frac"] == pytest.approx(64 * 64 / (768 * 1024))
+    assert net["wall_s"] == pytest.approx(0.1 * 64 * 64 / 512**2)  # charged what the net was fed
+    tiles = harness.run_tiling(img, NetSegmenter(), 0, costs)
+    assert tiles["net_pixels_frac"] == pytest.approx(6 * 64 * 64 / (768 * 1024)) and tiles["models"] == {"accurate": 6}
+    assert harness.net_px([NetSegmenter().predict(img), BlankSegmenter().predict(img)]) is None  # one unknown: unknown
+
+
 def test_predictions_map_back_to_l0():
     h, w = 128, 128
     probs = np.zeros((len(CLASSES), h, w), np.float32)
@@ -183,6 +204,93 @@ def test_governor_activity_counts_overrides_noted_on_halt_records():
     assert gov == {"p95>SLA": 1, "warp-spike": 1, "usd≥80%": 0}
 
 
+def test_a_confounded_comparison_is_named():
+    """A policy comparison is like for like only with the governor off, no model switch, and the accurate net throughout."""
+    am = {"governor_activity_in_eval": {"p95>SLA": 0}, "model_usage": {"downscale": {"accurate": 3}, "drishyam@0.3": {"accurate": 9}}}
+    ok = {"agent_config": {"governor": False}, "agent_metrics": am}
+    assert harness.confounded(ok) is None
+    assert "governor was on" in harness.confounded({**ok, "agent_config": {"governor": True}})
+    assert "governor was on" in harness.confounded({"agent_metrics": am})  # summaries from before the field ran it on
+    gov = {**ok, "agent_metrics": {**am, "governor_activity_in_eval": {"p95>SLA": 800}}}
+    assert "800 times" in harness.confounded(gov)  # the trained-model run that compared a 256-px fp16 net with the 512 one
+    fast = {**ok, "agent_metrics": {**am, "model_usage": {"drishyam@0.3": {"accurate": 2, "fast": 7}}}}
+    assert "fast" in harness.confounded(fast)
+
+
+def test_run_drishyam_records_the_switches_the_job_read(scene):
+    out = harness.run_drishyam(scene, 0.3)
+    assert out["switches"] == harness.switches("full") and out["switches"]["governor"] is False
+    assert set(out["models"]) == {"accurate"} and sum(out["models"].values()) == sum(t["action"] != "halt" for t in out["trace"])
+    assert harness.run_drishyam(scene, 0.3, governor=True)["switches"]["governor"] is True
+
+
+def test_ablations_assert_each_variant_ran_its_switches(tmp_path):
+    data = tmp_path / "abl"
+    synth.build_dataset(data, n=1, seed=1, width=1024, height=768)  # 1024 px: room for looks at cap 1.0, too small for a survey
+    entry = harness.run_ablations(str(data), n=1, out_dir=tmp_path / "pub", results_dir=tmp_path / "raw", workers=1,
+                                  caps=(1.0,), seed=1, log=lambda *_: None)
+    doc = json.loads((tmp_path / "pub" / "ablations.json").read_text())
+    assert doc["datasets"] == {"abl": json.loads(json.dumps(entry))} and "NaN" not in json.dumps(doc)
+    rows = entry["by_cap"]["1.0"]
+    assert set(rows) == set(harness.ABLATIONS) == set(entry["variants"]) and len(harness.ABLATIONS) == 8  # full + 7
+    assert rows["full"]["ratio_vs_full"] == 1.0 and rows["full"]["vs_full"] == "no measurable difference"
+    assert rows["no-verify"]["verify_looks"] == rows["no-survey"]["survey_looks"] == 0
+    assert set(rows["no-survey"]["model_usage"]) == {"accurate"} and len(rows["full"]["ratio_vs_full_ci"]) == 2
+    assert entry["variants"]["random-order-s2"] == {**harness.switches("full"), "order": "random", "seed": 2}
+    assert entry["random_order"][0].startswith("At a 100% pixel cap, random order found")
+    assert entry["provenance"]["dataset_gt_sha256"] == harness.dataset_sha256(harness.load_records(data, 1, seed=1)[0])["dataset_gt_sha256"]
+    saved = json.loads((tmp_path / "raw" / "ablation_per_image.json").read_text())["results"]
+    harness.check_variants(saved, (1.0,))
+    cfg = saved[0]["configs"]["no-survey@1.0"]
+    cfg["switches"]["survey"] = True  # labelled no-survey, ran the full agent
+    with pytest.raises(SystemExit, match="not its label"):
+        harness.check_variants(saved, (1.0,))
+    cfg["switches"]["survey"] = False
+    cfg["trace"].insert(0, {"action": "gaze", "cause": "survey"})  # right switches, but the trace has a survey look
+    with pytest.raises(SystemExit, match="trace shows a look"):
+        harness.check_variants(saved, (1.0,))
+
+
+def test_a_clean_set_is_scored_as_false_alarms(tmp_path):
+    data = tmp_path / "clean"
+    synth.build_dataset(data, n=2, seed=11, width=640, height=480, clean=True)  # + bridge_08, last: n=2 leaves it out
+    s = harness.run(str(data), n=2, out_dir=tmp_path / "pub", results_dir=tmp_path / "raw", workers=1, chaos=(0, 0, 0),
+                    seed=11, log=lambda *_: None)
+    assert "NaN" not in (tmp_path / "pub" / "summary.json").read_text() and s["headline_stats"] is None
+    assert s["dataset"].startswith("synthetic clean set, 2 images")
+    fa = s["false_alarms"]
+    assert set(fa) == {"downscale", *(f"tiling@L{lv}" for lv in harness.TILE_LEVELS), *(f"drishyam@{c}" for c in harness.BUDGETS)}
+    assert all(0 <= v["images_with_critical"] <= v["images_with_any"] <= 1 for v in fa.values())
+    assert "findings_per_image" in fa["drishyam@0.3"] and "findings_per_image" not in fa["downscale"]
+    d = s["policies"]["drishyam"][3]
+    assert d["recall"] is None and d["recall_ci"] == [None, None]
+    assert s["headline"].endswith("Every one of them is a false alarm.")
+    box = {"cls": "exposed_rebar", "box": [0, 0, 9, 9], "area": 81, "conf": 0.9}
+    one = harness.false_alarms([{"id": "bridge_08"}], [{"configs": {"downscale": {"preds": [box]}}}], ["downscale"], "components")
+    assert one["downscale"]["critical_per_image"] == 1.0 and one["classes_reported"] == {"bridge_08": {"downscale": ["exposed_rebar"]}}
+
+
+def test_thread_count_is_read_back_and_build_lines_quoted(monkeypatch):
+    from bench import micro
+
+    lines = micro.build_lines()
+    assert "cv2_baseline" in lines and set(lines) <= set(micro.BUILD_LINES.values())
+    assert all(v in cv2.getBuildInformation() for v in lines.values())  # verbatim
+    assert lines.items() <= micro.provenance().items()
+    before = cv2.getNumThreads()
+    try:
+        assert micro.set_threads(1) == 1 == cv2.getNumThreads()  # on macOS's GCD only setNumThreads(0) gives one
+    finally:
+        cv2.setNumThreads(before)
+    monkeypatch.setattr(micro.cv2, "setNumThreads", lambda n: None)  # a backend that ignores the request
+    monkeypatch.setattr(micro.cv2, "getNumThreads", lambda: 16)
+    with pytest.raises(SystemExit, match=r"getNumThreads\(\) = 16"):
+        micro.set_threads(1)
+    with pytest.raises(SystemExit, match="max-load 0"):
+        micro.check_load(0)
+    assert len(micro.check_load()) == 3
+
+
 # ---------------------------------------------------------------- end to end
 def test_three_image_run_writes_valid_summary_and_gallery(tmp_path):
     data = tmp_path / "data"
@@ -191,18 +299,20 @@ def test_three_image_run_writes_valid_summary_and_gallery(tmp_path):
     summary = harness.run(str(data), n=3, out_dir=pub, results_dir=raw, workers=1, chaos=(0, 0, 0), log=lambda *_: None)
     on_disk = json.loads((pub / "summary.json").read_text())
     assert on_disk == json.loads(json.dumps(summary))
-    assert list(on_disk) == ["dataset", "n_images", "segmenter", "cost_model", "policies", "headline_stats", "strata",
-                             "per_class", "agent_metrics", "micro", "provenance", "headline"]
+    assert list(on_disk) == ["dataset", "n_images", "segmenter", "agent_config", "cost_model", "policies", "headline_stats",
+                             "strata", "per_class", "agent_metrics", "micro", "provenance", "headline"]
     assert on_disk["n_images"] == 3 and on_disk["dataset"].startswith("synthetic-3 at 640x480")
+    assert on_disk["agent_config"]["governor"] is False and harness.confounded(on_disk) is None
     assert on_disk["cost_model"]["kind"] == "fixed" and on_disk["cost_model"]["ms_per_call"]["segment:accurate"] > 0
     pol = on_disk["policies"]
     assert [len(pol[k]) for k in ("downscale", "tiling", "drishyam")] == [1, 3, 6]
     for points in pol.values():
         for p in points:
-            assert set(p) == {"pixels_frac", "recall", "recall_ci", "recall_iou_only", "recall_iou_only_ci", "chance_recall",
-                              "chance_recall_iou_only", "precision", "fp_per_image", "boxes_per_image",
+            assert set(p) == {"pixels_frac", "net_pixels_frac", "recall", "recall_ci", "recall_iou_only", "recall_iou_only_ci",
+                              "chance_recall", "chance_recall_iou_only", "precision", "fp_per_image", "boxes_per_image",
                               "hits_per_matched_gt", "usd"}
             assert 0 <= p["recall"] <= 1 and p["pixels_frac"] > 0 and p["usd"] >= 0
+            assert p["net_pixels_frac"] is None or p["net_pixels_frac"] >= 0  # None until the segmenter reports net_px
             assert p["recall_ci"][0] <= p["recall"] <= p["recall_ci"][1]
     hs = on_disk["headline_stats"]
     assert hs["budget"] == 0.3 and len(hs["recall_ratio_vs_tiling_ci"]) == 2 and isinstance(hs["meets_target"], bool)
@@ -210,9 +320,15 @@ def test_three_image_run_writes_valid_summary_and_gallery(tmp_path):
     assert set(on_disk["strata"]["recall"]["downscale"]) == {"hairline_crack", "small_box"}
     assert {"drishyam@0.3", "tiling@1.0", "downscale"} <= set(on_disk["per_class"])
     assert set(on_disk["per_class"]["downscale"]) == set(synth.CLASSES)
-    assert set(on_disk["provenance"]) == {"cv2", "build_info_sha256", "machine", "cpu", "python", "timestamp", "build", "load_avg"}
+    prov = on_disk["provenance"]
+    assert set(prov) - {"cv2_custom_hal", "cv2_parallel_framework", "cv2_dispatch", "cv2_baseline"} == {
+        "cv2", "build_info_sha256", "machine", "cpu", "python", "timestamp", "build", "load_avg_start", "load_avg",
+        "dataset_gt_sha256", "dataset_images_sha256", "dataset_generator_version"}
+    assert prov["dataset_gt_sha256"] == harness.dataset_sha256(harness.load_records(data, 3)[0])["dataset_gt_sha256"]
     am = on_disk["agent_metrics"]
     assert am["steps_with_cause_pct"] == 100.0 and set(am["box_convention"]["recall"]) == {"components", "union", "as_specified"}
+    assert am["timing"]["cv2_threads_per_worker"] == harness.cv2.getNumThreads()  # inline: this process, read back
+    assert set(am["model_usage"]["drishyam@1.0"]) == {"accurate"} and am["model_usage"]["tiling@L0"] == {"accurate": 3 * len(harness.slice_boxes(480, 640))}
     head = on_disk["headline"]
     assert isinstance(head, str) and head.count(". ") == 1  # two sentences
     for baseline in ("20%-overlap 512-px tiling", "1024-px downscale", "L1 tiling", "L2 tiling", "IoU >= 0.3"):
@@ -236,9 +352,19 @@ def test_three_image_run_writes_valid_summary_and_gallery(tmp_path):
                     cost_model="live", log=lambda *_: None)
     with pytest.raises(SystemExit, match="seed 7, not --seed 8"):
         harness.run(str(data), n=3, out_dir=pub, results_dir=raw, workers=1, chaos=(0, 0, 0), seed=8, log=lambda *_: None)
+    with pytest.raises(SystemExit, match="ran the governor off"):
+        harness.run(str(data), n=3, out_dir=pub, results_dir=raw, workers=1, chaos=(0, 0, 0), reuse=True, governor=True,
+                    log=lambda *_: None)
+    cache.write_text(json.dumps({**saved, "dataset": {**saved["dataset"], "dataset_gt_sha256": "0" * 64}}))  # other GT
+    with pytest.raises(SystemExit, match="other images or ground truth"):
+        harness.run(str(data), n=3, out_dir=pub, results_dir=raw, workers=1, chaos=(0, 0, 0), reuse=True, log=lambda *_: None)
     cache.write_text(json.dumps({**saved, "segmenter": "onnx:m.onnx"}))  # an ONNX run, re-scored without DRISHYAM_ONNX
     with pytest.raises(SystemExit, match="onnx:m.onnx predictions"):
         harness.run(str(data), n=3, out_dir=pub, results_dir=raw, workers=1, chaos=(0, 0, 0), reuse=True, log=lambda *_: None)
+    ann = json.loads((data / "annotations.json").read_text())
+    (data / "annotations.json").write_text(json.dumps({k: v for k, v in ann.items() if k != "generator_version"}))
+    with pytest.raises(SystemExit, match="generator version None"):  # a set built before the version (and the hairline flag)
+        harness.run(str(data), n=3, out_dir=pub, results_dir=raw, workers=1, chaos=(0, 0, 0), log=lambda *_: None)
 
 
 def test_gallery_picks_a_real_false_alarm(tmp_path):
