@@ -131,7 +131,6 @@ DATA = {
     "/results/codebrim/summary.json": ("application/json", json.dumps(REAL).encode()),
     "/results/failures.json": ("application/json", json.dumps(FAILURES).encode()),
     "/results/failures/f01.jpg": ("image/jpeg", MOCK_JPG),
-    "/video/drishyam.mp4": ("video/mp4", b"\x00\x00\x00\x18ftypmp42"),  # only its HEAD is asked for (preload="none")
 }
 
 
@@ -240,8 +239,8 @@ class Session:
     def on_console(self, msg):
         if msg.type != "error":
             return
-        if "Failed to load resource" in msg.text and not self.with_data:
-            return  # 404s on the optional data files (the pending-state scenario)
+        if "Failed to load resource" in msg.text and not self.with_data and urlparse(msg.location["url"]).path in DATA:
+            return  # the 404s this scenario serves for the optional data files; any other failed load is an error
         self.errors.append(f"console.error: {msg.text}")
 
     def route(self, route):
@@ -383,7 +382,7 @@ def test_static_csp_hygiene():
     assert not re.findall(r"url\(\s*['\"]?(?:https?:)?//", css), "external url() in CSS"
     assert 'id="stat-real"' in html, "WS3 fills the #stat-real hero slot"
     assert html.count("og:image") == 1 and '<meta name="twitter:card" content="summary_large_image">' in html, "one share card"
-    assert ".mp4" not in html, "no video link in the page itself: js/results.js adds the player once video/drishyam.mp4 is deployed"
+    assert ".mp4" not in html, "no video link until the commit that ships video/drishyam.mp4 adds the player as static markup"
     print("ok  static CSP hygiene")
 
 
@@ -428,10 +427,8 @@ def test_desktop_mock(browser, base):
     expect(p.locator("#fail .fail")).to_have_count(1)
     expect(p.locator("#bench-cool")).to_contain_text("COOL on Graviton: not run.")  # FIG. 4.3 and the banner say why, nothing pending
     expect(p.locator("#cool-status")).to_contain_text("COOL on Graviton: not run.")
-    expect(p.locator("#video video")).to_have_attribute("src", "video/drishyam.mp4")  # same-origin player, once the file is there
-    expect(p.locator("#video video")).to_have_attribute("poster", "og.png")
-    expect(p.locator("#video track[kind=captions]")).to_have_count(1)
-    expect(p.locator("#video-link")).to_be_visible()
+    expect(p.locator("#video")).to_be_hidden()                    # no video shipped yet: no player, no link
+    expect(p.locator("#video-link")).to_be_hidden()
     p.keyboard.press("Tab")
     outline = p.evaluate("(() => { const s = getComputedStyle(document.activeElement); return s.outlineStyle + ' ' + s.outlineWidth; })()")
     assert outline.startswith("solid"), f"no visible keyboard focus: {outline}"
@@ -929,8 +926,7 @@ def test_pending_states(browser, base):
     expect(p.locator("#fail")).to_contain_text("failure gallery pending")
     expect(p.locator("#bench-cool")).to_contain_text("COOL on Graviton: not run.")   # static: it does not wait for a file
     expect(p.locator("#cool-status")).to_contain_text("COOL on Graviton: not run.")
-    expect(p.locator("#video")).to_be_hidden()                    # no video/drishyam.mp4 deployed: no player, no link
-    expect(p.locator("#video video")).to_have_count(0)
+    expect(p.locator("#video")).to_be_hidden()                    # no video shipped yet: no player, no link
     expect(p.locator("#video-link")).to_be_hidden()
     expect(p.locator("#gallery-empty")).to_be_visible()
     expect(p.locator("#say-1")).to_contain_text("Drop your own JPEG or PNG")

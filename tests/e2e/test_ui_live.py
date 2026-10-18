@@ -18,7 +18,7 @@ from playwright.sync_api import expect, sync_playwright
 ROOT = Path(__file__).resolve().parents[2]
 SHOTS = Path(os.environ.get("DRISHYAM_SHOTS", "/tmp/drishyam-e2e"))
 DONE = ("needs sign-off", "signed", "done", "halted", "budget spent")
-OPTIONAL = ("/results/", "/video/")  # the page shows a pending state, or no video player, without these
+OPTIONAL = ("/results/",)  # the page shows a pending state without these
 
 
 def start_local():
@@ -54,14 +54,14 @@ class Page:
         self.page.on("pageerror", lambda e: self.errors.append(str(e)))
         self.page.on("request", lambda r: "/api/" in r.url and self.requests.append(r.url))
         self.missing = []
-        self.page.on("response", lambda r: r.status == 404 and self.missing.append(r.url))
+        self.page.on("response", lambda r: r.status in (403, 404) and self.missing.append(r.url))  # S3 behind OAC answers a missing file with 403
         self.page.goto(base + "/")
 
     def clean(self):
         csp = self.page.evaluate("window.__csp")
         assert not csp, f"CSP violations: {csp}"
         unexpected = [u for u in self.missing if not any(o in u for o in OPTIONAL)]
-        assert not unexpected, f"unexpected 404s: {unexpected}"
+        assert not unexpected, f"unexpected failed loads: {unexpected}"
         errors = [e for e in self.errors if not e.startswith("Failed to load resource") or unexpected]
         assert not errors, f"console errors: {errors}"
 
