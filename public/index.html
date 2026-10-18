@@ -71,7 +71,7 @@
       <p class="lede">For bridge inspectors reviewing high-resolution photos: it finds cracks, spalling and exposed rebar by zooming in only where it needs to, and hands every critical finding to a human to sign off.</p>
       <p class="gloss">It works like a PTZ camera (pan-tilt-zoom), done in software: it pans and zooms across one big photo instead of moving a real camera.</p>
       <div class="cta">
-        <button class="btn btn--amber btn--xl" id="guided" type="button"><span>Watch it inspect a bridge <span class="cta__time">(about 45 s)</span></span></button>
+        <button class="btn btn--amber btn--xl" id="guided" type="button"><span>Watch it inspect a bridge <span class="cta__time">(about 35 s)</span></span></button>
         <a class="btn" id="own" href="#step-photo">Try your own photo</a>
         <a class="cta__link" id="video-link" href="#video" hidden>Watch the video</a>
       </div>
@@ -622,7 +622,7 @@
     </div>
     <div class="faq__item">
       <dt>Why not just tile the photo?</dt>
-      <dd>Tiling checks every 512 px tile at full resolution: 48 tiles for a 3000 &times; 2250 photo (turn on &ldquo;compare with tiling&rdquo; after a run to see them). The agent looks at the photo small first and zooms only where something might be, so it processes far fewer pixels. Whether it finds as much is measured in <a href="#benchmarks">Benchmarks</a>: on the synthetic set it finds a little less than tiling, and one downscaled pass does about as well.</dd>
+      <dd>Tiling checks every 512 px tile at full resolution: 48 tiles for a 3000 &times; 2250 photo (turn on &ldquo;compare with tiling&rdquo; after a run to see them). The agent looks at the photo small first and zooms only where something might be, so it processes far fewer pixels. Whether it finds as much is measured in <a href="#benchmarks">Benchmarks</a>: on the synthetic set it finds less than tiling, and one downscaled pass does at least as well.</dd>
     </div>
     <div class="faq__item">
       <dt>What does it cost?</dt>

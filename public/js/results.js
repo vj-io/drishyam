@@ -225,12 +225,14 @@ const busy = (prov) => {
   return Array.isArray(prov?.load_avg) && cpus > 0 && prov.load_avg[0] >= cpus;
 };
 
-/** Where a summary's timings were taken, in plain words. The published runs are from a busy x86 laptop, not Graviton. */
+/** Where a summary's jobs ran, in plain words. The published runs ran on a busy x86 laptop, charged the fixed costs
+ * (and showing the micro-benchmarks) of GitHub's arm64 runner; neither is Graviton. */
 function place(prov) {
   const machine = String(prov?.machine ?? '');
   if (!/^Darwin .*x86_64/.test(machine)) return machine;
   const cpu = String(prov.cpu ?? '').replace(/\((R|TM)\)| Core| CPU.*$/g, '');  // "Intel(R) Core(TM) i9-9880H CPU @ 2.30GHz" -> "Intel i9-9880H"
-  return `local x86 laptop${cpu ? ` (${cpu})` : ''}${busy(prov) ? ', under load' : ''}`;
+  const arm = /micro arm linux-aarch64/.test(machine) ? '; costs and micro-benchmarks from GitHub’s arm64 runner' : '';
+  return `local x86 laptop${cpu ? ` (${cpu})` : ''}${busy(prov) ? ', under load' : ''}${arm}`;
 }
 
 /** `extra` (optional) adds lines to the folded provenance block. */
