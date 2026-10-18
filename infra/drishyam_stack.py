@@ -39,10 +39,15 @@ LWA_LAYER = "arn:aws:lambda:{region}:753240598075:layer:LambdaAdapterLayerArm64:
 FUNCTION_NAME = "drishyam-web"
 ROOT = Path(__file__).resolve().parents[1]
 # POST /api/jobs per IP: 10 per 120 s. WAF's smallest limit is 10, so the 120 s window is what brings
-# it to 5 starts a minute, matching the reserved concurrency of 5 (docs/aws.md, "Limits").
+# it to 5 starts a minute. The live deployment has no reserved concurrency (RESERVED=none): the account
+# quota of 10 is the cap (docs/aws.md, "Limits").
 JOBS_LIMIT, JOBS_WINDOW_S = 10, 120
 KILL_REVIEW_PER_MINUTE = 30  # /api/kill and /api/review together, per IP per 60 s
 REQUESTS_PER_MINUTE = 300  # every request per IP per 60 s; a page load is about 30
+# What a blocked caller reads: each rule answers 429 with {"error": "rate limited: <this> per IP; wait and retry"}.
+RATE_LIMITS = {"job-starts": f"{JOBS_LIMIT} job starts per {JOBS_WINDOW_S // 60} min",
+               "kill-and-review": f"{KILL_REVIEW_PER_MINUTE} kill and review calls per min",
+               "all-requests": f"{REQUESTS_PER_MINUTE} requests per min"}
 BUDGET_USD = 20
 
 
@@ -54,8 +59,10 @@ def _path_is(path: str) -> waf.CfnWebACL.StatementProperty:
 
 
 def _rate_rule(name: str, priority: int, limit: int, scope: waf.CfnWebACL.StatementProperty | None, window: int = 60):
+    block = waf.CfnWebACL.BlockActionProperty(custom_response=waf.CfnWebACL.CustomResponseProperty(
+        response_code=429, custom_response_body_key=name))  # the body is RATE_LIMITS[name], on the web ACL
     return waf.CfnWebACL.RuleProperty(
-        name=name, priority=priority, action=waf.CfnWebACL.RuleActionProperty(block={}),
+        name=name, priority=priority, action=waf.CfnWebACL.RuleActionProperty(block=block),
         statement=waf.CfnWebACL.StatementProperty(rate_based_statement=waf.CfnWebACL.RateBasedStatementProperty(
             limit=limit, evaluation_window_sec=window, aggregate_key_type="IP", scope_down_statement=scope)),
         visibility_config=waf.CfnWebACL.VisibilityConfigProperty(
@@ -112,6 +119,10 @@ class DrishyamStack(Stack):
             description="Per IP rate limits on Drishyam job starts, kills, reviews and all requests",
             visibility_config=waf.CfnWebACL.VisibilityConfigProperty(
                 cloud_watch_metrics_enabled=True, metric_name="drishyam", sampled_requests_enabled=True),
+            custom_response_bodies={name: waf.CfnWebACL.CustomResponseBodyProperty(
+                content_type="APPLICATION_JSON",
+                content=json.dumps({"error": f"rate limited: {what} per IP; wait and retry"}))
+                for name, what in RATE_LIMITS.items()},
             rules=[
                 _rate_rule("job-starts", 0, JOBS_LIMIT, waf.CfnWebACL.StatementProperty(
                     and_statement=waf.CfnWebACL.AndStatementProperty(statements=[
@@ -201,18 +212,19 @@ class DrishyamStack(Stack):
                      comparison_operator=op, treat_missing_data=cw.TreatMissingData.NOT_BREACHING,
                      alarm_description=text).add_alarm_action(cw_actions.SnsAction(topic))
 
-        def job_metric(name: str, stat: str, prefix: str = "") -> cw.MathExpression:
-            # One line per Status value (completed, halted, awaiting_review), named by it, without hard-coding them.
-            return cw.MathExpression(expression=f"SEARCH('{{Drishyam,Status}} MetricName=\"{name}\"', '{stat}', 300)",
-                                     label=prefix + "${PROP('Dim.Status')}", period=five_min)
+        def emf_metric(name: str, stat: str, prefix: str = "", dim: str = "Status") -> cw.MathExpression:
+            # One line per value of the EMF dimension (Status: completed, halted, awaiting_review; Decision:
+            # approve, reject), named by it, without hard-coding them.
+            return cw.MathExpression(expression=f"SEARCH('{{Drishyam,{dim}}} MetricName=\"{name}\"', '{stat}', 300)",
+                                     label=prefix + f"${{PROP('Dim.{dim}')}}", period=five_min)
 
         dash = cw.Dashboard(self, "Dashboard", dashboard_name="Drishyam")
         dash.add_widgets(
-            cw.GraphWidget(title="Jobs by status", left=[job_metric("JobSeconds", "SampleCount")]),
-            cw.GraphWidget(title="Job seconds (mean)", left=[job_metric("JobSeconds", "Average")]),
-            cw.GraphWidget(title="Pixels used (fraction of full resolution)", left=[job_metric("PixelsFrac", "Average")]),
-            cw.GraphWidget(title="Steps and findings per job", left=[job_metric("Steps", "Average", "steps ")],
-                           right=[job_metric("Findings", "Average", "findings ")]))
+            cw.GraphWidget(title="Jobs by status", left=[emf_metric("JobSeconds", "SampleCount")]),
+            cw.GraphWidget(title="Job seconds (mean)", left=[emf_metric("JobSeconds", "Average")]),
+            cw.GraphWidget(title="Pixels used (fraction of full resolution)", left=[emf_metric("PixelsFrac", "Average")]),
+            cw.GraphWidget(title="Steps and findings per job", left=[emf_metric("Steps", "Average", "steps ")],
+                           right=[emf_metric("Findings", "Average", "findings ")]))
         dash.add_widgets(
             cw.GraphWidget(title="Lambda invocations, errors, throttles",
                            left=[fn.metric_invocations(period=five_min, statistic="Sum"),
@@ -221,7 +233,8 @@ class DrishyamStack(Stack):
             cw.GraphWidget(title="Lambda duration (ms)",
                            left=[fn.metric_duration(period=five_min, statistic=s) for s in ("p50", "p95", "Maximum")]),
             cw.GraphWidget(title="Concurrent executions",
-                           left=[fn.metric("ConcurrentExecutions", period=five_min, statistic="Maximum")]))
+                           left=[fn.metric("ConcurrentExecutions", period=five_min, statistic="Maximum")]),
+            cw.GraphWidget(title="Reviews by decision", left=[emf_metric("Reviews", "Sum", dim="Decision")]))
 
         budget = budgets.CfnBudget(
             self, "Budget",

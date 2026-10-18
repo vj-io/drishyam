@@ -54,5 +54,5 @@ before/after on `data/synth_dev` for it.
 | NFR-5 | Reproducibility: lock file, pinned OpenCV, seeds | `uv.lock`, `opencv-python-headless==5.0.0.93`, seeded synth + fake-clock tests | done |
 | NFR-6 | Datasets never committed; permissive deps | `scripts/get_data.sh`, `.gitignore`, `models/README.md`; deps and bundled models are permissive, except the optional dacl10k-trained segmenter, CC BY-NC 4.0 (non-commercial), once `scripts/install_model.sh` installs it | done |
 | NFR-7 | Same code on stock OpenCV 5, x86 and Arm | CI on `ubuntu-24.04` and `ubuntu-24.04-arm` | done |
-| NFR-8 | Free-tier observability | CloudWatch: one EMF line per job (`web._log_done`), dashboard, 4 alarms (`infra/`) | AWS (13 custom metrics, 3 over the free 10: about 0.90 USD a month estimated; deployed 2026-10-18) |
+| NFR-8 | Free-tier observability | CloudWatch: one EMF line per job (`web._log_done`), dashboard, 4 alarms (`infra/`) | AWS (15 custom metrics (12 job, 2 Reviews by Decision, AppErrors), 5 over the free 10: about 1.50 USD a month estimated; deployed 2026-10-18, the 2 Reviews metrics not yet live) |
 | NFR-9 | Honesty: pixels only, measured numbers, failure gallery | measurements are `*_px`; UI banner; `public/results/failures.json` | done |

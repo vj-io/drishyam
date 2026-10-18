@@ -116,7 +116,7 @@ def test_waf_rate_limits_per_ip(template):
     assert acl["Scope"] == "CLOUDFRONT" and acl["DefaultAction"] == {"Allow": {}}
     rules = {r["Name"]: r for r in acl["Rules"]}
     jobs = rules["job-starts"]["Statement"]["RateBasedStatement"]
-    # WAF's smallest limit is 10; over 120 s that is 5 job starts a minute, the reserved concurrency.
+    # WAF's smallest limit is 10; over 120 s that is 5 job starts a minute.
     assert (jobs["Limit"], jobs["EvaluationWindowSec"], jobs["AggregateKeyType"]) == (10, 120, "IP")
     scope = json.dumps(jobs["ScopeDownStatement"])
     assert '"/api/jobs"' in scope and '"POST"' in scope and "URL_DECODE" in scope
@@ -125,7 +125,15 @@ def test_waf_rate_limits_per_ip(template):
     assert '"/api/kill"' in json.dumps(kr) and '"/api/review"' in json.dumps(kr)
     everything = rules["all-requests"]["Statement"]["RateBasedStatement"]
     assert (everything["Limit"], everything["EvaluationWindowSec"]) == (300, 60) and "ScopeDownStatement" not in everything
-    assert all(r["Action"] == {"Block": {}} for r in acl["Rules"])
+    # A block is a readable 429 naming its own rule's limit, not CloudFront's default 403 page.
+    assert all(r["Action"] == {"Block": {"CustomResponse": {"ResponseCode": 429, "CustomResponseBodyKey": r["Name"]}}}
+               for r in acl["Rules"])
+    bodies = acl["CustomResponseBodies"]
+    assert set(bodies) == set(rules) and {b["ContentType"] for b in bodies.values()} == {"APPLICATION_JSON"}
+    assert json.loads(bodies["job-starts"]["Content"]) == {
+        "error": "rate limited: 10 job starts per 2 min per IP; wait and retry"}
+    assert "30 kill and review" in bodies["kill-and-review"]["Content"]
+    assert "300 requests" in bodies["all-requests"]["Content"]
     assert one(template, "AWS::CloudFront::Distribution")["DistributionConfig"]["WebACLId"]["Fn::GetAtt"][0] == "Waf"
 
 
@@ -192,8 +200,9 @@ def test_alarms_budget_and_topic_without_subscribers(template):
     assert all(n["Subscribers"] == [{"SubscriptionType": "SNS", "Address": {"Ref": topic_id}}] for n in notes)
     publishers = {s["Principal"]["Service"] for s in one(template, "AWS::SNS::TopicPolicy")["PolicyDocument"]["Statement"]}
     assert publishers == {"cloudwatch.amazonaws.com", "budgets.amazonaws.com"}
-    body = one(template, "AWS::CloudWatch::Dashboard")["DashboardBody"]
-    assert "{Drishyam,Status}" in json.dumps(body) and "JobSeconds" in json.dumps(body)
+    body = json.dumps(one(template, "AWS::CloudWatch::Dashboard")["DashboardBody"])
+    assert "{Drishyam,Status}" in body and "JobSeconds" in body
+    assert "Reviews by decision" in body and "{Drishyam,Decision}" in body  # web.py's review EMF records
 
 
 def test_reservation_can_be_left_out_and_no_em_dashes(template, tmp_path):
