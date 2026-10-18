@@ -392,19 +392,23 @@ the site.
 ## 10. Agentic evidence
 
 Every step's action is a logged function of an OpenCV output or a runtime
-statistic, with a `cause`. A recorded trace (synthetic sample `bridge_03`, 30 % pixel cap, fixed clock):
+statistic, with a `cause`. A recorded trace (synthetic sample `bridge_03`, 30 % pixel cap, the published fixed arm64
+costs on a virtual clock, so machine load does not change it and a re-run gives the same file:
+[trace-bridge_03.ndjson](trace-bridge_03.ndjson), from `python -m evals.trace_sample`), its first four steps abridged:
 
 ```json
-{"step": 1, "decision": {"action": "gaze", "args": {"x": 1500, "y": 1125, "level": 3}}, "observation": {"entropy": 0.69, "mask_area_px": 894}, "cause": "survey", "rationale": "one L3 look covers all 3 candidates before zooming; 7 looks affordable"}
-{"step": 2, "decision": {"action": "escalate", "args": {"x": 1374, "y": 1226, "level": 2}}, "observation": {"entropy": 0.34, "mask_area_px": 10740}, "cause": "entropy>tau", "rationale": "entropy 0.69 > 0.5 at L3"}
-{"step": 4, "decision": {"action": "verify", "args": {"x": 1597, "y": 1542, "level": 0}}, "observation": {"entropy": 0.33, "mask_area_px": 57395}, "cause": "verify-new-mask", "rationale": "new spalling mask at L1; confirming at L0"}
+{"step": 1, "decision": {"action": "gaze", "args": {"x": 1500, "y": 1125, "level": 3}}, "observation": {"entropy": 0.6931, "mask_area_px": 894}, "cause": "survey", "rationale": "one L3 look covers all 4 candidates before zooming; 7 looks affordable"}
+{"step": 2, "decision": {"action": "escalate", "args": {"x": 1374, "y": 1226, "level": 2}}, "observation": {"entropy": 0.3441, "mask_area_px": 10740}, "cause": "entropy>tau", "rationale": "entropy 0.69 > 0.5 at L3"}
+{"step": 3, "decision": {"action": "gaze", "args": {"x": 1840, "y": 1456, "level": 1}}, "observation": {"entropy": 0.4331, "mask_area_px": 28209}, "cause": "best-score", "rationale": "argmax score 1.13e-02: prior 0.69, unseen 1.00, t_hat 61 ms; lambda 4.88e-03"}
+{"step": 4, "decision": {"action": "verify", "args": {"x": 1597, "y": 1542, "level": 0}}, "observation": {"entropy": 0.3343, "mask_area_px": 57395}, "cause": "verify-new-mask", "rationale": "new spalling mask at L1; confirming at L0"}
 ```
 
-The entropy OpenCV measured on the coarse survey (0.69 > τ = 0.5) changed the next
-tool call from "next candidate" to "zoom one level finer, centred on the uncertain
-pixels"; a new confident spalling mask then triggered a verification one level finer.
-The resulting exposed-rebar finding carries its evidence trail (`steps: [2, 3]`) and
-waits in `pending_review` for a human.
+The entropy OpenCV measured on the coarse survey (0.69 > τ = 0.5) changed the next tool call from "next candidate"
+to "zoom one level finer, centred on the uncertain pixels". That L2 look drafted an exposed-rebar finding (`f1`,
+critical, so it waits in `pending_review`), and the L1 look at step 3 extended it (`steps: [2, 3]`). Step 3 also
+drew a new spalling mask, so step 4 verified one level finer; the mask IoU between L1 and L0 was 0.003, and `f1`
+goes to the human with the review request "unconfirmed: iou 0.003 < 0.5 between L1 and L0". At step 6 a second
+verify confirmed a spalling finding at IoU 0.69, and at step 7 the stop rule ended the job at 0.25 of the pixels.
 
 Failure drills, each runnable from the UI (`chaos` toggles) and covered by tests:
 
