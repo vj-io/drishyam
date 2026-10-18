@@ -103,7 +103,7 @@ limits and the cost table, is [aws.md](aws.md).
   p95 was 67.7 ms on aarch64, over the 6 steps of one job.
   That run was against the deployed build of commit ca69037, the commit `/api/health` reports. An earlier run against
   the same build (`smoke 2026-10-18T07:09:20Z`, without the WAF check) also passed but measured more weakly: step p95
-  83.7 ms over 6 steps, and KILL halted the second job only after 6 steps (`runs/aws-smoke.log`).
+  83.7 ms over 6 steps, and KILL halted the second job only after 6 steps ([aws.md](aws.md) quotes both runs).
 - **Cost.** Spent so far: not measured yet; the month-to-date figure from AWS Billing is still to be added. The
   list-price estimate is about 10 USD a month at 1,000 jobs a month, 8 of it the WAF ([aws.md](aws.md)). The $ shown
   in the UI and the evals is *modelled*: timed op milliseconds × 0.339 USD/h, the c8g.2xlarge rate plus the COOL
@@ -219,7 +219,7 @@ yet paid off in recall.
 
 ## 8. Evaluation
 
-Measured on **200 held-out labelled synthetic images** (seed 7; policy changes were tuned only on a separate 60-image dev split, seed 4242, `make eval-dev`, unpublished), one segmenter and one matching rule for every policy (a ground-truth box is found by a same-class component with IoU ≥ 0.3 or containing its centre; "IoU-only" drops the centre clause). The 95 % intervals are a bootstrap over images, paired across policies. "Chance" moves each policy's own boxes (same class and size) to random places in the photo and scores them again. Precision is one-to-one: in confidence order each prediction claims at most one ground-truth box, so a defect reported again from a second look is a false box; "hits per matched box" counts the predictions that land on each box found (1 = no duplicates). All of it runs on the **fixed cost model** (`--cost-model fixed`): every op the agent times costs its p50 from the `job_ops` table in `results/linux-aarch64/micro.json` (the stock aarch64 wheel on GitHub's `ubuntu-24.04-arm` runner, Neoverse-N2, one thread) on every call, so t̂, the stop rule and the governor see the same costs on a busy machine as on an idle one, and a re-run (`make eval`, whose `MICRO_ARM` defaults to `linux-aarch64`) reproduces the numbers exactly, however busy the machine. The jobs themselves ran on the x86 laptop; only their costs are the arm64 ones. $ is that modelled time × $0.339/h (untimed Python is not charged). In this comparison the governor's model, level and gaze-size overrides are off (caps and the kill switch stay), so Drishyam segments every look with the same accurate model as the baselines; turning them on changes nothing under fixed costs at the 30 % and 100 % caps, the only caps the governor-on ablation ran (30 % only on CODEBRIM; [Ablations](#ablations-fr-21) below).
+Measured on **200 held-out labelled synthetic images** (seed 7; policy changes were tuned only on a separate 60-image dev split, seed 4242, `make eval-dev`, unpublished), one segmenter and one matching rule for every policy (a ground-truth box is found by a same-class component with IoU ≥ 0.3 or containing its centre; "IoU-only" drops the centre clause). The 95 % intervals are a bootstrap over images, paired across policies. "Chance" moves each policy's own boxes (same class and size) to random places in the photo and scores them again. Precision is one-to-one: in confidence order each prediction claims at most one ground-truth box, so a defect reported again from a second look is a false box; "hits per matched box" counts the predictions that land on each box found (1 = no duplicates). All of it runs on the **fixed cost model** (`--cost-model fixed`): every op the agent times costs its p50 from the `job_ops` table in `results/linux-aarch64/micro.json` (the stock aarch64 wheel on GitHub's `ubuntu-24.04-arm` runner, Neoverse-N2, one thread) on every call, so t̂, the stop rule and the governor see the same costs on a busy machine as on an idle one, and a re-run (`make eval`, whose `MICRO_ARM` defaults to `linux-aarch64`) reproduces the numbers exactly on an x86 machine, however busy it is (on arm64 the synthetic images themselves come out slightly different: the aarch64 HAL rounds some pixel ops differently). The jobs themselves ran on the x86 laptop; only their costs are the arm64 ones. $ is that modelled time × $0.339/h (untimed Python is not charged). In this comparison the governor's model, level and gaze-size overrides are off (caps and the kill switch stay), so Drishyam segments every look with the same accurate model as the baselines; turning them on changes nothing under fixed costs at the 30 % and 100 % caps, the only caps the governor-on ablation ran (30 % only on CODEBRIM; [Ablations](#ablations-fr-21) below).
 
 The FR-21 ablations (random gaze order, no uncertainty term, no survey look, no verify step, governor on) are under
 [Ablations](#ablations-fr-21) below. The per-cap tables and per-class recall are in the
@@ -400,7 +400,7 @@ the site.
 
 Every step's action is a logged function of an OpenCV output or a runtime
 statistic, with a `cause`. A recorded trace (synthetic sample `bridge_03`, 30 % pixel cap, the published fixed arm64
-costs on a virtual clock, so machine load does not change it and a re-run gives the same file:
+costs on a virtual clock, so machine load does not change it and a re-run on x86 gives the same file:
 [trace-bridge_03.ndjson](trace-bridge_03.ndjson), from `python -m evals.trace_sample`), its first four steps abridged:
 
 ```json
@@ -457,7 +457,7 @@ notes the large spall it missed.
   on these sets, and that image-driven gaze order beats random order only on the larger photos (section 8).
 - COOL on Graviton was not run (section 6).
 - The arm64 timings come from GitHub's `ubuntu-24.04-arm` runner (`results/linux-aarch64/`, Neoverse-N2, one
-  thread), a GitHub Actions VM, not the deployed Lambda; on the Lambda itself the only numbers are the two smoke runs'
+  thread), a GitHub Actions VM, not the deployed Lambda; on the deployed Lambda build the only numbers are the two smoke runs'
   step p95s, 67.7 and 83.7 ms, each over one job (section 5). The evals ran on the x86 laptop with those arm64 costs.
 - The web demo is stateless; the signed `work_order.json` is its audit trail. There is no approval store, and
   human-approval latency is not measured.
