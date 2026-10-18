@@ -70,6 +70,11 @@ Event types, in order:
                  "exposure": 0.48, "classes": {"crack": 41}},
  "quality": {"ok": true, "reason": null},
  "verify": {"iou": 0.71, "against_level": 2},          // only on verify / escalate steps
+ "rejected": [{"cls": "crack", "cause": "straight line: formwork or joint", "box": [2232, 1250, 20, 320],
+               "length_px": 318.2, "width_px": 6.56, "residual_px": 1.26}],
+                                                        // only when the look dropped crack components that are
+                                                        // one straight line (centreline RMS residual < 1.5 L0 px
+                                                        // over >= 20x the mean width); no finding comes from them
  "runtime": {"p50_ms": {"warp": 9, "segment": 31}, "p95_ms": {"warp": 14, "segment": 54},
              "cpu_pct": 71, "usd": 0.0031},
  "rationale": "entropy 0.62 > 0.5 at L2",

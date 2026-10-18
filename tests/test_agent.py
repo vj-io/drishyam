@@ -124,8 +124,8 @@ def test_survey_window_larger_than_the_image_reports_nothing_outside_it(scene, m
 
     looks = []
 
-    def spy(segmenter, crop, model, valid):
-        looks.append((segment_view(segmenter, crop, model, valid), valid))
+    def spy(segmenter, crop, model, valid, scale):
+        looks.append((segment_view(segmenter, crop, model, valid, scale), valid))
         return looks[-1][0]
 
     monkeypatch.setattr(agent, "segment_view", spy)
@@ -417,6 +417,22 @@ def test_a_check_of_an_absorbed_class_counts_for_the_finding_that_absorbed_it():
     assert fe["verified"] is False and fe["verify_iou"] == pytest.approx(s["verify"]["iou"])
     assert any(e["type"] == "review_request" and e["finding_id"] == fe["id"] and e["reason"].startswith("unconfirmed: ")
                for e in after(s))
+
+
+def test_the_clean_concrete_sample_drafts_no_crack_on_its_formwork_groove():
+    """bridge_08 has one straight formwork groove, which used to be drafted as a 93 % crack ([2049, 1250, 581, 798]
+    in run j_d60376). Every look that sees it now logs it as a straight line, and no finding comes from it: the
+    groove is the only line on the photo longer than 100 px."""
+    from pathlib import Path
+
+    from drishyam.segment import STRAIGHT_CAUSE
+
+    img = cv2.imread(str(Path(__file__).resolve().parent.parent / "public" / "samples" / "bridge_08.jpg"))
+    job, events = run(img)
+    rejected = [x for s in steps(events) for x in s.get("rejected", [])]
+    assert rejected and all(x["cause"] == STRAIGHT_CAUSE and x["residual_px"] < 1.5 for x in rejected)
+    assert all(imaging.box_iou(x["box"], [2049, 1250, 581, 798]) > 0 for x in rejected)
+    assert not any(f.cls == "crack" and f.measure["length_px"] > 100 for f in job.findings)
 
 
 def test_review_on_ambiguity_when_a_class_is_absorbed_by_another(scene):

@@ -231,7 +231,8 @@ async def test_a_view_past_the_border_shows_no_mirrored_crack(d, tmp_path, monke
     root = tmp_path / "images"
     root.mkdir()
     img = concrete(600, 800, 5)
-    cv2.line(img, (15, 40), (25, 560), (55, 55, 58), 3, cv2.LINE_AA)
+    wobble = [(20 + round(5 * np.sin(y / 25)), y) for y in range(40, 561, 8)]  # a crack, not a ruler line
+    cv2.polylines(img, [np.array(wobble, np.int32)], False, (55, 55, 58), 3, cv2.LINE_AA)
     cv2.imwrite(str(root / "edge.png"), img)
     monkeypatch.setenv("DRISHYAM_IMAGE_ROOT", str(root))
     job = await d.open(root / "edge.png")

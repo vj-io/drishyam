@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = ROOT / "training" / "train_dacl10k.py"
 NOTEBOOK = ROOT / "training" / "drishyam_dacl10k_kaggle.ipynb"
 CARRIED = ("training/dacl_common.py", "training/class_map.json", "training/export_onnx.py", "training/parity.py",
-           "drishyam/__init__.py", "drishyam/segment.py")  # what the cells import or run, parity included
+           "drishyam/__init__.py", "drishyam/measure.py", "drishyam/segment.py")  # what the cells import or run
 PLACEHOLDER = "REPO_FILES: dict[str, str] = {}\n"
 SHA_PLACEHOLDER = 'SOURCE_SHA256 = ""'
 

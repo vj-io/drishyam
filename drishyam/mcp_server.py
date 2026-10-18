@@ -259,7 +259,7 @@ def _look(s: Session, rec: dict, x: int, y: int, level: int, yaw: float = 0.0, p
 def _segment(s: Session, rec: dict, g: Gaze, model: str) -> tuple[object, str]:
     used = "fast" if s.settings.model == "fast" else model  # the governor may have downgraded the model
     valid = imaging.footprint(g.to_l0, s.shape[::-1], g.crop.shape[0])  # no mirrored defects past the image
-    g.seg, ms = _timed(s, f"segment:{used}", segment_view, s.segmenter, g.crop, used, valid)
+    g.seg, ms = _timed(s, f"segment:{used}", segment_view, s.segmenter, g.crop, used, valid, 2**g.level)
     s.stats.record("segment", ms)
     areas = {c: a for c, a in g.seg.areas.items() if a}
     rec["observation"] = {

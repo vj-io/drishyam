@@ -22,7 +22,7 @@ from .findings import IOU_AGREE, SEVERITY, Finding, now_iso, work_order
 from .governor import MIN_GAZE, USD_PER_HOUR, Budget, RuntimeStats, Settings, check
 from .measure import measure
 from .planner import TIMEOUT_S, ChaosPlanner, consult
-from .segment import CLASSES, DEFECT_PX_BG_MAX, MIN_BLOB_PX, default_segmenter, segment_view
+from .segment import CLASSES, DEFECT_PX_BG_MAX, MIN_BLOB_PX, STRAIGHT_CAUSE, default_segmenter, segment_view
 
 SPIKE_STEP = 4  # chaos p95_spike lands here; the governor reacts on the next step
 SPIKE_MS = 900.0
@@ -347,8 +347,11 @@ class Job:
             model = self.settings.model
             # Background wherever the view runs past the image: gaze fills that by reflection (a mirrored defect).
             valid = imaging.footprint(to_l0, (W, H), size)
-            seg, seg_ms = self._timed(f"segment:{model}", segment_view, self.segmenter, crop, model, valid)
+            seg, seg_ms = self._timed(f"segment:{model}", segment_view, self.segmenter, crop, model, valid, 2**level)
             self.stats.record("segment", seg_ms)
+            # Crack components segment_view dropped as straight lines (formwork, joints): logged, never drafted.
+            rejected = [{"cls": "crack", "cause": STRAIGHT_CAUSE, "box": imaging.l0_box(b, to_l0, (W, H)),
+                         "length_px": ln, "width_px": wd, "residual_px": rms} for b, ln, wd, rms in seg.lines]
             injected = None
             if "p95_spike" in cfg.chaos and self.step == SPIKE_STEP:
                 self.stats.record(f"segment:{model}", SPIKE_MS)
@@ -461,6 +464,8 @@ class Job:
             }
             if iou is not None:
                 rec["verify"] = {"iou": iou, "against_level": prev_level}
+            if rejected:
+                rec["rejected"] = rejected
             if planner_status:
                 rec["planner_status"] = planner_status
             if cfg.thumbs:

@@ -12,10 +12,12 @@ import functools
 import os
 import threading
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import cv2
 import numpy as np
+
+from .measure import thin
 
 CLASSES = ("background", "crack", "spalling", "efflorescence", "exposed_rebar", "corrosion")
 DEFECTS = CLASSES[1:]
@@ -23,6 +25,9 @@ MIN_BLOB_PX = 12  # connected components smaller than this are noise
 ENTROPY_MIN_PX = 64  # fewer ambiguous pixels than this is not uncertainty worth a closer look
 DEFECT_PX_BG_MAX = 0.7  # a pixel counts toward entropy when p(background) is below this
 CRACK_LINK_SIGMA = 2.5  # crack hysteresis low threshold: half the 5-sigma seed threshold (Canny's 2:1)
+STRAIGHT_RMS_PX = 1.5  # crack centreline RMS residual from its cv2.fitLine (Huber) line, L0 px
+STRAIGHT_ASPECT = 20.0  # length over mean width, and the minAreaRect long side over its short side
+STRAIGHT_CAUSE = "straight line: formwork or joint"
 
 
 @dataclass
@@ -34,6 +39,7 @@ class Segmentation:
     confidence: dict[str, float]  # mean probability over each class's pixels
     latency_ms: float
     model: str
+    lines: list = field(default_factory=list)  # crack components dropped as straight lines (`drop_straight_lines`)
 
     def mask(self, cls: str) -> np.ndarray:
         return (self.labels == CLASSES.index(cls)).astype(np.uint8)
@@ -132,9 +138,42 @@ def restrict(seg: Segmentation, valid: np.ndarray) -> Segmentation:
                         seg.latency_ms + (time.perf_counter() - t0) * 1000, seg.model)
 
 
-def segment_view(segmenter, crop: np.ndarray, model: str, valid: np.ndarray) -> Segmentation:
-    """Segment a gaze crop, keeping only what lies inside the image (`valid`, from `imaging.footprint`)."""
-    return restrict(segmenter.predict(crop, model), valid)
+def drop_straight_lines(seg: Segmentation, scale: float = 1.0) -> Segmentation:
+    """`seg` without the crack components that are one straight line, each listed in `.lines` as ((x, y, w, h) in
+    the view, then length, mean width and residual in L0 px; `scale` is L0 px per view px). A centreline within
+    STRAIGHT_RMS_PX L0 px (RMS) of its cv2.fitLine line over a length of at least STRAIGHT_ASPECT x its mean width,
+    inside a minAreaRect at least that thin, is a formwork seam, joint or edge: real cracks meander. The residual
+    is judged in L0 px because a coarse view smooths a crack's jitter away, so only a fine view can call a line
+    straight. Its pixels become background (`restrict`): no finding, entropy or escalation comes from it."""
+    n, lab, stats, _ = cv2.connectedComponentsWithStats(seg.mask("crack"), connectivity=8)
+    lines, keep = [], np.ones(seg.labels.shape, bool)
+    for i in range(1, n):
+        x, y, w, h, area = (int(v) for v in stats[i])
+        comp = (lab[y : y + h, x : x + w] == i).astype(np.uint8)
+        (_, _), (rw, rh), _ = cv2.minAreaRect(cv2.findNonZero(comp))
+        length = max(rw, rh)
+        if length < STRAIGHT_ASPECT * max(1.0, min(rw, rh)) or length * length < STRAIGHT_ASPECT * area:
+            continue  # not long and thin, the common case: decided before any thinning
+        c = cv2.findNonZero(thin(cv2.copyMakeBorder(comp, 1, 1, 1, 1, cv2.BORDER_CONSTANT, value=0)))
+        c = c.reshape(-1, 2).astype(np.float32)
+        vx, vy, x0, y0 = cv2.fitLine(c, cv2.DIST_HUBER, 0, 0.01, 0.01).ravel()
+        # RMS over the 90 % of centreline points nearest the line: thinning leaves spurs where a speck touches it
+        d = np.sort(np.abs((c[:, 0] - x0) * vy - (c[:, 1] - y0) * vx))[: max(1, len(c) * 9 // 10)]
+        rms = scale * float(np.sqrt(np.mean(d * d)))
+        if rms < STRAIGHT_RMS_PX:
+            keep[lab == i] = False
+            lines.append(((x, y, w, h), round(length * scale, 1), round(area / length * scale, 2), round(rms, 2)))
+    if not lines:
+        return seg
+    out = restrict(seg, keep)
+    out.lines = lines
+    return out
+
+
+def segment_view(segmenter, crop: np.ndarray, model: str, valid: np.ndarray, scale: float = 1.0) -> Segmentation:
+    """Segment a gaze crop, keeping only what lies inside the image (`valid`, from `imaging.footprint`) and is not
+    a straight line (`drop_straight_lines`; `scale`: L0 px per crop px, 2**level)."""
+    return drop_straight_lines(restrict(segmenter.predict(crop, model), valid), scale)
 
 
 class ClassicalSegmenter:
