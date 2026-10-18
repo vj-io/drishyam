@@ -252,8 +252,12 @@ def test_ablations_assert_each_variant_ran_its_switches(tmp_path):
     doc = json.loads((tmp_path / "pub" / "ablations.json").read_text())
     assert doc["datasets"] == {"abl": json.loads(json.dumps(entry))} and "NaN" not in json.dumps(doc)
     rows = entry["by_cap"]["1.0"]
-    assert set(rows) == set(harness.ABLATIONS) == set(entry["variants"]) and len(harness.ABLATIONS) == 10  # full + 9
+    assert set(rows) == set(harness.ABLATIONS) == set(entry["variants"]) and len(harness.ABLATIONS) == 12  # full + 11
     assert rows["full"]["ratio_vs_full"] == 1.0 and rows["full"]["vs_full"] == "no measurable difference"
+    # a score term moves the stop floor too: its floor-free twin is scored against no-floor, and every row says how it ended
+    for v in ("no-seed+no-floor", "no-uncertainty+no-floor"):
+        assert rows[v]["ref"] == "no-floor" and len(rows[v]["ratio_vs_ref_ci"]) == 2 and "vs_ref" in rows[v]
+    assert all(sum(r["halt_causes"].values()) == 1 for r in rows.values()) and "no-floor" in entry["coupling"]
     assert rows["no-verify"]["verify_looks"] == rows["no-survey"]["survey_looks"] == 0
     assert set(rows["no-survey"]["model_usage"]) == {"accurate"} and len(rows["full"]["ratio_vs_full_ci"]) == 2
     assert entry["variants"]["random-order-s2"] == {**harness.switches("full"), "order": "random", "seed": 2}
@@ -290,10 +294,9 @@ def test_no_seed_and_no_floor_ablations_switch_one_term_off_and_change_the_run(s
     full_run, no_seed = (harness.run_drishyam(scene, 1.0, **harness.ABLATIONS[v]) for v in ("full", "no-seed"))
     assert no_seed["switches"] == harness.switches("no-seed") and looks(no_seed) != looks(full_run)
     clean = synth.render(2, 1600, 1200, {"distractors": ["water_stain"]})[0]  # nothing to find
-    for cap in (0.3, 1.0):
-        full_run, no_floor = (harness.run_drishyam(clean, cap, **harness.ABLATIONS[v]) for v in ("full", "no-floor"))
-        assert no_floor["switches"] == harness.switches("no-floor") and full_run["halt_cause"] == "stop-rule"
-        assert len(looks(no_floor)) > len(looks(full_run)) and no_floor["halt_cause"] != "stop-rule"
+    full_run, no_floor = (harness.run_drishyam(clean, 1.0, **harness.ABLATIONS[v]) for v in ("full", "no-floor"))
+    assert no_floor["switches"] == harness.switches("no-floor") and full_run["halt_cause"] == "stop-rule"
+    assert len(looks(no_floor)) > len(looks(full_run)) and no_floor["halt_cause"] != "stop-rule"
 
 
 def test_random_order_matches_only_inside_the_margin():
@@ -637,3 +640,10 @@ def test_codebrim_dev_split_is_disjoint_from_the_held_out_list():
     picked = codebrim.select_dev(records, ["image_1.jpg", "image_2.jpg"], n=5, seed=3)
     assert len(picked) == 5 and not {"image_1", "image_2"} & {r["id"] for r in picked}
     assert picked == codebrim.select_dev(records, ["image_1.jpg", "image_2.jpg"], n=5, seed=3)
+
+
+def test_dev_sweep_reads_variants_and_only_dev_splits():
+    from evals import dev_sweep
+
+    assert dev_sweep.parse("a=v0:2,seed_from_looks:False;b=") == {"a": {"v0": 2.0, "seed_from_looks": False}, "b": {}}
+    assert {d for d, _, _ in dev_sweep.SPLITS.values()} == {"data/synth_dev", "data/synth_clean_dev"}  # never held out

@@ -166,10 +166,13 @@ def main(argv=None) -> None:
     ap.add_argument("--root", default="data/codebrim")
     ap.add_argument("--out", default="data/eval200.txt")
     ap.add_argument("--n", type=int, default=200)
-    ap.add_argument("--seed", type=int, default=7)
+    ap.add_argument("--seed", type=int, default=None, help="default 7, or 4244 with --dev (evals/codebrim_dev100.txt)")
     ap.add_argument("--min-per-class", type=int, default=40)
-    ap.add_argument("--dev", type=int, metavar="N", help="instead: N images (seed --seed) not in the committed eval list")
+    ap.add_argument("--dev", type=int, metavar="N", help="instead: N images (seed --seed) not in the committed eval list; "
+                    "--dev 100 --out evals/codebrim_dev100.txt regenerates the committed dev list")
     a = ap.parse_args(argv)
+    if a.seed is None:
+        a.seed = 4244 if a.dev else 7
     if a.unpack:
         print(f"unpacked {unpack(a.unpack, a.root)} images and annotations from {a.unpack} to {a.root}")
     records = load(a.root)

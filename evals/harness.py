@@ -76,10 +76,16 @@ ABLATIONS = {  # FR-21: each variant flips one switch of the compared agent (gov
     "no-uncertainty": {"use_uncertainty": False},
     "no-seed": {"seed_from_looks": False},  # no look sets an unvisited candidate's entropy or class: score = prior x unseen
     "no-floor": {"v0": 0.0},  # the stop rule's lambda is 0 until something is found
+    # A score term also moves the stop floor (it compares the score with eps x v0), so turning one off changes when a
+    # job stops as well as where it looks. These two take the floor away too and are compared with no-floor (REFERENCE):
+    # that ratio is the term's effect on gaze order alone.
+    "no-uncertainty+no-floor": {"use_uncertainty": False, "v0": 0.0},
+    "no-seed+no-floor": {"seed_from_looks": False, "v0": 0.0},
     "no-survey": {"survey": False},
     "no-verify": {"verify": False},
     "governor-on": {"governor": True},  # deployment behaviour: may switch to the fast net, so not like for like
 }
+REFERENCE = {"no-uncertainty+no-floor": "no-floor", "no-seed+no-floor": "no-floor"}  # also scored against these
 GOVERNOR_USE = {
     False: "policy comparison: the governor's model, level and gaze-size overrides are off (caps and the kill switch "
            "stay), so Drishyam segments every look with the same accurate net as the baselines",
@@ -970,13 +976,23 @@ def run_ablations(data_dir="data/synth200", n=200, out_dir="public/results", res
                       "steps_p50": _r(np.percentile([sum(t["action"] != "halt" for t in trace) for trace in tr], 50), 1),
                       "verify_looks": sum(t["action"] == "verify" for t in steps),
                       "survey_looks": sum(t["cause"] == "survey" for t in steps),
+                      # how the jobs ended: a variant that stops earlier also spends fewer pixels (pixels_frac)
+                      "halt_causes": dict(collections.Counter(r["configs"][f"{v}@{cap}"]["halt_cause"] for r in results)),
                       "model_usage": usage[f"{v}@{cap}"]}
+            if ref := REFERENCE.get(v):
+                mr, ci_ref = m[f"{ref}@{cap}"], ratio_ci(mv, m[f"{ref}@{cap}"], n_img)
+                out[v] |= {"ref": ref, "ratio_vs_ref": _r(mv["recall"] / mr["recall"]) if mr["recall"] else None,
+                           "ratio_vs_ref_ci": ci_ref, "vs_ref": vs_full(ci_ref).replace("the full agent", ref)}
         by_cap[str(cap)] = out
     threads = sorted({r["cv2_threads"] for r in results})
     prov = run_provenance(load_start)
     entry = {"dataset": label, "n_images": n_img, "segmenter": seg.name, "box_convention": primary_boxes,
              "cost_model": {"kind": "fixed", "source": f"results/{micro_arm}/micro.json job_ops (p50 ms per call)"},
              "variants": {v: switches(v) for v in ABLATIONS}, "by_cap": by_cap,
+             "coupling": ("no-uncertainty and no-seed lower every score, so the stop floor (eps x v0) also ends their "
+                          "jobs sooner: their ratio_vs_full mixes the term's effect on where the agent looks with a "
+                          "smaller pixel spend (see pixels_frac and halt_causes). The '+no-floor' rows remove the floor "
+                          "as well; their ratio_vs_ref, against no-floor, is the term's effect on gaze order alone."),
              "random_order": [random_order_note(by_cap[str(c)], c, ratio_ci(pooled_seeds(m, c), m[f"full@{c}"], n_img), n_img)
                               for c in caps],
              "provenance": short_provenance(prov, workers, threads[0] if len(threads) == 1 else threads, micro_arm, data_id,
