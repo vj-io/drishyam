@@ -26,7 +26,7 @@ npx @modelcontextprotocol/inspector uv run --directory /abs/path/to/drishyam dri
 | `verify(job, gaze_id, why="")` | Looks one level finer at the same centre, segments, returns the mask IoU against the coarser look (below 0.5 is disagreement). |
 | `runtime_stats(job)` | p50/p95 per op, CPU %, $ so far, budget against caps, what the governor changed. |
 | `set_budget(job, pixel_cap, usd_cap, seconds_cap, why="")` | Lowers caps (0.02-1.0, 0.0001-0.05, 1-30). Raising one is refused. |
-| `log_finding(job, gaze_id, cls, why="")` | Records a class that the last segmentation shows. Critical ones become `pending_review`. |
+| `log_finding(job, gaze_id, cls, why="")` | Records a class that the last segmentation shows. Critical ones become `pending_review`. A crack shorter than 8x its mean width is refused as a pore or bug hole. |
 | `request_human_review(job, finding_id, reason)` | Records the request in the trace. Changes no state. |
 | `draft_work_order(job)` | Writes `runs/<job>/work_order.json` and `crops/` and returns the order. |
 

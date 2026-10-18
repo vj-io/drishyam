@@ -74,7 +74,9 @@ Event types, in order:
                "length_px": 318.2, "width_px": 6.56, "residual_px": 1.26}],
                                                         // only when the look dropped crack components that are
                                                         // one straight line (centreline RMS residual < 1.5 L0 px
-                                                        // over >= 20x the mean width); no finding comes from them
+                                                        // over >= 20x the mean width), or its crack measured as a
+                                                        // blob ("not elongated: pore or bug hole": length < 8x the
+                                                        // mean width, no residual_px); no finding comes from them
  "runtime": {"p50_ms": {"warp": 9, "segment": 31}, "p95_ms": {"warp": 14, "segment": 54},
              "cpu_pct": 71, "usd": 0.0031},
  "rationale": "entropy 0.62 > 0.5 at L2",

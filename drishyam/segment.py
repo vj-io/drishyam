@@ -29,6 +29,8 @@ CRACK_LINK_SIGMA = 2.5  # crack hysteresis low threshold: half the 5-sigma seed 
 STRAIGHT_RMS_PX = 1.5  # crack centreline RMS residual from its cv2.fitLine (Huber) line, L0 px
 STRAIGHT_ASPECT = 20.0  # length over mean width, and the minAreaRect long side over its short side
 STRAIGHT_CAUSE = "straight line: formwork or joint"
+PORE_ASPECT = 8.0  # a crack is drafted only if its measured length is at least this many mean widths: not a blob
+PORE_CAUSE = "not elongated: pore or bug hole"
 
 
 @dataclass
@@ -178,6 +180,11 @@ def rejected_lines(seg: Segmentation, to_l0: np.ndarray, l0_size: tuple[int, int
     """`seg.lines` as trace records (the step's `rejected` list): class, cause, L0 box, length, width, residual."""
     return [{"cls": "crack", "cause": STRAIGHT_CAUSE, "box": imaging.l0_box(b, to_l0, l0_size), "length_px": ln,
              "width_px": wd, "residual_px": rms} for b, ln, wd, rms in seg.lines]
+
+
+def elongated(m: dict) -> bool:
+    """A crack `measure` that is a line, not a blob: length >= PORE_ASPECT x mean width (a pore or bug hole is not)."""
+    return m["length_px"] >= PORE_ASPECT * m["width_px"]
 
 
 def segment_view(segmenter, crop: np.ndarray, model: str, valid: np.ndarray, scale: float = 1.0) -> Segmentation:

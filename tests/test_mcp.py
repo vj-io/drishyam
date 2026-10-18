@@ -245,17 +245,18 @@ async def test_a_view_past_the_border_shows_no_mirrored_crack(d, tmp_path, monke
     assert 0 <= x <= 15 and 0 <= y and x + w <= 40 and y + h <= 600
 
 
-async def test_a_straight_line_is_rejected_with_its_cause(d, tmp_path, monkeypatch):
+async def test_a_straight_line_and_a_bug_hole_are_rejected_with_their_cause(d, tmp_path, monkeypatch):
     """A ruler-straight line is dropped by segment as formwork and comes back (and is traced) as rejected with that
-    cause, as in the agent's step records, so log_finding has no crack to log."""
-    from drishyam.segment import STRAIGHT_CAUSE
+    cause, so log_finding has no crack to log. On bridge_08 a bug hole that segments as crack is refused by
+    log_finding as not elongated, as the agent refuses to draft it."""
+    from drishyam.segment import PORE_CAUSE, STRAIGHT_CAUSE
 
     root = tmp_path / "images"
     root.mkdir()
     img = concrete(600, 800, 5)
     cv2.line(img, (380, 60), (390, 560), (55, 55, 58), 3, cv2.LINE_AA)
     cv2.imwrite(str(root / "seam.png"), img)
-    monkeypatch.setenv("DRISHYAM_IMAGE_ROOT", str(root))
+    monkeypatch.setenv("DRISHYAM_IMAGE_ROOT", f"{root}{os.pathsep}{SAMPLES}")
     job = await d.open(root / "seam.png")
     g, _ = await d.ok("gaze", job=job, x=400, y=300, level=0)
     seg, _ = await d.ok("segment", job=job, gaze_id=g["gaze"])
@@ -265,6 +266,11 @@ async def test_a_straight_line_is_rejected_with_its_cause(d, tmp_path, monkeypat
     assert 370 <= x and x + w <= 400 and y <= 300 - 200 and y + h >= 300 + 200  # the line, in L0 px
     assert next(t for t in trace_of(tmp_path, job) if t.get("tool") == "segment")["rejected"] == [line]
     await d.refused("log_finding", "no crack in the last segmentation", job=job, gaze_id=g["gaze"], cls="crack")
+
+    job = await d.open(SAMPLES / "bridge_08.jpg")
+    g, _ = await d.ok("gaze", job=job, x=2377, y=925, level=0)
+    assert "crack" in (await d.ok("segment", job=job, gaze_id=g["gaze"]))[0]["areas"]
+    await d.refused("log_finding", PORE_CAUSE, job=job, gaze_id=g["gaze"], cls="crack")
 
 
 async def test_a_cap_can_be_lowered_never_raised(d, tmp_path):

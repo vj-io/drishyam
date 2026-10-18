@@ -22,7 +22,16 @@ from .findings import IOU_AGREE, SEVERITY, Finding, now_iso, work_order
 from .governor import MIN_GAZE, USD_PER_HOUR, Budget, RuntimeStats, Settings, check
 from .measure import measure
 from .planner import TIMEOUT_S, ChaosPlanner, consult
-from .segment import CLASSES, DEFECT_PX_BG_MAX, MIN_BLOB_PX, default_segmenter, rejected_lines, segment_view
+from .segment import (
+    CLASSES,
+    DEFECT_PX_BG_MAX,
+    MIN_BLOB_PX,
+    PORE_CAUSE,
+    default_segmenter,
+    elongated,
+    rejected_lines,
+    segment_view,
+)
 
 SPIKE_STEP = 4  # chaos p95_spike lands here; the governor reacts on the next step
 SPIKE_MS = 900.0
@@ -194,6 +203,16 @@ class Job:
             return event, True
         # change_level / reverify queue their own look, which carries planner:<strategy> as its cause.
         return event, False
+
+    def _present(self, seg, to_l0, level, rejected: list) -> list[str]:
+        """The classes a look drafts, most severe first: every class with a mask of at least A_min, except a crack
+        whose measure is a blob, not a line (`elongated`): that one is appended to `rejected` instead."""
+        present = sorted((c for c, a in seg.areas.items() if a >= self.cfg.a_min), key=lambda c: -SEVERITY[c])
+        if "crack" in present and not elongated(m := measure(mask := seg.mask("crack"), 2**level)):
+            present.remove("crack")
+            rejected.append({"cls": "crack", "cause": PORE_CAUSE, "length_px": m["length_px"], "width_px": m["width_px"],
+                             "box": imaging.l0_box(cv2.boundingRect(cv2.findNonZero(mask)), to_l0, self.image.shape[1::-1])})
+        return present
 
     def _log_finding(self, r, cls, seg, crop, to_l0, level, verify_iou=None):
         """(finding, "new" | "update"), or (the finding that absorbed it, "absorbed")."""
@@ -379,8 +398,7 @@ class Job:
                 follow = ("escalate", r, level - 1, "entropy>tau", f"entropy {seg.entropy:.2f} > {cfg.tau} at L{level}")
             elif level > 0 and not batch and best and area < cfg.a_min:
                 follow = ("escalate", r, level - 1, "area<A_min", f"{best} area {area} px < {cfg.a_min} at L{level}")
-            elif best and (present := sorted((c for c, a in seg.areas.items() if a >= cfg.a_min),
-                                             key=lambda c: -SEVERITY[c])):
+            elif best and (present := self._present(seg, to_l0, level, rejected)):
                 # Every class with a confident mask becomes evidence, most severe first.
                 r.cls = present[0]
                 critical = checked = None

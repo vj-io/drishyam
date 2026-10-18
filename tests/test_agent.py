@@ -443,20 +443,23 @@ def test_review_requests_say_their_reason_in_fields_too():
     assert kinds == {"critical", "ambiguous", "disagree", "unconfirmed"}
 
 
-def test_the_clean_concrete_sample_drafts_no_crack_on_its_formwork_groove():
+def test_the_clean_concrete_sample_drafts_no_crack():
     """bridge_08 has one straight formwork groove, which used to be drafted as a 93 % crack ([2049, 1250, 581, 798]
-    in run j_d60376). Every look that sees it now logs it as a straight line, and no finding comes from it: the
-    groove is the only line on the photo longer than 100 px."""
+    in run j_d60376), and bug holes that classical-v1 labels crack. Every look that sees the groove logs it as a
+    straight line; a bug hole is logged as not elongated (a blob, under PORE_ASPECT widths long). No crack is drafted."""
     from pathlib import Path
 
-    from drishyam.segment import STRAIGHT_CAUSE
+    from drishyam.segment import PORE_ASPECT, PORE_CAUSE, STRAIGHT_CAUSE
 
     img = cv2.imread(str(Path(__file__).resolve().parent.parent / "public" / "samples" / "bridge_08.jpg"))
     job, events = run(img)
     rejected = [x for s in steps(events) for x in s.get("rejected", [])]
-    assert rejected and all(x["cause"] == STRAIGHT_CAUSE and x["residual_px"] < 1.5 for x in rejected)
-    assert all(imaging.box_iou(x["box"], [2049, 1250, 581, 798]) > 0 for x in rejected)
-    assert not any(f.cls == "crack" and f.measure["length_px"] > 100 for f in job.findings)
+    lines = [x for x in rejected if x["cause"] == STRAIGHT_CAUSE]
+    pores = [x for x in rejected if x["cause"] == PORE_CAUSE]
+    assert lines and pores and len(lines) + len(pores) == len(rejected)
+    assert all(x["residual_px"] < 1.5 and imaging.box_iou(x["box"], [2049, 1250, 581, 798]) > 0 for x in lines)
+    assert all(x["length_px"] < PORE_ASPECT * x["width_px"] and inside_image(x["box"], img.shape) for x in pores)
+    assert not any(f.cls == "crack" for f in job.findings)
 
 
 def test_review_on_ambiguity_when_a_class_is_absorbed_by_another(scene):

@@ -36,7 +36,15 @@ from .findings import Finding, now_iso, order_status
 from .findings import work_order as make_work_order
 from .governor import Budget, RuntimeStats, Settings, check, global_kill
 from .measure import measure as measure_px
-from .segment import DEFECTS, default_segmenter, rejected_lines, segment_view
+from .segment import (
+    DEFECTS,
+    PORE_ASPECT,
+    PORE_CAUSE,
+    default_segmenter,
+    elongated,
+    rejected_lines,
+    segment_view,
+)
 
 MAX_LEVEL = 3
 OVERVIEW_LEVEL = imaging.OVERVIEW_LEVEL
@@ -600,6 +608,9 @@ def log_finding(job: JobId, gaze_id: RecordId, cls: Defect, why: Why = "") -> st
             raise ToolError(f"no {cls} in the last segmentation of {g.id}")
         mask = seg.mask(cls)
         m = measure_px(mask, 2**g.level, linear=cls == "crack")
+        if cls == "crack" and not elongated(m):
+            raise ToolError(f"{PORE_CAUSE}: the crack in {g.id} is {m['length_px']} px long and {m['width_px']} px wide; "
+                            f"a crack is at least {PORE_ASPECT:g} widths long")
         x, y, w, h = cv2.boundingRect(cv2.findNonZero(mask))
         box = imaging.l0_box((x, y, w, h), g.to_l0, s.shape[::-1])
         same = next(
