@@ -1,0 +1,1832 @@
+{
+ "note": "FR-21 ablations: each variant flips one JobConfig switch of the agent as compared (governor off; 'governor-on' is deployment behaviour). Same segmenter and fixed costs for all; ratio_vs_full is a paired bootstrap over images; chance_recall is each variant's own boxes at random places.",
+ "datasets": {
+  "synth200": {
+   "dataset": "synthetic-200 at 2048x1536 (labelled synthetic)",
+   "n_images": 200,
+   "segmenter": "classical-v1",
+   "box_convention": "components",
+   "cost_model": {
+    "kind": "fixed",
+    "source": "results/linux-aarch64/micro.json job_ops (p50 ms per call)"
+   },
+   "variants": {
+    "full": {
+     "order": "score",
+     "seed": 0,
+     "use_uncertainty": true,
+     "survey": true,
+     "verify": true,
+     "governor": false
+    },
+    "random-order-s0": {
+     "order": "random",
+     "seed": 0,
+     "use_uncertainty": true,
+     "survey": true,
+     "verify": true,
+     "governor": false
+    },
+    "random-order-s1": {
+     "order": "random",
+     "seed": 1,
+     "use_uncertainty": true,
+     "survey": true,
+     "verify": true,
+     "governor": false
+    },
+    "random-order-s2": {
+     "order": "random",
+     "seed": 2,
+     "use_uncertainty": true,
+     "survey": true,
+     "verify": true,
+     "governor": false
+    },
+    "no-uncertainty": {
+     "order": "score",
+     "seed": 0,
+     "use_uncertainty": false,
+     "survey": true,
+     "verify": true,
+     "governor": false
+    },
+    "no-survey": {
+     "order": "score",
+     "seed": 0,
+     "use_uncertainty": true,
+     "survey": false,
+     "verify": true,
+     "governor": false
+    },
+    "no-verify": {
+     "order": "score",
+     "seed": 0,
+     "use_uncertainty": true,
+     "survey": true,
+     "verify": false,
+     "governor": false
+    },
+    "governor-on": {
+     "order": "score",
+     "seed": 0,
+     "use_uncertainty": true,
+     "survey": true,
+     "verify": true,
+     "governor": true
+    }
+   },
+   "by_cap": {
+    "0.3": {
+     "full": {
+      "pixels_frac": 0.2344,
+      "net_pixels_frac": 0.2188,
+      "recall": 0.4675,
+      "recall_ci": [
+       0.4321,
+       0.507
+      ],
+      "recall_iou_only": 0.4231,
+      "recall_iou_only_ci": [
+       0.3851,
+       0.4615
+      ],
+      "chance_recall": 0.0355,
+      "chance_recall_iou_only": 0.0133,
+      "precision": 0.1018,
+      "fp_per_image": 13.9,
+      "boxes_per_image": 15.5,
+      "hits_per_matched_gt": 1.49,
+      "usd": 1.6e-05,
+      "ratio_vs_full": 1.0,
+      "ratio_vs_full_ci": [
+       1.0,
+       1.0
+      ],
+      "vs_full": "no measurable difference",
+      "ratio_iou_only_vs_full_ci": [
+       1.0,
+       1.0
+      ],
+      "steps_p50": 3.0,
+      "verify_looks": 148,
+      "survey_looks": 196,
+      "model_usage": {
+       "accurate": 525
+      }
+     },
+     "random-order-s0": {
+      "pixels_frac": 0.2344,
+      "net_pixels_frac": 0.2188,
+      "recall": 0.4556,
+      "recall_ci": [
+       0.42,
+       0.4953
+      ],
+      "recall_iou_only": 0.4068,
+      "recall_iou_only_ci": [
+       0.3674,
+       0.4481
+      ],
+      "chance_recall": 0.0311,
+      "chance_recall_iou_only": 0.0148,
+      "precision": 0.0891,
+      "fp_per_image": 15.7,
+      "boxes_per_image": 17.2,
+      "hits_per_matched_gt": 1.65,
+      "usd": 1.6e-05,
+      "ratio_vs_full": 0.9747,
+      "ratio_vs_full_ci": [
+       0.9505,
+       1.0
+      ],
+      "vs_full": "no measurable difference",
+      "ratio_iou_only_vs_full_ci": [
+       0.9329,
+       0.9889
+      ],
+      "steps_p50": 3.0,
+      "verify_looks": 148,
+      "survey_looks": 196,
+      "model_usage": {
+       "accurate": 525
+      }
+     },
+     "random-order-s1": {
+      "pixels_frac": 0.2344,
+      "net_pixels_frac": 0.2188,
+      "recall": 0.463,
+      "recall_ci": [
+       0.4286,
+       0.5023
+      ],
+      "recall_iou_only": 0.4201,
+      "recall_iou_only_ci": [
+       0.3822,
+       0.4603
+      ],
+      "chance_recall": 0.0296,
+      "chance_recall_iou_only": 0.0163,
+      "precision": 0.0995,
+      "fp_per_image": 14.1,
+      "boxes_per_image": 15.7,
+      "hits_per_matched_gt": 1.52,
+      "usd": 1.6e-05,
+      "ratio_vs_full": 0.9905,
+      "ratio_vs_full_ci": [
+       0.9711,
+       1.0102
+      ],
+      "vs_full": "no measurable difference",
+      "ratio_iou_only_vs_full_ci": [
+       0.9711,
+       1.0147
+      ],
+      "steps_p50": 3.0,
+      "verify_looks": 148,
+      "survey_looks": 196,
+      "model_usage": {
+       "accurate": 525
+      }
+     },
+     "random-order-s2": {
+      "pixels_frac": 0.2344,
+      "net_pixels_frac": 0.2188,
+      "recall": 0.466,
+      "recall_ci": [
+       0.4311,
+       0.5065
+      ],
+      "recall_iou_only": 0.4216,
+      "recall_iou_only_ci": [
+       0.384,
+       0.4601
+      ],
+      "chance_recall": 0.0266,
+      "chance_recall_iou_only": 0.0104,
+      "precision": 0.1009,
+      "fp_per_image": 14.0,
+      "boxes_per_image": 15.6,
+      "hits_per_matched_gt": 1.49,
+      "usd": 1.6e-05,
+      "ratio_vs_full": 0.9968,
+      "ratio_vs_full_ci": [
+       0.9898,
+       1.0
+      ],
+      "vs_full": "no measurable difference",
+      "ratio_iou_only_vs_full_ci": [
+       0.9887,
+       1.0
+      ],
+      "steps_p50": 3.0,
+      "verify_looks": 148,
+      "survey_looks": 196,
+      "model_usage": {
+       "accurate": 525
+      }
+     },
+     "no-uncertainty": {
+      "pixels_frac": 0.2344,
+      "net_pixels_frac": 0.2188,
+      "recall": 0.4675,
+      "recall_ci": [
+       0.4321,
+       0.507
+      ],
+      "recall_iou_only": 0.4231,
+      "recall_iou_only_ci": [
+       0.3851,
+       0.4615
+      ],
+      "chance_recall": 0.034,
+      "chance_recall_iou_only": 0.0222,
+      "precision": 0.1018,
+      "fp_per_image": 13.9,
+      "boxes_per_image": 15.5,
+      "hits_per_matched_gt": 1.49,
+      "usd": 1.6e-05,
+      "ratio_vs_full": 1.0,
+      "ratio_vs_full_ci": [
+       1.0,
+       1.0
+      ],
+      "vs_full": "no measurable difference",
+      "ratio_iou_only_vs_full_ci": [
+       1.0,
+       1.0
+      ],
+      "steps_p50": 3.0,
+      "verify_looks": 148,
+      "survey_looks": 196,
+      "model_usage": {
+       "accurate": 525
+      }
+     },
+     "no-survey": {
+      "pixels_frac": 0.2277,
+      "net_pixels_frac": 0.2121,
+      "recall": 0.4216,
+      "recall_ci": [
+       0.386,
+       0.4564
+      ],
+      "recall_iou_only": 0.3595,
+      "recall_iou_only_ci": [
+       0.3247,
+       0.3935
+      ],
+      "chance_recall": 0.0133,
+      "chance_recall_iou_only": 0.003,
+      "precision": 0.0785,
+      "fp_per_image": 16.6,
+      "boxes_per_image": 18.0,
+      "hits_per_matched_gt": 1.56,
+      "usd": 1.5e-05,
+      "ratio_vs_full": 0.9019,
+      "ratio_vs_full_ci": [
+       0.8383,
+       0.9684
+      ],
+      "vs_full": "below the full agent",
+      "ratio_iou_only_vs_full_ci": [
+       0.7855,
+       0.9222
+      ],
+      "steps_p50": 3.0,
+      "verify_looks": 165,
+      "survey_looks": 0,
+      "model_usage": {
+       "accurate": 509
+      }
+     },
+     "no-verify": {
+      "pixels_frac": 0.236,
+      "net_pixels_frac": 0.2204,
+      "recall": 0.4822,
+      "recall_ci": [
+       0.4454,
+       0.5207
+      ],
+      "recall_iou_only": 0.4275,
+      "recall_iou_only_ci": [
+       0.3872,
+       0.466
+      ],
+      "chance_recall": 0.0355,
+      "chance_recall_iou_only": 0.0192,
+      "precision": 0.1115,
+      "fp_per_image": 12.9,
+      "boxes_per_image": 14.5,
+      "hits_per_matched_gt": 1.41,
+      "usd": 1.6e-05,
+      "ratio_vs_full": 1.0316,
+      "ratio_vs_full_ci": [
+       1.003,
+       1.0663
+      ],
+      "vs_full": "above the full agent",
+      "ratio_iou_only_vs_full_ci": [
+       0.985,
+       1.0412
+      ],
+      "steps_p50": 3.0,
+      "verify_looks": 0,
+      "survey_looks": 196,
+      "model_usage": {
+       "accurate": 529
+      }
+     },
+     "governor-on": {
+      "pixels_frac": 0.2344,
+      "net_pixels_frac": 0.2188,
+      "recall": 0.4675,
+      "recall_ci": [
+       0.4321,
+       0.507
+      ],
+      "recall_iou_only": 0.4231,
+      "recall_iou_only_ci": [
+       0.3851,
+       0.4615
+      ],
+      "chance_recall": 0.0237,
+      "chance_recall_iou_only": 0.0074,
+      "precision": 0.1018,
+      "fp_per_image": 13.9,
+      "boxes_per_image": 15.5,
+      "hits_per_matched_gt": 1.49,
+      "usd": 1.6e-05,
+      "ratio_vs_full": 1.0,
+      "ratio_vs_full_ci": [
+       1.0,
+       1.0
+      ],
+      "vs_full": "no measurable difference",
+      "ratio_iou_only_vs_full_ci": [
+       1.0,
+       1.0
+      ],
+      "steps_p50": 3.0,
+      "verify_looks": 148,
+      "survey_looks": 196,
+      "model_usage": {
+       "accurate": 525
+      }
+     }
+    },
+    "1.0": {
+     "full": {
+      "pixels_frac": 0.3465,
+      "net_pixels_frac": 0.3308,
+      "recall": 0.5148,
+      "recall_ci": [
+       0.479,
+       0.5531
+      ],
+      "recall_iou_only": 0.4527,
+      "recall_iou_only_ci": [
+       0.4182,
+       0.4897
+      ],
+      "chance_recall": 0.0207,
+      "chance_recall_iou_only": 0.0104,
+      "precision": 0.0834,
+      "fp_per_image": 19.1,
+      "boxes_per_image": 20.8,
+      "hits_per_matched_gt": 1.68,
+      "usd": 2.4e-05,
+      "ratio_vs_full": 1.0,
+      "ratio_vs_full_ci": [
+       1.0,
+       1.0
+      ],
+      "vs_full": "no measurable difference",
+      "ratio_iou_only_vs_full_ci": [
+       1.0,
+       1.0
+      ],
+      "steps_p50": 4.0,
+      "verify_looks": 217,
+      "survey_looks": 196,
+      "model_usage": {
+       "accurate": 794
+      }
+     },
+     "random-order-s0": {
+      "pixels_frac": 0.4073,
+      "net_pixels_frac": 0.3917,
+      "recall": 0.5118,
+      "recall_ci": [
+       0.4763,
+       0.5521
+      ],
+      "recall_iou_only": 0.4497,
+      "recall_iou_only_ci": [
+       0.4139,
+       0.4883
+      ],
+      "chance_recall": 0.037,
+      "chance_recall_iou_only": 0.0207,
+      "precision": 0.0649,
+      "fp_per_image": 24.8,
+      "boxes_per_image": 26.5,
+      "hits_per_matched_gt": 2.1,
+      "usd": 2.8e-05,
+      "ratio_vs_full": 0.9943,
+      "ratio_vs_full_ci": [
+       0.9595,
+       1.0287
+      ],
+      "vs_full": "no measurable difference",
+      "ratio_iou_only_vs_full_ci": [
+       0.9583,
+       1.0319
+      ],
+      "steps_p50": 4.0,
+      "verify_looks": 278,
+      "survey_looks": 196,
+      "model_usage": {
+       "accurate": 940
+      }
+     },
+     "random-order-s1": {
+      "pixels_frac": 0.3652,
+      "net_pixels_frac": 0.3496,
+      "recall": 0.5178,
+      "recall_ci": [
+       0.4818,
+       0.5569
+      ],
+      "recall_iou_only": 0.4571,
+      "recall_iou_only_ci": [
+       0.4216,
+       0.4955
+      ],
+      "chance_recall": 0.0385,
+      "chance_recall_iou_only": 0.0207,
+      "precision": 0.0764,
+      "fp_per_image": 21.1,
+      "boxes_per_image": 22.9,
+      "hits_per_matched_gt": 1.76,
+      "usd": 2.5e-05,
+      "ratio_vs_full": 1.0057,
+      "ratio_vs_full_ci": [
+       0.9837,
+       1.0288
+      ],
+      "vs_full": "no measurable difference",
+      "ratio_iou_only_vs_full_ci": [
+       0.9905,
+       1.0288
+      ],
+      "steps_p50": 4.0,
+      "verify_looks": 234,
+      "survey_looks": 196,
+      "model_usage": {
+       "accurate": 839
+      }
+     },
+     "random-order-s2": {
+      "pixels_frac": 0.3481,
+      "net_pixels_frac": 0.3325,
+      "recall": 0.5148,
+      "recall_ci": [
+       0.479,
+       0.5531
+      ],
+      "recall_iou_only": 0.4527,
+      "recall_iou_only_ci": [
+       0.4182,
+       0.4897
+      ],
+      "chance_recall": 0.0325,
+      "chance_recall_iou_only": 0.0104,
+      "precision": 0.0827,
+      "fp_per_image": 19.2,
+      "boxes_per_image": 21.0,
+      "hits_per_matched_gt": 1.69,
+      "usd": 2.4e-05,
+      "ratio_vs_full": 1.0,
+      "ratio_vs_full_ci": [
+       1.0,
+       1.0
+      ],
+      "vs_full": "no measurable difference",
+      "ratio_iou_only_vs_full_ci": [
+       1.0,
+       1.0
+      ],
+      "steps_p50": 4.0,
+      "verify_looks": 219,
+      "survey_looks": 196,
+      "model_usage": {
+       "accurate": 798
+      }
+     },
+     "no-uncertainty": {
+      "pixels_frac": 0.3465,
+      "net_pixels_frac": 0.3308,
+      "recall": 0.5148,
+      "recall_ci": [
+       0.479,
+       0.5531
+      ],
+      "recall_iou_only": 0.4527,
+      "recall_iou_only_ci": [
+       0.4182,
+       0.4897
+      ],
+      "chance_recall": 0.0429,
+      "chance_recall_iou_only": 0.0251,
+      "precision": 0.0834,
+      "fp_per_image": 19.1,
+      "boxes_per_image": 20.8,
+      "hits_per_matched_gt": 1.68,
+      "usd": 2.4e-05,
+      "ratio_vs_full": 1.0,
+      "ratio_vs_full_ci": [
+       1.0,
+       1.0
+      ],
+      "vs_full": "no measurable difference",
+      "ratio_iou_only_vs_full_ci": [
+       1.0,
+       1.0
+      ],
+      "steps_p50": 4.0,
+      "verify_looks": 217,
+      "survey_looks": 196,
+      "model_usage": {
+       "accurate": 794
+      }
+     },
+     "no-survey": {
+      "pixels_frac": 0.3031,
+      "net_pixels_frac": 0.2875,
+      "recall": 0.4393,
+      "recall_ci": [
+       0.4028,
+       0.4739
+      ],
+      "recall_iou_only": 0.3743,
+      "recall_iou_only_ci": [
+       0.3401,
+       0.4084
+      ],
+      "chance_recall": 0.0251,
+      "chance_recall_iou_only": 0.0104,
+      "precision": 0.0695,
+      "fp_per_image": 19.7,
+      "boxes_per_image": 21.2,
+      "hits_per_matched_gt": 1.67,
+      "usd": 2.1e-05,
+      "ratio_vs_full": 0.8534,
+      "ratio_vs_full_ci": [
+       0.8046,
+       0.904
+      ],
+      "vs_full": "below the full agent",
+      "ratio_iou_only_vs_full_ci": [
+       0.7748,
+       0.8822
+      ],
+      "steps_p50": 4.0,
+      "verify_looks": 228,
+      "survey_looks": 0,
+      "model_usage": {
+       "accurate": 690
+      }
+     },
+     "no-verify": {
+      "pixels_frac": 0.3127,
+      "net_pixels_frac": 0.2971,
+      "recall": 0.5089,
+      "recall_ci": [
+       0.4718,
+       0.5507
+      ],
+      "recall_iou_only": 0.4438,
+      "recall_iou_only_ci": [
+       0.4072,
+       0.4832
+      ],
+      "chance_recall": 0.034,
+      "chance_recall_iou_only": 0.0104,
+      "precision": 0.099,
+      "fp_per_image": 15.5,
+      "boxes_per_image": 17.2,
+      "hits_per_matched_gt": 1.47,
+      "usd": 2.1e-05,
+      "ratio_vs_full": 0.9885,
+      "ratio_vs_full_ci": [
+       0.9621,
+       1.0156
+      ],
+      "vs_full": "no measurable difference",
+      "ratio_iou_only_vs_full_ci": [
+       0.9511,
+       1.0103
+      ],
+      "steps_p50": 3.0,
+      "verify_looks": 0,
+      "survey_looks": 196,
+      "model_usage": {
+       "accurate": 713
+      }
+     },
+     "governor-on": {
+      "pixels_frac": 0.3465,
+      "net_pixels_frac": 0.3308,
+      "recall": 0.5148,
+      "recall_ci": [
+       0.479,
+       0.5531
+      ],
+      "recall_iou_only": 0.4527,
+      "recall_iou_only_ci": [
+       0.4182,
+       0.4897
+      ],
+      "chance_recall": 0.0207,
+      "chance_recall_iou_only": 0.0118,
+      "precision": 0.0834,
+      "fp_per_image": 19.1,
+      "boxes_per_image": 20.8,
+      "hits_per_matched_gt": 1.68,
+      "usd": 2.4e-05,
+      "ratio_vs_full": 1.0,
+      "ratio_vs_full_ci": [
+       1.0,
+       1.0
+      ],
+      "vs_full": "no measurable difference",
+      "ratio_iou_only_vs_full_ci": [
+       1.0,
+       1.0
+      ],
+      "steps_p50": 4.0,
+      "verify_looks": 217,
+      "survey_looks": 196,
+      "model_usage": {
+       "accurate": 794
+      }
+     }
+    }
+   },
+   "random_order": [
+    "At a 30% pixel cap, random order found 0.46-0.47 of the ground-truth boxes over seeds 0-2 and the full agent 0.47. Paired 95% CI of the recall ratio over 200 images, the seeds pooled per image: 0.97-1.00 (seeds 0, 1, 2 alone: 0.95-1.00, 0.97-1.01, 0.99-1.00); inside the 0.95-1.05 margin set in advance, so random order matches the full agent. None of the 7 variant-vs-full CIs at this cap is corrected for multiple comparisons.",
+    "At a 100% pixel cap, random order found 0.51-0.52 of the ground-truth boxes over seeds 0-2 and the full agent 0.51. Paired 95% CI of the recall ratio over 200 images, the seeds pooled per image: 0.98-1.01 (seeds 0, 1, 2 alone: 0.96-1.03, 0.98-1.03, 1.00-1.00); inside the 0.95-1.05 margin set in advance, so random order matches the full agent. None of the 7 variant-vs-full CIs at this cap is corrected for multiple comparisons."
+   ],
+   "provenance": {
+    "cv2": "5.0.0",
+    "build_info_sha256": "fe5f9337dbc8663639ee7bcb2deb09359893fc8d2aa5b6a447cee2a0117d2ec7",
+    "cv2_baseline": "SSE SSE2 SSE3 SSSE3 SSE4_1",
+    "cv2_dispatch": "SSE4_2 AVX FP16 AVX2 AVX512_SKX",
+    "cv2_parallel_framework": "GCD",
+    "cv2_custom_hal": "YES (ipp (ver 0.0.1))",
+    "machine": "Darwin 25.6.0 x86_64, 16 logical CPUs; eval ran 8 worker(s) x 1 cv2 thread(s); micro arm linux-aarch64",
+    "cpu": "Intel(R) Core(TM) i9-9880H CPU @ 2.30GHz",
+    "python": "3.13.16",
+    "timestamp": "2026-10-18T08:46:08Z",
+    "build": "stock (not COOL)",
+    "load_avg": [
+     17.3,
+     24.41,
+     29.25
+    ],
+    "load_avg_start": [
+     17.3,
+     24.41,
+     29.25
+    ],
+    "load_avg_end": [
+     70.19,
+     51.44,
+     39.41
+    ],
+    "dataset_gt_sha256": "a06f5c40620efc1f37e3f247be35e84790d3ed82e385f1cb1122eb30b0528b7f",
+    "dataset_images_sha256": "8cfbe42f03b89e6ad8851666db2869deb3745b575d5235d356a028945667a95a",
+    "dataset_generator_version": 2
+   }
+  },
+  "synth_large": {
+   "dataset": "synthetic-100 at 4608x3456 (labelled synthetic)",
+   "n_images": 100,
+   "segmenter": "classical-v1",
+   "box_convention": "components",
+   "cost_model": {
+    "kind": "fixed",
+    "source": "results/linux-aarch64/micro.json job_ops (p50 ms per call)"
+   },
+   "variants": {
+    "full": {
+     "order": "score",
+     "seed": 0,
+     "use_uncertainty": true,
+     "survey": true,
+     "verify": true,
+     "governor": false
+    },
+    "random-order-s0": {
+     "order": "random",
+     "seed": 0,
+     "use_uncertainty": true,
+     "survey": true,
+     "verify": true,
+     "governor": false
+    },
+    "random-order-s1": {
+     "order": "random",
+     "seed": 1,
+     "use_uncertainty": true,
+     "survey": true,
+     "verify": true,
+     "governor": false
+    },
+    "random-order-s2": {
+     "order": "random",
+     "seed": 2,
+     "use_uncertainty": true,
+     "survey": true,
+     "verify": true,
+     "governor": false
+    },
+    "no-uncertainty": {
+     "order": "score",
+     "seed": 0,
+     "use_uncertainty": false,
+     "survey": true,
+     "verify": true,
+     "governor": false
+    },
+    "no-survey": {
+     "order": "score",
+     "seed": 0,
+     "use_uncertainty": true,
+     "survey": false,
+     "verify": true,
+     "governor": false
+    },
+    "no-verify": {
+     "order": "score",
+     "seed": 0,
+     "use_uncertainty": true,
+     "survey": true,
+     "verify": false,
+     "governor": false
+    },
+    "governor-on": {
+     "order": "score",
+     "seed": 0,
+     "use_uncertainty": true,
+     "survey": true,
+     "verify": true,
+     "governor": true
+    }
+   },
+   "by_cap": {
+    "0.3": {
+     "full": {
+      "pixels_frac": 0.2822,
+      "net_pixels_frac": 0.2665,
+      "recall": 0.5059,
+      "recall_ci": [
+       0.4512,
+       0.5636
+      ],
+      "recall_iou_only": 0.4379,
+      "recall_iou_only_ci": [
+       0.3856,
+       0.4912
+      ],
+      "chance_recall": 0.0385,
+      "chance_recall_iou_only": 0.0089,
+      "precision": 0.019,
+      "fp_per_image": 87.8,
+      "boxes_per_image": 89.5,
+      "hits_per_matched_gt": 2.19,
+      "usd": 9.8e-05,
+      "ratio_vs_full": 1.0,
+      "ratio_vs_full_ci": [
+       1.0,
+       1.0
+      ],
+      "vs_full": "no measurable difference",
+      "ratio_iou_only_vs_full_ci": [
+       1.0,
+       1.0
+      ],
+      "steps_p50": 17.0,
+      "verify_looks": 227,
+      "survey_looks": 100,
+      "model_usage": {
+       "accurate": 1619
+      }
+     },
+     "random-order-s0": {
+      "pixels_frac": 0.2873,
+      "net_pixels_frac": 0.2716,
+      "recall": 0.4438,
+      "recall_ci": [
+       0.3889,
+       0.5029
+      ],
+      "recall_iou_only": 0.3846,
+      "recall_iou_only_ci": [
+       0.3363,
+       0.4359
+      ],
+      "chance_recall": 0.0444,
+      "chance_recall_iou_only": 0.0207,
+      "precision": 0.0152,
+      "fp_per_image": 96.3,
+      "boxes_per_image": 97.8,
+      "hits_per_matched_gt": 2.54,
+      "usd": 0.0001,
+      "ratio_vs_full": 0.8772,
+      "ratio_vs_full_ci": [
+       0.8176,
+       0.9372
+      ],
+      "vs_full": "below the full agent",
+      "ratio_iou_only_vs_full_ci": [
+       0.8219,
+       0.9329
+      ],
+      "steps_p50": 17.0,
+      "verify_looks": 245,
+      "survey_looks": 100,
+      "model_usage": {
+       "accurate": 1650
+      }
+     },
+     "random-order-s1": {
+      "pixels_frac": 0.2891,
+      "net_pixels_frac": 0.2734,
+      "recall": 0.4586,
+      "recall_ci": [
+       0.4018,
+       0.516
+      ],
+      "recall_iou_only": 0.3994,
+      "recall_iou_only_ci": [
+       0.3464,
+       0.4522
+      ],
+      "chance_recall": 0.0237,
+      "chance_recall_iou_only": 0.0148,
+      "precision": 0.0161,
+      "fp_per_image": 93.8,
+      "boxes_per_image": 95.3,
+      "hits_per_matched_gt": 2.3,
+      "usd": 0.0001,
+      "ratio_vs_full": 0.9064,
+      "ratio_vs_full_ci": [
+       0.8554,
+       0.9534
+      ],
+      "vs_full": "below the full agent",
+      "ratio_iou_only_vs_full_ci": [
+       0.8553,
+       0.9699
+      ],
+      "steps_p50": 17.0,
+      "verify_looks": 224,
+      "survey_looks": 100,
+      "model_usage": {
+       "accurate": 1661
+      }
+     },
+     "random-order-s2": {
+      "pixels_frac": 0.2884,
+      "net_pixels_frac": 0.2728,
+      "recall": 0.4497,
+      "recall_ci": [
+       0.3932,
+       0.5063
+      ],
+      "recall_iou_only": 0.3905,
+      "recall_iou_only_ci": [
+       0.3407,
+       0.4429
+      ],
+      "chance_recall": 0.0325,
+      "chance_recall_iou_only": 0.0148,
+      "precision": 0.0155,
+      "fp_per_image": 95.8,
+      "boxes_per_image": 97.3,
+      "hits_per_matched_gt": 2.43,
+      "usd": 0.0001,
+      "ratio_vs_full": 0.8889,
+      "ratio_vs_full_ci": [
+       0.8228,
+       0.9479
+      ],
+      "vs_full": "below the full agent",
+      "ratio_iou_only_vs_full_ci": [
+       0.8239,
+       0.9548
+      ],
+      "steps_p50": 17.0,
+      "verify_looks": 231,
+      "survey_looks": 100,
+      "model_usage": {
+       "accurate": 1657
+      }
+     },
+     "no-uncertainty": {
+      "pixels_frac": 0.2822,
+      "net_pixels_frac": 0.2665,
+      "recall": 0.5059,
+      "recall_ci": [
+       0.4512,
+       0.5636
+      ],
+      "recall_iou_only": 0.4379,
+      "recall_iou_only_ci": [
+       0.3856,
+       0.4912
+      ],
+      "chance_recall": 0.0325,
+      "chance_recall_iou_only": 0.0178,
+      "precision": 0.019,
+      "fp_per_image": 87.8,
+      "boxes_per_image": 89.5,
+      "hits_per_matched_gt": 2.19,
+      "usd": 9.8e-05,
+      "ratio_vs_full": 1.0,
+      "ratio_vs_full_ci": [
+       1.0,
+       1.0
+      ],
+      "vs_full": "no measurable difference",
+      "ratio_iou_only_vs_full_ci": [
+       1.0,
+       1.0
+      ],
+      "steps_p50": 17.0,
+      "verify_looks": 227,
+      "survey_looks": 100,
+      "model_usage": {
+       "accurate": 1619
+      }
+     },
+     "no-survey": {
+      "pixels_frac": 0.2715,
+      "net_pixels_frac": 0.2558,
+      "recall": 0.4438,
+      "recall_ci": [
+       0.3909,
+       0.5015
+      ],
+      "recall_iou_only": 0.3817,
+      "recall_iou_only_ci": [
+       0.3315,
+       0.4338
+      ],
+      "chance_recall": 0.0296,
+      "chance_recall_iou_only": 0.0178,
+      "precision": 0.0142,
+      "fp_per_image": 103.8,
+      "boxes_per_image": 105.3,
+      "hits_per_matched_gt": 1.63,
+      "usd": 9.4e-05,
+      "ratio_vs_full": 0.8772,
+      "ratio_vs_full_ci": [
+       0.8187,
+       0.9346
+      ],
+      "vs_full": "below the full agent",
+      "ratio_iou_only_vs_full_ci": [
+       0.8077,
+       0.9348
+      ],
+      "steps_p50": 17.0,
+      "verify_looks": 201,
+      "survey_looks": 0,
+      "model_usage": {
+       "accurate": 1554
+      }
+     },
+     "no-verify": {
+      "pixels_frac": 0.2636,
+      "net_pixels_frac": 0.2479,
+      "recall": 0.5059,
+      "recall_ci": [
+       0.4518,
+       0.5651
+      ],
+      "recall_iou_only": 0.4379,
+      "recall_iou_only_ci": [
+       0.3858,
+       0.4927
+      ],
+      "chance_recall": 0.0296,
+      "chance_recall_iou_only": 0.0148,
+      "precision": 0.0242,
+      "fp_per_image": 68.5,
+      "boxes_per_image": 70.2,
+      "hits_per_matched_gt": 1.5,
+      "usd": 9.1e-05,
+      "ratio_vs_full": 1.0,
+      "ratio_vs_full_ci": [
+       0.9779,
+       1.0241
+      ],
+      "vs_full": "no measurable difference",
+      "ratio_iou_only_vs_full_ci": [
+       0.965,
+       1.0432
+      ],
+      "steps_p50": 17.0,
+      "verify_looks": 0,
+      "survey_looks": 100,
+      "model_usage": {
+       "accurate": 1506
+      }
+     },
+     "governor-on": {
+      "pixels_frac": 0.2822,
+      "net_pixels_frac": 0.2665,
+      "recall": 0.5059,
+      "recall_ci": [
+       0.4512,
+       0.5636
+      ],
+      "recall_iou_only": 0.4379,
+      "recall_iou_only_ci": [
+       0.3856,
+       0.4912
+      ],
+      "chance_recall": 0.0207,
+      "chance_recall_iou_only": 0.0118,
+      "precision": 0.019,
+      "fp_per_image": 87.8,
+      "boxes_per_image": 89.5,
+      "hits_per_matched_gt": 2.19,
+      "usd": 9.8e-05,
+      "ratio_vs_full": 1.0,
+      "ratio_vs_full_ci": [
+       1.0,
+       1.0
+      ],
+      "vs_full": "no measurable difference",
+      "ratio_iou_only_vs_full_ci": [
+       1.0,
+       1.0
+      ],
+      "steps_p50": 17.0,
+      "verify_looks": 227,
+      "survey_looks": 100,
+      "model_usage": {
+       "accurate": 1619
+      }
+     }
+    },
+    "1.0": {
+     "full": {
+      "pixels_frac": 0.4614,
+      "net_pixels_frac": 0.4458,
+      "recall": 0.5118,
+      "recall_ci": [
+       0.4578,
+       0.5696
+      ],
+      "recall_iou_only": 0.4467,
+      "recall_iou_only_ci": [
+       0.3937,
+       0.5
+      ],
+      "chance_recall": 0.0355,
+      "chance_recall_iou_only": 0.0089,
+      "precision": 0.014,
+      "fp_per_image": 121.5,
+      "boxes_per_image": 123.2,
+      "hits_per_matched_gt": 2.65,
+      "usd": 0.000162,
+      "ratio_vs_full": 1.0,
+      "ratio_vs_full_ci": [
+       1.0,
+       1.0
+      ],
+      "vs_full": "no measurable difference",
+      "ratio_iou_only_vs_full_ci": [
+       1.0,
+       1.0
+      ],
+      "steps_p50": 29.0,
+      "verify_looks": 326,
+      "survey_looks": 100,
+      "model_usage": {
+       "accurate": 2708
+      }
+     },
+     "random-order-s0": {
+      "pixels_frac": 0.5495,
+      "net_pixels_frac": 0.5338,
+      "recall": 0.5148,
+      "recall_ci": [
+       0.4591,
+       0.5702
+      ],
+      "recall_iou_only": 0.4438,
+      "recall_iou_only_ci": [
+       0.3934,
+       0.4939
+      ],
+      "chance_recall": 0.0444,
+      "chance_recall_iou_only": 0.0148,
+      "precision": 0.0112,
+      "fp_per_image": 152.2,
+      "boxes_per_image": 153.9,
+      "hits_per_matched_gt": 3.06,
+      "usd": 0.000193,
+      "ratio_vs_full": 1.0058,
+      "ratio_vs_full_ci": [
+       0.9711,
+       1.0398
+      ],
+      "vs_full": "no measurable difference",
+      "ratio_iou_only_vs_full_ci": [
+       0.963,
+       1.0216
+      ],
+      "steps_p50": 34.0,
+      "verify_looks": 402,
+      "survey_looks": 100,
+      "model_usage": {
+       "accurate": 3243
+      }
+     },
+     "random-order-s1": {
+      "pixels_frac": 0.5669,
+      "net_pixels_frac": 0.5513,
+      "recall": 0.5207,
+      "recall_ci": [
+       0.4655,
+       0.5788
+      ],
+      "recall_iou_only": 0.4467,
+      "recall_iou_only_ci": [
+       0.3975,
+       0.4973
+      ],
+      "chance_recall": 0.0385,
+      "chance_recall_iou_only": 0.0207,
+      "precision": 0.0109,
+      "fp_per_image": 159.3,
+      "boxes_per_image": 161.0,
+      "hits_per_matched_gt": 3.12,
+      "usd": 0.000199,
+      "ratio_vs_full": 1.0173,
+      "ratio_vs_full_ci": [
+       0.994,
+       1.0435
+      ],
+      "vs_full": "no measurable difference",
+      "ratio_iou_only_vs_full_ci": [
+       0.9728,
+       1.0258
+      ],
+      "steps_p50": 36.5,
+      "verify_looks": 417,
+      "survey_looks": 100,
+      "model_usage": {
+       "accurate": 3349
+      }
+     },
+     "random-order-s2": {
+      "pixels_frac": 0.5745,
+      "net_pixels_frac": 0.5588,
+      "recall": 0.5266,
+      "recall_ci": [
+       0.4711,
+       0.5845
+      ],
+      "recall_iou_only": 0.4556,
+      "recall_iou_only_ci": [
+       0.4036,
+       0.5071
+      ],
+      "chance_recall": 0.071,
+      "chance_recall_iou_only": 0.0325,
+      "precision": 0.011,
+      "fp_per_image": 158.9,
+      "boxes_per_image": 160.7,
+      "hits_per_matched_gt": 3.15,
+      "usd": 0.000202,
+      "ratio_vs_full": 1.0289,
+      "ratio_vs_full_ci": [
+       1.0061,
+       1.0556
+      ],
+      "vs_full": "above the full agent",
+      "ratio_iou_only_vs_full_ci": [
+       1.0,
+       1.0467
+      ],
+      "steps_p50": 38.0,
+      "verify_looks": 424,
+      "survey_looks": 100,
+      "model_usage": {
+       "accurate": 3395
+      }
+     },
+     "no-uncertainty": {
+      "pixels_frac": 0.4614,
+      "net_pixels_frac": 0.4458,
+      "recall": 0.5118,
+      "recall_ci": [
+       0.4578,
+       0.5696
+      ],
+      "recall_iou_only": 0.4467,
+      "recall_iou_only_ci": [
+       0.3937,
+       0.5
+      ],
+      "chance_recall": 0.0414,
+      "chance_recall_iou_only": 0.0178,
+      "precision": 0.014,
+      "fp_per_image": 121.5,
+      "boxes_per_image": 123.2,
+      "hits_per_matched_gt": 2.65,
+      "usd": 0.000162,
+      "ratio_vs_full": 1.0,
+      "ratio_vs_full_ci": [
+       1.0,
+       1.0
+      ],
+      "vs_full": "no measurable difference",
+      "ratio_iou_only_vs_full_ci": [
+       1.0,
+       1.0
+      ],
+      "steps_p50": 29.0,
+      "verify_looks": 326,
+      "survey_looks": 100,
+      "model_usage": {
+       "accurate": 2708
+      }
+     },
+     "no-survey": {
+      "pixels_frac": 0.4239,
+      "net_pixels_frac": 0.4082,
+      "recall": 0.4556,
+      "recall_ci": [
+       0.4012,
+       0.5141
+      ],
+      "recall_iou_only": 0.3994,
+      "recall_iou_only_ci": [
+       0.3488,
+       0.4532
+      ],
+      "chance_recall": 0.0266,
+      "chance_recall_iou_only": 0.0,
+      "precision": 0.0113,
+      "fp_per_image": 135.1,
+      "boxes_per_image": 136.7,
+      "hits_per_matched_gt": 2.06,
+      "usd": 0.000148,
+      "ratio_vs_full": 0.8902,
+      "ratio_vs_full_ci": [
+       0.8333,
+       0.9429
+      ],
+      "vs_full": "below the full agent",
+      "ratio_iou_only_vs_full_ci": [
+       0.8344,
+       0.9555
+      ],
+      "steps_p50": 28.0,
+      "verify_looks": 287,
+      "survey_looks": 0,
+      "model_usage": {
+       "accurate": 2480
+      }
+     },
+     "no-verify": {
+      "pixels_frac": 0.4067,
+      "net_pixels_frac": 0.3911,
+      "recall": 0.5118,
+      "recall_ci": [
+       0.4559,
+       0.571
+      ],
+      "recall_iou_only": 0.4438,
+      "recall_iou_only_ci": [
+       0.3909,
+       0.4985
+      ],
+      "chance_recall": 0.0325,
+      "chance_recall_iou_only": 0.0207,
+      "precision": 0.0182,
+      "fp_per_image": 92.8,
+      "boxes_per_image": 94.5,
+      "hits_per_matched_gt": 1.71,
+      "usd": 0.000142,
+      "ratio_vs_full": 1.0,
+      "ratio_vs_full_ci": [
+       0.9792,
+       1.0219
+      ],
+      "vs_full": "no measurable difference",
+      "ratio_iou_only_vs_full_ci": [
+       0.9565,
+       1.0345
+      ],
+      "steps_p50": 26.0,
+      "verify_looks": 0,
+      "survey_looks": 100,
+      "model_usage": {
+       "accurate": 2376
+      }
+     },
+     "governor-on": {
+      "pixels_frac": 0.4614,
+      "net_pixels_frac": 0.4458,
+      "recall": 0.5118,
+      "recall_ci": [
+       0.4578,
+       0.5696
+      ],
+      "recall_iou_only": 0.4467,
+      "recall_iou_only_ci": [
+       0.3937,
+       0.5
+      ],
+      "chance_recall": 0.0503,
+      "chance_recall_iou_only": 0.0178,
+      "precision": 0.014,
+      "fp_per_image": 121.5,
+      "boxes_per_image": 123.2,
+      "hits_per_matched_gt": 2.65,
+      "usd": 0.000162,
+      "ratio_vs_full": 1.0,
+      "ratio_vs_full_ci": [
+       1.0,
+       1.0
+      ],
+      "vs_full": "no measurable difference",
+      "ratio_iou_only_vs_full_ci": [
+       1.0,
+       1.0
+      ],
+      "steps_p50": 29.0,
+      "verify_looks": 326,
+      "survey_looks": 100,
+      "model_usage": {
+       "accurate": 2708
+      }
+     }
+    }
+   },
+   "random_order": [
+    "At a 30% pixel cap, random order found 0.44-0.46 of the ground-truth boxes over seeds 0-2 and the full agent 0.51. Paired 95% CI of the recall ratio over 100 images, the seeds pooled per image: 0.85-0.94 (seeds 0, 1, 2 alone: 0.82-0.94, 0.86-0.95, 0.82-0.95); random order is below the full agent. None of the 7 variant-vs-full CIs at this cap is corrected for multiple comparisons.",
+    "At a 100% pixel cap, random order found 0.51-0.53 of the ground-truth boxes over seeds 0-2 and the full agent 0.51. Paired 95% CI of the recall ratio over 100 images, the seeds pooled per image: 1.00-1.04 (seeds 0, 1, 2 alone: 0.97-1.04, 0.99-1.04, 1.01-1.06); inside the 0.95-1.05 margin set in advance, so random order matches the full agent. None of the 7 variant-vs-full CIs at this cap is corrected for multiple comparisons."
+   ],
+   "provenance": {
+    "cv2": "5.0.0",
+    "build_info_sha256": "fe5f9337dbc8663639ee7bcb2deb09359893fc8d2aa5b6a447cee2a0117d2ec7",
+    "cv2_baseline": "SSE SSE2 SSE3 SSSE3 SSE4_1",
+    "cv2_dispatch": "SSE4_2 AVX FP16 AVX2 AVX512_SKX",
+    "cv2_parallel_framework": "GCD",
+    "cv2_custom_hal": "YES (ipp (ver 0.0.1))",
+    "machine": "Darwin 25.6.0 x86_64, 16 logical CPUs; eval ran 8 worker(s) x 1 cv2 thread(s); micro arm linux-aarch64",
+    "cpu": "Intel(R) Core(TM) i9-9880H CPU @ 2.30GHz",
+    "python": "3.13.16",
+    "timestamp": "2026-10-18T09:00:22Z",
+    "build": "stock (not COOL)",
+    "load_avg": [
+     70.19,
+     51.44,
+     39.41
+    ],
+    "load_avg_start": [
+     70.19,
+     51.44,
+     39.41
+    ],
+    "load_avg_end": [
+     17.31,
+     23.26,
+     28.22
+    ],
+    "dataset_gt_sha256": "5c1550bb26caa75cba933bac2d6ee30a0b4ea4b503e6f48a8de30c95739dfcee",
+    "dataset_images_sha256": "549e79f351ec9d934f21ec051a267235f6fcd4bceab95bdfac89ef4123c30697",
+    "dataset_generator_version": 2
+   }
+  },
+  "codebrim": {
+   "dataset": "CODEBRIM eval subset (200 images)",
+   "n_images": 200,
+   "segmenter": "classical-v1",
+   "box_convention": "components",
+   "cost_model": {
+    "kind": "fixed",
+    "source": "results/linux-aarch64/micro.json job_ops (p50 ms per call)"
+   },
+   "variants": {
+    "full": {
+     "order": "score",
+     "seed": 0,
+     "use_uncertainty": true,
+     "survey": true,
+     "verify": true,
+     "governor": false
+    },
+    "random-order-s0": {
+     "order": "random",
+     "seed": 0,
+     "use_uncertainty": true,
+     "survey": true,
+     "verify": true,
+     "governor": false
+    },
+    "random-order-s1": {
+     "order": "random",
+     "seed": 1,
+     "use_uncertainty": true,
+     "survey": true,
+     "verify": true,
+     "governor": false
+    },
+    "random-order-s2": {
+     "order": "random",
+     "seed": 2,
+     "use_uncertainty": true,
+     "survey": true,
+     "verify": true,
+     "governor": false
+    },
+    "no-uncertainty": {
+     "order": "score",
+     "seed": 0,
+     "use_uncertainty": false,
+     "survey": true,
+     "verify": true,
+     "governor": false
+    },
+    "no-survey": {
+     "order": "score",
+     "seed": 0,
+     "use_uncertainty": true,
+     "survey": false,
+     "verify": true,
+     "governor": false
+    },
+    "no-verify": {
+     "order": "score",
+     "seed": 0,
+     "use_uncertainty": true,
+     "survey": true,
+     "verify": false,
+     "governor": false
+    },
+    "governor-on": {
+     "order": "score",
+     "seed": 0,
+     "use_uncertainty": true,
+     "survey": true,
+     "verify": true,
+     "governor": true
+    }
+   },
+   "by_cap": {
+    "0.3": {
+     "full": {
+      "pixels_frac": 0.2872,
+      "net_pixels_frac": 0.2716,
+      "recall": 0.197,
+      "recall_ci": [
+       0.1675,
+       0.2286
+      ],
+      "recall_iou_only": 0.0878,
+      "recall_iou_only_ci": [
+       0.0686,
+       0.1096
+      ],
+      "chance_recall": 0.1223,
+      "chance_recall_iou_only": 0.0285,
+      "precision": 0.0018,
+      "fp_per_image": 889.0,
+      "boxes_per_image": 890.6,
+      "hits_per_matched_gt": 1.68,
+      "usd": 9.2e-05,
+      "ratio_vs_full": 1.0,
+      "ratio_vs_full_ci": [
+       1.0,
+       1.0
+      ],
+      "vs_full": "no measurable difference",
+      "ratio_iou_only_vs_full_ci": [
+       1.0,
+       1.0
+      ],
+      "steps_p50": 17.0,
+      "verify_looks": 1076,
+      "survey_looks": 200,
+      "model_usage": {
+       "accurate": 3031
+      }
+     },
+     "random-order-s0": {
+      "pixels_frac": 0.2905,
+      "net_pixels_frac": 0.2749,
+      "recall": 0.1875,
+      "recall_ci": [
+       0.157,
+       0.2197
+      ],
+      "recall_iou_only": 0.076,
+      "recall_iou_only_ci": [
+       0.0574,
+       0.0963
+      ],
+      "chance_recall": 0.1211,
+      "chance_recall_iou_only": 0.0273,
+      "precision": 0.0016,
+      "fp_per_image": 932.1,
+      "boxes_per_image": 933.6,
+      "hits_per_matched_gt": 1.72,
+      "usd": 9.3e-05,
+      "ratio_vs_full": 0.9518,
+      "ratio_vs_full_ci": [
+       0.9038,
+       1.0
+      ],
+      "vs_full": "no measurable difference",
+      "ratio_iou_only_vs_full_ci": [
+       0.7866,
+       0.9474
+      ],
+      "steps_p50": 17.0,
+      "verify_looks": 1061,
+      "survey_looks": 200,
+      "model_usage": {
+       "accurate": 3072
+      }
+     },
+     "random-order-s1": {
+      "pixels_frac": 0.2897,
+      "net_pixels_frac": 0.274,
+      "recall": 0.1864,
+      "recall_ci": [
+       0.1566,
+       0.2162
+      ],
+      "recall_iou_only": 0.0789,
+      "recall_iou_only_ci": [
+       0.0607,
+       0.099
+      ],
+      "chance_recall": 0.13,
+      "chance_recall_iou_only": 0.0315,
+      "precision": 0.0016,
+      "fp_per_image": 935.9,
+      "boxes_per_image": 937.4,
+      "hits_per_matched_gt": 1.73,
+      "usd": 9.2e-05,
+      "ratio_vs_full": 0.9458,
+      "ratio_vs_full_ci": [
+       0.8981,
+       0.9857
+      ],
+      "vs_full": "below the full agent",
+      "ratio_iou_only_vs_full_ci": [
+       0.8197,
+       0.9817
+      ],
+      "steps_p50": 17.0,
+      "verify_looks": 1076,
+      "survey_looks": 200,
+      "model_usage": {
+       "accurate": 3062
+      }
+     },
+     "random-order-s2": {
+      "pixels_frac": 0.2904,
+      "net_pixels_frac": 0.2747,
+      "recall": 0.1893,
+      "recall_ci": [
+       0.1585,
+       0.2211
+      ],
+      "recall_iou_only": 0.0766,
+      "recall_iou_only_ci": [
+       0.0594,
+       0.0969
+      ],
+      "chance_recall": 0.1234,
+      "chance_recall_iou_only": 0.0267,
+      "precision": 0.0016,
+      "fp_per_image": 941.3,
+      "boxes_per_image": 942.8,
+      "hits_per_matched_gt": 1.76,
+      "usd": 9.3e-05,
+      "ratio_vs_full": 0.9608,
+      "ratio_vs_full_ci": [
+       0.925,
+       0.994
+      ],
+      "vs_full": "below the full agent",
+      "ratio_iou_only_vs_full_ci": [
+       0.8,
+       0.9471
+      ],
+      "steps_p50": 17.0,
+      "verify_looks": 1099,
+      "survey_looks": 200,
+      "model_usage": {
+       "accurate": 3070
+      }
+     },
+     "no-uncertainty": {
+      "pixels_frac": 0.2872,
+      "net_pixels_frac": 0.2716,
+      "recall": 0.197,
+      "recall_ci": [
+       0.1675,
+       0.2286
+      ],
+      "recall_iou_only": 0.0878,
+      "recall_iou_only_ci": [
+       0.0686,
+       0.1096
+      ],
+      "chance_recall": 0.1211,
+      "chance_recall_iou_only": 0.0285,
+      "precision": 0.0018,
+      "fp_per_image": 889.0,
+      "boxes_per_image": 890.6,
+      "hits_per_matched_gt": 1.68,
+      "usd": 9.2e-05,
+      "ratio_vs_full": 1.0,
+      "ratio_vs_full_ci": [
+       1.0,
+       1.0
+      ],
+      "vs_full": "no measurable difference",
+      "ratio_iou_only_vs_full_ci": [
+       1.0,
+       1.0
+      ],
+      "steps_p50": 17.0,
+      "verify_looks": 1076,
+      "survey_looks": 200,
+      "model_usage": {
+       "accurate": 3031
+      }
+     },
+     "no-survey": {
+      "pixels_frac": 0.2815,
+      "net_pixels_frac": 0.2659,
+      "recall": 0.13,
+      "recall_ci": [
+       0.1079,
+       0.1532
+      ],
+      "recall_iou_only": 0.0564,
+      "recall_iou_only_ci": [
+       0.0427,
+       0.071
+      ],
+      "chance_recall": 0.051,
+      "chance_recall_iou_only": 0.0107,
+      "precision": 0.0012,
+      "fp_per_image": 892.4,
+      "boxes_per_image": 893.5,
+      "hits_per_matched_gt": 1.44,
+      "usd": 9e-05,
+      "ratio_vs_full": 0.6596,
+      "ratio_vs_full_ci": [
+       0.6,
+       0.722
+      ],
+      "vs_full": "below the full agent",
+      "ratio_iou_only_vs_full_ci": [
+       0.5608,
+       0.7273
+      ],
+      "steps_p50": 17.0,
+      "verify_looks": 1021,
+      "survey_looks": 0,
+      "model_usage": {
+       "accurate": 2972
+      }
+     },
+     "no-verify": {
+      "pixels_frac": 0.2496,
+      "net_pixels_frac": 0.234,
+      "recall": 0.2024,
+      "recall_ci": [
+       0.1718,
+       0.234
+      ],
+      "recall_iou_only": 0.0861,
+      "recall_iou_only_ci": [
+       0.067,
+       0.1084
+      ],
+      "chance_recall": 0.1139,
+      "chance_recall_iou_only": 0.0285,
+      "precision": 0.0022,
+      "fp_per_image": 738.8,
+      "boxes_per_image": 740.4,
+      "hits_per_matched_gt": 1.38,
+      "usd": 7.7e-05,
+      "ratio_vs_full": 1.0271,
+      "ratio_vs_full_ci": [
+       0.9901,
+       1.0651
+      ],
+      "vs_full": "no measurable difference",
+      "ratio_iou_only_vs_full_ci": [
+       0.9147,
+       1.0451
+      ],
+      "steps_p50": 14.0,
+      "verify_looks": 0,
+      "survey_looks": 200,
+      "model_usage": {
+       "accurate": 2545
+      }
+     },
+     "governor-on": {
+      "pixels_frac": 0.2872,
+      "net_pixels_frac": 0.2716,
+      "recall": 0.197,
+      "recall_ci": [
+       0.1675,
+       0.2286
+      ],
+      "recall_iou_only": 0.0878,
+      "recall_iou_only_ci": [
+       0.0686,
+       0.1096
+      ],
+      "chance_recall": 0.1193,
+      "chance_recall_iou_only": 0.0291,
+      "precision": 0.0018,
+      "fp_per_image": 889.0,
+      "boxes_per_image": 890.6,
+      "hits_per_matched_gt": 1.68,
+      "usd": 9.2e-05,
+      "ratio_vs_full": 1.0,
+      "ratio_vs_full_ci": [
+       1.0,
+       1.0
+      ],
+      "vs_full": "no measurable difference",
+      "ratio_iou_only_vs_full_ci": [
+       1.0,
+       1.0
+      ],
+      "steps_p50": 17.0,
+      "verify_looks": 1076,
+      "survey_looks": 200,
+      "model_usage": {
+       "accurate": 3031
+      }
+     }
+    }
+   },
+   "random_order": [
+    "At a 30% pixel cap, random order found 0.19-0.19 of the ground-truth boxes over seeds 0-2 and the full agent 0.20. Paired 95% CI of the recall ratio over 200 images, the seeds pooled per image: 0.92-0.98 (seeds 0, 1, 2 alone: 0.90-1.00, 0.90-0.99, 0.93-0.99); random order is below the full agent. None of the 7 variant-vs-full CIs at this cap is corrected for multiple comparisons."
+   ],
+   "provenance": {
+    "cv2": "5.0.0",
+    "build_info_sha256": "fe5f9337dbc8663639ee7bcb2deb09359893fc8d2aa5b6a447cee2a0117d2ec7",
+    "cv2_baseline": "SSE SSE2 SSE3 SSSE3 SSE4_1",
+    "cv2_dispatch": "SSE4_2 AVX FP16 AVX2 AVX512_SKX",
+    "cv2_parallel_framework": "GCD",
+    "cv2_custom_hal": "YES (ipp (ver 0.0.1))",
+    "machine": "Darwin 25.6.0 x86_64, 16 logical CPUs; eval ran 8 worker(s) x 1 cv2 thread(s); micro arm linux-aarch64",
+    "cpu": "Intel(R) Core(TM) i9-9880H CPU @ 2.30GHz",
+    "python": "3.13.16",
+    "timestamp": "2026-10-18T09:11:19Z",
+    "build": "stock (not COOL)",
+    "load_avg": [
+     16.24,
+     22.94,
+     28.08
+    ],
+    "load_avg_start": [
+     16.24,
+     22.94,
+     28.08
+    ],
+    "load_avg_end": [
+     14.98,
+     19.21,
+     23.29
+    ],
+    "dataset_gt_sha256": "c9af626ec9be981956b6eb1b14b4bc79d611119e60f421e9a2d5d8059d0a3b4a",
+    "dataset_images_sha256": "db9329d026f48bdbd16ebd281c3ced9c4b9378d41c25bd6e32882fdb7577addc"
+   }
+  }
+ }
+}

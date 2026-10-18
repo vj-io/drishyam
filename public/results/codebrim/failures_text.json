@@ -1,23 +1,9 @@
 [
  {
-  "id": "image_0000726",
-  "class": "crack",
-  "category": "Crack missed under a small budget",
-  "what_happened": "image_0000726, drishyam@0.3: a 324x40 px crack box is missed under the 30% cap but found by drishyam@1.0 and tiling@L0; it was looked at (step 1, L3) but no crack mask survived.",
-  "rule_that_would_catch_it": "Reserve a small share of the pixel cap for a coarse sweep of low-saliency regions, or lower the stop-rule epsilon so the job does not stop while unvisited candidates remain. Both trade pixels for recall. Not implemented."
- },
- {
   "id": "image_0000582",
   "class": "crack",
   "category": "Crack missed under a small budget",
   "what_happened": "image_0000582, drishyam@0.3: a 244x79 px crack box is missed under the 30% cap but found by drishyam@1.0 and tiling@L0; it was looked at (step 1, L3) but no crack mask survived.",
-  "rule_that_would_catch_it": "Reserve a small share of the pixel cap for a coarse sweep of low-saliency regions, or lower the stop-rule epsilon so the job does not stop while unvisited candidates remain. Both trade pixels for recall. Not implemented."
- },
- {
-  "id": "image_0000635",
-  "class": "crack",
-  "category": "Crack missed under a small budget",
-  "what_happened": "image_0000635, drishyam@0.3: a 79x147 px crack box is missed under the 30% cap but found by drishyam@1.0 and tiling@L0; it was looked at (step 1, L2) but no crack mask survived.",
   "rule_that_would_catch_it": "Reserve a small share of the pixel cap for a coarse sweep of low-saliency regions, or lower the stop-rule epsilon so the job does not stop while unvisited candidates remain. Both trade pixels for recall. Not implemented."
  },
  {
@@ -28,6 +14,27 @@
   "rule_that_would_catch_it": "Reserve a small share of the pixel cap for a coarse sweep of low-saliency regions, or lower the stop-rule epsilon so the job does not stop while unvisited candidates remain. Both trade pixels for recall. Not implemented."
  },
  {
+  "id": "image_0001294",
+  "class": "crack",
+  "category": "Crack missed under a small budget",
+  "what_happened": "image_0001294, drishyam@0.3: a 895x140 px crack box is missed under the 30% cap but found by drishyam@1.0 and tiling@L0; it was looked at (step 1, L3) but no crack mask survived.",
+  "rule_that_would_catch_it": "Reserve a small share of the pixel cap for a coarse sweep of low-saliency regions, or lower the stop-rule epsilon so the job does not stop while unvisited candidates remain. Both trade pixels for recall. Not implemented."
+ },
+ {
+  "id": "image_0000554",
+  "class": "crack",
+  "category": "Crack missed under a small budget",
+  "what_happened": "image_0000554, drishyam@0.3: a 872x152 px crack box is missed under the 30% cap but found by drishyam@1.0 and tiling@L0; it was looked at (step 1, L3) but no crack mask survived.",
+  "rule_that_would_catch_it": "Reserve a small share of the pixel cap for a coarse sweep of low-saliency regions, or lower the stop-rule epsilon so the job does not stop while unvisited candidates remain. Both trade pixels for recall. Not implemented."
+ },
+ {
+  "id": "image_0001296",
+  "class": "exposed_rebar",
+  "category": "Rebar, spall and stain confusion",
+  "what_happened": "image_0001296, drishyam@1.0: ground truth is exposed_rebar, the job reported spalling there (confidence 0.95, step 18 at L0) and no exposed_rebar finding overlaps the box.",
+  "rule_that_would_catch_it": "Shape and co-occurrence rule: exposed bars need rust inside a spall rim and a linear shape (minAreaRect aspect above 3); rust with no spall rim is corrosion. Where two classes clear the threshold on one region, send it to human review instead of choosing. The rust-near-spall part exists; the review-on-ambiguity step does not."
+ },
+ {
   "id": "image_0001435",
   "class": "exposed_rebar",
   "category": "Rebar, spall and stain confusion",
@@ -35,24 +42,17 @@
   "rule_that_would_catch_it": "Shape and co-occurrence rule: exposed bars need rust inside a spall rim and a linear shape (minAreaRect aspect above 3); rust with no spall rim is corrosion. Where two classes clear the threshold on one region, send it to human review instead of choosing. The rust-near-spall part exists; the review-on-ambiguity step does not."
  },
  {
-  "id": "image_0001236",
-  "class": "exposed_rebar",
-  "category": "Rebar, spall and stain confusion",
-  "what_happened": "image_0001236, drishyam@0.3: ground truth is exposed_rebar, the job reported corrosion there (confidence 0.94, step 17 at L0) and no exposed_rebar finding overlaps the box.",
-  "rule_that_would_catch_it": "Shape and co-occurrence rule: exposed bars need rust inside a spall rim and a linear shape (minAreaRect aspect above 3); rust with no spall rim is corrosion. Where two classes clear the threshold on one region, send it to human review instead of choosing. The rust-near-spall part exists; the review-on-ambiguity step does not."
- },
- {
   "id": "image_0001255",
   "class": "exposed_rebar",
   "category": "Rebar, spall and stain confusion",
-  "what_happened": "image_0001255, drishyam@1.0: ground truth is exposed_rebar, the job reported corrosion there (confidence 0.87, step 21 at L1) and no exposed_rebar finding overlaps the box.",
+  "what_happened": "image_0001255, drishyam@1.0: ground truth is exposed_rebar, the job reported corrosion there (confidence 0.92, step 20 at L0) and no exposed_rebar finding overlaps the box.",
   "rule_that_would_catch_it": "Shape and co-occurrence rule: exposed bars need rust inside a spall rim and a linear shape (minAreaRect aspect above 3); rust with no spall rim is corrosion. Where two classes clear the threshold on one region, send it to human review instead of choosing. The rust-near-spall part exists; the review-on-ambiguity step does not."
  },
  {
-  "id": "image_0000238",
-  "class": "spalling",
+  "id": "image_0001236",
+  "class": "exposed_rebar",
   "category": "Rebar, spall and stain confusion",
-  "what_happened": "image_0000238, drishyam@0.3: ground truth is spalling, the job reported corrosion there (confidence 0.98, step 9 at L1) and no spalling finding overlaps the box.",
+  "what_happened": "image_0001236, drishyam@0.3: ground truth is exposed_rebar, the job reported corrosion there (confidence 0.91, step 5 at L0) and no exposed_rebar finding overlaps the box.",
   "rule_that_would_catch_it": "Shape and co-occurrence rule: exposed bars need rust inside a spall rim and a linear shape (minAreaRect aspect above 3); rust with no spall rim is corrosion. Where two classes clear the threshold on one region, send it to human review instead of choosing. The rust-near-spall part exists; the review-on-ambiguity step does not."
  }
 ]
