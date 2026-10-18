@@ -13,7 +13,7 @@ flowchart TB
         LAMBDA["Lambda arm64 (Graviton) · Python 3.12<br/>AWS Lambda Web Adapter → FastAPI web tier, web.py<br/>CSP · HMAC-SHA256 work-order token · per-job kill token"]
         DDB[("DynamoDB kill-flag table<br/>GetItem ConsistentRead before every step")]
         SM["Secrets Manager<br/>DRISHYAM_SIGNING_KEY"]
-        CW["CloudWatch<br/>EMF metrics · dashboard · alarms → SNS (no subscriber)"]
+        CW["CloudWatch<br/>EMF metrics · dashboard · alarms → SNS (email subscription unconfirmed)"]
         BUD["AWS Budgets<br/>spend alerts → the same SNS topic"]
     end
 
