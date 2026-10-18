@@ -641,6 +641,9 @@ def headline_stats(m: dict, n: int) -> dict:
             "recall_ratio_vs_downscale": r(d, s), "recall_ratio_vs_downscale_ci": ratio_ci(d, s, n)}
 
 
+BOX_NAMES = {"components": "per-component", "union": "one-box-per-class", "as_specified": "as-specified mixed"}
+
+
 def headline(scored: dict, primary: str, n: int, label: str) -> str:
     """Two sentences: the hypothesis test against L0 tiling, then every other baseline, as recall ratios."""
     m, key = scored[primary], f"drishyam@{HEADLINE_BUDGET}"
@@ -653,8 +656,7 @@ def headline(scored: dict, primary: str, n: int, label: str) -> str:
                f"meets {hyp} on the point estimate, but the 95% CI includes values below 0.9" if hs["meets_target"] else
                f"does not meet {hyp}")
     ci = lambda v: "" if None in v else f"95% CI {v[0]:.2f}-{v[1]:.2f}, "
-    names = {"components": "per-component", "union": "one-box-per-class", "as_specified": "as-specified mixed"}
-    others = ", ".join(f"{ratio_of(sc, 'tiling@L0'):.2f}x with {names[name]} boxes" for name, sc in scored.items() if name != primary)
+    others = ", ".join(f"{ratio_of(sc, 'tiling@L0'):.2f}x with {BOX_NAMES[name]} boxes" for name, sc in scored.items() if name != primary)
     best = max((f"tiling@L{lv}" for lv in TILE_LEVELS), key=lambda k: m[k]["recall"])
     grids = " and ".join(f"{ratio_of(m, k):.2f}x L{k[-1]} tiling ({m[k]['recall']:.2f} at {m[k]['pixels_frac']:.2f}"
                          f"{', the best grid' if k == best else ''})" for k in ("tiling@L1", "tiling@L2"))
@@ -670,8 +672,9 @@ def headline(scored: dict, primary: str, n: int, label: str) -> str:
 
 def false_alarms(records: list[dict], results: list[dict], keys: list[str], primary: str) -> dict:
     """On images with no damage every box is a false alarm. Per policy: boxes and critical boxes per image (in the
-    primary box convention), Drishyam's findings per image, and the share of images with any (critical) box; and
-    what each policy reported on the demo's clean sample bridge_08, if the set holds it."""
+    primary box convention), boxes per image with one box per class per view (`union_per_image`: for Drishyam, its
+    findings), and the share of images with any (critical) box; and what each policy reported on the demo's clean
+    sample bridge_08, if the set holds it."""
     out, named = {}, {}
     for k in keys:
         cs = [res["configs"][k] for res in results]
@@ -679,22 +682,24 @@ def false_alarms(records: list[dict], results: list[dict], keys: list[str], prim
         crit = [[p for p in b if is_critical(p["cls"], p["area"])] for b in boxes]
         n = len(cs)
         out[k] = {"boxes_per_image": _r(sum(map(len, boxes)) / n, 2), "critical_per_image": _r(sum(map(len, crit)) / n, 2),
+                  "union_per_image": _r(sum(len(c["preds_union"]) for c in cs) / n, 2),
                   "images_with_any": _r(sum(map(bool, boxes)) / n), "images_with_critical": _r(sum(map(bool, crit)) / n)}
-        if k.startswith("drishyam"):
-            out[k]["findings_per_image"] = _r(sum(len(c["preds_union"]) for c in cs) / n, 2)
         for rec, b in zip(records, boxes, strict=True):
             if rec["id"] == "bridge_08":
                 named.setdefault(rec["id"], {})[k] = dict(collections.Counter(p["cls"] for p in b))
     return {**out, **({"classes_reported": named} if named else {})}
 
 
-def clean_headline(fa: dict, n: int) -> str:
+def clean_headline(fa: dict, n: int, primary: str) -> str:
+    """Every policy in one box unit per clause: the primary convention, then one box per class per view."""
     d, s, t = fa[f"drishyam@{HEADLINE_BUDGET}"], fa["downscale"], fa["tiling@L0"]
-    return (f"On {n} synthetic images with no damage (distractors only), Drishyam at a {HEADLINE_BUDGET:.0%} pixel cap reported "
-            f"{d['findings_per_image']:.2f} findings per image ({d['critical_per_image']:.2f} critical boxes) and some damage on "
-            f"{d['images_with_any']:.0%} of the images; a single 1024-px downscale reported {s['boxes_per_image']:.2f} boxes per "
-            f"image ({s['critical_per_image']:.2f} critical) and 20%-overlap tiling {t['boxes_per_image']:.2f} "
-            f"({t['critical_per_image']:.2f} critical). Every one of them is a false alarm.")
+    union = (f"; with one box per class per view (a Drishyam finding), {d['union_per_image']:.2f}, {s['union_per_image']:.2f} "
+             f"and {t['union_per_image']:.2f}" if primary != "union" else "")
+    return (f"On {n} synthetic images with no damage (distractors only), every box is a false alarm. In {BOX_NAMES[primary]} "
+            f"boxes per image, Drishyam at a {HEADLINE_BUDGET:.0%} pixel cap reported {d['boxes_per_image']:.2f} "
+            f"({d['critical_per_image']:.2f} critical), a single 1024-px downscale {s['boxes_per_image']:.2f} "
+            f"({s['critical_per_image']:.2f} critical) and 20%-overlap tiling {t['boxes_per_image']:.2f} "
+            f"({t['critical_per_image']:.2f} critical){union}. Drishyam reported some damage on {d['images_with_any']:.0%} of the images.")
 
 
 # ---------------------------------------------------------------- run
@@ -829,7 +834,7 @@ def run(data_dir="data/synth200", n=200, out_dir="public/results", results_dir="
         "agent_metrics": am,
         "micro": micro_rows(micro_arm, results_dir),
         "provenance": keep,
-        "headline": (clean_headline(fa, len(records)) if clean else
+        "headline": (clean_headline(fa, len(records), primary_boxes) if clean else
                      ("Deployment behaviour (governor on). " if governor else "")
                      + headline(scored, primary_boxes, len(records), "labelled synthetic images" if synthetic else "CODEBRIM images")),
     }

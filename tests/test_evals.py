@@ -261,12 +261,18 @@ def test_a_clean_set_is_scored_as_false_alarms(tmp_path):
     fa = s["false_alarms"]
     assert set(fa) == {"downscale", *(f"tiling@L{lv}" for lv in harness.TILE_LEVELS), *(f"drishyam@{c}" for c in harness.BUDGETS)}
     assert all(0 <= v["images_with_critical"] <= v["images_with_any"] <= 1 for v in fa.values())
-    assert "findings_per_image" in fa["drishyam@0.3"] and "findings_per_image" not in fa["downscale"]
+    raw = json.loads((tmp_path / "raw" / "eval_per_image.json").read_text())["results"]
+    for k, v in fa.items():  # every policy in both units: the headline never sets findings beside component boxes
+        if k != "classes_reported":
+            assert v["union_per_image"] == round(sum(len(r["configs"][k]["preds_union"]) for r in raw) / 2, 2)
+            assert v["boxes_per_image"] == round(sum(len(r["configs"][k]["preds"]) for r in raw) / 2, 2)
     d = s["policies"]["drishyam"][3]
     assert d["recall"] is None and d["recall_ci"] == [None, None]
-    assert s["headline"].endswith("Every one of them is a false alarm.")
+    d, ds = fa["drishyam@0.3"], fa["downscale"]
+    assert f"per-component boxes per image, Drishyam at a 30% pixel cap reported {d['boxes_per_image']:.2f}" in s["headline"]
+    assert f"(a Drishyam finding), {d['union_per_image']:.2f}, {ds['union_per_image']:.2f} and" in s["headline"]
     box = {"cls": "exposed_rebar", "box": [0, 0, 9, 9], "area": 81, "conf": 0.9}
-    one = harness.false_alarms([{"id": "bridge_08"}], [{"configs": {"downscale": {"preds": [box]}}}], ["downscale"], "components")
+    one = harness.false_alarms([{"id": "bridge_08"}], [{"configs": {"downscale": {"preds": [box], "preds_union": [box]}}}], ["downscale"], "components")
     assert one["downscale"]["critical_per_image"] == 1.0 and one["classes_reported"] == {"bridge_08": {"downscale": {"exposed_rebar": 1}}}
 
 
