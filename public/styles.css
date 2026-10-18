@@ -103,7 +103,7 @@ img, canvas, svg { max-width: 100%; }
 .hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.02fr); gap: 40px; align-items: stretch; padding: 30px 0 6px; }
 .hero__side { display: flex; flex-direction: column; justify-content: space-between; gap: 24px; min-width: 0; padding-top: 18px; }
 .hero__main { container-type: inline-size; display: grid; grid-template-columns: minmax(0, 1fr); gap: 22px; justify-items: start; min-width: 0; }
-.eyebrow { margin: 0; font: 500 12px/1.5 var(--f-mono); text-transform: uppercase; letter-spacing: .14em; color: var(--line-2); }
+.eyebrow { margin: 0; text-wrap: balance; font: 500 12px/1.5 var(--f-mono); text-transform: uppercase; letter-spacing: .14em; color: var(--line-2); }
 .eyebrow__fig { display: inline-block; margin-right: 10px; padding: 2px 7px; border: 2px solid var(--amber); color: var(--amber); font-weight: 700; }
 .wordmark { margin: 0 0 -6px; font: 700 min(9.6rem, 17.5cqw)/.84 var(--f-title); letter-spacing: .035em; color: var(--line); white-space: nowrap; }  /* 17.5cqw: still fits if the webfont falls back to a wider face */
 
@@ -176,6 +176,9 @@ img, canvas, svg { max-width: 100%; }
 /* hero: what it is, for whom, and how to start */
 .lede { max-width: 40em; margin: 0; font: 400 clamp(15px, 1.35vw, 17px)/1.55 var(--f-mono); color: var(--line); }
 .gloss { max-width: 40em; margin: -10px 0 0; font-size: 13px; line-height: 1.5; color: var(--line-2); }
+.namegloss { margin: -8px 0 0; font: 500 12px/1.3 var(--f-mono); letter-spacing: .1em; color: var(--line-2); }
+.stakes { max-width: 40em; margin: 0; padding-left: 12px; border-left: 3px solid var(--amber); font-size: 13.5px; line-height: 1.55; color: var(--line); }
+.stakes a { color: var(--amber); }
 .cta { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; }
 .cta .btn--xl { text-align: left; }
 .cta__time { font-weight: 500; letter-spacing: .04em; text-transform: none; }

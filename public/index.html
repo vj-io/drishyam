@@ -52,16 +52,17 @@
 <section class="sheet sheet--hero" id="top" aria-labelledby="h-top">
   <div class="strip" aria-hidden="true">
     <span class="strip__a">Drishyam // virtual-PTZ inspection agent</span>
-    <span class="strip__b">OpenCV agentic vision</span>
+    <span class="strip__b">OpenCV AI Competition 2026, powered by AWS &middot; Agentic Vision entry</span>
     <span class="strip__no pop">Sheet <b>1</b> of 7</span>
   </div>
   <ol class="zones" aria-hidden="true"><li>1</li><li>2</li><li>3</li><li>4</li><li>5</li><li>6</li><li>7</li><li>8</li></ol>
 
   <div class="hero">
     <div class="hero__main">
-      <p class="eyebrow"><span class="eyebrow__fig">FIG. 0</span> OpenCV agentic vision for bridge inspection</p>
+      <p class="eyebrow"><span class="eyebrow__fig">FIG. 0</span> OpenCV AI Competition 2026, powered by AWS &middot; Agentic Vision entry</p>
       <h1 class="wordmark" id="h-top">DRISHYAM</h1>
-      <div class="dim dim--word" aria-hidden="true"><span>one photo &middot; many looks &middot; one human</span></div>
+      <p class="namegloss">Sanskrit: that which is seen</p>
+      <div class="dim dim--word" aria-hidden="true"><span>one photo &middot; a few looks &middot; one human</span></div>
       <p class="lede">For bridge inspectors reviewing high-resolution photos: it finds cracks, spalling and exposed rebar by zooming in only where it needs to, and hands every critical finding to a human to sign off.</p>
       <p class="gloss">It works like a PTZ camera (pan-tilt-zoom), done in software: it pans and zooms across one big photo instead of moving a real camera.</p>
       <div class="cta">
@@ -69,6 +70,7 @@
         <a class="btn" id="own" href="#step-photo">Try your own photo</a>
         <a class="cta__link" href="https://github.com/vj-io/drishyam/releases/latest/download/drishyam-demo.mp4" rel="noopener noreferrer">Download the video (MP4)</a>
       </div>
+      <p class="stakes">The US has 624,939 bridges (FHWA, 2026), and the rule is a routine inspection at intervals of up to 24 months (23 CFR 650.311). One drone inspection of a single bridge produced 2,536 photos. Someone has to look at every one. <a href="https://github.com/vj-io/drishyam/blob/main/docs/impact-sources.md" rel="noopener noreferrer">Sources</a></p>
       <ol class="claims" aria-label="How to use it">
         <li>Pick a photo</li>
         <li>Watch the agent look, zoom and double-check</li>
@@ -90,7 +92,7 @@
           <pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path d="M0 0V8" class="hatch"/></pattern>
         </defs>
         <text class="t-fig" x="20" y="16">FIG. 1</text>
-        <text class="t-cap" x="72" y="16">ONE PHOTO, THREE LOOKS, ONE HUMAN</text>
+        <text class="t-cap" x="72" y="16">ONE PHOTO, A FEW LOOKS, ONE HUMAN</text>
 
         <!-- the photo and the bridge in it -->
         <path class="d s3 at0" pathLength="1" d="M20 60H420V360H20Z"/>
@@ -103,12 +105,12 @@
         <path class="d s15 at3" pathLength="1" d="M303 176L299 190L306 203L301 219L308 236"/>
         <path class="d s15 at3" pathLength="1" d="M294 252L302 248L314 251L318 262L315 276L304 282L295 276L292 264Z"/>
 
-        <!-- dimension 1:4 over the whole photo -->
+        <!-- dimension 1:8 over the whole photo (the L3 survey) -->
         <g class="dm dm--x at4">
           <path class="ext" d="M20 34V56M420 34V56"/>
           <path class="dimln" d="M24 42H416" marker-start="url(#ah)" marker-end="url(#ah)"/>
           <rect class="lblbg" x="196" y="34" width="48" height="16"/>
-          <text class="t-dim" x="220" y="46" text-anchor="middle">1:4</text>
+          <text class="t-dim" x="220" y="46" text-anchor="middle">1:8</text>
         </g>
 
         <!-- L1 window and its 1:2 dimension -->
@@ -136,12 +138,12 @@
         <g class="co at4">
           <path class="lead" d="M400 76H452"/><circle class="dot" cx="400" cy="76" r="3.5"/>
           <circle class="num" cx="466" cy="76" r="13"/><text class="t-num" x="466" y="81" text-anchor="middle">1</text>
-          <text class="t-co" x="486" y="73">SURVEY</text><text class="t-sub" x="486" y="89">L2 &#183; WHOLE PHOTO</text>
+          <text class="t-co" x="486" y="73">SURVEY</text><text class="t-sub" x="486" y="89">L3 &#183; WHOLE PHOTO</text>
         </g>
         <g class="co at6">
           <path class="lead" d="M365 178L384 160H452"/><circle class="dot" cx="365" cy="178" r="3.5"/>
           <circle class="num" cx="466" cy="160" r="13"/><text class="t-num" x="466" y="165" text-anchor="middle">2</text>
-          <text class="t-co" x="486" y="157">ESCALATE</text><text class="t-sub" x="486" y="173">L1 &#183; UNSURE, ZOOM</text>
+          <text class="t-co" x="486" y="157">ESCALATE</text><text class="t-sub" x="486" y="173">L2 &#8594; L1 &#183; UNSURE</text>
         </g>
         <g class="co at8">
           <path class="lead" d="M336 240L360 230H452"/><circle class="dot" cx="336" cy="240" r="3.5"/>
@@ -158,8 +160,8 @@
         <path class="ext rule" d="M20 404H580"/>
       </svg>
       <ol class="art__key">
-        <li><b>Survey</b> L2 &middot; whole photo</li>
-        <li><b>Escalate</b> L1 &middot; unsure, zoom</li>
+        <li><b>Survey</b> L3 &middot; whole photo at 1/8</li>
+        <li><b>Escalate</b> L2 &rarr; L1 &middot; unsure, zoom</li>
         <li><b>Verify</b> L0 &middot; re-segment</li>
         <li><b>Exposed rebar</b> needs a human</li>
       </ol>
@@ -544,6 +546,7 @@
           <li><b>Privacy blur.</b> Faces, people and vehicles are found with OpenCV DNN models and blurred before any look is taken. A photo in which one person fills more than a quarter of the frame is refused: this inspects structures, not people.</li>
           <li><b>Signed work orders.</b> The work order is signed with HMAC-SHA256 and every sign-off returns a new signature, so an edited order no longer verifies. The download includes the signature.</li>
         </ol>
+        <p class="note guards__llm">No LLM runs in this demo. The live agent is the rule policy (FIG. 3.2), and the drill planners are scripted to fail. The LLM path is the MCP server: in a recorded session Claude chose each call from the numbers the tools measured (its prompt states the decision rules). <a href="https://github.com/vj-io/drishyam/blob/main/docs/mcp-session/transcript.md" rel="noopener noreferrer">Read the recorded session</a>.</p>
       </div>
     </section>
     <section class="win pop win--wide" aria-labelledby="t-auto">
@@ -584,7 +587,7 @@
   <dl class="faq">
     <div class="faq__item">
       <dt>Is this live or recorded?</dt>
-      <dd>Live. The photo goes to the API and every look is computed on the spot with stock OpenCV 5. The page then shows the decisions at reading speed; the agent itself is much faster, and the status bar says how long it really took. <a href="?mock=1#demo">Watch a recorded run</a> replays a saved job instead, and is labelled recorded.</dd>
+      <dd>Live. The photo goes to the API and every look is computed on the spot with stock OpenCV 5. The page then shows the decisions at reading speed; the agent itself is much faster, and the status bar shows the agent&rsquo;s own time and the server&rsquo;s total time (upload, decode and privacy blur included). <a href="?mock=1#demo">Watch a recorded run</a> replays a saved job instead, and is labelled recorded.</dd>
     </div>
     <div class="faq__item">
       <dt>What is OpenCV doing here?</dt>
