@@ -1,0 +1,241 @@
+WEBVTT
+
+1
+00:00:01.900 --> 00:00:07.115
+It read 24.9 % of this photo's pixels and found 3 critical findings.
+
+2
+00:00:07.215 --> 00:00:09.768
+It will not sign them off. A person must.
+
+3
+00:00:10.618 --> 00:00:17.501
+Drishyam: an Agentic Vision entry to the OpenCV AI Competition 2026, powered by AWS.
+
+4
+00:00:17.701 --> 00:00:23.276
+Built by Vaibhav Jangid, lead engineer, and Bhavya Dhoot, design and presentation.
+
+5
+00:00:24.126 --> 00:00:29.015
+The US has 624,939 bridges (41,148 in poor condition); the rule:
+
+6
+00:00:29.025 --> 00:00:33.332
+a routine inspection at intervals of up to 24 months.
+
+7
+00:00:33.532 --> 00:00:38.142
+One drone inspection of one bridge produced 2,536 photos.
+
+8
+00:00:38.152 --> 00:00:41.077
+Someone has to look at every one.
+
+9
+00:00:41.277 --> 00:00:43.975
+Drishyam is for the engineer reviewing them.
+
+10
+00:00:43.985 --> 00:00:49.219
+It zooms in only where it needs to, and hands every critical finding to a person.
+
+11
+00:00:50.069 --> 00:00:55.296
+Live on AWS: opencv 5.0.0 · arch aarch64 · host aws-lambda
+
+12
+00:00:55.546 --> 00:00:58.824
+Watch it inspect a bridge. Faces are blurred first.
+
+13
+00:00:59.074 --> 00:01:02.517
+One survey look at the whole photo, at one eighth size.
+
+14
+00:01:02.767 --> 00:01:07.672
+Entropy 0.69 > 0.5: unsure, so it zooms in one level.
+
+15
+00:01:07.922 --> 00:01:11.836
+Then it moves to the best region, and double-checks at full resolution.
+
+16
+00:01:12.086 --> 00:01:18.805
+The two looks barely overlap (IoU 0.002 < 0.5), so the exposed rebar goes to a person.
+
+17
+00:01:19.055 --> 00:01:23.484
+Then a second spall, and it stops when the next look would cost more than it is worth.
+
+18
+00:01:23.734 --> 00:01:28.385
+The agent took 0.712 s; the page replays it slowly.
+
+19
+00:01:28.635 --> 00:01:33.633
+Only a person can approve. A name, Approve, and the server signs the work order.
+
+20
+00:01:33.883 --> 00:01:37.840
+One character of the signature changed: HTTP 403, “signature does not match”.
+
+21
+00:01:38.490 --> 00:01:39.652
+Now, break it.
+
+22
+00:01:39.852 --> 00:01:47.487
+Slowed segmenter: p95 738 ms, so the governor switches to the fast model.
+
+23
+00:01:47.687 --> 00:01:51.585
+The planner drill sends “rm -rf /”: rejected by the allow-list;
+
+24
+00:01:51.595 --> 00:01:53.396
+the rule planner decides.
+
+25
+00:01:53.596 --> 00:01:59.317
+KILL: halted, cause kill-switch. Resume: 5 moves replayed, then it carries on.
+
+26
+00:01:59.517 --> 00:02:04.111
+No language model runs live. These drill planners are scripted to fail.
+
+27
+00:02:05.061 --> 00:02:06.524
+Recorded MCP session:
+
+28
+00:02:06.534 --> 00:02:11.622
+Claude drives the same OpenCV tools on bridge_03, one call at a time.
+
+29
+00:02:11.822 --> 00:02:19.040
+Call 6: IoU 0.00 between L1 and L0, so the rebar goes to a human.
+
+30
+00:02:19.240 --> 00:02:26.055
+Call 18: IoU 0.72 confirms a spall. Call 20: the measured budget ends the search.
+
+31
+00:02:26.255 --> 00:02:31.102
+It still missed the large spall. The rules are in the prompt; the values were measured.
+
+32
+00:02:32.152 --> 00:02:36.782
+Every step is perception, decision and action, with a human gate at the end.
+
+33
+00:02:36.982 --> 00:02:43.454
+CloudFront + WAF (10 job starts per IP per 120 s) → Function URL (AWS_IAM) → Lambda arm64,
+
+34
+00:02:43.464 --> 00:02:45.011
+stock OpenCV 5.0.0
+
+35
+00:02:45.211 --> 00:02:49.583
+DynamoDB holds the kill flags, Secrets Manager the signing key,
+
+36
+00:02:49.593 --> 00:02:51.652
+and CloudWatch the alarms.
+
+37
+00:02:51.852 --> 00:02:55.401
+OpenCV: pyrDown pyramid · saliency (Sobel, black-hat,
+
+38
+00:02:55.411 --> 00:03:00.764
+CLAHE) · warpPerspective virtual PTZ · Laplacian gate · YuNet + NanoDet blur
+
+39
+00:03:00.964 --> 00:03:03.115
+Live: the classical segmenter.
+
+40
+00:03:03.125 --> 00:03:08.922
+The one OpenCV-5-only call, cv2.dnn.ENGINE_NEW, is on the optional ONNX path.
+
+41
+00:03:09.122 --> 00:03:11.262
+Lambda step p95: 67.7 ms (last smoke test).
+
+42
+00:03:11.272 --> 00:03:14.471
+COOL: not run, the Marketplace AMI could not be subscribed.
+
+43
+00:03:15.421 --> 00:03:19.039
+200 synthetic photos, 30 % cap:
+
+44
+00:03:19.049 --> 00:03:28.429
+85 % of exhaustive tiling's recall at 23 % of the pixels. Target 90 %: missed.
+
+45
+00:03:28.679 --> 00:03:33.281
+One downscale does about as well: 0.94× (95 % CI 0.89–1.00).
+
+46
+00:03:33.531 --> 00:03:36.229
+4608 px: 1.12× one downscale (CI 1.02–1.22);
+
+47
+00:03:36.239 --> 00:03:39.935
+L2 tiling 0.53 at 0.10 of the pixels, ours 0.51 at 0.28.
+
+48
+00:03:40.185 --> 00:03:44.077
+In the ablations, dropping the survey look hurts on every set.
+
+49
+00:03:44.087 --> 00:03:47.798
+A random gaze order does as well on the smaller photos.
+
+50
+00:03:48.048 --> 00:03:53.561
+CODEBRIM, 200 real photos: every method finds about 1 in 5 defects;
+
+51
+00:03:53.571 --> 00:03:56.377
+its boxes at random score 0.12.
+
+52
+00:03:56.627 --> 00:04:02.017
+51 photos with no damage: something reported on 67 % of them (6.35 boxes per image).
+
+53
+00:04:02.267 --> 00:04:04.664
+Trained segmenter: results pending.
+
+54
+00:04:05.814 --> 00:04:07.644
+The failures stay in the open:
+
+55
+00:04:07.654 --> 00:04:12.257
+graffiti read as spalling, a formwork line as a crack, glare, and blur.
+
+56
+00:04:12.457 --> 00:04:16.139
+Each names the rule that would catch it. None of them is built yet.
+
+57
+00:04:16.339 --> 00:04:20.452
+CODEBRIM image_0001435 (text only): ground truth exposed rebar, reported corrosion.
+
+58
+00:04:21.502 --> 00:04:27.106
+Pixels, not millimetres. AI-assisted, not an inspection. Only a person signs.
+
+59
+00:04:28.056 --> 00:04:34.137
+Make test, make eval, and one script that deploys, tests and destroys the AWS stack.
+
+60
+00:04:35.187 --> 00:04:38.851
+Drishyam. It looks where it matters, and asks a human first.

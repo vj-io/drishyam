@@ -17,3 +17,6 @@ brag-output*/
 build/
 .venv-infra/
 cdk.out/
+
+# the video MP4 ships to the site bucket at deploy time and as a release asset, not in git
+public/video/*.mp4
