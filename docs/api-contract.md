@@ -10,7 +10,7 @@ Behind CloudFront with Origin Access Control (the AWS deployment), every `POST` 
 through OAC with a 403. Locally the header is ignored. When one of AWS WAF's per-IP rate rules blocks a
 request, CloudFront answers `429` with `Content-Type: application/json` and a body such as
 `{"error": "rate limited: 10 job starts per 2 min per IP; wait and retry"}`. Lambda also answers 429, with
-its own body and no `error` field, when every function environment is busy (docs/aws.md, "Limits"). The
+its own body (do not count on an `error` field), when every function environment is busy (docs/aws.md, "Limits"). The
 app itself never sends 429.
 
 ## `GET /api/health`

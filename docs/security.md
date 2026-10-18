@@ -39,7 +39,8 @@ the control that stops it. Every control named here has a test in `tests/` (the 
 
 - The web demo keeps no work orders: a signed work order lives in the browser,
   and the downloaded `work_order.json` is its copy. Each accepted review also
-  prints one log line (on AWS an EMF record in CloudWatch Logs, kept 14 days):
+  prints one log line (on AWS an EMF record in CloudWatch Logs, kept 14 days;
+  not yet live, the current build predates it):
   the work order and finding ids, the decision, and SHA-256 hashes of the
   reviewer name and of the token before and after, never the name or a token
   (a hash of a guessable name is a pseudonym, not a secret). There is no
