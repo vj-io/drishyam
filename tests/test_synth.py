@@ -111,10 +111,24 @@ def test_build_dataset_writes_images_and_annotations(tmp_path):
     synth.build_dataset(tmp_path, n=3, seed=7, width=320, height=240)
     ann = json.loads((tmp_path / "annotations.json").read_text())
     assert ann["dataset"] == "synthetic-3" and ann["synthetic"] is True and ann["seed"] == 7
+    assert ann["generator_version"] == synth.GENERATOR_VERSION and ann["clean"] is False
     assert [i["id"] for i in ann["images"]] == ["s0001", "s0002", "s0003"]
     for im in ann["images"]:
         assert cv2.imread(str(tmp_path / im["file"])).shape == (im["height"], im["width"], 3)
         assert all(_in_bounds(b["box"], im["width"], im["height"]) for b in im["boxes"])
+
+
+def test_clean_set_has_distractors_and_no_damage(tmp_path):
+    synth.build_dataset(tmp_path, n=4, seed=11, width=320, height=240, clean=True)
+    ann = json.loads((tmp_path / "annotations.json").read_text())
+    assert ann["clean"] is True and ann["generator_version"] == synth.GENERATOR_VERSION and ann["dataset"] == "synthetic-clean-5"
+    assert [i["id"] for i in ann["images"]] == ["s0001", "s0002", "s0003", "s0004", "bridge_08"]
+    for im in ann["images"]:
+        assert im["boxes"] == [] and 1 <= len(im["distractors"]) <= 2
+        assert {d["kind"] for d in im["distractors"]} <= set(synth.CLEAN_DISTRACTORS)
+    assert ann["images"][-1]["width"] == 3000
+    if (SAMPLES_DIR / "bridge_08.jpg").exists():  # the demo's clean sample, byte for byte
+        assert (tmp_path / "images" / "bridge_08.jpg").read_bytes() == (SAMPLES_DIR / "bridge_08.jpg").read_bytes()
 
 
 @pytest.mark.skipif(not (SAMPLES_DIR / "index.json").exists(), reason="samples not generated")

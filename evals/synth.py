@@ -13,8 +13,12 @@ from pathlib import Path
 import cv2
 import numpy as np
 
+# Bump whenever a change alters the images or ground truth a seed yields; evals.harness refuses a set built by
+# another version. 2: GT crack boxes carry `hairline` (sets built before it have no version and no flag).
+GENERATOR_VERSION = 2
 CLASSES = ("crack", "spalling", "efflorescence", "exposed_rebar", "corrosion")  # CODEBRIM's five
 DISTRACTORS = ("graffiti", "formwork_line", "water_stain", "blur_region", "glare")  # drawn in this order
+CLEAN_DISTRACTORS = ("formwork_line", "water_stain", "graffiti", "glare")  # no GT box (blur_region hides a crack)
 CLASS_WEIGHTS = (0.34, 0.20, 0.16, 0.08, 0.22)  # for random mixes, same order as CLASSES
 MIN_PER_CLASS = 40
 REF = 2048.0  # sizes below are pixels at this long side; defect sizes scale with the image, hairlines don't
@@ -460,18 +464,35 @@ def stratify(n, seed, floor=MIN_PER_CLASS):
     return specs
 
 
-def build_dataset(out_dir, n: int = 200, seed: int = 7, width: int = 2048, height: int = 1536):
+def clean_specs(n, seed):
+    """Per-image specs with no damage: one or two distinct CLEAN_DISTRACTORS each."""
+    rng = np.random.default_rng((seed, 4))
+    return [{"distractors": [str(k) for k in rng.choice(CLEAN_DISTRACTORS, int(rng.integers(1, 3)), replace=False)]}
+            for _ in range(n)]
+
+
+def build_dataset(out_dir, n: int = 200, seed: int = 7, width: int = 2048, height: int = 1536, clean: bool = False):
+    """The labelled benchmark; `clean`: n images with distractors and no damage, then the demo's clean sample
+    bridge_08 (byte for byte as `build_samples` writes it, at 3000x2250) as the last record, for false alarms."""
     out = Path(out_dir)
     (out / "images").mkdir(parents=True, exist_ok=True)
     images = []
-    for i, spec in enumerate(stratify(n, seed)):
+    for i, spec in enumerate(clean_specs(n, seed) if clean else stratify(n, seed)):
         img, gt, extra = render(seed * 100_000 + i, width, height, spec)
         iid = f"s{i + 1:04d}"
         cv2.imwrite(str(out / "images" / f"{iid}.jpg"), img, [cv2.IMWRITE_JPEG_QUALITY, 92])
         images.append({"id": iid, "file": f"images/{iid}.jpg", "width": width, "height": height,
                        "boxes": gt, "distractors": extra})
+    if clean:
+        k, (s, _, _, spec) = next((k, x) for k, x in enumerate(SAMPLES, 1) if x[1] == "Clean concrete")
+        img, gt, extra = render(s, 3000, 2250, spec)
+        (out / "images" / f"bridge_{k:02d}.jpg").write_bytes(_jpeg_under(img, SAMPLE_LIMIT)[0].tobytes())
+        images.append({"id": f"bridge_{k:02d}", "file": f"images/bridge_{k:02d}.jpg", "width": 3000, "height": 2250,
+                       "boxes": gt, "distractors": extra})
+    name = f"synthetic-clean-{len(images)}" if clean else f"synthetic-{n}"
     (out / "annotations.json").write_text(json.dumps(
-        {"dataset": f"synthetic-{n}", "synthetic": True, "seed": seed, "images": images}, indent=1))
+        {"dataset": name, "synthetic": True, "seed": seed, "generator_version": GENERATOR_VERSION, "clean": clean,
+         "images": images}, indent=1))
     return images
 
 
@@ -528,11 +549,12 @@ def main(argv=None):
     d.add_argument("--out", default="data/synth200")
     for name, default in (("n", 200), ("seed", 7), ("width", 2048), ("height", 1536)):
         d.add_argument(f"--{name}", type=int, default=default)
+    d.add_argument("--clean", action="store_true", help="no damage: n images of distractors only, plus bridge_08")
     sub.add_parser("samples", help="8 curated demo images").add_argument("--out", default="public/samples")
     a = ap.parse_args(argv)
     t = time.perf_counter()
     if a.cmd == "dataset":
-        build_dataset(a.out, a.n, a.seed, a.width, a.height)
+        build_dataset(a.out, a.n, a.seed, a.width, a.height, a.clean)
     else:
         build_samples(a.out)
     print(f"done in {time.perf_counter() - t:.1f}s")
