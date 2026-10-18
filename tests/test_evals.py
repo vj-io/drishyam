@@ -511,12 +511,34 @@ def test_leakage_keeps_unrelated_low_texture_photos_apart():
     assert leakage.nearest(a, leakage.phash(cv2.resize(a, (400, 300)))[None])[2] <= leakage.MAX_DIST  # a copy still is one
 
 
-def test_model_eval_refuses_a_mislabelled_arm():
+def test_model_eval_refuses_a_mislabelled_confounded_or_other_data_arm(tmp_path):
     from evals import model_eval
 
-    assert model_eval.check({"segmenter": "onnx:m.onnx"}, "onnx:m.onnx", "x") == {"segmenter": "onnx:m.onnx"}
+    data = {"dataset_gt_sha256": "a" * 64, "dataset_images_sha256": "b" * 64}
+    ok = {"segmenter": "onnx:m.onnx", "agent_config": {"governor": False}, "provenance": data,
+          "agent_metrics": {"governor_activity_in_eval": {"p95>SLA": 0}, "model_usage": {"drishyam@0.3": {"accurate": 5}}}}
+    assert model_eval.check(ok, "onnx:m.onnx", "x") == ok
     with pytest.raises(SystemExit, match="scored with classical-v1, not onnx:m.onnx"):
-        model_eval.check({"segmenter": "classical-v1"}, "onnx:m.onnx", "runs/model-eval/onnx-synth")
+        model_eval.check({**ok, "segmenter": "classical-v1"}, "onnx:m.onnx", "runs/model-eval/onnx-synth")
+    slow = {**ok, "agent_metrics": {**ok["agent_metrics"], "governor_activity_in_eval": {"p95>SLA": 800}}}
+    with pytest.raises(SystemExit, match="not a like-for-like.*800 times"):  # the governor swapped in the fp16 net
+        model_eval.check(slow, "onnx:m.onnx", "runs/model-eval/onnx-synth")
+    assert model_eval.same_data(ok, {**ok}) and not model_eval.same_data(ok, {**ok, "provenance": {**data, "dataset_gt_sha256": "c"}})
+    assert not model_eval.same_data({"provenance": {}}, {"provenance": {}})  # unhashed summaries never match
+    leak = tmp_path / "leakage.json"
+    leak.write_text(json.dumps({"skipped": "no dacl10k images under x"}))
+    with pytest.raises(SystemExit, match="refusing to publish a CODEBRIM number"):
+        model_eval.leakage_block(leak)
+    rep = {"eval_images": 200, "train_images": 9000, "max_dist": 32, "min_ncc": 0.8, "candidates": 3, "near_duplicates": 1,
+           "hash_at_or_below": {"8": 0}, "pairs": [["a.jpg", "b.jpg", 4, 0.95]], "calibration": {"separated": True}}
+    leak.write_text(json.dumps(rep))
+    assert model_eval.leakage_block(leak) == {k: v for k, v in rep.items() if k != "pairs"}  # counts and calibration, no file names
+    onnx, cb = tmp_path / "m.onnx", tmp_path / "codebrim"
+    onnx.write_bytes(b"")
+    cb.mkdir()
+    (cb / "eval200.txt").write_text("image_0000001.jpg\n")
+    with pytest.raises(SystemExit, match="needs the dacl10k leakage check"):  # refused before anything runs
+        model_eval.main(["--onnx", str(onnx), "--codebrim", str(cb), "--publish"])
 
 
 # ---------------------------------------------------------------- parity
