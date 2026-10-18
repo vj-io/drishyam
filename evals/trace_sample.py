@@ -2,7 +2,8 @@
 
     python -m evals.trace_sample > docs/trace-bridge_03.ndjson
 
-Deterministic (fixed costs on a virtual clock, fixed job id). Steps keep the fields section 10 quotes; findings,
+Deterministic (fixed costs on a virtual clock, fixed job id). Steps keep the fields section 10 quotes, and the
+cross-level check (`verify`) and the candidates each look seeded (`seeded`) when they have them; findings,
 review requests and the done summary are kept without images, the kill token or the signed work order.
 """
 
@@ -24,7 +25,8 @@ def main() -> None:
         if ev["type"] == "step":
             obs = ev.get("observation", {})
             ev = {"type": "step", "step": ev["step"], "decision": ev["decision"], "cause": ev["cause"], "rationale": ev["rationale"],
-                  "observation": {k: obs[k] for k in ("entropy", "mask_area_px", "classes") if k in obs}}
+                  "observation": {k: obs[k] for k in ("entropy", "mask_area_px", "classes") if k in obs},
+                  **{k: ev[k] for k in ("verify", "seeded") if k in ev}}  # the cross-level check, the candidates it seeded
         elif ev["type"] == "finding":
             ev = {**ev, "finding": {k: v for k, v in ev["finding"].items() if k != "crop_jpeg_b64"}}
         elif ev["type"] == "done":
