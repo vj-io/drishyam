@@ -1,17 +1,18 @@
 """Dev-only sweep of JobConfig values: Drishyam alone on the tuning splits, fixed linux-aarch64 costs, no baselines.
 
-    python -m evals.dev_sweep synth_dev 0.3 "v0_0=v0:0;v0_2=v0:2" [--workers 6] [--codebrim data/codebrim]
+    python -m evals.dev_sweep synth_dev 0.3 "v0_0=v0:0;v0_2=v0:2" [--workers 6] [--codebrim data/codebrim] [--out f]
 
 Splits: synth_dev (60, seed 4242), clean (data/synth_clean_dev, 30 with no damage, seed 4243) and real (CODEBRIM
 evals/codebrim_dev100.txt). It never reads a held-out set. Prints one JSON row per variant (recall with the
-components boxes, pixels, false boxes, halt causes, looks). results/dev/v0_sweep.json collects the rows that chose
-JobConfig.v0.
+components boxes, pixels, false boxes, halt causes, looks); `--out` also writes them, with the split, cap and
+variants, as JSON. results/dev/v0_sweep.json holds the rows that chose JobConfig.v0.
 """
 
 import argparse
 import collections
 import functools
 import json
+from pathlib import Path
 
 import cv2
 
@@ -34,7 +35,7 @@ def parse(spec: str) -> dict:
 def task(rec, variants, rows, cap):
     img = cv2.imread(rec["path"], cv2.IMREAD_COLOR)
     costs = harness.op_costs(rows, img.shape[1], img.shape[0])
-    return {"id": rec["id"], "configs": {k: harness.run_drishyam(img, cap, costs, **sw) for k, sw in variants.items()}}
+    return {"id": rec["id"], "width": img.shape[1], "height": img.shape[0], "configs": {k: harness.run_drishyam(img, cap, costs, **sw) for k, sw in variants.items()}}
 
 
 def main(argv=None) -> None:
@@ -44,6 +45,7 @@ def main(argv=None) -> None:
     ap.add_argument("variants")
     ap.add_argument("--workers", type=int, default=6)
     ap.add_argument("--codebrim", default="data/codebrim")
+    ap.add_argument("--out", help="also write the rows here, as JSON")
     a = ap.parse_args(argv)
     variants = parse(a.variants)
     if a.split == "real":
@@ -54,6 +56,7 @@ def main(argv=None) -> None:
     rows = harness.cost_rows("linux-aarch64", default_segmenter().name)
     results = harness.pool_map(functools.partial(task, variants=variants, rows=rows, cap=a.cap), records, a.workers,
                                lambda m: print(m, flush=True), a.split)
+    out = {}
     for k in variants:
         m = harness.score_config(k, records, results, "preds")
         cs = [r["configs"][k] for r in results]
@@ -62,7 +65,11 @@ def main(argv=None) -> None:
                "halt": dict(collections.Counter(c["halt_cause"] for c in cs)),
                "looks_mean": sum(sum(t["action"] != "halt" for t in c["trace"]) for c in cs) / len(cs),
                "images_with_any": sum(bool(c["preds"]) for c in cs) / len(cs)}
-        print(k, json.dumps({x: (round(y, 4) if isinstance(y, float) else y) for x, y in row.items()}), flush=True)
+        out[k] = {x: (round(y, 4) if isinstance(y, float) else y) for x, y in row.items()}
+        print(k, json.dumps(out[k]), flush=True)
+    if a.out:
+        Path(a.out).write_text(json.dumps({"split": a.split, "n": len(records), "cap": a.cap, "variants": variants,
+                                           "rows": out}, indent=1) + "\n")
 
 
 if __name__ == "__main__":
