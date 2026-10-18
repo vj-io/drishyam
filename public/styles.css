@@ -252,7 +252,7 @@ img, canvas, svg { max-width: 100%; }
 .pill { display: inline-flex; align-items: center; gap: .55em; padding: .45em .8em; border: 2px solid var(--line-2); font: 700 12px/1 var(--f-mono); text-transform: uppercase; letter-spacing: .1em; color: var(--line); white-space: nowrap; }
 .pill--running { border-color: var(--amber); color: var(--amber); }
 .pill--running::before { content: ''; width: .65em; height: .65em; background: var(--amber); animation: blink .9s steps(2) infinite; }
-.pill--killed, .pill--error { border-color: var(--red); color: var(--red); }
+.pill--killed, .pill--stopped, .pill--error { border-color: var(--red); color: var(--red); }
 .pill--awaiting_review { border-style: dashed; border-color: var(--amber); color: var(--amber); }
 .pill--completed, .pill--signed { border-color: var(--amber); background: var(--amber); color: var(--amber-ink); }
 .pill--halted, .pill--budget { border-color: var(--sky); color: var(--sky); }
@@ -826,7 +826,8 @@ input:checked + .switch__ui::after { transform: translateX(22px); background: va
   .cam__fig { max-width: 320px; }
   .vtools { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px 12px; justify-items: start; }
   .vtools > #look, .vtools > .key { grid-column: 1 / -1; }
-  .pip { display: block; grid-column: 2; grid-row: 2 / span 2; align-self: center; width: 64px; height: 64px; object-fit: cover; border: 2.5px solid var(--amber); background: var(--deep); pointer-events: none; }
+  .vtools > .switch { grid-column: 1; }  /* the switches keep column 1 whether or not the crop is shown: no overlap; the crop (56 px) fits their two rows, so no shift */
+  .pip { display: block; grid-column: 2; grid-row: 2 / span 2; align-self: center; width: 56px; height: 56px; object-fit: cover; border: 2.5px solid var(--amber); background: var(--deep); pointer-events: none; }
   .narrator { padding: 10px 12px; }
   .narrator__tag { position: static; float: left; margin: 1px 8px 0 0; }
   .narrator__text { font-size: 13px; }

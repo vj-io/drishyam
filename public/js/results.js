@@ -207,11 +207,17 @@ function heroChips(sum, real) {
   const total = (halts) => Object.values(halts).reduce((a, b) => a + b, 0);
   const halts = am.by_budget?.['1.0']?.halt_causes;
   const capped = am.by_budget?.[String(hs.budget)]?.halt_causes;
+  // every halt cause is counted, so the numbers add up: "exhausted" is a job that had looked at every candidate
+  const other = (h) => Object.entries(h).filter(([k, n]) => n && !['stop-rule', 'cap-hit'].includes(k))
+    .map(([k, n]) => `${n} ${k === 'exhausted' ? 'had looked at every candidate' : `stopped on ${k}`}`);
   if (uncapped && halts) {
     const stops = halts['stop-rule'] ?? 0;
-    fill('stat-cost', `${stops * 2 >= total(halts) ? 'Stops on its own' : 'Stop rule'} at the 100 % pixel cap`, stops, { suffix: ` of ${total(halts)} jobs` },
-      `with the pixel cap at 100 % (the whole image), the stop rule ended them when the next look was worth less than it cost, at ${pct(uncapped.pixels_frac)} of the image's pixels on average`
-      + `${capped ? `. At the ${pct(hs.budget)} pixel cap of the headline, the cap ends ${capped['cap-hit'] ?? 0} of ${total(capped)} first and the stop rule ${capped['stop-rule'] ?? 0}` : ''}.`);
+    const rest = [halts['cap-hit'] && `${halts['cap-hit']} hit a time, $ or step cap`, ...other(halts)].filter(Boolean);
+    const at = capped && [`a cap ended ${capped['cap-hit'] ?? 0} of ${total(capped)} first`, `the stop rule ${capped['stop-rule'] ?? 0}`, ...other(capped)];
+    fill('stat-cost', `With no pixel cap (100 %): ${stops * 2 >= total(halts) ? 'stops on its own' : 'the stop rule'}`, stops, { suffix: ` of ${total(halts)} jobs` },
+      `the stop rule ended them when the next look was worth less than it cost, at ${pct(uncapped.pixels_frac)} of the image's pixels on average`
+      + `${rest.length ? `; the other ${rest.join(', ')}` : ''}.`
+      + `${at ? ` At the ${pct(hs.budget)} pixel cap of the headline: ${at.slice(0, -1).join(', ')}, and ${at.at(-1)}.` : ''}`);
   }
   // Agentic evidence: injected planner and governor faults, and how many the agent recovered from.
   const fired = (am.planner_recovery?.timeout?.fired ?? 0) + (am.planner_recovery?.malformed?.fired ?? 0) + (am.governor_response?.fired ?? 0);

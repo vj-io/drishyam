@@ -28,8 +28,8 @@ const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
 export const words = (cls) => String(cls).replaceAll('_', ' ');
 export const label = (cls) => cap(words(cls));
 
-/** What kind of evidence a cause is: the photo itself (OpenCV), the governor, the planner drill, or a replay. */
-export const kindOf = (cause) => (cause === 'replay' ? 'replay'
+/** What kind of evidence a cause is: the photo itself (OpenCV), KILL, the governor, the planner drill, or a replay. */
+export const kindOf = (cause) => (cause === 'replay' ? 'replay' : cause === 'kill-switch' ? 'kill'
   : cause === 'planner-fallback' || String(cause).startsWith('planner:') ? 'planner'
     : GOVERNOR.has(cause) ? 'governor' : 'vision');
 
@@ -40,22 +40,38 @@ const HALT = {
   'kill-switch': 'You pressed KILL, so it stopped before its next look. Its state is kept: Resume carries on from here.',
   'planner:stop': 'The planner proposed stopping and the validator accepted, so it stops.',
 };
+// A kill-switch halt as the job's first record: only the operator-wide switch can do that (a page's KILL is read after a look).
+const KILLED_FIRST = 'The kill switch was already set, so it stopped before its first look. Nothing was looked at, so there is nothing to resume.';
 /** The stop rule's bar was its floor (ε × v0 ÷ t̂) rather than ε × value so far ÷ cost so far: "... (floor: eps x v0 / t_hat)". */
 const floorBound = (rationale) => /\(floor[:)]/.test(String(rationale ?? ''));
-const FLOOR = ' The bar it fell under was the floor, ε × v0 ÷ t̂, which was higher than ε × value found so far ÷ cost so far.';
-/** Why a job stopped; `rationale` (the halt record's) says which term of the stop rule bound. */
-export const haltText = (cause, rationale) => (HALT[cause] ?? `It stopped (${cause}).`) + (cause === 'stop-rule' && floorBound(rationale) ? FLOOR : '');
+const FLOOR = ' The bar it fell under was the floor, the least any look must promise: ε × v0 ÷ t̂, where v0 is the value of a look'
+  + ' that finds nothing. It was higher than the usual bar, ε × value found so far ÷ cost so far.';
+/** Why a job stopped; `rationale` (the halt record's) says which term of the stop rule bound; `looked`: whether any look
+    came before the halt (a halt record numbered 1 had none). */
+export const haltText = (cause, rationale, looked = true) => (cause === 'kill-switch' && !looked ? KILLED_FIRST
+  : (HALT[cause] ?? `It stopped (${cause}).`) + (cause === 'stop-rule' && floorBound(rationale) ? FLOOR : ''));
 
-/** The terms an argmax (or random-pick) rationale names: "prior 0.45, severity 2.0 (spalling), uncertainty 0.31, unseen 0.62,
-    t_hat 70 ms". Each is read on its own, so a clause that leaves one out still reads. */
+/** Where a candidate's severity came from, as the agent records it after the number: "spalling seen at L2", "no class
+    seen at L2", "not seen yet", "seeding off" (an ablation), or a bare class. Unknown text is kept as recorded. */
+function severitySource(t) {
+  let m;
+  if ((m = t.match(/^(\w+) seen at L(\d)$/)) && m[1] !== 'no') return `${words(m[1])}, seen at ${scale(m[2])}`;
+  if ((m = t.match(/^no class seen at L(\d)$/))) return `the default: no class seen there at ${scale(m[1])}`;
+  if (t === 'not seen yet') return 'the default: no look has shown it yet';
+  if (t === 'seeding off') return 'the default: looks do not set it in this run';
+  return /^\w+$/.test(t) ? words(t) : t;
+}
+
+/** The terms an argmax (or random-pick) rationale names: "prior 0.45, severity 2 (spalling seen at L2), uncertainty 0.31,
+    unseen 0.62, t_hat 70 ms". Each is read on its own, so a clause that leaves one out still reads. */
 function terms(t) {
-  const sev = t.match(/severity ([\d.]+)(?: \((\w+)\)| (?:from|set by) (\w+))?/);
+  const sev = t.match(/severity ([\d.]+)(?: \(([^)]*)\))?/);
   return {
     prior: t.match(/prior ([\d.]+)/)?.[1], unseen: t.match(/unseen ([\d.]+)/)?.[1], t: t.match(/t_hat ([\d.]+) ?ms/)?.[1],
-    u: t.match(/(?:uncertainty|entropy) ([\d.]+)/)?.[1], sev: sev?.[1], sevCls: sev?.[2] ?? sev?.[3],
+    u: t.match(/(?:uncertainty|entropy) ([\d.]+)/)?.[1], sev: sev?.[1], sevFrom: sev?.[2] ? severitySource(sev[2]) : null,
   };
 }
-const severity = (x) => (x.sev ? `severity ${x.sev}${x.sevCls ? ` (${words(x.sevCls)})` : ''}` : '');
+const severity = (x) => (x.sev ? `severity ${x.sev}${x.sevFrom ? ` (${x.sevFrom})` : ''}` : '');
 
 function governorText(cause, why) {
   if (cause === 'p95>SLA') {
@@ -107,7 +123,7 @@ export function explain(s, planner) {
   return [
     gov ? governorText(gov, s.governor?.rationale ?? why) : '',
     plannerText(planner ?? s.planner_status),
-    halt ? haltText(s.cause, why) : lookText(s),
+    halt ? haltText(s.cause, why, s.step > 1) : lookText(s),
     quality ? `The view failed the quality check (${quality[1]}), so it does not trust this look.` : '',
   ].filter(Boolean);
 }
@@ -139,10 +155,10 @@ const CLAUSES = [
   [/^quality gate: (\w+)$/, (m) => `the view failed the quality check (${m[1]}), so it does not trust this look`],
   [/^every candidate has been looked at$/, () => 'every candidate region has been looked at'],
   [/^best score (\S+) < lambda (\S+)/, (m) => (floorBound(m.input)
-    ? `the next look would be worth less than it costs: its score ${m[1]} is under the floor ${m[2]} (ε × v0 ÷ t̂), the higher of the stop rule's two bars`
+    ? `the next look would be worth less than it costs: its score ${m[1]} is under the floor ${m[2]} (the least any look must promise, ε × v0 ÷ t̂)`
     : 'the next look would be worth less than it costs')],
-  [/^kill switch set$/, () => 'you pressed KILL'],
-  [/^state preserved for resume$/, () => 'its state is kept for Resume'],
+  [/^kill switch set$/, (m, s) => (s.step > 1 ? 'you pressed KILL' : 'the kill switch was already set before its first look')],
+  [/^state preserved for resume$/, (m, s) => (s.step > 1 ? 'its state is kept for Resume' : 'but nothing was looked at, so there is nothing to resume')],
   [/^next look needs (\d+) px$/, (m) => `the next look needs ${px(+m[1])} px`],
   [/^(-?\d+) px left of the cap$/, (m) => `but only ${px(+m[1])} px of the pixel budget are left`],
   [/^\$[\d.]+ spent of \$[\d.]+$/, () => 'the $ budget is spent'],
@@ -158,7 +174,7 @@ export function brief(s) {
   if (String(s.cause).startsWith('planner:')) return `The planner asked to ${words(s.cause.slice(8))}, and the validator allowed it.`;
   const text = String(s.rationale ?? '').split('; ').reduce((out, clause) => {
     const rule = CLAUSES.find(([re]) => re.test(clause));
-    const said = rule ? rule[1](clause.match(rule[0])) : clause;
+    const said = rule ? rule[1](clause.match(rule[0]), s) : clause;
     if (!said) return out;
     return !out ? cap(said) : /^(so|and|but) /.test(said) ? `${out}, ${said}` : `${out}. ${cap(said)}`;
   }, '');
@@ -196,7 +212,8 @@ export function reviewText(reason) {
 function verifyText(v) {
   if (!v) return null;
   const then = scale(v.against_level);
-  if (v.class && v.class_now && v.class_now !== v.class && num(v.iou_any) && v.iou_any >= 0.5) {  // its own class may be gone (no iou)
+  const agree = num(v.iou) && v.iou >= 0.5;  // the compared class still overlaps: no class change, whatever the best class now is
+  if (!agree && v.class && v.class_now && v.class_now !== v.class && num(v.iou_any) && v.iou_any >= 0.5) {  // its own class may be gone (no iou)
     return `same place, different class: ${words(v.class_now)} now, ${words(v.class)} in the ${then} look (${pct(v.iou_any)} overlap)`;
   }
   return num(v.iou) ? `${v.class ? `its ${words(v.class)} mask: ` : ''}${pct(v.iou)} overlap with the ${then} look` : null;
@@ -209,7 +226,7 @@ const seededOf = (s) => (Array.isArray(s.seeded) ? s.seeded : []).filter((c) => 
 export function seededText(s) {
   const list = seededOf(s);
   if (!list.length) return null;
-  const one = (c) => `${c.region} (${c.cls ? `looks like ${words(c.cls)}, ` : ''}uncertainty ${c.entropy.toFixed(2)})`;
+  const one = (c) => `${c.region} (${c.cls ? `${words(c.cls)} seen there` : 'no class seen there'}, uncertainty ${c.entropy.toFixed(2)})`;
   return `It also set what the agent expects in ${list.length} region${list.length === 1 ? '' : 's'} it has not visited: `
     + `${list.map(one).join(', ')}. Their next scores use these numbers.`;
 }
@@ -218,7 +235,8 @@ export function seededText(s) {
 function sawText(s) {
   const o = s.observation;
   if (!o) return null;
-  const top = Object.entries(o.classes ?? {}).sort((x, y) => y[1] - x[1])[0];
+  const best = s.verify?.class_now;
+  const top = best && num(o.classes?.[best]) ? [best, o.classes[best]] : Object.entries(o.classes ?? {}).sort((x, y) => y[1] - x[1])[0];
   return [
     top ? `${words(top[0])} ${px(top[1])} px` : 'no damage',
     num(o.entropy) ? `uncertainty ${o.entropy.toFixed(2)}` : null,
@@ -312,7 +330,7 @@ export class Trace {
       s.rationale ? h('span', { class: 'trace__why' }, h('i', {}, 'because'), from ? ` (from ${from})` : '', ': ', brief(s)) : null,
       saw ? h('span', { class: 'trace__saw' }, h('i', {}, 'saw'), ': ', saw) : null,
       seeded.length ? h('span', { class: 'trace__saw trace__seeded' }, h('i', {}, 'set for later'), ': ',
-        seeded.map((c) => `${c.region} ${c.cls ? `likely ${words(c.cls)}, ` : ''}unsure ${c.entropy.toFixed(2)}`).join('; ')) : null);
+        seeded.map((c) => `${c.region}: ${c.cls ? `${words(c.cls)} seen there` : 'no class seen there'}, unsure ${c.entropy.toFixed(2)}`).join('; ')) : null);
     btn.addEventListener('click', () => this.onPick(s.step));
     this.push(h('li', { class: 'trace__line', 'data-step': s.step }, btn,
       s.rationale ? numbers('All numbers for this step', `recorded: ${s.rationale}`) : null));
@@ -376,8 +394,9 @@ export function renderStepDetail(root, step, planner) {
         row('entropy (unsure, 0-1)', num(o?.entropy) ? o.entropy.toFixed(2) : null),
         row('mask area', num(o?.mask_area_px) ? `${px(o.mask_area_px)} px` : null),
         row('classes', o ? classes : null),
-        row('verify IoU (overlap)', num(v?.iou) ? `${v.iou.toFixed(2)} vs L${v.against_level}${v.class ? `, ${words(v.class)} at both` : ''}` : null),
-        row('class then → now', v?.class && v.class_now ? `${words(v.class)} at L${v.against_level} → ${words(v.class_now)} now` : null),
+        row('verify IoU (overlap)', num(v?.iou) ? `${v.iou.toFixed(2)}${v.class ? `: the ${words(v.class)} mask vs L${v.against_level}`
+          + `${o && !o.classes?.[v.class] ? `, ${words(v.class)} gone at this look` : ''}` : ` vs L${v.against_level}`}` : null),
+        row('best class then → now', v?.class && v.class_now !== undefined ? `${words(v.class)} at L${v.against_level} → ${v.class_now ? words(v.class_now) : 'no defect'} now` : null),
         row('best masks overlap (any class)', num(v?.iou_any) ? v.iou_any.toFixed(2) : null),
         row('sharpness / exposure', o ? `${o.sharpness ?? '–'} / ${o.exposure ?? '–'}` : null),
         row('quality', step.quality ? (step.quality.ok ? 'ok' : `rejected: ${step.quality.reason}`) : null),

@@ -113,13 +113,13 @@ export class Findings {
     return [...(this.reasons.get(f.id) ?? [])].filter(([r]) => !r.endsWith(' is critical')).map(([, plain]) => plain);
   }
 
-  /** A draft the agent sent to a person (a class change, a disagreement, an ambiguity): said on its card. A critical card
-      says it in its sign-off box instead; a draft has no sign-off, so the work order does not wait for it. */
+  /** A draft the agent flagged for a person (an ambiguity, a disagreement no look will settle): said on its card. A
+      critical card says it in its sign-off box instead; a draft has no sign-off, so the work order does not wait for it. */
   showAsk(card) {
     const extra = card.review ? [] : this.extra(card.finding);
     card.ask?.remove();
-    card.ask = extra.length ? h('p', { class: 'finding__ask' }, h('b', {}, 'Sent to a person: '), `${extra.join('; ')}. `,
-      'It is a draft, so the work order does not wait for this.') : null;
+    card.ask = extra.length ? h('p', { class: 'finding__ask' }, h('b', {}, 'Flagged for a person to look at: '), `${extra.join('; ')}. `,
+      'No sign-off is needed for a draft, so the work order does not wait for it.') : null;
     if (card.ask) card.insertBefore(card.ask, card.parts.conf);
   }
 
