@@ -11,6 +11,7 @@ const CHIP = {
   'best-score': 'look', 'entropy>tau': 'unsure', 'area<A_min': 'unsure', 'iou<0.5': 'unsure',
   'verify-new-mask': 'verify', replay: 'plain', survey: 'look',
 };
+const INJECTED = { p95_spike: 'slow segmenter' };  // a chaos drill the agent records on its step
 const chip = (cause) => h('span', { class: `chip chip--${GOVERNOR.has(cause) ? 'gov' : CHIP[cause] ?? 'plain'}` }, cause);
 
 const ms = (v) => (num(v) ? `${v}` : '–');
@@ -241,7 +242,7 @@ export class Trace {
     if (s.governor?.cause) parts.push(chip(s.governor.cause));  // an override made on the step that then halted
     if (plannerFell(s)) parts.push(chip('planner-fallback'));
     if (s.quality?.ok === false) parts.push(h('span', { class: 'chip chip--gov' }, `quality: ${s.quality.reason ?? 'rejected'}`));
-    if (s.injected) parts.push(h('span', { class: 'chip chip--inject' }, `injected ${s.injected}`));
+    if (s.injected) parts.push(h('span', { class: 'chip chip--inject' }, `injected: ${INJECTED[s.injected] ?? words(s.injected)}`));
     if (num(s.latency_ms)) parts.push(h('span', { class: 't-ms' }, `${s.latency_ms} ms`));
     const saw = sawText(s);
     const btn = h('button', { type: 'button', class: 'trace__btn' },

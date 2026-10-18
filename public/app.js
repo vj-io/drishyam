@@ -28,7 +28,7 @@ const el = {
 const S = {
   image: null, sample: null, ready: null, ctl: null, mode: 'idle', opts: {}, job: null, overview: null, steps: [], done: null,
   token: null, order: null, ui: null, timer: 0, rev: 0, events: [], planners: new Map(), arrived: null, note: null, critSeen: false, killTimer: 0,
-  found: [], crit: null, slow: false,  // what the step on screen found, its critical NOTE; whether the run was replayed slowly
+  found: [], sent: [], crit: null, slow: false,  // what the step on screen found and sent to a person, its critical NOTE; replayed slowly?
 };
 // The presentation queue: stream events wait here and are shown one decision at a time. A step's findings and
 // review requests arrive with it and join it on screen, so they never wait behind its pause.
@@ -197,7 +197,7 @@ function togglePlay() {
 
 function clearJob() {
   stopPlay();
-  Object.assign(S, { job: null, overview: null, done: null, token: null, order: null, ui: null, rev: 0, planners: new Map(), critSeen: false, found: [], crit: null });
+  Object.assign(S, { job: null, overview: null, done: null, token: null, order: null, ui: null, rev: 0, planners: new Map(), critSeen: false, found: [], sent: [], crit: null });
   el.tbChecked.textContent = 'human reviewer';
   viewport.reset(null);
   S.steps = viewport.steps;
@@ -299,6 +299,8 @@ function handle(ev) {
         const f = findings.cards.get(ev.finding_id)?.finding;
         trace.addNote('review', S.steps.at(-1)?.step ?? 0, ev.finding_id, `${f ? label(f.cls) : 'Finding'} ${ev.finding_id} → human`,
           `${plain}, so a person must check it`, () => findings.focus(ev.finding_id), reason);
+        S.sent.push(`${f ? label(f.cls) : 'Finding'} ${ev.finding_id} goes to a person: ${plain}.`);
+        sayStep();
       }
       return 0;
     }
@@ -326,12 +328,12 @@ function sayStep() {
   if (!step || viewport.cursor !== S.steps.length) return;  // the viewer has picked another step
   const [look, ...more] = explain(step, S.planners.get(step.step));
   const found = S.found.length ? `It found ${S.found.join(', ')}.` : '';
-  narrate(S.crit ?? look, [found, S.crit ? look : '', ...more].filter(Boolean).join(' '));
+  narrate(S.crit ?? look, [found, ...S.sent, S.crit ? look : '', ...more].filter(Boolean).join(' '));
 }
 
 function addStep(step) {
   const follow = viewport.cursor === S.steps.length;
-  Object.assign(S, { found: [], crit: null });
+  Object.assign(S, { found: [], sent: [], crit: null });
   S.steps.push(step);
   trace.addStep(step, causeFrom(step));
   findings.refresh();

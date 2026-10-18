@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[2]
 SHOTS = Path(os.environ.get("DRISHYAM_SHOTS", "/tmp/drishyam-e2e"))
 DONE = ("needs sign-off", "signed", "done", "halted", "budget spent")
 OPTIONAL = ("/results/",)  # the page shows a pending state without these
-JARGON = re.compile(r"\b\d+(?:\.\d+)?e[-+]?\d+\b|\b[a-z]+_[a-z_]+\b")  # scientific notation, snake_case
+JARGON = re.compile(r"\b\d+(?:\.\d+)?e[-+]?\d+\b|\b\w+_\w+\b")  # scientific notation, snake_case (p95_spike too)
 RATE_LIMITED = "Too many jobs from this address: 10 starts per 2 minutes. Wait a minute and retry."
 BUSY = "The demo is busy: no server is free right now. Wait a few seconds and retry."
 
@@ -77,9 +77,12 @@ class Page:
     def status(self):
         return self.page.locator("#job-pill").inner_text().strip().lower()
 
-    def wait_done(self, timeout=60):
+    def wait_done(self, timeout=60, notes=None):
+        """Poll the job pill until the run is over; `notes` (a set) collects the NOTE's secondary lines meanwhile."""
         end = time.time() + timeout
         while time.time() < end:
+            if notes is not None:
+                notes.add(self.page.locator("#narrator-sub").inner_text())
             if self.status() in DONE:
                 return self.status()
             self.page.wait_for_timeout(200)
@@ -131,7 +134,8 @@ def run(base, server_log=None):
         t1 = time.time()
         expect(page.locator("#trace .trace__line[data-step='2']")).to_be_visible(timeout=15000)
         assert time.time() - t1 < 5, f"step 1 stayed {time.time() - t1:.1f} s: the camera should move every 3-4 s"
-        status = p.wait_done(timeout=90)                  # the whole guided run at reading speed, no Skip
+        notes = set()
+        status = p.wait_done(timeout=90, notes=notes)     # the whole guided run at reading speed, no Skip
         took = time.time() - t0
         assert took < 40, f"the guided run took {took:.1f} s"
         expect(page.locator("#job-text")).to_contain_text("we replayed it slowly so you can read it")
@@ -153,7 +157,10 @@ def run(base, server_log=None):
         expect(critical.locator(".chip--state")).to_have_text("approved", timeout=10000)
         with page.expect_download() as dl:
             page.get_by_role("button", name="Download trace.ndjson").click()
-        job = json.loads(Path(dl.value.path()).read_text().splitlines()[0])
+        lines = Path(dl.value.path()).read_text().splitlines()
+        job = json.loads(lines[0])
+        handoffs = [e for e in map(json.loads, lines) if e["type"] == "review_request" and not e["reason"].endswith(" is critical")]
+        assert not handoffs or any("goes to a person" in n for n in notes), f"a review hand-off never reached the NOTE: {handoffs}"
         if "prep_ms" in job:  # the server's read, decode and privacy times: the status line adds them to the agent's
             expect(page.locator("#job-text")).to_contain_text("server total")
             expect(page.locator("#stages [data-stage='photo']")).to_contain_text("decoded in")
@@ -161,6 +168,14 @@ def run(base, server_log=None):
             expect(page.locator("#job-text")).not_to_contain_text("server total")
         print(f"ok  guided live run ({took:.1f} s): paced, plain words, viewer on screen, findings, recap in view, critical card, "
               f"human approval signed by the server; server total {'shown' if 'prep_ms' in job else 'not sent'}")
+
+        # Now break it, from the recap: the injected faults read in plain words too.
+        page.get_by_role("button", name="Now break it").click()
+        page.locator("#skip").click()
+        p.wait_done()
+        expect(page.locator("#trace .chip--inject")).to_have_text("injected: slow segmenter")
+        p.plain()
+        print("ok  Now break it: injected faults and the governor's reaction in plain words")
 
         # Try KILL from the recap: a run shown live whose planner stalls 2 s at step 3, so KILL lands mid-job.
         page.get_by_role("button", name="Try KILL").click()
