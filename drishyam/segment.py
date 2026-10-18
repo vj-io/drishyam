@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 import cv2
 import numpy as np
 
+from . import imaging
 from .measure import thin
 
 CLASSES = ("background", "crack", "spalling", "efflorescence", "exposed_rebar", "corrosion")
@@ -171,6 +172,12 @@ def drop_straight_lines(seg: Segmentation, scale: float = 1.0) -> Segmentation:
     out = restrict(seg, keep)
     out.lines = lines
     return out
+
+
+def rejected_lines(seg: Segmentation, to_l0: np.ndarray, l0_size: tuple[int, int]) -> list[dict]:
+    """`seg.lines` as trace records (the step's `rejected` list): class, cause, L0 box, length, width, residual."""
+    return [{"cls": "crack", "cause": STRAIGHT_CAUSE, "box": imaging.l0_box(b, to_l0, l0_size), "length_px": ln,
+             "width_px": wd, "residual_px": rms} for b, ln, wd, rms in seg.lines]
 
 
 def segment_view(segmenter, crop: np.ndarray, model: str, valid: np.ndarray, scale: float = 1.0) -> Segmentation:

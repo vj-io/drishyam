@@ -36,7 +36,7 @@ from .findings import Finding, now_iso, order_status
 from .findings import work_order as make_work_order
 from .governor import Budget, RuntimeStats, Settings, check, global_kill
 from .measure import measure as measure_px
-from .segment import DEFECTS, default_segmenter, segment_view
+from .segment import DEFECTS, default_segmenter, rejected_lines, segment_view
 
 MAX_LEVEL = 3
 OVERVIEW_LEVEL = imaging.OVERVIEW_LEVEL
@@ -269,6 +269,8 @@ def _segment(s: Session, rec: dict, g: Gaze, model: str) -> tuple[object, str]:
         "classes": areas,
     }
     rec["model"] = used
+    if g.seg.lines:  # crack components dropped as straight lines (formwork, joints): logged, never a finding
+        rec["rejected"] = rejected_lines(g.seg, g.to_l0, s.shape[::-1])
     return g.seg, used
 
 
@@ -457,6 +459,7 @@ def segment(job: JobId, gaze_id: RecordId, model: Literal["accurate", "fast"] = 
             entropy=seg.entropy,
             latency_ms=round(seg.latency_ms, 1),
             quality_ok=g.quality["ok"],
+            **({"rejected": rec["rejected"]} if "rejected" in rec else {}),
         )
 
 
@@ -509,6 +512,7 @@ def verify(job: JobId, gaze_id: RecordId, why: Why = "") -> str:
             agrees=None if iou is None else iou >= IOU_AGREE,
             quality_ok=fine.quality["ok"],
             entropy=seg.entropy,
+            **({"rejected": rec["rejected"]} if "rejected" in rec else {}),
         )
 
 

@@ -21,7 +21,7 @@ npx @modelcontextprotocol/inspector uv run --directory /abs/path/to/drishyam dri
 | `overview(job)` | At most 20 ranked candidate boxes (L0 pixels) and a saliency heatmap PNG. |
 | `gaze(job, x, y, level, yaw=0, pitch=0, why="")` | Virtual-PTZ look at an L0 pixel at pyramid level 0-3. Returns a gaze id, window, quality gate and a JPEG of the crop (at most 512 px). |
 | `enhance(job, gaze_id, why="")` | CLAHE re-look. Replaces that gaze's crop; segment again afterwards. |
-| `segment(job, gaze_id, model)` | Per-class areas, confidence, entropy, latency. `model` is `accurate` or `fast`. |
+| `segment(job, gaze_id, model)` | Per-class areas, confidence, entropy, latency. `model` is `accurate` or `fast`. Crack components that are one straight line (formwork, joints) are dropped and listed under `rejected`, as in the agent's step records. |
 | `measure(job, gaze_id, cls)` | Length, width, area, orientation of one class, in L0 pixels. |
 | `verify(job, gaze_id, why="")` | Looks one level finer at the same centre, segments, returns the mask IoU against the coarser look (below 0.5 is disagreement). |
 | `runtime_stats(job)` | p50/p95 per op, CPU %, $ so far, budget against caps, what the governor changed. |
