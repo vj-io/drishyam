@@ -3,13 +3,13 @@ import { $, $$, h, num, dataUrl } from './js/dom.js';
 import { MOCK, streamJob, postReview, postKill, getJSON, health } from './js/api.js';
 import { prepareImage } from './js/prep.js';
 import { Viewport, pointOf, tileBoxes } from './js/viewport.js';
-import { Budget, Trace, renderStepDetail, isGovernor, plannerFell, explain, haltText, kindOf, pad, px } from './js/panels.js';
+import { Budget, Trace, renderStepDetail, isGovernor, plannerFell, explain, haltText, kindOf, pad, px, label, words, reviewText } from './js/panels.js';
 import { Findings, ruleOf } from './js/findings.js';
 import { countUp, popup, reduced, replay, sound } from './js/fx.js';
 import { initResults } from './js/results.js';
 
-const PACE = 5000;  // ms each decision stays on screen: long enough to read its NOTE
-const HOLD = PACE + 3000;  // the first critical finding's NOTE outlasts every decision: the hand-off to a person
+const PACE = 3500;  // ms each decision stays on screen, with what its look found: the camera moves every few seconds
+const HOLD = 5000;  // the decision that finds the first critical damage stays this long: the hand-off to a person
 const GUIDE = 'bridge_03.jpg';  // exposed rebar: the default run ends with critical findings for a human
 const GUIDE_PACE_MS = 1000;  // asks the server to wait this long between looks (pace_ms); its timings exclude the wait
 const NOTE = 'Press Run and the agent’s reasoning appears here, one decision at a time, in plain words.';
@@ -28,9 +28,13 @@ const el = {
 const S = {
   image: null, sample: null, ready: null, ctl: null, mode: 'idle', opts: {}, job: null, overview: null, steps: [], done: null,
   token: null, order: null, ui: null, timer: 0, rev: 0, events: [], planners: new Map(), arrived: null, note: null, critSeen: false, killTimer: 0,
+  found: [], sent: [], crit: null, slow: false,  // what the step on screen found and sent to a person, its critical NOTE; replayed slowly?
 };
-// The presentation queue: stream events wait here and are shown one decision at a time.
+// The presentation queue: stream events wait here and are shown one decision at a time. A step's findings and
+// review requests arrive with it and join it on screen, so they never wait behind its pause; so does the overview's
+// drawing (the heatmap), while its NOTE waits for the photo line's read time.
 const Q = { items: [], timer: 0, skip: false };
+const JOINS = new Set(['finding', 'review_request', 'overview']);
 
 const viewport = new Viewport($('#stage'), (k) => goto(k));
 const budget = new Budget($('#budget'));
@@ -102,6 +106,7 @@ function setMode(mode, text) {
   el.look.disabled = el.runBar.disabled = running || !S.image;
   el.guided.disabled = running;
   if (!running) el.count.textContent = '';
+  if (['error', 'killed'].includes(mode) && !S.events.length) narrate(el.text.textContent);  // nothing arrived: the NOTE still says "Sending"
   if (onBar && !running) (el.resume.hidden ? el.look : el.resume).focus({ preventScroll: true });
   syncSteps();
 }
@@ -111,10 +116,18 @@ function narrate(text, sub = '') {
   el.narratorSub.textContent = sub;
 }
 
+// The server's pause between looks: as the job record echoes it, else as this page asked for it (pace_ms).
+const paceMs = () => S.job?.pace_ms ?? S.opts.pace ?? 0;
+
 const overviewLevel = () => {
   const i = S.job?.levels?.findIndex(([w, hh]) => w * hh === S.overview?.pixels_used) ?? -1;
   return i >= 0 ? i : null;
 };
+
+function photoText() {
+  const pv = S.job.privacy ?? {};
+  return `Photo received: ${S.job.width} × ${S.job.height} px. Before any look, faces and people are blurred (${pv.faces_blurred ?? 0} faces and ${pv.people_blurred ?? 0} people here).`;
+}
 
 function overviewText() {
   const n = S.overview.candidates?.length ?? 0;
@@ -144,7 +157,8 @@ function showCam(k) {
 }
 
 function stage(name, text) {
-  const li = $(`[data-stage=${name}]`, el.stages);
+  const li = [...el.stages.children].find((x) => x.dataset.stage === name);
+  if (!li) return;  // a stage this page does not draw
   li.classList.add('is-on');
   if (text) li.textContent = text;
 }
@@ -169,7 +183,7 @@ function goto(k, animate = false) {
   showCam(k);
   if (step) {  // the NOTE keeps to the main sentence; the rest goes on its secondary line
     const [main, ...more] = explain(step, planner);
-    narrate(main, more.length ? more.join(' ') : step.rationale ? `recorded: ${step.rationale}` : '');
+    narrate(main, more.join(' '));
   }
   else if (S.overview) narrate(overviewText());
 }
@@ -189,7 +203,7 @@ function togglePlay() {
 
 function clearJob() {
   stopPlay();
-  Object.assign(S, { job: null, overview: null, done: null, token: null, order: null, ui: null, rev: 0, planners: new Map(), critSeen: false });
+  Object.assign(S, { job: null, overview: null, done: null, token: null, order: null, ui: null, rev: 0, planners: new Map(), critSeen: false, found: [], sent: [], crit: null });
   el.tbChecked.textContent = 'human reviewer';
   viewport.reset(null);
   S.steps = viewport.steps;
@@ -244,22 +258,22 @@ function showFinding(f) {
 /** Present one event; returns how long it stays on screen before the next one (ms). */
 function handle(ev) {
   switch (ev.type) {
-    case 'job': {
-      clearJob();
+    case 'job': {  // the last job is cleared (run(), or a Resume's first record), and any `stage` record before this one has lit its stage
       S.job = ev;
       viewport.reset(ev);
       S.steps = viewport.steps;
       budget.setCaps(ev.budget);
       goto(0);
       const pv = ev.privacy ?? {};
-      stage('photo', `photo received · ${ev.width} × ${ev.height} px`);
-      stage('privacy', `privacy blur · ${pv.faces_blurred ?? 0} faces, ${pv.people_blurred ?? 0} people`);
+      const took = (ms, what) => (num(ms) ? ` · ${what} ${Math.round(ms)} ms` : '');  // prep_ms: the server's {read, decode, privacy}
+      stage('photo', `photo received · ${ev.width} × ${ev.height} px${took(ev.prep_ms?.decode, 'decoded in')}`);
+      stage('privacy', `privacy blur · ${pv.faces_blurred ?? 0} faces, ${pv.people_blurred ?? 0} people${took(ev.prep_ms?.privacy, 'in')}`);
       showCam(0);
-      narrate(`Photo received: ${ev.width} × ${ev.height} px. Before any look, faces and people are blurred (${pv.faces_blurred ?? 0} faces and ${pv.people_blurred ?? 0} people here).`);
+      narrate(photoText());
       if (!S.arrived) {
         el.text.textContent = S.opts.killHint ? `${MOCK ? 'Recorded run' : 'Live'}: each look is shown the moment it arrives. Press KILL in this bar while it is looking.`
           : MOCK ? 'Recorded run: replaying a saved job from fixtures (no server), at reading speed.'
-            : ev.pace_ms > 0 ? `Paced for viewing: the agent waits ${ev.pace_ms / 1000} s between looks; timings exclude the wait.`
+            : paceMs() > 0 ? `Paced for viewing: the agent waits ${paceMs() / 1000} s between looks; timings exclude the wait.`
               : 'Running live on the server; each decision is shown at reading speed.';
       }
       return 900;
@@ -272,19 +286,32 @@ function handle(ev) {
       stage('saliency', 'saliency map (the heatmap)');
       stage('regions', `${n} candidate region${n === 1 ? '' : 's'}`);
       goto(0);
+      narrate(photoText());  // the photo line keeps its read time; the overview's NOTE follows in the queue
+      Q.items.unshift({ type: 'overview-note' });
+      return 0;
+    }
+    case 'overview-note':  // no step has arrived yet: the viewer is on the overview
+      narrate(overviewText());
       return 2400;
+    case 'stage': {  // the server's preparation, lit as each part finishes
+      const li = [...el.stages.children].find((x) => x.dataset.stage === ev.name);
+      stage(ev.name, li && num(ev.ms) ? `${li.dataset.text} · ${Math.round(ev.ms)} ms` : null);
+      return 0;
     }
     case 'step':
       return addStep(ev);
     case 'finding':
       return addFinding(ev.finding);
     case 'review_request': {
-      findings.addReason(ev.finding_id, ev.reason);
-      if (!String(ev.reason).endsWith(' is critical')) {  // that one is said by the finding's own line
+      const reason = String(ev.reason);
+      const plain = reviewText(reason);
+      findings.addReason(ev.finding_id, reason, plain);
+      if (!reason.endsWith(' is critical')) {  // that one is said by the finding's own line
         const f = findings.cards.get(ev.finding_id)?.finding;
-        trace.addNote('review', S.steps.at(-1)?.step ?? 0, ev.finding_id, `${f?.cls ?? 'finding'} ${ev.finding_id} → human`,
-          /^iou /.test(ev.reason) ? `${ev.reason}: two looks disagree on a critical finding, so a person must check it` : ev.reason,
-          () => findings.focus(ev.finding_id));
+        trace.addNote('review', S.steps.at(-1)?.step ?? 0, ev.finding_id, `${f ? label(f.cls) : 'Finding'} ${ev.finding_id} → human`,
+          `${plain}, so a person must check it`, () => findings.focus(ev.finding_id), reason);
+        S.sent.push(`${f ? label(f.cls) : 'Finding'} ${ev.finding_id} goes to a person: ${plain}.`);
+        sayStep();
       }
       return 0;
     }
@@ -306,8 +333,18 @@ function handle(ev) {
   }
 }
 
+/** The newest step's NOTE with what its look found (its findings arrive with it): one narrated line per decision. */
+function sayStep() {
+  const step = S.steps.at(-1);
+  if (!step || viewport.cursor !== S.steps.length) return;  // the viewer has picked another step
+  const [look, ...more] = explain(step, S.planners.get(step.step));
+  const found = S.found.length ? `It found ${S.found.join(', ')}.` : '';
+  narrate(S.crit ?? look, [found, ...S.sent, S.crit ? look : '', ...more].filter(Boolean).join(' '));
+}
+
 function addStep(step) {
   const follow = viewport.cursor === S.steps.length;
+  Object.assign(S, { found: [], sent: [], crit: null });
   S.steps.push(step);
   trace.addStep(step, causeFrom(step));
   findings.refresh();
@@ -328,25 +365,27 @@ function addFinding(f) {
   if (!findings.add(f)) return 0;  // a re-measure of a known finding updates its card only
   const at = S.steps.at(-1)?.step ?? f.step;
   trace.addNote('finding', at, f.id,
-    `${f.cls} · ${px(f.measure?.area_px)} px²${f.critical ? ' → human sign-off requested' : ' · draft, no sign-off needed'}`,
+    `${label(f.cls)} · ${px(f.measure?.area_px)} px²${f.critical ? ' → human sign-off requested' : ' · draft, no sign-off needed'}`,
     f.critical ? ruleOf(f) : null, () => findings.focus(f.id));
-  if (!f.critical || S.critSeen) return 0;
-  S.critSeen = true;
-  narrate(`Critical: ${f.cls.replace('_', ' ')}, found at step ${at}. The agent cannot approve this; only you can, in step 4 once the run ends.`,
-    ruleOf(f) ? `rule: ${ruleOf(f)}` : '');
-  return HOLD;
+  S.found.push(`${words(f.cls)} (${f.critical ? 'critical' : 'a draft'})`);
+  const first = f.critical && !S.critSeen;
+  if (first) {
+    S.critSeen = true;
+    S.crit = `Critical: ${words(f.cls)}, found at step ${at}. The agent cannot approve this; only you can, in step 4 once the run ends.`;
+  }
+  sayStep();
+  return first ? HOLD : 0;
 }
 
 function pump() {
-  if (Q.timer) return;
-  while (Q.items.length) {
+  while (Q.items.length && (!Q.timer || JOINS.has(Q.items[0].type))) {
     const wait = handle(Q.items.shift());
     if (wait && !Q.skip) {
+      clearTimeout(Q.timer);  // a joining event may lengthen the pause of the step it joins
       Q.timer = setTimeout(() => {
         Q.timer = 0;
         pump();
       }, wait);
-      return;
     }
   }
 }
@@ -361,13 +400,26 @@ function skip() {
   pump();
 }
 
+const paced = () => (paceMs() > 0 ? ' (not counting the paced waits)' : '');
+
+/** " · server total …" from the job record's prep_ms {read, decode, privacy} (ms) and the agent's seconds; '' without it. */
+function serverTotal(seconds) {
+  const p = S.job?.prep_ms;
+  if (!p) return '';
+  const ms = ['read', 'decode', 'privacy'].reduce((t, k) => t + (num(p[k]) ? p[k] : 0), 0);
+  return ` · server total ${(seconds + ms / 1000).toFixed(2)} s (reading the upload, decode, privacy blur and the agent)`;
+}
+
 function arrive(ev) {
+  // a Resume keeps the killed run (and Resume) until the server's first record: a refused re-send loses nothing
+  if (S.opts.replay && !S.events.length && !['end', 'error'].includes(ev.type)) clearJob();
   if (ev.type === 'done') {
     S.arrived = ev;
     if (Q.timer || Q.items.length) {
+      S.slow = true;
       const n = S.events.filter((e) => e.type === 'step').length;
       el.text.textContent = `Replay: ${MOCK ? 'the recorded agent' : 'the agent'} took ${ev.summary.seconds} s for its ${n} decisions`  // a phone shows only the start
-        + `${S.job?.pace_ms > 0 ? ' (not counting the paced waits)' : ''}; shown at reading speed. Skip to end shows the result now.`;
+        + `${paced()}; we are showing it slowly so you can read it${serverTotal(ev.summary.seconds)}. Skip to end shows the result now.`;
     }
   }
   if (!['end', 'error'].includes(ev.type)) S.events.push(ev);
@@ -496,7 +548,8 @@ function finish(ev) {
   const n = sm.critical_pending;
   setMode('done', S.note ?? (ev.cause === 'kill-switch'
     ? `Halted by KILL at step ${sm.steps}: the trace shows kill-switch and the state is kept. Resume carries on.`
-    : `Done in ${sm.seconds} s of agent time: ${sm.steps} looks, ${(sm.pixels_frac * 100).toFixed(1)} % of the pixels.`));
+    : S.slow && !Q.skip ? `The agent took ${sm.seconds} s${paced()}; we replayed it slowly so you can read it${serverTotal(sm.seconds)}.`
+      : `Done in ${sm.seconds} s of agent time: ${sm.steps} looks, ${(sm.pixels_frac * 100).toFixed(1)} % of the pixels${serverTotal(sm.seconds)}.`));
   narrate(n ? `${n} critical finding${n === 1 ? ' needs' : 's need'} you. Sign ${n === 1 ? 'it' : 'them'} off in step 4: the agent cannot.`
     : 'Nothing critical was found, so nothing needs your sign-off.', haltText(ev.cause));
   findings.setReady();
@@ -538,14 +591,27 @@ async function run(opts = {}) {
   if (!S.image || S.mode === 'running') return;
   S.opts = opts;
   S.ctl = new AbortController();
-  Object.assign(S, { events: [], arrived: null, note: null });
+  Object.assign(S, { events: [], arrived: null, note: null, slow: false });
   clearTimeout(Q.timer);
   Object.assign(Q, { items: [], timer: 0, skip: Boolean(opts.killHint) });  // a KILL drill is shown live: never behind the job it asks to stop
-  const refocus = [el.look, el.runBar, el.resume, el.guided].includes(document.activeElement);  // all hidden or disabled while running
+  const active = document.activeElement;  // all hidden or disabled while running
+  const refocus = [el.look, el.runBar, el.resume, el.guided].includes(active) || el.recap.contains(active);
+  if (!opts.replay) clearJob();  // the last run goes at once: the page answers the click before the server does
   setMode('running', MOCK ? 'Recorded run: replaying a saved job (no server).'
     : opts.replay ? 'Resuming: re-sending the photo and replaying the moves so far…' : undefined);
+  narrate(MOCK ? 'Loading the recorded job…' : `Sending the photo (${(S.image.blob.size / 1e6).toFixed(1)} MB). On the server it is decoded, `
+    + 'and faces and people are blurred, before the agent’s first look.');
   if (refocus) el.skip.focus({ preventScroll: true });  // the safe next key press: show the result now
   scrollToViewer();
+  const t0 = performance.now();
+  const wait = setInterval(() => {  // until the server's first record, the wait counts up in the job bar
+    const waiting = S.mode === 'running' && !S.events.length;
+    if (waiting) el.count.textContent = `${((performance.now() - t0) / 1000).toFixed(1)} s`;
+    else {
+      clearInterval(wait);
+      if (S.mode === 'running' && !S.steps.length) el.count.textContent = '';
+    }
+  }, 100);
   try {
     for await (const ev of streamJob({ blob: S.image.blob, params: params(opts), replay: opts.replay, signal: S.ctl.signal })) arrive(ev);
     arrive({ type: 'end' });
@@ -553,7 +619,8 @@ async function run(opts = {}) {
     if (err.name === 'AbortError') return;
     const offline = err instanceof TypeError;  // fetch could not reach the server at all
     el.recorded.hidden = MOCK || !offline;
-    arrive({ type: 'error', message: offline ? 'Could not reach the API. Check your connection, or watch a recorded run instead.' : `The job failed: ${err.message}` });
+    arrive({ type: 'error', message: offline ? 'Could not reach the API. Check your connection, or watch a recorded run instead.'
+      : err.status === 429 ? err.message : `The job failed: ${err.message}` });
   }
 }
 
@@ -570,7 +637,7 @@ function kill() {
     S.note = `The job had already finished on the server (the agent took ${S.arrived.summary.seconds} s) before KILL could reach it; here is its result.`;
     return skip();
   }
-  if (MOCK || !S.job) return stop('');  // a recording (or a job not started yet) stops here
+  if (MOCK || !S.job || !S.events.length) return stop('');  // a recording, or a job (a Resume too) the server has not started yet
   postKill(S.job.job, S.job.kill_token);  // the server halts before its next look and sends the kill-switch record
   skip();
   el.text.textContent = 'KILL sent: the agent halts before its next look…';

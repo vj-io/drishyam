@@ -2,6 +2,7 @@
 // measurements), confidence last; critical ones wait for a human, whose decision lands on the card as a rubber stamp.
 import { h, dataUrl, num } from './dom.js';
 import { countUp, replay, sound } from './fx.js';
+import { label, words } from './panels.js';
 
 const PRINTABLE = /^[^\x00-\x1f\x7f]{1,64}$/;
 const STATE = { draft: 'draft', pending_review: 'needs review', approved: 'approved', rejected: 'rejected' };
@@ -10,7 +11,15 @@ const when = (at) => String(at ?? '').replace(ISO_UTC, '$1 $2 UTC');  // 2026-10
 const px = (v, d = 0) => (num(v) ? `${v.toLocaleString('en-US', { maximumFractionDigits: d })}` : '–');
 // Until the server sends `critical_rule`, the two rules drishyam/findings.py enforces, in words.
 const RULE = { exposed_rebar: 'exposed rebar is always critical', spalling: 'spalling of 40,000 px² or more is critical' };
-export const ruleOf = (f) => f.critical_rule ?? RULE[f.cls] ?? null;
+/** The rule that made a finding critical, in words: the server's `critical_rule` ("exposed_rebar: always critical",
+    "spalling 52,000 px² >= 40,000 px²") rephrased, or the rule above. */
+export function ruleOf(f) {
+  const r = f.critical_rule ?? '';
+  let m;
+  if ((m = r.match(/^(\w+): always critical$/))) return `${words(m[1])} is always critical`;
+  if ((m = r.match(/^(\w+) ([\d,]+) px² >= ([\d,]+) px²$/))) return `${words(m[1])} of ${m[2]} px² is critical (${m[3]} px² or more)`;
+  return r || (RULE[f.cls] ?? null);
+}
 const regionName = (r) => (r === 's0' ? 'Whole photo (survey look)' : `Region ${r}`);
 
 export class Findings {
@@ -87,21 +96,21 @@ export class Findings {
     card.className = `finding finding--${f.cls}${f.critical ? ' finding--critical' : ''}`;
   }
 
-  /** Why a review request was raised for finding `id` (shown on its card above the sign-off). */
-  addReason(id, reason) {
-    const list = this.reasons.get(id) ?? [];
-    if (!list.includes(reason)) list.push(reason);
+  /** Why a review request was raised for finding `id`, as recorded and in plain words (shown on its card above the sign-off). */
+  addReason(id, reason, plain = reason) {
+    const list = this.reasons.get(id) ?? new Map();
+    list.set(reason, plain);
     this.reasons.set(id, list);
     const card = this.cards.get(id);
     if (card?.review) card.review.why.replaceChildren(...this.why(card.finding));
   }
 
   why(f) {
-    const extra = (this.reasons.get(f.id) ?? []).filter((r) => !r.endsWith(' is critical'));
+    const extra = [...(this.reasons.get(f.id) ?? [])].filter(([r]) => !r.endsWith(' is critical')).map(([, plain]) => plain);
     return [
       h('b', {}, 'Why you: '),
-      [ruleOf(f), ...extra.map((r) => (/^iou /.test(r) ? `two looks disagree (${r})` : r))].filter(Boolean).join('; '),
-      num(f.verify_iou) ? `. Verify overlap ${f.verify_iou.toFixed(2)}` : '',
+      [ruleOf(f), ...extra].filter(Boolean).join('; '),
+      num(f.verify_iou) ? `. The latest check across zoom levels overlapped ${Math.round(f.verify_iou * 100)}\u00a0%` : '',
       f.unconfirmed ? '. Not confirmed at a finer level' : '',
       '.',
     ];
@@ -129,12 +138,12 @@ export class Findings {
     return {
       state,
       head: h('header', { class: 'finding__head' },
-        h('span', { class: `chip chip--cls chip--${f.cls}` }, f.cls),
+        h('span', { class: `chip chip--cls chip--${f.cls}` }, label(f.cls)),
         h('span', { class: 'finding__where' }, `found at step ${f.step}${refined}, L${f.level}`),
         state),
       body: h('div', { class: 'finding__body' },
         h('figure', { class: 'finding__fig' },
-          crop ? h('img', { class: 'finding__crop', src: crop, alt: `Crop of the ${f.cls} finding`, width: 128, height: 128 }) : h('div', { class: 'finding__crop finding__crop--none' }, 'no crop'),
+          crop ? h('img', { class: 'finding__crop', src: crop, alt: `Crop of the ${words(f.cls)} finding`, width: 128, height: 128 }) : h('div', { class: 'finding__crop finding__crop--none' }, 'no crop'),
           this.dim(m)),
         h('dl', { class: 'kv kv--px' },
           h('div', {}, h('dt', {}, 'length'), h('dd', {}, `${px(m.length_px, 1)} px`)),
