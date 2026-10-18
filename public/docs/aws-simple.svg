@@ -14,7 +14,7 @@
   .n { fill: #0F3B73; stroke: #FFC857; stroke-width: 2; }
   text { font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, 'DejaVu Sans Mono', monospace; font-size: 13px; fill: #B8CDEC; }
   .ti { font-family: 'Archivo Narrow', 'Arial Narrow', 'Roboto Condensed', Arial, sans-serif; font-weight: 700; font-size: 22px; fill: #E8F1FF; letter-spacing: .03em; }
-  .fs { font-size: 11px; }
+  .fs { font-size: 13px; }
   .h { font-weight: 700; font-size: 14px; fill: #E8F1FF; letter-spacing: .04em; }
   .nt { font-weight: 700; font-size: 12px; fill: #FFC857; }
   .am { fill: #FFC857; font-weight: 700; }
@@ -35,7 +35,7 @@
 <path class="cross" d="M332 640H350M341 631V649"/><circle class="cross" cx="341" cy="640" r="4"/>
 
 <text x="34" y="46" class="ti">DRISHYAM · ON AWS</text>
-<text x="34" y="64" class="fs">FIG. A-3 · the live demo's path, simplified</text>
+<text x="34" y="64" class="fs">the live demo's path, simplified</text>
 <line class="rule" x1="28" y1="74" x2="332" y2="74"/>
 
 <!-- 1 browser -->
@@ -89,5 +89,5 @@
 <text x="94" y="594" class="h">CLOUDWATCH</text>
 <text x="94" y="612">metrics + alarms</text>
 
-<text x="326" y="634" class="fs" text-anchor="end">full: docs/architecture.png · SCALE NTS</text>
+<text x="326" y="634" class="fs" text-anchor="end">full: docs/architecture.png · NTS</text>
 </svg>
