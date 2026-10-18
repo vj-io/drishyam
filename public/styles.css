@@ -844,7 +844,7 @@ input:checked + .switch__ui::after { transform: translateX(22px); background: va
 }
 
 @media (min-width: 1101px) {
-  .trace { max-height: 260px; }  /* the newest line stays on screen beside the photo while a run plays */
+  .trace { max-height: 240px; }  /* the newest line stays on screen beside the photo while a run plays (Linux fonts run taller) */
   .detail { max-height: 220px; overflow-y: auto; }  /* no taller than the crop beside it, so a long step never pushes the trace down */
 }
 @media (min-width: 1101px) and (min-height: 800px) {

@@ -486,7 +486,10 @@ def build_dataset(out_dir, n: int = 200, seed: int = 7, width: int = 2048, heigh
     if clean:
         k, (s, _, _, spec) = next((k, x) for k, x in enumerate(SAMPLES, 1) if x[1] == "Clean concrete")
         img, gt, extra = render(s, 3000, 2250, spec)
-        (out / "images" / f"bridge_{k:02d}.jpg").write_bytes(_jpeg_under(img, SAMPLE_LIMIT)[0].tobytes())
+        # the committed demo file itself: a re-encode is byte-identical only on the platform that wrote the sample
+        demo = Path(__file__).resolve().parents[1] / "public" / "samples" / f"bridge_{k:02d}.jpg"
+        (out / "images" / f"bridge_{k:02d}.jpg").write_bytes(
+            demo.read_bytes() if demo.exists() else _jpeg_under(img, SAMPLE_LIMIT)[0].tobytes())
         images.append({"id": f"bridge_{k:02d}", "file": f"images/bridge_{k:02d}.jpg", "width": 3000, "height": 2250,
                        "boxes": gt, "distractors": extra})
     name = f"synthetic-clean-{len(images)}" if clean else f"synthetic-{n}"
