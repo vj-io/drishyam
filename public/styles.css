@@ -719,6 +719,7 @@ input:checked + .switch__ui::after { transform: translateX(22px); background: va
 .faq dt { margin-bottom: 6px; font: 700 18px/1.2 var(--f-title); letter-spacing: .05em; text-transform: uppercase; color: var(--amber); }
 .faq dd { margin: 0; font-size: 13.5px; line-height: 1.6; }
 .faq a { color: var(--amber); }
+.win--loop { margin: 0; }  /* a <figure>: without this the browser's 40 px side margins inset it */
 .loop__img { display: block; width: 100%; height: auto; }
 .loop__link, .aws__link { display: block; }
 .loop__hint { display: none; }  /* phones only: the drawing is too dense to read at 375 px, so it opens full size */

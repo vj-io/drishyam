@@ -862,6 +862,8 @@ def test_mobile(browser, base):
     s.scroll_through()
     off = hscroll_offenders(p)
     assert off["sw"] <= 375 and not off["off"], f"horizontal overflow before the run: {off}"
+    loop, aws = (p.locator(sel).bounding_box() for sel in ("#loop", "[aria-labelledby=t-aws]"))
+    assert [round(loop[k]) for k in ("x", "width")] == [round(aws[k]) for k in ("x", "width")], f"FIG. 3.0 is inset from its neighbours: {loop} {aws}"
     s.shot("mobile-hero.png")
     p.click("#look")
     expect(p.locator("#kill")).to_be_visible()
