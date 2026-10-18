@@ -185,16 +185,20 @@ async def _api_headers(request: Request, call_next):
 def build_facts() -> dict:
     """The OpenCV build facts a reviewer asks about, read from cv2.getBuildInformation(): the custom HAL (the Lambda's
     aarch64 wheel names carotene and KleidiCV there), the CPU baseline and dispatched SIMD sets, the parallel framework,
-    and the ENGINE_* names cv2.dnn exposes. A line the build does not print is None."""
+    the `ONNX Runtime` line, and the cv2.dnn engines this build can run: the ENGINE_* names cv2.dnn exposes, without
+    `ort` unless the ONNX Runtime line says YES (the constant exists whether or not that backend is built in).
+    A line the build does not print is None."""
     info = cv2.getBuildInformation()
 
     def line(label: str) -> str | None:
         m = re.search(rf"^\s*{re.escape(label)}:[ \t]*(\S.*?)\s*$", info, re.MULTILINE)
         return m.group(1) if m else None
 
+    ort = line("ONNX Runtime")
+    engines = sorted(n.removeprefix("ENGINE_").lower() for n in dir(cv2.dnn) if n.startswith("ENGINE_"))
     return {"hal": line("Custom HAL"), "cpu_baseline": line("Baseline"), "cpu_dispatch": line("Dispatched code generation"),
-            "parallel": line("Parallel framework"),
-            "dnn_engines": sorted(n.removeprefix("ENGINE_").lower() for n in dir(cv2.dnn) if n.startswith("ENGINE_"))}
+            "parallel": line("Parallel framework"), "onnx_runtime": ort,
+            "dnn_engines": [e for e in engines if e != "ort" or str(ort).startswith("YES")]}
 
 
 BUILD = build_facts()  # fixed for the process: read once, not per request

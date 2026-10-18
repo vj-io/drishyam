@@ -45,7 +45,7 @@ def test_health_and_security_headers():
     assert client.get("/docs").status_code == 404 and client.get("/openapi.json").status_code == 404
     b = h["cv2_build"]  # this process's own build, as cv2.getBuildInformation() prints it
     info = cv2.getBuildInformation()
-    assert set(b) == {"hal", "cpu_baseline", "cpu_dispatch", "parallel", "dnn_engines"}
+    assert set(b) == {"hal", "cpu_baseline", "cpu_dispatch", "parallel", "onnx_runtime", "dnn_engines"}
     for key, label in (("hal", "Custom HAL"), ("cpu_baseline", "Baseline"), ("parallel", "Parallel framework")):
         assert b[key] and f"{label}:" in info and b[key] in info, key
     assert "new" in b["dnn_engines"]  # OpenCV 5's cv2.dnn.ENGINE_NEW, the opt-in ONNX segmenter's engine
@@ -66,6 +66,19 @@ def test_build_facts_read_the_hal_line_of_an_arm_build(monkeypatch):
     assert (b["cpu_baseline"], b["cpu_dispatch"]) == ("NEON FP16", "NEON_DOTPROD NEON_FP16 NEON_BF16")
     monkeypatch.setattr(web.cv2, "getBuildInformation", lambda: "General configuration for OpenCV 5.0.0\n")
     assert web.build_facts()["hal"] is None
+
+
+def test_build_facts_list_ort_only_when_onnx_runtime_is_built_in(monkeypatch):
+    """cv2.dnn.ENGINE_ORT exists whether or not the wheel was built with ONNX Runtime: the build line decides."""
+    from drishyam import web
+
+    monkeypatch.setattr(web.cv2.dnn, "ENGINE_ORT", 3, raising=False)
+    for printed, listed in (("NO", False), ("YES (ver 1.20.0)", True)):
+        monkeypatch.setattr(web.cv2, "getBuildInformation", lambda p=printed: f"  ONNX Runtime:                  {p}\n")
+        b = web.build_facts()
+        assert b["onnx_runtime"] == printed and ("ort" in b["dnn_engines"]) is listed, printed
+    monkeypatch.setattr(web.cv2, "getBuildInformation", lambda: "General configuration for OpenCV 5.0.0\n")
+    assert "ort" not in web.build_facts()["dnn_engines"]  # no line: not claimed
 
 
 def test_health_names_the_dacl10k_licence(monkeypatch):

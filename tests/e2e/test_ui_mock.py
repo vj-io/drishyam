@@ -182,7 +182,8 @@ def contract_events():
 LIVE = {"plans": [], "jobs": [], "kills": [], "reviews": [], "order": None, "tokens": 0, "fixture_delay": 0}
 # build facts in the shape /api/health sends them, aarch64-style values made up for the test (tests/test_web.py checks the parser)
 HEALTH_BUILD = {"hal": "YES (carotene (ver 0.0.1) KleidiCV (ver 0.6.0))", "cpu_baseline": "NEON FP16",
-                "cpu_dispatch": "NEON_DOTPROD NEON_FP16", "parallel": "pthreads", "dnn_engines": ["auto", "classic", "new", "ort"]}
+                "cpu_dispatch": "NEON_DOTPROD NEON_FP16", "parallel": "pthreads", "onnx_runtime": "NO",
+                "dnn_engines": ["auto", "classic", "new"]}
 
 
 def reset_live(plans):
@@ -710,7 +711,7 @@ def test_live_api_contract(browser, base):
     expect(p.locator("#live-where")).to_contain_text("on local (x86_64)")
     expect(p.locator("#api-build")).to_have_text(  # the OpenCV build facts /api/health reads from cv2.getBuildInformation()
         "Custom HAL: YES (carotene (ver 0.0.1) KleidiCV (ver 0.6.0)) · parallel framework: pthreads · CPU baseline: NEON FP16"
-        " · dispatched: NEON_DOTPROD NEON_FP16 · cv2.dnn engines: auto, classic, new, ort")
+        " · dispatched: NEON_DOTPROD NEON_FP16 · cv2.dnn engines built in: auto, classic, new · ONNX Runtime: NO")
     expect(p.locator("#recorded")).to_be_hidden()
     expect(p.locator("#look")).to_be_enabled(timeout=T)        # the first sample is preselected
     expect(p.locator(".thumb[aria-pressed='true']")).to_have_count(1)

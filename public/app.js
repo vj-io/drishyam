@@ -853,7 +853,8 @@ health().then((hl) => {
   if (b) {
     $('#api-build').textContent = [b.hal && `Custom HAL: ${b.hal}`, b.parallel && `parallel framework: ${b.parallel}`,
       b.cpu_baseline && `CPU baseline: ${b.cpu_baseline}`, b.cpu_dispatch && `dispatched: ${b.cpu_dispatch}`,
-      Array.isArray(b.dnn_engines) && b.dnn_engines.length && `cv2.dnn engines: ${b.dnn_engines.join(', ')}`].filter(Boolean).join(' · ');
+      Array.isArray(b.dnn_engines) && b.dnn_engines.length && `cv2.dnn engines built in: ${b.dnn_engines.join(', ')}`,
+      b.onnx_runtime && `ONNX Runtime: ${b.onnx_runtime}`].filter(Boolean).join(' · ');
     $('#api-build').hidden = false;
   }
   el.recorded.hidden = MOCK || Boolean(hl?.ok);
