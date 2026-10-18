@@ -1,6 +1,6 @@
 # Drishyam segmenter: dacl10k training and ONNX export (FR-4)
 
-Fine-tune a MobileNetV3 UNet on dacl10k on Kaggle, export one ONNX that outputs Drishyam's six classes directly,
+Fine-tune a MobileNetV3 UNet on dacl10k on Kaggle (or Colab, section 4), export one ONNX that outputs Drishyam's six classes directly,
 and prove it matches PyTorch when run through `drishyam.segment.OnnxSegmenter` on OpenCV 5 DNN `ENGINE_NEW`.
 
 ## Kaggle in 6 steps
@@ -78,7 +78,7 @@ The PRD says to look before training. Nothing is usable as a drop-in; nothing wa
   treat it as non-commercial. It is the only credible public weight set. It cannot be fine-tuned into this
   pipeline (a different architecture), and SegFormer's attention graph is a risky fit for OpenCV DNN with dynamic H x W,
   so I did not build on it. Use: a teacher for sanity checks or distillation if our MobileNetV3 lands far below
-  the paper's 0.320 validation mIoU.
+  the paper's 0.320 validation mIoU for DeepLabv3+ with MobileNetV3-Large (arXiv:2309.00460, Table 3).
 - **[Sarim-MBZUAI/Architect_eye](https://github.com/Sarim-MBZUAI/Architect_eye)**: FPN + EfficientNet-B4, weights in a SharePoint
   folder, no licence stated. Not used.
 - [Voxel51/dacl10k](https://huggingface.co/datasets/Voxel51/dacl10k) is a FiftyOne copy of the data (8,922 samples),
@@ -114,7 +114,7 @@ Source of the 19 names and their channel order: `Dacl10kDataset.TARGET_LIST` in
 | 15 | Drainage | background (dropped) | Structural object |
 | 16 | PEquipment | background (dropped) | Structural object |
 | 17 | JTape | background (dropped) | Structural object |
-| 18 | WConccor | spalling (merged) | Planar surface erosion; the PRD calls out spalling vs rockpocket vs washout confusion, and the best paper model scores only 0.085 / 0.121 IoU on it (val / test), so a separate class would be mostly noise |
+| 18 | WConccor | spalling (merged) | Planar surface erosion; the PRD calls out spalling vs rockpocket vs washout confusion, and the best paper model (FPN, EfficientNet-B4, auxiliary loss) scores only 0.085 / 0.121 IoU on it (val / test; the paper's Table 4), so a separate class would be mostly noise |
 
 Counts: 5 kept 1:1 (Crack, Spalling, Efflorescence, ExposedRebars, and Rust renamed to corrosion), 1 merged into crack
 (ACrack), 4 merged into spalling (Rockpocket, Hollowareas, Cavity, WConccor), 9 dropped to
@@ -141,7 +141,8 @@ sigmoid-derived probabilities of merged classes over-counts. So the merge is exp
 ## 4. Data
 
 dacl10k v2 "devphase": 6,935 train + 975 validation images with labelme polygons (test labels are withheld, so
-validation mIoU is the only local number). Licence **CC BY-NC 4.0**: keep it out of the repo and off EC2.
+validation mIoU is the only local number; the epoch is chosen on it too, so it is not a held-out score). Licence
+**CC BY-NC 4.0**: keep the data out of the repo.
 
 ```
 <root>/annotations/{train,validation}/*.json
@@ -201,7 +202,9 @@ zoomed crop of the full-resolution photo (the virtual-PTZ regime). Lower `--batc
   set), then the same for the five merged Drishyam defect classes (a Drishyam class is on if any mapped channel is).
 - Expected time: **roughly 2 to 4 GPU hours for 30 epochs** on a T4 (an estimate from model size, not measured: this
   Mac has no GPU). That is well inside the 30 h/week quota; the data loader (4 vCPUs) should keep up.
-- Target: the paper's MobileNetV3 DeepLabV3+ scores 0.320 validation mIoU; anything near 0.3 is fit for purpose.
+- Reference: the paper's DeepLabv3+ with a MobileNetV3-Large encoder scores 0.320 validation mIoU without auxiliary
+  loss and 0.329 with it (arXiv:2309.00460, Table 3). Ours is measured on the split that chose its epoch, so a number
+  near that is a sanity check, not a held-out result; whether the model helps is for the CODEBRIM eval to show.
   `--arch deeplabv3plus` is the like-for-like model (4.7 M params against UNet's 6.7 M).
 
 ## 6. Export and parity
@@ -255,8 +258,9 @@ To take the model off the live site later, deploy again without them:
 scripts/aws.sh deploy
 ```
 
-Publish to the Hugging Face Hub so the EC2 box can pull it (the weights inherit dacl10k's non-commercial licence, so say
-**CC BY-NC 4.0 (trained on dacl10k)** in the model card, with the `metrics.json` table):
+To publish the weights outside git, for example on the Hugging Face Hub (they inherit dacl10k's non-commercial licence,
+so say **CC BY-NC 4.0 (trained on dacl10k)** in the model card, with the `metrics.json` table, and upload the licence
+file with them):
 
 ```
 hf auth login
@@ -264,6 +268,7 @@ hf repo create <user>/drishyam-dacl10k-unet-mnv3 --repo-type model
 hf upload <user>/drishyam-dacl10k-unet-mnv3 models/drishyam_dacl10k.onnx
 hf upload <user>/drishyam-dacl10k-unet-mnv3 models/drishyam_dacl10k.fp16.onnx
 hf upload <user>/drishyam-dacl10k-unet-mnv3 training/class_map.json
+hf upload <user>/drishyam-dacl10k-unet-mnv3 models/LICENSE.drishyam_dacl10k
 ```
 
 ## 8. Smoke test on the Intel Mac (no dataset, no downloads)
@@ -287,10 +292,12 @@ These are the notebook's pins, plus timm 1.0.30, the version all nine tests in `
 torch 2.2.2 (2026-10-18). On Kaggle torch, torchvision and timm stay the image's own; which versions a run used is in
 its `run_info.json` (zipped with the weights, and copied into `models/README.md` by `scripts/install_model.sh`).
 
-Then undo the install (smoke weights are noise):
+The install overwrites `models/drishyam_dacl10k.*`, including real trained weights, which git does not hold: run the
+smoke test in a checkout without them, or copy them aside first. Then undo the install (smoke weights are noise):
 
 ```
-git checkout models/README.md README.md && rm models/drishyam_dacl10k.*
+git checkout models/README.md README.md models/drishyam_dacl10k.metrics.json
+rm -f models/drishyam_dacl10k.onnx models/drishyam_dacl10k.fp16.onnx models/drishyam_dacl10k.run_info.json
 ```
 
 The first command is the notebook's whole path (train, export into `/tmp/run/onnx`, parity on noise crops,
