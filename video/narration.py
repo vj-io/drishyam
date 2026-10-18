@@ -110,6 +110,7 @@ def lines(D):
     add("arch", "a1", "CloudFront and a rate-limiting firewall front a signed Function URL and the arm Lambda.")
     add("arch", "a2", "DynamoDB holds the kill flags, Secrets Manager the signing key, and CloudWatch the alarms.")
     add("arch", "a3", "OpenCV does the looking: a pyramid, saliency, ", ("warp perspective", "warpPerspective"), " as a virtual pan-tilt-zoom camera, a blur gate, and face blurring.")
+    assert h["segmenter"].startswith("classical"), "a4 says the live site uses the classical segmenter"
     add("arch", "a4", "Live, it uses the classical segmenter; OpenCV ", CV, "'s new DNN engine is on the optional ONNX path.")
     lo, hi = a["p95"]
     add("arch", "a5", "On Lambda, a step took ", (f"{words(round(lo))} to {words(round(hi))} milliseconds", f"{round(lo)} to {round(hi)} ms"), " at ", P95,
@@ -123,7 +124,7 @@ def lines(D):
     add("results", "r3", "Drishyam scores ", (f"{dec(s['ds_ratio'])} times", f"{s['ds_ratio']:.2f}×"), " one downscaled pass: the downscale does as well, or slightly better.")
     assert lg["ds_ci"][0] > 1.0 and lg["l2"]["recall"] >= lg["head"]["recall"] and lg["l2"]["pixels_frac"] < lg["head"]["pixels_frac"]
     add("results", "r4", f"On larger photos it beats one downscale, which reads a {ORD[round(lg['head']['pixels_frac'] / lg['ds']['pixels_frac'])]} as many pixels; "
-        f"{ORD[g['l2_div']]}-size tiling does as well with fewer.")
+        f"{ORD[lg['l2_div']]}-size tiling does as well with fewer.")
     assert all(ab[d]["no-survey"] < 1 and ab[d]["vs"]["no-survey"] == "below the full agent" for d in ab) and ab["synth200"]["random_lo"] >= 0.95
     assert all(ab[d][v] == 1.0 and ab[d]["vs"][v] == "no measurable difference" for d in ab for v in ("no-uncertainty", "governor-on")), "r5 says these change nothing"
     assert all(ab[d]["vs"]["no-verify"] in ("no measurable difference", "above the full agent") for d in ab), "r5 says dropping verify costs no recall"

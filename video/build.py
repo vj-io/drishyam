@@ -88,6 +88,11 @@ def arm_of(summary):
     return re.match(r"results/([^/ ]+?)(?:-dacl10k)?/", summary["cost_model"]["source"])[1]
 
 
+def half(n):
+    """cv2.pyrDown's output side: half, rounded up (data() checks it against the guided job's recorded levels)"""
+    return (n + 1) // 2
+
+
 def in_text(rel, *phrases):
     """Each phrase is in the file (case and whitespace folded): scene text typed in film.js is checked against its source."""
     t = re.sub(r"[\s*]+", " ", (ROOT / rel).read_text()).lower()
@@ -130,6 +135,8 @@ def data(model=MODEL):
                   "l2": pts(s["policies"]["tiling"])[0], "ds": pts(s["policies"]["downscale"])[0],
                   "ds_ratio": src("4608 px: recall vs one downscale", hs["recall_ratio_vs_downscale"], f, "headline_stats.recall_ratio_vs_downscale"),
                   "ds_ci": src("its 95 % CI", hs["recall_ratio_vs_downscale_ci"], f, "headline_stats.recall_ratio_vs_downscale_ci")}
+    w = D["large"]["size"][0]; assert w % half(half(w)) == 0
+    D["large"]["l2_div"] = src("4608 px: full width / L2 width (the tiling level called quarter-size)", w // half(half(w)), f, "dataset size, halved twice by pyrDown's rule (job.levels in video/live/guided.ndjson)")
     src("4608 px headline point: pixels, recall", [D["large"]["head"]["pixels_frac"], D["large"]["head"]["recall"]], f, "policies.drishyam[pixels_frac <= 0.3][-1]")
     src("4608 px L2 tiling: pixels, recall", [D["large"]["l2"]["pixels_frac"], D["large"]["l2"]["recall"]], f, "policies.tiling[min pixels_frac] (L2)")
     src("4608 px one downscale: pixels, recall", [D["large"]["ds"]["pixels_frac"], D["large"]["ds"]["recall"]], f, "policies.downscale[0]")
@@ -211,12 +218,12 @@ def data(model=MODEL):
               and not any(overlaps(b["box"], x["box"]) for x in fin.values())]
     assert [b["cls"] for b in missed] == ["crack"], missed
     lv = job["levels"]
+    assert all(lv[k + 1] == [half(x) for x in lv[k]] for k in range(len(lv) - 1)), f"each pyramid level halves the last, rounding up: {lv}"
     assert lv[0][0] % lv[3][0] == 0 and steps[0]["cause"] == "survey" and steps[0]["rationale"].startswith("one L3 look"), steps[0]
     D["guided"] = {"pixels_frac": src("guided run: share of pixels read", done["summary"]["pixels_frac"], f, "done.summary.pixels_frac"),
                    "critical": src("guided run: critical findings", done["summary"]["critical_pending"], f, "done.summary.critical_pending"),
                    "seconds": src("guided run: agent seconds", done["summary"]["seconds"], f, "done.summary.seconds"),
                    "survey_div": src("survey look: full width / L3 width", lv[0][0] // lv[3][0], f, "job.levels[0][0] / job.levels[3][0]"),
-                   "l2_div": src("L2 (the tiling level called quarter-size): full width / L2 width", lv[0][0] // lv[2][0], f, "job.levels[0][0] / job.levels[2][0]"),
                    "privacy": src("privacy pass: faces, people, vehicles blurred", [job["privacy"][k] for k in ("faces_blurred", "people_blurred", "vehicles_blurred")], f, "job.privacy"),
                    "entropy1": src("step 2 entropy (the zoom decision)", steps[0]["observation"]["entropy"], f, f"step[1].observation.entropy; step[2] rationale '{zoom['rationale']}'"),
                    "tau": src("entropy threshold", tau, f, "step[cause=entropy>tau].rationale"),
@@ -239,7 +246,7 @@ def data(model=MODEL):
     f = "video/live/tamper.json"; t = load(f)
     D["tamper"] = {"status": src("tampered token: HTTP status", t["status"], f, "status"), "error": src("tampered token: error", t["response"]["error"], f, "response.error")}
     f = "video/live/health.json"; h = load(f)
-    D["health"] = {k: src(f"/api/health {k}", h[k], f, k) for k in ("opencv", "arch", "host", "build", "commit")}
+    D["health"] = {k: src(f"/api/health {k}", h[k], f, k) for k in ("opencv", "arch", "host", "build", "commit", "segmenter")}
 
     # MCP session
     f = "docs/mcp-session/exchange.jsonl"; ex = ndjson(f)
@@ -253,13 +260,16 @@ def data(model=MODEL):
                 "job": src("MCP: job id", ex[0]["content"][0]["value"]["job"], f, "[tool=open_image].content[0].value.job")}
     hr = next(e for e in ex if e["tool"] == "request_human_review" and e["n"] > ver[0]["n"])
     assert "always critical" in hr["args"]["reason"] and ver[0]["content"][0]["value"]["agrees"] is False, hr
+    D["mcp"]["rows"] = mcp_rows()
     D["mcp"]["crops"] = {}
-    for crop in ("crops/img-004-1.jpg", "crops/img-016-1.jpg"):   # the two gaze crops the chapter shows, by the call that returned them
+    for crop, lab in (("crops/img-004-1.jpg", "three rust bars"), ("crops/img-016-1.jpg", "a spall")):   # the two gaze crops the chapter shows, by the call that returned them
         e = next(e for e in ex if any(c.get("file") == crop for c in e["content"]))
-        D["mcp"]["crops"][crop] = src(f"MCP: call that returned {crop}, its level", [e["n"], e["args"]["level"]], f, "[content.file=crop].n, .args.level")
+        why = next(r["why"] for r in D["mcp"]["rows"] if r["n"] == e["n"])
+        assert lab in why.lower(), f"transcript.md call {e['n']} no longer says {lab!r}: {why}"
+        D["mcp"]["crops"][crop] = src(f"MCP: call that returned {crop}, its level, its label", [e["n"], e["args"]["level"], lab], f"{f}; docs/mcp-session/transcript.md",
+                                      "[content.file=crop].n, .args.level; the label is in that call's 'why' cell")
     tr = (ROOT / "docs/mcp-session/transcript.md").read_text()
     D["mcp"]["missed_box"] = src("MCP: the large spall it missed (box)", re.search(r"\(box (\d+,\d+,\d+,\d+)\)", tr)[1], "docs/mcp-session/transcript.md", "'(box x,y,w,h)' after the call table")
-    D["mcp"]["rows"] = mcp_rows()
     src("MCP call table: call, what came back, why", f"{len(D['mcp']['rows'])} rows", "docs/mcp-session/transcript.md", "'How each measurement chose the next call' table")
 
     # AWS facts
@@ -327,6 +337,8 @@ def data(model=MODEL):
         "cites": src("problem-sheet citations", in_text("docs/impact-sources.md", "FHWA, Bridge Condition by Highway System 2026", "23 CFR 650.311", "SPR 787", "Table 4.1"), "docs/impact-sources.md", "sections 1, 2, 5"),
         "client": src("MCP client", in_text("docs/mcp-session/transcript.md", "Claude (Opus 5.5) inside Claude Code"), "docs/mcp-session/transcript.md", "line 4"),
         "graviton": src("Lambda CPU", in_text("docs/aws.md", "arm64 (Graviton)"), "docs/aws.md", "line 4"),
+        "behind": src("health card: what the Lambda sits behind", in_text("README.md", "behind CloudFront"), "README.md", "Live demo line"),
+        "stack": src("reproduce sheet: what the CDK stack is", in_text("infra/drishyam_stack.py", "Lambda arm64 behind CloudFront and WAF"), "infra/drishyam_stack.py", "stack description"),
         "title": src("cold-open title", in_text("public/index.html", "ONE PHOTO, A FEW LOOKS, ONE HUMAN"), "public/index.html", "the site's figure note"),
         "limits": src("limits, in the site's words", in_text("public/index.html", "Pixels, not millimetres", "AI-assisted, not an inspection", "Only a person can approve",
                                                              "Its licence does not allow sharing the photos"), "public/index.html", "footer note, Human sign-off, the CODEBRIM citation"),
@@ -494,6 +506,8 @@ def cues(placed):
             d = l["dur"] * len(p) / total
             out.append({"t": round(t, 3), "end": round(t + d, 3), "text": p, "id": l["id"]})
             t += d
+    for k, c in enumerate(out):   # each cue lingers 0.25 s, never into the next one; film.js and the VTT both stop at `stop`
+        c["stop"] = round(min(c["end"] + 0.25, out[k + 1]["t"] - 0.01) if k + 1 < len(out) else c["end"] + 0.25, 3)
     return out
 
 
@@ -502,9 +516,8 @@ def vtt(cs, path):
         h, r = divmod(x, 3600); m, s = divmod(r, 60)
         return f"{int(h):02d}:{int(m):02d}:{s:06.3f}"
     body = ["WEBVTT", ""]
-    for k, c in enumerate(cs, 1):   # each cue lingers 0.25 s, never into the next one
-        stop = min(c["end"] + 0.25, cs[k]["t"] - 0.01) if k < len(cs) else c["end"] + 0.25
-        body += [str(k), f"{ts(c['t'])} --> {ts(stop)}", c["text"], ""]
+    for k, c in enumerate(cs, 1):
+        body += [str(k), f"{ts(c['t'])} --> {ts(c['stop'])}", c["text"], ""]
     path.write_text("\n".join(body))
 
 
@@ -561,6 +574,7 @@ REQS = [   # competition requirement -> where the film covers it (scene ids or n
 
 def plan_tables(scenes, placed, D):
     def mmss(x):
+        x = round(x, 1)
         return f"{int(x // 60)}:{x % 60:04.1f}"
     L = {l["id"]: l for l in placed}
     req = ["| Requirement | Covered by | From | To |", "| --- | --- | --- | --- |"]

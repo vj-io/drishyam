@@ -174,6 +174,7 @@ again (4 job starts, about 3 minutes):
 | 4608 px photo size (px) | [4608, 3456] | `public/results/large/summary.json` | dataset |
 | 4608 px: recall vs one downscale | 1.1176 | `public/results/large/summary.json` | headline_stats.recall_ratio_vs_downscale |
 | its 95 % CI | [1.0191, 1.2208] | `public/results/large/summary.json` | headline_stats.recall_ratio_vs_downscale_ci |
+| 4608 px: full width / L2 width (the tiling level called quarter-size) | 4 | `public/results/large/summary.json` | dataset size, halved twice by pyrDown's rule (job.levels in video/live/guided.ndjson) |
 | 4608 px headline point: pixels, recall | [0.2822, 0.5059] | `public/results/large/summary.json` | policies.drishyam[pixels_frac <= 0.3][-1] |
 | 4608 px L2 tiling: pixels, recall | [0.0988, 0.5296] | `public/results/large/summary.json` | policies.tiling[min pixels_frac] (L2) |
 | 4608 px one downscale: pixels, recall | [0.0494, 0.4527] | `public/results/large/summary.json` | policies.downscale[0] |
@@ -234,7 +235,6 @@ again (4 job starts, about 3 minutes):
 | guided run: critical findings | 3 | `video/live/guided.ndjson` | done.summary.critical_pending |
 | guided run: agent seconds | 0.712 | `video/live/guided.ndjson` | done.summary.seconds |
 | survey look: full width / L3 width | 8 | `video/live/guided.ndjson` | job.levels[0][0] / job.levels[3][0] |
-| L2 (the tiling level called quarter-size): full width / L2 width | 4 | `video/live/guided.ndjson` | job.levels[0][0] / job.levels[2][0] |
 | privacy pass: faces, people, vehicles blurred | [0, 0, 0] | `video/live/guided.ndjson` | job.privacy |
 | step 2 entropy (the zoom decision) | 0.6931 | `video/live/guided.ndjson` | step[1].observation.entropy; step[2] rationale 'entropy 0.69 > 0.5 at L3' |
 | entropy threshold | 0.5 | `video/live/guided.ndjson` | step[cause=entropy>tau].rationale |
@@ -255,14 +255,15 @@ again (4 job starts, about 3 minutes):
 | /api/health host | aws-lambda | `video/live/health.json` | host |
 | /api/health build | stock (not COOL) | `video/live/health.json` | build |
 | /api/health commit | ca690371bf3c21eb5efc61f58f9048322a41ec52 | `video/live/health.json` | commit |
+| /api/health segmenter | classical-v1 | `video/live/health.json` | segmenter |
 | MCP: first verify call | 6 | `docs/mcp-session/exchange.jsonl` | [tool=verify][0].n |
 | MCP: its IoU | 0.0 | `docs/mcp-session/exchange.jsonl` | [tool=verify][0].content[0].value.iou |
 | MCP: second verify call | 18 | `docs/mcp-session/exchange.jsonl` | [tool=verify][1].n |
 | MCP: its IoU | 0.719 | `docs/mcp-session/exchange.jsonl` | [tool=verify][1].content[0].value.iou |
 | MCP: the budget check | 20 | `docs/mcp-session/exchange.jsonl` | [tool=runtime_stats].n |
 | MCP: job id | j_90a925 | `docs/mcp-session/exchange.jsonl` | [tool=open_image].content[0].value.job |
-| MCP: call that returned crops/img-004-1.jpg, its level | [4, 1] | `docs/mcp-session/exchange.jsonl` | [content.file=crop].n, .args.level |
-| MCP: call that returned crops/img-016-1.jpg, its level | [16, 1] | `docs/mcp-session/exchange.jsonl` | [content.file=crop].n, .args.level |
+| MCP: call that returned crops/img-004-1.jpg, its level, its label | [4, 1, "three rust bars"] | `docs/mcp-session/exchange.jsonl; docs/mcp-session/transcript.md` | [content.file=crop].n, .args.level; the label is in that call's 'why' cell |
+| MCP: call that returned crops/img-016-1.jpg, its level, its label | [16, 1, "a spall"] | `docs/mcp-session/exchange.jsonl; docs/mcp-session/transcript.md` | [content.file=crop].n, .args.level; the label is in that call's 'why' cell |
 | MCP: the large spall it missed (box) | 1326,1296,570,529 | `docs/mcp-session/transcript.md` | '(box x,y,w,h)' after the call table |
 | MCP call table: call, what came back, why | 23 rows | `docs/mcp-session/transcript.md` | 'How each measurement chose the next call' table |
 | WAF: job starts | 10 | `public/docs/aws-simple.svg` | <desc> 'WAF rate limit (10 job starts per 120 s per IP)' |
@@ -285,6 +286,8 @@ again (4 job starts, about 3 minutes):
 | problem-sheet citations | ["FHWA, Bridge Condition by Highway System 2026", "23 CFR 650.311", "SPR 787", "Table 4.1"] | `docs/impact-sources.md` | sections 1, 2, 5 |
 | MCP client | Claude (Opus 5.5) inside Claude Code | `docs/mcp-session/transcript.md` | line 4 |
 | Lambda CPU | arm64 (Graviton) | `docs/aws.md` | line 4 |
+| health card: what the Lambda sits behind | behind CloudFront | `README.md` | Live demo line |
+| reproduce sheet: what the CDK stack is | Lambda arm64 behind CloudFront and WAF | `infra/drishyam_stack.py` | stack description |
 | cold-open title | ONE PHOTO, A FEW LOOKS, ONE HUMAN | `public/index.html` | the site's figure note |
 | limits, in the site's words | ["Pixels, not millimetres", "AI-assisted, not an inspection", "Only a person can approve", "Its licence does not allow sharing the photos"] | `public/index.html` | footer note, Human sign-off, the CODEBRIM citation |
 | reproduce: what make test runs | unit, API, MCP, CLI and eval tests (same as CI) | `Makefile` | 'test:' comment |
@@ -307,7 +310,7 @@ again (4 job starts, about 3 minutes):
 | l1 | 0:46.1 | The live site runs on AWS: OpenCV five, on an arm Lambda. | The live site runs on AWS: OpenCV 5, on an arm Lambda. |
 | l2 | 0:51.4 | Watch it inspect a bridge. A privacy pass runs first; nothing to blur here. | Watch it inspect a bridge. A privacy pass runs first; nothing to blur here. |
 | l3 | 0:56.4 | One survey look at the whole photo, at one eighth size. | One survey look at the whole photo, at one eighth size. |
-| l4 | 0:60.0 | Entropy zero point six nine is above one half. Unsure, so it zooms in. | Entropy 0.69 is above 0.5. Unsure, so it zooms in. |
+| l4 | 1:00.0 | Entropy zero point six nine is above one half. Unsure, so it zooms in. | Entropy 0.69 is above 0.5. Unsure, so it zooms in. |
 | l5 | 1:05.0 | Then it moves to the best region, and double-checks at full resolution. | Then it moves to the best region, and double-checks at full resolution. |
 | l6 | 1:09.0 | At full resolution the masks disagree: unconfirmed. Exposed rebar always goes to a person. | At full resolution the masks disagree: unconfirmed. Exposed rebar always goes to a person. |
 | l7 | 1:15.6 | Then a second spall. It stops when the next look costs more than it is worth, and so it misses a crack in a region it never visited. | Then a second spall. It stops when the next look costs more than it is worth, and so it misses a crack in a region it never visited. |

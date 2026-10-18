@@ -162,7 +162,7 @@ function drawFrame(t) {
     css(railCall, { opacity: Math.min(p, q), transform: `scale(${(0.85 + 0.15 * spring(seg(t, call.t0, call.t0 + 0.6))).toFixed(3)})` }); railNote.style.opacity = 0; }
   else { railCall.style.opacity = 0; railNote.style.opacity = 1; }
   railNote.innerHTML = RAILNOTE[id] ? RAILNOTE[id](t) : '';
-  const c = F.cues.find((x) => t >= x.t - 0.05 && t <= x.end + 0.25);
+  const c = F.cues.find((x) => t >= x.t && t <= x.stop);   // the same start and stop as public/video/drishyam.vtt
   capSpan.textContent = c ? c.text : ''; capBox.style.opacity = c ? 1 : 0;
 }
 const RAILNOTE = {
@@ -196,14 +196,14 @@ function buildOpen() {
   const veil = el('div', 'abs', S.e); css(veil, { inset: 0, background: 'var(--chest)' });
   S.draws.push(async (t) => {
     const u = t - s.t0, p = seg(u, 1.3, 1.75);
-    css(big, { opacity: 1 - p, transform: `scale(${(1.25 - 0.25 * eo(seg(u, 0, 0.5)) - 0.05 * p).toFixed(3)})` }); css(veil, { opacity: 1 - p, zIndex: 3 }); big.style.zIndex = 4;
+    css(big, { opacity: 1 - p, transform: `scale(${(0.9 + 0.1 * eo(seg(u, 0, 0.5)) - 0.05 * p).toFixed(3)})` }); css(veil, { opacity: 1 - p, zIndex: 3 }); big.style.zIndex = 4;
     await fw.draw(Math.max(t, F.warp.open.t0));
   });
   cue(s.t0 + 0.05, 'slam'); fw.clicksSfx();
   railcall(1, (D.guided.pixels_frac * 100).toFixed(1) + ' %', `of the pixels read; ${D.guided.critical} critical findings`, at('o1') + 0.6, end('o2') + 0.3);
 }
 
-// a camera over a board: keyframes [film t, cx, cy, width], eased moves, a push-in while a view is held
+// a camera over a board: keyframes [film t, cx, cy, width, push?], eased moves, a push-in while a view is held (a key's own push overrides the board's)
 function boardView(host, VW = 1530, VH = 836) {
   const view = el('div', 'abs', host); css(view, { left: 0, top: 0, width: VW + 'px', height: VH + 'px', overflow: 'hidden' });
   const board = el('div', 'abs', view); css(board, { left: 0, top: 0, width: '6800px', height: '3400px', transformOrigin: '0 0' });
@@ -216,9 +216,9 @@ function camBoard(B, K, push = 0.08) {
     if (k < K.length - 1) {
       const n = K[k + 1], mv = Math.min(1.25, (n[0] - K[k][0]) * 0.6), p = eio(seg(t, n[0] - mv, n[0]));
       const far = Math.hypot(n[1] - c[0], n[2] - c[1]) > 1500, out = far ? 1 + 0.9 * bump(p) : 1;      // a long flight pulls back first
-      const hold = 1 - push * seg(t, K[k][0], n[0] - mv);
+      const hold = 1 - (K[k][4] ?? push) * seg(t, K[k][0], n[0] - mv);
       c = [lerp(c[0], n[1], p), lerp(c[1], n[2], p), lerp(c[2] * hold, n[3], p) * out];
-    } else c[2] *= 1 - push * seg(t, K[k][0], K[k][0] + 6);
+    } else c[2] *= 1 - (K[k][4] ?? push) * seg(t, K[k][0], K[k][0] + 6);
     const z = B.VW / c[2];
     css(B.board, { transform: `translate(${(B.VW / 2 - c[0] * z).toFixed(1)}px,${(B.VH / 2 - c[1] * z).toFixed(1)}px) scale(${z.toFixed(4)})` });
   };
@@ -236,7 +236,7 @@ function buildTeam() {
     const sv = svgEl('svg', { width: w, height: h, viewBox: `0 0 ${w} ${h}`, class: 'abs' }, box);
     const r = svgEl('rect', { x: 3, y: 3, width: w - 6, height: h - 6, fill: 'rgba(11,50,100,.92)', stroke: '#E8F1FF', 'stroke-width': 3, pathLength: 1, 'stroke-dasharray': 1 }, sv);
     const rows = [92, 300].map((yy) => svgEl('path', { d: `M3 ${yy}H${w - 3}`, stroke: '#B8CDEC', 'stroke-width': 2.5, pathLength: 1, 'stroke-dasharray': 1 }, sv));
-    const dim = svgEl('path', { d: `M30 ${h - 34}H${w - 30}M30 ${h - 46}V${h - 22}M${w - 30} ${h - 46}V${h - 22}`, stroke: '#FFC857', 'stroke-width': 2.5, fill: 'none', pathLength: 1, 'stroke-dasharray': 1 }, sv);
+    const dim = svgEl('path', { d: `M30 ${h - 18}H${w - 30}M30 ${h - 28}V${h - 8}M${w - 30} ${h - 28}V${h - 8}`, stroke: '#FFC857', 'stroke-width': 2.5, fill: 'none', pathLength: 1, 'stroke-dasharray': 1 }, sv);
     const a = el('div', 'abs lab', box, 'ROLE'); css(a, { left: '30px', top: '24px', fontSize: '20px', color: 'var(--line-3)' });
     const b = el('div', 'abs', box, ''); css(b, { left: '30px', top: '50px', font: '700 28px/1 var(--fm)', letterSpacing: '.12em', color: 'var(--amber)' });
     const c = el('div', 'abs lab', box, 'NAME'); css(c, { left: '30px', top: '116px', fontSize: '20px', color: 'var(--line-3)' });
@@ -311,7 +311,7 @@ function buildLive() {
     css(this.cam, { transform: `translate(${(this.sw / 2 - c[0] * z).toFixed(2)}px,${(this.sh / 2 - c[1] * z).toFixed(2)}px) scale(${z.toFixed(4)})` });
     this.tag.textContent = 'GET /api/health'; this.tag.className = 'tag'; this.A.style.opacity = 1; this.B.style.opacity = 0; css(this.cur, { opacity: 0 });
   };
-  const keys = [['"opencv":"5.0.0"', 'opencv', D.health.opencv, `build: ${D.health.build}`], ['"host":"aws-lambda"', 'host', D.health.host, 'behind CloudFront'], ['"arch":"aarch64"', 'arch', D.health.arch, LIT.graviton]];
+  const keys = [['"opencv":"5.0.0"', 'opencv', D.health.opencv, `build: ${D.health.build}`], ['"host":"aws-lambda"', 'host', D.health.host, LIT.behind], ['"arch":"aarch64"', 'arch', D.health.arch, LIT.graviton]];
   const lead = svgEl('svg', { width: 1530, height: 836, class: 'abs', style: 'left:0;top:0;z-index:2' }, hw);
   const JSON_BOTTOM = Math.max(...Object.values(F.health_boxes).map(([r]) => r[1] + r[3]));   // the last line of the response
   const hls = keys.map(([k, name, val, sub], i) => {
@@ -386,10 +386,10 @@ function buildBreak() {
 function buildMcp() {
   const S = scene('mcp'), s = SC.mcp, m = D.mcp, B = boardView(S.e), H = B.board;
   el('div', 'abs lab', H, `docs/mcp-session · ${LIT.client} → drishyam mcp over stdio · job ${m.job}`).style.cssText = 'left:0;top:0;font-size:21px';
-  const crops = [['crops/img-004-1.jpg', 'three rust bars'], ['crops/img-016-1.jpg', 'a spall']].map(([f, lab]) => ['../docs/mcp-session/' + f, `call ${m.crops[f][0]} · gaze L${m.crops[f][1]}: ${lab}`]);
-  const cx = crops.map(([src, lab], i) => { const b = el('div', 'abs', H); css(b, { left: '0px', top: 52 + i * 394 + 'px', width: '340px', height: '380px' });
-    const im = img(src, b); css(im, { position: 'absolute', left: 0, top: 0, width: '340px', height: '340px', border: '3px solid var(--line)' });
-    el('div', 'src', b, lab).style.cssText = 'position:absolute;left:0;top:350px;width:340px;color:var(--line-2)'; return b; });
+  const crops = Object.entries(m.crops).map(([f, [n, lvl, lab]]) => ['../docs/mcp-session/' + f, `call ${n} · gaze L${lvl}<br>${lab}`]);
+  const cx = crops.map(([src, lab], i) => { const b = el('div', 'abs', H); css(b, { left: '0px', top: 52 + i * 394 + 'px', width: '360px', height: '380px' });
+    const im = img(src, b); css(im, { position: 'absolute', left: 0, top: 0, width: '300px', height: '300px', border: '3px solid var(--line)' });
+    el('div', 'src', b, lab).style.cssText = 'position:absolute;left:0;top:312px;width:360px;font-size:24px;line-height:1.3;color:var(--line)'; return im; });
   railcall(m.call_a, `IoU ${fmt(m.iou_a)}`, `mask IoU, L1 vs L0 at call ${m.call_a}: they disagree; exposed rebar is always critical`, at('m2') + 0.3, end('m2') + 0.3);
   railcall(m.call_b, `IoU ${fmt(m.iou_b)}`, `at call ${m.call_b}: the spall is confirmed`, at('m3') + 0.3, at('m3') + LINE.m3.dur * 0.55);
   const box = el('div', 'abs', H); css(box, { left: '380px', top: '52px', width: '1150px', height: '650px', overflow: 'hidden', border: '3px solid var(--line)', background: 'rgba(8,42,85,.95)' });
@@ -444,13 +444,24 @@ function buildArch() {
   const VW = 1524, VH = 830;
   const a0 = at('a0'), d = (id, f) => at(id) + LINE[id].dur * f;
   const whole = (h) => h * VW / VH / 0.92;   // the width that shows a diagram of height h whole, even at the end of the push
-  // crops: each view's edges, at the start of the hold and after the 8 % push, fall in text-free bands of the diagram
-  // each diagram is held whole for a beat first (the agent loop, the AWS path, the system sheet), then the camera reads it box by box
-  const K = [[a0 - 0.6, LX + 1340, 1236, whole(2472)], [d('a0', 0.5), LX + 1340, 932, 2846], [d('a0', 0.8), LX + 1340, 2430, 2938],
-    [at('a1'), WX + 450, 825, whole(1650)], [d('a1', 0.5), WX + 450, 360, 1150], [d('a1', 0.78), WX + 450, 1122, 1790],   // the AWS path whole, then boxes 1-2 and 3-7 with their titles whole
-    [at('a2'), 1340, 1640, whole(3280)], [d('a2', 0.45), 1500, 850, 950], [d('a2', 0.75), 1500, 1110, 950],
-    [at('a3') + 0.1, 1975, 2427, 1300], [d('a3', 0.5), 734, 2427, 1320],   // OpenCV layer: pyramid and saliency, then the virtual PTZ, blur gate and privacy pass
-    [at('a4') + 0.1, 1668, 2601, 620], [d('a4', 0.55), 1668, 2610, 600], [at('a5') + 0.1, 600, 1230, 1120], [d('a5', 0.55), 600, 1225, 1060]];   // a4 above the full-width footnote, a5 the Function URL and Lambda boxes whole
+  // crops: every edge of every view stays clear of the text inside the images for the whole hold, push included
+  // (placed by a one-off pixel scan of the text lines in the rasterised diagrams, sampled from hold start to push end; if a key, a line's
+  // timing or a diagram changes, re-check stills at the start and end of each hold)
+  // each diagram is held whole first (the AWS path, the one readable whole, for over 3 s), then the camera reads it box by box
+  const K = [[a0 - 0.6, LX + 1340, 1236, whole(2472)], [d('a0', 0.5), LX + 1423, 936, 2822], [d('a0', 0.8), LX + 1340, 2130, 2720],
+    [at('a1') - 0.2, WX + 450, 825, whole(1650)], [d('a1', 0.8), WX + 450, 762, 1259, 0.05],   // the AWS path whole, then boxes 2-4 (CloudFront, Function URL, Lambda)
+    [at('a2') + 0.2, 1340, 1640, whole(3280)], [d('a2', 0.45), 1481, 821, 728], [d('a2', 0.75), 1464, 1192, 689],
+    // OpenCV layer, held still (its header and footnote span the sheet, so a push would cut them): pyramid and saliency, then the virtual PTZ, blur gate and privacy pass
+    [at('a3') + 0.65, 1959, 2459, 1130, 0], [d('a3', 0.6), 760, 2428, 1268, 0],
+    [at('a4') + 0.6, 1645, 2620, 562], [d('a4', 0.55), 1645, 2620, 562], [at('a5') + 0.1, 642, 1223, 1006, 0.05], [d('a5', 0.55), 642, 1223, 996, 0.06]];   // a4 the segment box, a5 the Function URL and Lambda boxes
+  // the OpenCV boxes light up as a3 names them (architecture.png pixels)
+  // (each goes out as the camera leaves its view: the first two before the left half arrives, the rest as a4 begins)
+  const a3 = LINE.a3.say, L3 = d('a3', 0.6), HL = [['pyramid', [1386, 2206, 1948, 2449], L3], ['saliency', [2000, 2206, 2562, 2449], L3], ['camera', [158, 2518, 720, 2761], at('a4') + 0.4],
+    ['blur gate', [772, 2518, 1334, 2761], at('a4') + 0.4], ['face', [772, 2206, 1334, 2449], at('a4') + 0.4]]
+    .map(([w, [x0, y0, x1, y1], off]) => { const e = el('div', 'abs', board); css(e, { left: x0 + 'px', top: y0 + 'px', width: x1 - x0 + 'px', height: y1 - y0 + 'px', border: '6px solid var(--amber)', opacity: 0 });
+      const T = d('a3', a3.indexOf(w) / a3.length); cue(T, 'tick', 3); return [e, T, off]; });
+  S.draws.push((t) => HL.forEach(([e, T, off]) => {   // a flash as the box is named, settling to a light wash
+    css(e, { opacity: Math.min(seg(t, T, T + 0.1), 1 - seg(t, off - 0.5, off)), background: `rgba(255,200,87,${(0.1 + 0.26 * (1 - seg(t, T + 0.1, T + 0.6))).toFixed(3)})` }); }));
   const cam = camBoard({ board, VW, VH }, K, 0.08);
   S.draws.push(cam);
   K.forEach((k, i) => i && cue(k[0] - 0.6, 'whoosh'));
@@ -513,7 +524,7 @@ function buildResults() {
     <table class="t" style="margin-top:12px"><tr><th>policy</th><th>pixels</th><th>recall</th></tr>
     <tr><td class="amber">Drishyam, ${pc(sy.cap)} cap</td><td class="n">${fmt(lg.head.pixels_frac)}</td><td class="n">${fmt(lg.head.recall)}</td></tr>
     <tr><td>one downscale</td><td class="n">${fmt(lg.ds.pixels_frac)}</td><td class="n">${fmt(lg.ds.recall)}</td></tr>
-    <tr><td>tiling at L2 (quarter size)</td><td class="n">${fmt(lg.l2.pixels_frac)}</td><td class="n">${fmt(lg.l2.recall)}</td></tr>
+    <tr><td>tiling at L2 (1/${lg.l2_div} size)</td><td class="n">${fmt(lg.l2.pixels_frac)}</td><td class="n">${fmt(lg.l2.recall)}</td></tr>
     <tr><td colspan="3">ours / one downscale: <b class="amber">${fmt(lg.ds_ratio)}×</b> (95 % CI ${fmt(lg.ds_ci[0])}–${fmt(lg.ds_ci[1])})</td></tr></table>
     <div class="lab" style="font-size:24px;margin-top:200px">Ablations, ${pc(sy.cap)} cap: recall / full agent</div><div class="src">public/results/ablations.json</div>
     <table class="t" style="margin-top:12px"><tr><th>variant</th>${dsl.map((d) => `<th>${ab[d].label}</th>`).join('')}</tr>
@@ -569,7 +580,7 @@ function buildFailures() {
   const S = scene('failures'), s = SC.failures, B = boardView(S.e), H = B.board;
   const cells = D.fails.map((f, i) => {
     const b = el('div', 'box', H); css(b, { left: (i % 2) * 900 + 'px', top: Math.floor(i / 2) * 400 + 'px', width: '755px', height: '322px', overflow: 'hidden' });
-    const im = img(f.img, b); css(im, { position: 'absolute', left: '0px', top: '0px', height: '316px', width: '330px', objectFit: 'cover', borderRight: '3px solid var(--line)' });
+    const im = img(f.img, b); css(im, { position: 'absolute', left: '0px', top: '0px', height: '316px', width: '330px', objectFit: 'contain', borderRight: '3px solid var(--line)' });
     el('div', 'abs', b, `<div class="lab" style="color:var(--line-3)">FIG. 5.${i + 1} · ${f.id}</div><div class="h2 amber" style="font-size:40px;margin:10px 0 12px;white-space:normal">${f.cat}</div>
       <div class="mono" style="font-size:22px;line-height:1.35;white-space:normal"><span style="color:var(--line-2)">rule that would catch it:</span> ${f.ruleShort}</div>
       <div class="mono" style="font-size:22px;color:var(--red);margin-top:8px">not implemented</div>`).style.cssText = 'left:352px;top:18px;width:385px';
@@ -591,7 +602,7 @@ function buildFailures() {
 // 10. limits: the site's own wording (footer note, Human sign-off, the CODEBRIM citation), ticked off as they are said
 function buildLimits() {
   const S = scene('limits'), s = SC.limits, B = boardView(S.e), H = B.board;
-  el('div', 'abs', H, '<span class="fig">LIMITS</span><span class="src" style="margin-left:16px">in the site’s words (public/index.html: footer note, Human sign-off, the CODEBRIM citation)</span>').style.cssText = 'left:60px;top:40px';
+  el('div', 'abs', H, '<span class="fig">LIMITS</span><div class="src" style="margin-top:10px;font-size:25px;color:var(--line-2)">in the site’s words (public/index.html: footer note, Human sign-off, the CODEBRIM citation)</div>').style.cssText = 'left:60px;top:40px';
   const notes = LIT.limits.map((n, i) => (i === 3 ? 'CODEBRIM: ' + n[0].toLowerCase() + n.slice(1) : n));   // checked against public/index.html by build.py
   const L = at('x1'), d = LINE.x1.dur;
   const rows = notes.map((n, i) => { const r = el('div', 'abs', H, `<span style="display:inline-grid;place-items:center;width:64px;height:64px;border:4px solid var(--amber);border-radius:50%;color:var(--amber);font:700 30px/1 var(--fm);margin-right:30px">${i + 1}</span><span class="h2" style="font-size:46px;white-space:nowrap"></span>`);
@@ -607,7 +618,7 @@ function buildLimits() {
 function buildRepro() {
   const S = scene('repro'), s = SC.repro, B = boardView(S.e), H = B.board;
   const term = el('div', 'term', H); css(term, { left: '0px', top: '60px', width: '1530px', height: '560px', fontSize: '34px', lineHeight: '1.75' });
-  const cmds = [['uv sync --all-extras && make test', LIT.test_note], ['make eval', `${D.syn.n} synthetic images → public/results`], ['scripts/aws.sh deploy | smoke | destroy', 'the CDK stack: CloudFront, WAF, Lambda arm64, ...']];
+  const cmds = [['uv sync --all-extras && make test', LIT.test_note], ['make eval', `${D.syn.n} synthetic images → public/results`], ['scripts/aws.sh deploy | smoke | destroy', `the CDK stack: ${LIT.stack}`]];
   const repo = el('div', 'abs mono', H, `<span class="lab">source</span> ${D.urls.repo}`); css(repo, { left: '0px', top: '680px', fontSize: '38px' });
   const L = at('y1') - 0.2, d = LINE.y1.dur + 0.4, Ts = [L, L + d * 0.32, L + d * 0.6];
   S.draws.push((t) => {
