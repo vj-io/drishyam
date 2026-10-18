@@ -168,7 +168,7 @@ def test_chaos_drills_over_http_on_the_real_clock(scene, monkeypatch):
     """REAL CLOCK, so it depends on machine load: a busy machine trips p95>SLA on its own and can reach the 30 s cap
     before look 6. It asserts behaviour every path guarantees, never a timing: the job ends with a done record,
     every governor override carries its cause, and each drill that was reached was answered (the fixed-cost test
-    above pins the full sequence)."""
+    above pins the full sequence). A kill or cap halt right after the spike is checked before p95, so it answers none."""
     import functools
 
     from drishyam import agent, web
@@ -178,7 +178,7 @@ def test_chaos_drills_over_http_on_the_real_clock(scene, monkeypatch):
     assert ev[-1]["type"] == "done"
     assert all(e["governor"]["cause"] for e in ev if e.get("governor"))
     after, planned = drill_records(ev)
-    if after:
+    if after and after["cause"] not in ("cap-hit", "kill-switch"):
         assert "p95>SLA" in {after["cause"], (after.get("governor") or {}).get("cause")}
     if planned:
         assert planned["status"] == "rejected"

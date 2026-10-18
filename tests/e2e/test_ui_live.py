@@ -77,13 +77,14 @@ class Page:
     def status(self):
         return self.page.locator("#job-pill").inner_text().strip().lower()
 
-    def wait_done(self, timeout=60, notes=None):
-        """Poll the job pill until the run is over; `notes` (a set) collects the NOTE's secondary lines meanwhile."""
+    def wait_done(self, timeout=60, notes=None, also=()):
+        """Poll the job pill until the run is over (or shows one of `also`); `notes` (a set) collects the NOTE's
+        secondary lines meanwhile."""
         end = time.time() + timeout
         while time.time() < end:
             if notes is not None:
                 notes.add(self.page.locator("#narrator-sub").inner_text())
-            if self.status() in DONE:
+            if self.status() in DONE + tuple(also):
                 return self.status()
             self.page.wait_for_timeout(200)
         raise AssertionError(f"job did not finish; pill = {self.status()!r}")
@@ -193,18 +194,21 @@ def run(base, server_log=None):
 
         # Try KILL from the recap: a run shown live whose planner stalls 2 s at step 3, so KILL usually lands mid-job.
         # REAL CLOCK: on a loaded machine the stop rule can end the job before KILL reaches it. Either way KILL must not
-        # claim more than happened: a kill-switch halt by the server, or the page saying the job had already finished.
+        # claim more than happened: a kill-switch halt by the server, the page saying the job had already finished, or
+        # (no confirmation within 6 s on a loaded host) the page saying it stopped showing a job the server may still run.
         page.get_by_role("button", name="Try KILL").click()
         expect(page.locator("#job-text")).to_contain_text("shown the moment it arrives", timeout=15000)
         expect(page.locator("#trace .trace__line[data-step='1']")).to_be_visible(timeout=30000)
         page.locator("#kill").click()
-        status = p.wait_done()
+        status = p.wait_done(also=("stopped",))
         killed = page.locator("#trace .trace__line .chip", has_text="kill-switch").count() == 1
-        if killed:
+        if status == "stopped":
+            expect(page.locator("#job-text")).to_contain_text("the server may still be running it")
+        elif killed:
             assert status == "halted", status
         else:
             expect(page.locator("#job-text")).to_contain_text("had already finished")
-        print(f"ok  Try KILL: {'halted by the server with kill-switch' if killed else 'the job had finished first, and the page said so'}")
+        print(f"ok  Try KILL: {'not confirmed in 6 s, and the page said the server may run on' if status == 'stopped' else 'halted by the server with kill-switch' if killed else 'the job had finished first, and the page said so'}")
 
         # 2. KILL mid-run reaches the server, which halts before its next look and sends a kill-switch record.
         # planner_timeout parks the job for 2 s at step 3, so the click lands while it is still running.

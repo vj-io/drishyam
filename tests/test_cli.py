@@ -256,7 +256,7 @@ def test_p95_spike_drill_on_the_real_clock(tmp_path):
     """REAL CLOCK, so it depends on machine load: a busy machine can trip p95>SLA before the spike, and the stop rule
     or a cap can end the job before look 4. It asserts only what every path guarantees, never a timing: the job
     finishes, and every override the governor made is written with its cause (once the spike is injected, the next
-    record carries p95>SLA)."""
+    record carries p95>SLA, unless that record is a kill or cap halt: the governor checks those first)."""
     out = tmp_path / "out"
     assert cli.main(["run", str(SAMPLE), "--pixel-cap", "1", "--chaos", "p95_spike", "--out", str(out)]) == 0
     trace = cli.read_trace(next(out.glob("j_*/trace.jsonl")))
@@ -266,7 +266,8 @@ def test_p95_spike_drill_on_the_real_clock(tmp_path):
     spike = next((t for t in steps if t.get("injected") == "p95_spike"), None)
     if spike is not None and spike is not steps[-1]:
         after = next(t for t in steps if t["step"] == spike["step"] + 1)
-        assert "p95>SLA" in {after["cause"], (after.get("governor") or {}).get("cause")}
+        if after["cause"] not in ("cap-hit", "kill-switch"):  # e.g. the 20 s cap crossed during the spiked look
+            assert "p95>SLA" in {after["cause"], (after.get("governor") or {}).get("cause")}
 
 
 def test_bad_run_arguments(capsys):
