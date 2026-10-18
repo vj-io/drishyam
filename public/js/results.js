@@ -200,8 +200,9 @@ function heroChips(sum, real) {
     if (plain) fill('stat-real', key, Math.round(1 / mid), { prefix: 'about 1 in ' }, `defects found by every method, ours included.${chance}${strict}${why}`);
     else fill('stat-real', key, rd.recall, { decimals: 2, prefix: 'recall ' }, `ours; the other methods ${dec(Math.min(...others))}–${dec(Math.max(...others))}.${chance}${strict}${why}`);
   }
-  // Two caps, each named: at a 100 % pixel cap (none below the whole image) the stop rule (value per ms) ends the job
-  // by itself; at the headline's cap, the cap binds first. by_budget is keyed by the pixel cap ("1.0", "0.3").
+  // Two caps, each named: at the 100 % pixel cap (the whole image's pixels, still a cap) the stop rule (value per ms)
+  // ends most jobs by itself; at the headline's cap, the cap binds first. by_budget is keyed by the pixel cap ("1.0",
+  // "0.3"). A cap-hit does not say which cap fired (pixels, time, $ or steps), so it is said as "a cap".
   const am = sum.agent_metrics ?? {};
   const uncapped = points(sum.policies?.drishyam).pop();
   const total = (halts) => Object.values(halts).reduce((a, b) => a + b, 0);
@@ -212,11 +213,11 @@ function heroChips(sum, real) {
     .map(([k, n]) => `${n} ${k === 'exhausted' ? 'had looked at every candidate' : `stopped on ${k}`}`);
   if (uncapped && halts) {
     const stops = halts['stop-rule'] ?? 0;
-    const rest = [halts['cap-hit'] && `${halts['cap-hit']} hit a time, $ or step cap`, ...other(halts)].filter(Boolean);
+    const rest = [halts['cap-hit'] && `${halts['cap-hit']} hit a cap`, ...other(halts)].filter(Boolean);
     const at = capped && [`a cap ended ${capped['cap-hit'] ?? 0} of ${total(capped)} first`, `the stop rule ${capped['stop-rule'] ?? 0}`, ...other(capped)];
-    fill('stat-cost', `With no pixel cap (100 %): ${stops * 2 >= total(halts) ? 'stops on its own' : 'the stop rule'}`, stops, { suffix: ` of ${total(halts)} jobs` },
-      `the stop rule ended them when the next look was worth less than it cost, at ${pct(uncapped.pixels_frac)} of the image's pixels on average`
-      + `${rest.length ? `; the other ${rest.join(', ')}` : ''}.`
+    fill('stat-cost', `At the 100 % pixel cap: ${stops * 2 >= total(halts) ? 'stops on its own' : 'the stop rule'}`, stops, { suffix: ` of ${total(halts)} jobs` },
+      `the stop rule ended them when the next look was worth less than it cost${rest.length ? `; the other ${rest.join(', ')}` : ''}. `
+      + `All ${total(halts)} read ${pct(uncapped.pixels_frac)} of the image's pixels on average.`
       + `${at ? ` At the ${pct(hs.budget)} pixel cap of the headline: ${at.slice(0, -1).join(', ')}, and ${at.at(-1)}.` : ''}`);
   }
   // Agentic evidence: injected planner and governor faults, and how many the agent recovered from.

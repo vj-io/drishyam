@@ -494,10 +494,11 @@ def test_desktop_mock(browser, base):
     expect(p.locator("#stat-recall .stat__s")).to_contain_text("Target was 90 %: met. It beats one downscaled pass (1.60×, 95 % CI 1.40–1.80).")
     # the stop-rule count is at the 100 % pixel cap, next to the 30 % headline: each number names its cap
     halts = SUMMARY["agent_metrics"]["by_budget"]
-    expect(p.locator("#stat-cost .stat__k")).to_have_text("With no pixel cap (100 %): stops on its own")
+    expect(p.locator("#stat-cost .stat__k")).to_have_text("At the 100 % pixel cap: stops on its own")
     expect(p.locator("#stat-cost .stat__v")).to_have_text(f"{halts['1.0']['halt_causes']['stop-rule']} of 200 jobs")
     expect(p.locator("#stat-cost .stat__s")).to_contain_text("the stop rule ended them when the next look was worth less than it cost")
     expect(p.locator("#stat-cost .stat__s")).to_contain_text("; the other 17 had looked at every candidate.")   # 183 + 17 = 200
+    expect(p.locator("#stat-cost .stat__s")).to_contain_text("All 200 read 50 % of the image's pixels on average.")  # every job, not the 183
     expect(p.locator("#stat-cost .stat__s")).to_contain_text(
         "At the 30 % pixel cap of the headline: a cap ended 125 of 200 first, the stop rule 71, and 4 had looked at every candidate.")
     expect(p.locator("#stat-ops .stat__v")).to_have_text("49 / 50 recovered")
