@@ -238,6 +238,7 @@ def test_ablations_assert_each_variant_ran_its_switches(tmp_path):
     assert set(rows["no-survey"]["model_usage"]) == {"accurate"} and len(rows["full"]["ratio_vs_full_ci"]) == 2
     assert entry["variants"]["random-order-s2"] == {**harness.switches("full"), "order": "random", "seed": 2}
     assert entry["random_order"][0].startswith("At a 100% pixel cap, random order found")
+    assert "the seeds pooled per image" in entry["random_order"][0] and "multiple comparisons" in entry["random_order"][0]
     assert entry["provenance"]["dataset_gt_sha256"] == harness.dataset_sha256(harness.load_records(data, 1, seed=1)[0])["dataset_gt_sha256"]
     saved = json.loads((tmp_path / "raw" / "ablation_per_image.json").read_text())["results"]
     harness.check_variants(saved, (1.0,))
@@ -249,6 +250,19 @@ def test_ablations_assert_each_variant_ran_its_switches(tmp_path):
     cfg["trace"].insert(0, {"action": "gaze", "cause": "survey"})  # right switches, but the trace has a survey look
     with pytest.raises(SystemExit, match="trace shows a look"):
         harness.check_variants(saved, (1.0,))
+
+
+def test_random_order_matches_only_inside_the_margin():
+    # a 6-image review run: every seed below the full agent, every CI reaching 1.0 only at its top
+    rows = {"full": {"recall": 0.625}, **{f"random-order-s{s}": {"recall": r, "ratio_vs_full_ci": ci}
+                                          for s, (r, ci) in enumerate([(0.583, [0.81, 1.0]), (0.542, [0.73, 1.0]), (0.542, [0.6, 1.0])])}}
+    note = lambda ci: harness.random_order_note(rows, 1.0, ci, 6)
+    assert "no measurable difference at n=6, but the CI reaches down to 0.75" in note([0.75, 1.0]) and "matches the" not in note([0.75, 1.0])
+    assert "0.81-1.00, 0.73-1.00, 0.60-1.00" in note([0.75, 1.0])
+    assert "so random order matches the full agent" in note([0.97, 1.03])
+    assert "below the full agent" in note([0.6, 0.9]) and "undefined" in note([None, None])
+    m = {f"random-order-s{s}@1.0": {"per_image": [[s, 0, 0, 0, 4], [2, 0, 0, 0, 4]]} for s in (0, 1, 2)}
+    assert harness.pooled_seeds(m, 1.0)["per_image"].tolist() == [[1, 0, 0, 0, 4], [2, 0, 0, 0, 4]]
 
 
 def test_a_clean_set_is_scored_as_false_alarms(tmp_path):

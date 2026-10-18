@@ -895,13 +895,29 @@ def vs_full(ci: list) -> str:
     return "no measurable difference" if ci[0] <= 1 <= ci[1] else "below the full agent" if ci[1] < 1 else "above the full agent"
 
 
-def random_order_note(rows: dict, cap: float) -> str:
+MATCH_MARGIN = (0.95, 1.05)  # set before the published ablation run: "matches the full agent" needs the ratio CI inside it
+
+
+def pooled_seeds(m: dict, cap: float) -> dict:
+    """The three random-order seeds as one policy: each image's counts averaged over the seeds (the GT column is equal)."""
+    return {"per_image": np.mean([m[f"random-order-s{s}@{cap}"]["per_image"] for s in (0, 1, 2)], 0)}
+
+
+def random_order_note(rows: dict, cap: float, pooled_ci: list, n: int) -> str:
+    """Says random order matches the full agent only if the pooled ratio CI lies inside MATCH_MARGIN: a CI that
+    merely includes 1 is no measurable difference, not evidence that the two are the same."""
     seeds = [rows[f"random-order-s{s}"] for s in (0, 1, 2)]
-    rec, verdicts = [r["recall"] for r in seeds], [r["vs_full"] for r in seeds]
-    tail = ("each includes 1, so random order matches the full agent at this cap" if set(verdicts) == {"no measurable difference"}
-            else "; ".join(f"seed {s}: {v}" for s, v in enumerate(verdicts)))
+    rec, lo, hi = [r["recall"] for r in seeds], *pooled_ci
+    span = lambda ci: "undefined" if None in ci else f"{ci[0]:.2f}-{ci[1]:.2f}"
+    verdict = ("undefined" if None in pooled_ci else
+               f"inside the {MATCH_MARGIN[0]}-{MATCH_MARGIN[1]} margin set in advance, so random order matches the full agent"
+               if MATCH_MARGIN[0] <= lo and hi <= MATCH_MARGIN[1] else "random order is below the full agent" if hi < 1 else
+               "random order is above the full agent" if lo > 1 else
+               f"no measurable difference at n={n}, but the CI reaches down to {lo:.2f}, so this does not show that they match")
     return (f"At a {cap:.0%} pixel cap, random order found {min(rec):.2f}-{max(rec):.2f} of the ground-truth boxes over seeds "
-            f"0-2 and the full agent {rows['full']['recall']:.2f}; paired 95% CIs of the recall ratio: {tail}.")
+            f"0-2 and the full agent {rows['full']['recall']:.2f}. Paired 95% CI of the recall ratio over {n} images, the "
+            f"seeds pooled per image: {span(pooled_ci)} (seeds 0, 1, 2 alone: {', '.join(span(r['ratio_vs_full_ci']) for r in seeds)}); "
+            f"{verdict}. None of the {len(rows) - 1} variant-vs-full CIs at this cap is corrected for multiple comparisons.")
 
 
 def run_ablations(data_dir="data/synth200", n=200, out_dir="public/results", results_dir="runs/ablations", workers=None,
@@ -944,7 +960,8 @@ def run_ablations(data_dir="data/synth200", n=200, out_dir="public/results", res
     entry = {"dataset": label, "n_images": n_img, "segmenter": seg.name, "box_convention": primary_boxes,
              "cost_model": {"kind": "fixed", "source": f"results/{micro_arm}/micro.json job_ops (p50 ms per call)"},
              "variants": {v: switches(v) for v in ABLATIONS}, "by_cap": by_cap,
-             "random_order": [random_order_note(by_cap[str(c)], c) for c in caps],
+             "random_order": [random_order_note(by_cap[str(c)], c, ratio_ci(pooled_seeds(m, c), m[f"full@{c}"], n_img), n_img)
+                              for c in caps],
              "provenance": short_provenance(prov, workers, threads[0] if len(threads) == 1 else threads, micro_arm, data_id,
                                             label.startswith("synthetic"))}
     out_file = Path(out_dir) / "ablations.json"
