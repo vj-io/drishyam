@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 660" width="360" height="660" role="img" aria-labelledby="t d">
+<title id="t">Drishyam on AWS, simplified</title>
+<desc id="d">The browser reaches CloudFront with a WAF rate limit (10 job starts per 120 s per IP). CloudFront serves the site from a private S3 bucket and forwards /api/* to a Lambda Function URL with AWS_IAM auth, signed by OAC. The arm64 Lambda runs stock OpenCV 5.0.0 and the FastAPI agent, and uses DynamoDB for kill flags, Secrets Manager for the HMAC key that signs work orders, and CloudWatch for metrics and alarms.</desc>
+<style>
+  .bg { fill: #072247; }
+  .sheet { fill: #0F3B73; stroke: #E8F1FF; stroke-width: 2.5; }
+  .inner { fill: none; stroke: #B8CDEC; stroke-width: 1; }
+  .box { fill: #0B3264; stroke: #E8F1FF; stroke-width: 2; }
+  .svc { fill: #082A55; stroke: #B8CDEC; stroke-width: 1.5; }
+  .rule { stroke: #B8CDEC; stroke-width: 1; }
+  .cross { fill: none; stroke: #E8F1FF; stroke-width: 1.5; }
+  .edge { fill: none; stroke: #B8CDEC; stroke-width: 1.8; marker-end: url(#arr); }
+  .bus { fill: none; stroke: #B8CDEC; stroke-width: 1.8; }
+  .n { fill: #0F3B73; stroke: #FFC857; stroke-width: 2; }
+  text { font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, 'DejaVu Sans Mono', monospace; font-size: 13px; fill: #B8CDEC; }
+  .ti { font-family: 'Archivo Narrow', 'Arial Narrow', 'Roboto Condensed', Arial, sans-serif; font-weight: 700; font-size: 22px; fill: #E8F1FF; letter-spacing: .03em; }
+  .fs { font-size: 11px; }
+  .h { font-weight: 700; font-size: 14px; fill: #E8F1FF; letter-spacing: .04em; }
+  .nt { font-weight: 700; font-size: 12px; fill: #FFC857; }
+  .am { fill: #FFC857; font-weight: 700; }
+  .el { font-size: 12px; fill: #9CC8FF; }
+</style>
+<defs>
+  <pattern id="g8" width="8" height="8" patternUnits="userSpaceOnUse"><path d="M8 0H0V8" fill="none" stroke="#E8F1FF" stroke-opacity=".055" stroke-width="1"/></pattern>
+  <pattern id="g40" width="40" height="40" patternUnits="userSpaceOnUse"><rect width="40" height="40" fill="url(#g8)"/><path d="M40 0H0V40" fill="none" stroke="#E8F1FF" stroke-opacity=".12" stroke-width="1"/></pattern>
+  <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 1L10 5L0 9Z" fill="#B8CDEC"/></marker>
+</defs>
+<rect class="bg" width="360" height="660"/>
+<rect class="sheet" x="6" y="6" width="348" height="648"/>
+<rect x="7.5" y="7.5" width="345" height="645" fill="url(#g40)"/>
+<rect class="inner" x="11" y="11" width="338" height="638"/>
+<path class="cross" d="M10 20H28M19 11V29"/><circle class="cross" cx="19" cy="20" r="4"/>
+<path class="cross" d="M332 20H350M341 11V29"/><circle class="cross" cx="341" cy="20" r="4"/>
+<path class="cross" d="M10 640H28M19 631V649"/><circle class="cross" cx="19" cy="640" r="4"/>
+<path class="cross" d="M332 640H350M341 631V649"/><circle class="cross" cx="341" cy="640" r="4"/>
+
+<text x="34" y="46" class="ti">DRISHYAM · ON AWS</text>
+<text x="34" y="64" class="fs">FIG. A-3 · the live demo's path, simplified</text>
+<line class="rule" x1="28" y1="74" x2="332" y2="74"/>
+
+<!-- 1 browser -->
+<rect class="box" x="28" y="86" width="304" height="56"/>
+<circle class="n" cx="46" cy="106" r="10"/><text class="nt" x="46" y="110" text-anchor="middle">1</text>
+<text x="64" y="111" class="h">BROWSER</text>
+<text x="40" y="131">this page and its /api/* calls</text>
+<path class="edge" d="M180 142V170"/>
+<text x="190" y="161" class="el">HTTPS</text>
+
+<!-- 2 CloudFront + WAF -->
+<rect class="box" x="28" y="172" width="304" height="74"/>
+<circle class="n" cx="46" cy="192" r="10"/><text class="nt" x="46" y="196" text-anchor="middle">2</text>
+<text x="64" y="197" class="h">CLOUDFRONT + WAF</text>
+<text x="40" y="217">site from a private S3 bucket (OAC)</text>
+<text x="40" y="235">WAF: <tspan class="am">10 job starts / 120 s</tspan> per IP</text>
+<path class="edge" d="M180 246V274"/>
+<text x="190" y="265" class="el">/api/* only</text>
+
+<!-- 3 Function URL -->
+<rect class="box" x="28" y="276" width="304" height="56"/>
+<circle class="n" cx="46" cy="296" r="10"/><text class="nt" x="46" y="300" text-anchor="middle">3</text>
+<text x="64" y="301" class="h">FUNCTION URL</text>
+<text x="40" y="321"><tspan class="am">AWS_IAM</tspan> auth, signed by OAC</text>
+<path class="edge" d="M180 332V360"/>
+<text x="190" y="351" class="el">streamed NDJSON</text>
+
+<!-- 4 Lambda -->
+<rect class="box" x="28" y="362" width="304" height="74"/>
+<circle class="n" cx="46" cy="382" r="10"/><text class="nt" x="46" y="386" text-anchor="middle">4</text>
+<text x="64" y="387" class="h">LAMBDA · arm64</text>
+<text x="40" y="407">stock <tspan class="am">OpenCV 5.0.0</tspan> wheel</text>
+<text x="40" y="425">the FastAPI agent and its trace</text>
+
+<!-- what the function uses -->
+<path class="bus" d="M44 436V598"/>
+<text x="58" y="458" class="el">the function uses</text>
+<path class="edge" d="M44 494H56"/>
+<rect class="svc" x="58" y="470" width="274" height="48"/>
+<circle class="n" cx="76" cy="494" r="10"/><text class="nt" x="76" y="498" text-anchor="middle">5</text>
+<text x="94" y="490" class="h">DYNAMODB</text>
+<text x="94" y="508">kill flags</text>
+<path class="edge" d="M44 546H56"/>
+<rect class="svc" x="58" y="522" width="274" height="48"/>
+<circle class="n" cx="76" cy="546" r="10"/><text class="nt" x="76" y="550" text-anchor="middle">6</text>
+<text x="94" y="542" class="h">SECRETS MANAGER</text>
+<text x="94" y="560">HMAC key, signs work orders</text>
+<path class="edge" d="M44 598H56"/>
+<rect class="svc" x="58" y="574" width="274" height="48"/>
+<circle class="n" cx="76" cy="598" r="10"/><text class="nt" x="76" y="602" text-anchor="middle">7</text>
+<text x="94" y="594" class="h">CLOUDWATCH</text>
+<text x="94" y="612">metrics + alarms</text>
+
+<text x="326" y="634" class="fs" text-anchor="end">full: docs/architecture.png · SCALE NTS</text>
+</svg>

@@ -414,7 +414,10 @@
 
     <figure class="win pop win--wide win--loop" id="loop">
       <div class="win__bar"><span class="win__fig" aria-hidden="true">FIG. 3.0</span><h3 class="win__title">The agent loop: perception, decision, action, human</h3></div>
-      <div class="win__body"><img class="loop__img" src="docs/agent-loop.svg" width="1340" height="1236" loading="lazy" alt="The agent loop: OpenCV perception, the decision rules and planner, the action, and the human sign-off."></div>
+      <div class="win__body stack stack--tight">
+        <a class="loop__link" href="docs/agent-loop.svg"><img class="loop__img" src="docs/agent-loop.svg" width="1340" height="1236" loading="lazy" alt="The agent loop: OpenCV perception, the decision rules and planner, the action, and the human sign-off."></a>
+        <p class="note loop__hint">Tap the drawing to open it full size.</p>
+      </div>
     </figure>
 
     <section class="win pop" aria-labelledby="t-score">
@@ -448,6 +451,8 @@
     <section class="win pop win--wide" aria-labelledby="t-gov">
       <div class="win__bar"><span class="win__fig" aria-hidden="true">FIG. 3.3</span><h3 class="win__title" id="t-gov">Governor schedule</h3></div>
       <div class="win__body">
+        <details class="data">
+        <summary>Six signals the governor watches, and what it does about each</summary>
         <div class="table-wrap" tabindex="0" role="region" aria-label="Governor table">
           <table class="tbl tbl--rows">
             <thead><tr><th scope="col">Signal</th><th scope="col">Action</th><th scope="col">Trace cause</th></tr></thead>
@@ -461,6 +466,23 @@
             </tbody>
           </table>
         </div>
+        </details>
+      </div>
+    </section>
+
+    <section class="win pop" aria-labelledby="t-aws">
+      <div class="win__bar"><span class="win__fig" aria-hidden="true">FIG. 3.4</span><h3 class="win__title" id="t-aws">Where the live demo runs: AWS</h3></div>
+      <div class="win__body stack stack--tight">
+        <a class="aws__link" href="docs/aws-simple.svg"><img class="aws__img" src="docs/aws-simple.svg" width="360" height="660" loading="lazy" alt="Browser to CloudFront with WAF (10 job starts per 120 s per IP), to a Lambda Function URL (AWS_IAM, signed by OAC), to Lambda arm64 running stock OpenCV 5.0.0, which uses DynamoDB kill flags, a Secrets Manager HMAC key and CloudWatch metrics and alarms."></a>
+        <p class="note">The full diagram, with the OpenCV calls and agent parts: <a href="https://github.com/vj-io/drishyam/blob/main/docs/architecture.png" rel="noopener noreferrer">architecture.png</a>.</p>
+      </div>
+    </section>
+
+    <section class="win pop" aria-labelledby="t-live">
+      <div class="win__bar"><span class="win__fig" aria-hidden="true">FIG. 3.5</span><h3 class="win__title" id="t-live">What runs live, and what does not</h3></div>
+      <div class="win__body stack">
+        <p class="say"><b>No LLM runs in this demo.</b> The live agent is the rule policy above, and the drill planners are scripted to fail. The LLM path is the MCP server: in a recorded session Claude chose each call from the numbers the tools measured: saliency priors, entropy, IoU and the budget left (its prompt states the decision rules). <a href="https://github.com/vj-io/drishyam/blob/main/docs/mcp-session/transcript.md" rel="noopener noreferrer">Read the recorded session</a>.</p>
+        <p class="say"><b>OpenCV 5.</b> The live demo uses no OpenCV 5-only API (segmenter classical-v1). The one 5.x-specific call, <code>cv2.dnn</code> <code>ENGINE_NEW</code>, is on the opt-in ONNX segmenter path, exercised by tests and the offline evals.</p>
       </div>
     </section>
 

@@ -719,6 +719,12 @@ input:checked + .switch__ui::after { transform: translateX(22px); background: va
 .faq dd { margin: 0; font-size: 13.5px; line-height: 1.6; }
 .faq a { color: var(--amber); }
 .loop__img { display: block; width: 100%; height: auto; }
+.loop__link, .aws__link { display: block; }
+.loop__hint { display: none; }  /* phones only: the drawing is too dense to read at 375 px, so it opens full size */
+.aws__img { display: block; width: 100%; max-width: 360px; height: auto; margin-inline: auto; }
+.guards__llm { margin-top: 18px; }
+.video { margin: 0; }
+.video video { display: block; width: 100%; height: auto; border: 2.5px solid var(--line); background: var(--deep); }
 
 /* ---------- footer ---------- */
 .footer { max-width: var(--max); margin: 0 auto; padding: 18px var(--gutter) 72px; }
@@ -789,6 +795,7 @@ input:checked + .switch__ui::after { transform: translateX(22px); background: va
   .finding__where { flex-basis: 100%; order: 3; }
   .stats { grid-template-columns: minmax(0, 1fr); }
   .stat__k { min-height: 0; }
+  .loop__hint { display: block; }
   .taskbar__id { display: none; }
   .taskbar__actions { margin-left: 0; width: 100%; }
   /* running on a phone: the two controls that matter (Skip to end, KILL), then one line of status, which says it is a replay */
