@@ -40,7 +40,22 @@ const HALT = {
   'kill-switch': 'You pressed KILL, so it stopped before its next look. Its state is kept: Resume carries on from here.',
   'planner:stop': 'The planner proposed stopping and the validator accepted, so it stops.',
 };
-export const haltText = (cause) => HALT[cause] ?? `It stopped (${cause}).`;
+/** The stop rule's bar was its floor (ε × v0 ÷ t̂) rather than ε × value so far ÷ cost so far: "... (floor: eps x v0 / t_hat)". */
+const floorBound = (rationale) => /\(floor[:)]/.test(String(rationale ?? ''));
+const FLOOR = ' The bar it fell under was the floor, ε × v0 ÷ t̂, which was higher than ε × value found so far ÷ cost so far.';
+/** Why a job stopped; `rationale` (the halt record's) says which term of the stop rule bound. */
+export const haltText = (cause, rationale) => (HALT[cause] ?? `It stopped (${cause}).`) + (cause === 'stop-rule' && floorBound(rationale) ? FLOOR : '');
+
+/** The terms an argmax (or random-pick) rationale names: "prior 0.45, severity 2.0 (spalling), uncertainty 0.31, unseen 0.62,
+    t_hat 70 ms". Each is read on its own, so a clause that leaves one out still reads. */
+function terms(t) {
+  const sev = t.match(/severity ([\d.]+)(?: \((\w+)\)| (?:from|set by) (\w+))?/);
+  return {
+    prior: t.match(/prior ([\d.]+)/)?.[1], unseen: t.match(/unseen ([\d.]+)/)?.[1], t: t.match(/t_hat ([\d.]+) ?ms/)?.[1],
+    u: t.match(/(?:uncertainty|entropy) ([\d.]+)/)?.[1], sev: sev?.[1], sevCls: sev?.[2] ?? sev?.[3],
+  };
+}
+const severity = (x) => (x.sev ? `severity ${x.sev}${x.sevCls ? ` (${words(x.sevCls)})` : ''}` : '');
 
 function governorText(cause, why) {
   if (cause === 'p95>SLA') {
@@ -72,8 +87,11 @@ function lookText(s) {
   if ((m = why.match(/(\w+) area (\d+) px < (\d+) at L\d/))) return `The ${words(m[1])} it found is tiny (${m[2]} px < ${m[3]} px), so it zooms in 2× to measure it properly${now}.`;
   if ((m = why.match(/iou ([\d.]+) < 0\.5 between L(\d) and L(\d)/))) return `Its L${m[2]} and L${m[3]} looks disagree (overlap ${m[1]} < 0.5), so it takes one more, finer look${now}.`;
   if ((m = why.match(/new (\w+) mask at L(\d); confirming at L(\d)/))) return `A new ${words(m[1])} mask appeared at L${m[2]}, so it double-checks it one level finer (L${m[3]}) before trusting it.`;
-  if ((m = why.match(/argmax score [^:]+: prior ([\d.]+), unseen ([\d.]+), t_hat (\d+) ms/))) {
-    return `Region ${s.region} is now the best value for the time: damage looks likely there (prior ${m[1]}), ${Math.round(+m[2] * 100)} % of it is unseen, and a look costs about ${m[3]} ms. So it looks there next${now}.`;
+  const x = (m = why.match(/argmax score [^:]+: ([^;]+)/)) && terms(m[1]);
+  if (x?.prior && x.unseen && x.t) {
+    const why2 = [`damage looks likely there (prior ${x.prior})`, x.sev && `it weighs ${severity(x)}`, x.u && `it is unsure there (uncertainty ${x.u})`,
+      `${Math.round(+x.unseen * 100)} % of it is unseen`].filter(Boolean).join(', ');
+    return `Region ${s.region} is now the best value for the time: ${why2}, and a look costs about ${x.t} ms. So it looks there next${now}.`;
   }
   if (String(s.cause).startsWith('planner:')) return `The planner asked to ${s.cause.slice(8).replace('_', ' ')}, and the validator allowed it${now}.`;
   return why || 'No reason was recorded.';
@@ -89,7 +107,7 @@ export function explain(s, planner) {
   return [
     gov ? governorText(gov, s.governor?.rationale ?? why) : '',
     plannerText(planner ?? s.planner_status),
-    halt ? haltText(s.cause) : lookText(s),
+    halt ? haltText(s.cause, why) : lookText(s),
     quality ? `The view failed the quality check (${quality[1]}), so it does not trust this look.` : '',
   ].filter(Boolean);
 }
@@ -99,8 +117,12 @@ export function explain(s, planner) {
 const CLAUSES = [
   [/^one L(\d) look covers all (\d+) candidates before zooming$/, (m) => `the whole photo first, at ${size(+m[1])}: all ${m[2]} candidate regions in one look`],
   [/^(\d+) looks affordable$/, (m) => `the budget has room for ${m[1]} looks`],
-  [/^(argmax|random) score [^:]+: prior ([\d.]+), unseen ([\d.]+), t_hat (\d+) ms$/, (m) => `${m[1] === 'random' ? 'a random pick' : 'best value for the time'}: `
-    + `damage ${+m[2] >= 0.5 ? 'looks likely' : 'is possible'} (${m[2]}), ${+m[3] >= 0.995 ? 'not seen yet' : `${pct(m[3])} not seen yet`}, a look costs about ${m[4]} ms`],
+  [/^(argmax|random pick[^,]*,) score [^:]+: (.+)$/, (m) => {
+    const x = terms(m[2]);
+    if (!(x.prior && x.unseen && x.t)) return m[0];  // a clause this page cannot read is kept as recorded
+    return [`${m[1] === 'argmax' ? 'best value for the time' : 'a random pick'}: damage ${+x.prior >= 0.5 ? 'looks likely' : 'is possible'} (${x.prior})`,
+      severity(x), x.u && `unsure ${x.u}`, +x.unseen >= 0.995 ? 'not seen yet' : `${pct(x.unseen)} not seen yet`, `a look costs about ${x.t} ms`].filter(Boolean).join(', ');
+  }],
   [/^lambda /, () => ''],  // the stop line: a halt says it in words
   [/^entropy ([\d.]+) > ([\d.]+) at L\d$/, (m) => `unsure what it saw (${m[1]}, over ${m[2]}), so it zooms in 2×`],
   [/^(\w+) area (\d+) px < (\d+) at L\d$/, (m) => `the ${words(m[1])} is tiny (${m[2]} px, under ${m[3]} px), so it zooms in 2× to measure it`],
@@ -116,7 +138,9 @@ const CLAUSES = [
   [/^verifying critical classes only$/, () => 'so only critical damage is double-checked'],
   [/^quality gate: (\w+)$/, (m) => `the view failed the quality check (${m[1]}), so it does not trust this look`],
   [/^every candidate has been looked at$/, () => 'every candidate region has been looked at'],
-  [/^best score \S+ < lambda /, () => 'the next look would be worth less than it costs'],
+  [/^best score (\S+) < lambda (\S+)/, (m) => (floorBound(m.input)
+    ? `the next look would be worth less than it costs: its score ${m[1]} is under the floor ${m[2]} (ε × v0 ÷ t̂), the higher of the stop rule's two bars`
+    : 'the next look would be worth less than it costs')],
   [/^kill switch set$/, () => 'you pressed KILL'],
   [/^state preserved for resume$/, () => 'its state is kept for Resume'],
   [/^next look needs (\d+) px$/, (m) => `the next look needs ${px(+m[1])} px`],
@@ -141,16 +165,50 @@ export function brief(s) {
   return text ? `${text}.` : 'No reason was recorded.';
 }
 
+/** A review request's kind: the server's `kind` (critical, ambiguous, disagree, class-change, unconfirmed), else read from
+    its reason (a trace recorded before the field). */
+export function reviewKind(ev) {
+  if (ev.kind) return String(ev.kind);
+  const r = String(ev.reason ?? '');
+  return r.endsWith(' is critical') ? 'critical' : r.startsWith('ambiguous:') ? 'ambiguous' : r.startsWith('unconfirmed:') ? 'unconfirmed'
+    : r.startsWith('class change:') ? 'class-change' : r.startsWith('iou ') ? 'disagree' : 'review';
+}
+
 /** A review request's reason in plain words (an unknown one is kept as recorded). */
 export function reviewText(reason) {
   let m;
   if ((m = reason.match(/^(unconfirmed: )?iou ([\d.e+-]+) < [\d.]+ between L(\d) and L(\d)$/))) {
     return `the ${scale(m[3])} and ${scale(m[4])} zoom levels disagree (${pct(m[2])} overlap)${m[1] ? ', and no finer look is left to settle it' : ''}`;
   }
+  // "class change: spalling at L1, corrosion at L0 (same place, iou 0.62)": the closer look is the lower level
+  if ((m = reason.match(/^class change: (\w+) at L(\d), (\w+) at L(\d)(?: \(same place, iou ([\d.]+)\))?/))) {
+    const [near, far] = +m[2] < +m[4] ? [m[1], m[3]] : [m[3], m[1]];
+    return `the closer look saw ${words(near)} where the coarser one saw ${words(far)}: a person decides`
+      + `${m[5] ? ` (same place: the two looks' masks overlap ${pct(m[5])})` : ''}`;
+  }
   if ((m = reason.match(/^ambiguous: (\w+) (\d+) px .* inside (\w+) \w+; recorded as/))) {
     return `it also looks like ${words(m[1])} (${px(+m[2])} px, mostly inside it), but only ${words(m[3])} was recorded`;
   }
   return (m = reason.match(/^(\w+) is critical$/)) ? `${words(m[1])} is critical` : reason;
+}
+
+/** The cross-level check of a look, from its `verify` record {iou (same class), class, against_level, class_now, iou_any}. */
+function verifyText(v) {
+  if (!num(v?.iou)) return null;
+  const then = scale(v.against_level);
+  if (v.class && v.class_now && v.class_now !== v.class && num(v.iou_any) && v.iou_any >= 0.5) {
+    return `same place, different class: ${words(v.class_now)} now, ${words(v.class)} in the ${then} look (${pct(v.iou_any)} overlap)`;
+  }
+  return `${v.class ? `its ${words(v.class)} mask: ` : ''}${pct(v.iou)} overlap with the ${then} look`;
+}
+
+/** The unvisited candidates this look set the uncertainty and class of ({region, entropy, cls, from_level}), in words. */
+export function seededText(s) {
+  const list = (Array.isArray(s.seeded) ? s.seeded : []).filter((c) => c?.region && num(c.entropy));
+  if (!list.length) return null;
+  const one = (c) => `${c.region} (${c.cls ? `looks like ${words(c.cls)}, ` : ''}uncertainty ${c.entropy.toFixed(2)})`;
+  return `It also set what the agent expects in ${list.length} region${list.length === 1 ? '' : 's'} it has not visited: `
+    + `${list.map(one).join(', ')}. Their next scores use these numbers.`;
 }
 
 /** What a look measured, in one line. */
@@ -161,7 +219,7 @@ function sawText(s) {
   return [
     top ? `${words(top[0])} ${px(top[1])} px` : 'no damage',
     num(o.entropy) ? `uncertainty ${o.entropy.toFixed(2)}` : null,
-    num(s.verify?.iou) ? `${pct(s.verify.iou)} overlap with the ${scale(s.verify.against_level)} look` : null,
+    verifyText(s.verify),
     s.quality?.ok === false ? `failed the quality check (${s.quality.reason ?? 'rejected'})` : null,
   ].filter(Boolean).join(' · ');
 }
@@ -245,20 +303,24 @@ export class Trace {
     if (s.injected) parts.push(h('span', { class: 'chip chip--inject' }, `injected: ${INJECTED[s.injected] ?? words(s.injected)}`));
     if (num(s.latency_ms)) parts.push(h('span', { class: 't-ms' }, `${s.latency_ms} ms`));
     const saw = sawText(s);
+    const seeded = (Array.isArray(s.seeded) ? s.seeded : []).filter((c) => c?.region && num(c.entropy));
     const btn = h('button', { type: 'button', class: 'trace__btn' },
       h('span', { class: 'trace__head' }, parts),
       s.rationale ? h('span', { class: 'trace__why' }, h('i', {}, 'because'), from ? ` (from ${from})` : '', ': ', brief(s)) : null,
-      saw ? h('span', { class: 'trace__saw' }, h('i', {}, 'saw'), ': ', saw) : null);
+      saw ? h('span', { class: 'trace__saw' }, h('i', {}, 'saw'), ': ', saw) : null,
+      seeded.length ? h('span', { class: 'trace__saw trace__seeded' }, h('i', {}, 'set for later'), ': ',
+        seeded.map((c) => `${c.region} ${c.cls ? `likely ${words(c.cls)}, ` : ''}unsure ${c.entropy.toFixed(2)}`).join('; ')) : null);
     btn.addEventListener('click', () => this.onPick(s.step));
     this.push(h('li', { class: 'trace__line', 'data-step': s.step }, btn,
       s.rationale ? numbers('All numbers for this step', `recorded: ${s.rationale}`) : null));
   }
 
-  /** A finding or a review request: what the agent handed on, and why (`raw`: the reason as recorded, folded away).
-      Clicking it opens the finding's card. */
-  addNote(kind, stepNo, id, text, because, onOpen, raw = null) {
+  /** A finding or a review request: what the agent handed on, and why (`raw`: the reason as recorded, folded away;
+      `tag`: a chip, such as the review's kind). Clicking it opens the finding's card. */
+  addNote(kind, stepNo, id, text, because, onOpen, raw = null, tag = null) {
     const btn = h('button', { type: 'button', class: 'trace__btn' },
-      h('span', { class: 'trace__head' }, h('span', { class: 't-num' }, pad(stepNo)), h('span', { class: `t-act t-act--${kind}` }, kind), h('span', {}, text)),
+      h('span', { class: 'trace__head' }, h('span', { class: 't-num' }, pad(stepNo)), h('span', { class: `t-act t-act--${kind}` }, kind),
+        tag ? h('span', { class: 'chip chip--unsure' }, tag) : null, h('span', {}, text)),
       because ? h('span', { class: 'trace__why' }, h('i', {}, 'because'), ': ', because) : null);
     btn.addEventListener('click', onOpen);
     this.push(h('li', { class: `trace__line trace__line--${kind}`, 'data-finding': id }, btn,
@@ -293,13 +355,17 @@ export function renderStepDetail(root, step, planner) {
   const o = step.observation;
   const rt = step.runtime;
   const saw = sawText(step);
-  const classes = o?.classes && Object.keys(o.classes).length ? Object.entries(o.classes).map(([k, v]) => `${k} ${px(v)} px`).join(', ') : 'none';
+  const seeded = seededText(step);
+  const v = step.verify;
+  const classes = o?.classes && Object.keys(o.classes).length ? Object.entries(o.classes).map(([k, n]) => `${k} ${px(n)} px`).join(', ') : 'none';
   root.replaceChildren(...[
     h('p', { class: 'detail__title' }, `step ${step.step} · ${step.decision?.action ?? 'step'}`, step.cause ? ' ' : null, step.cause ? chip(step.cause) : null),
-    h('h4', { class: 'detail__h' }, 'Why this look'),
+    h('h4', { class: 'detail__h' }, step.decision?.action === 'halt' ? 'Why it stopped' : 'Why this look'),
     h('p', { class: 'detail__why' }, explain(step, planner).join(' ')),
     saw ? h('h4', { class: 'detail__h' }, 'What it saw') : null,
     saw ? h('p', { class: 'detail__why' }, saw) : null,
+    seeded ? h('h4', { class: 'detail__h' }, 'What it set for later') : null,
+    seeded ? h('p', { class: 'detail__why' }, seeded) : null,
     h('details', { class: 'detail__more' }, h('summary', {}, 'All numbers for this step'),
       h('p', { class: 'detail__raw' }, 'recorded: ', step.rationale ?? 'no rationale recorded'),
       step.governor?.cause ? h('p', { class: 'detail__raw' }, `governor: ${step.governor.cause}: ${step.governor.rationale ?? ''}`) : null,
@@ -307,7 +373,9 @@ export function renderStepDetail(root, step, planner) {
         row('entropy (unsure, 0-1)', num(o?.entropy) ? o.entropy.toFixed(2) : null),
         row('mask area', num(o?.mask_area_px) ? `${px(o.mask_area_px)} px` : null),
         row('classes', o ? classes : null),
-        row('verify IoU (overlap)', num(step.verify?.iou) ? `${step.verify.iou.toFixed(2)} vs L${step.verify.against_level}` : null),
+        row('verify IoU (overlap)', num(v?.iou) ? `${v.iou.toFixed(2)} vs L${v.against_level}${v.class ? `, ${words(v.class)} at both` : ''}` : null),
+        row('class then → now', num(v?.iou) && v.class && v.class_now ? `${words(v.class)} at L${v.against_level} → ${words(v.class_now)} now` : null),
+        row('best masks overlap (any class)', num(v?.iou_any) ? v.iou_any.toFixed(2) : null),
         row('sharpness / exposure', o ? `${o.sharpness ?? '–'} / ${o.exposure ?? '–'}` : null),
         row('quality', step.quality ? (step.quality.ok ? 'ok' : `rejected: ${step.quality.reason}`) : null),
         row('region', step.region),
