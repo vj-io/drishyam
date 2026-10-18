@@ -4,7 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Drishyam · bridge-photo inspection agent</title>
-<meta name="description" content="For bridge inspectors reviewing high-resolution photos: Drishyam finds cracks, spalling and exposed rebar by zooming in only where it needs to, and hands every critical finding to a human. An OpenCV agentic-vision demo.">
+<meta name="description" content="For bridge inspectors reviewing high-resolution photos: Drishyam finds cracks, spalling and exposed rebar by zooming in only where it needs to, and hands every critical finding to a human. OpenCV AI Competition 2026, powered by AWS · Agentic Vision entry.">
+<meta property="og:title" content="Drishyam: an agent that looks where it matters, then asks a human">
+<meta property="og:description" content="For bridge inspectors reviewing high-resolution photos: it finds cracks, spalling and exposed rebar by zooming in only where it needs to, and hands every critical finding to a human to sign off.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://d1xg58guluup8c.cloudfront.net/">
+<meta property="og:image" content="https://d1xg58guluup8c.cloudfront.net/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="A screenshot of the demo: the agent's numbered looks drawn over a synthetic concrete photo, the camera crop of exposed rebar it stopped on, and the trace of what it decided and why.">
+<meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#0F3B73">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230F3B73'/%3E%3Cpath d='M4 4h24v24H4z' fill='none' stroke='%23E8F1FF' stroke-width='2.5'/%3E%3Cpath d='M16 7v18M7 16h18' stroke='%23E8F1FF' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='5' fill='none' stroke='%23FFC857' stroke-width='2.5'/%3E%3C/svg%3E">
 <link rel="preload" href="fonts/ArchivoNarrow-700.woff2" as="font" type="font/woff2" crossorigin>
@@ -48,32 +57,34 @@
 <section class="sheet sheet--hero" id="top" aria-labelledby="h-top">
   <div class="strip" aria-hidden="true">
     <span class="strip__a">Drishyam // virtual-PTZ inspection agent</span>
-    <span class="strip__b">OpenCV agentic vision</span>
+    <span class="strip__b">OpenCV AI Competition 2026, powered by AWS &middot; Agentic Vision entry</span>
     <span class="strip__no pop">Sheet <b>1</b> of 7</span>
   </div>
   <ol class="zones" aria-hidden="true"><li>1</li><li>2</li><li>3</li><li>4</li><li>5</li><li>6</li><li>7</li><li>8</li></ol>
 
   <div class="hero">
     <div class="hero__main">
-      <p class="eyebrow"><span class="eyebrow__fig">FIG. 0</span> OpenCV agentic vision for bridge inspection</p>
+      <p class="eyebrow"><span class="eyebrow__fig">FIG. 0</span> OpenCV AI Competition 2026, powered by AWS &middot; Agentic Vision entry</p>
       <h1 class="wordmark" id="h-top">DRISHYAM</h1>
-      <div class="dim dim--word" aria-hidden="true"><span>one photo &middot; many looks &middot; one human</span></div>
+      <p class="namegloss">Sanskrit: that which is seen</p>
+      <div class="dim dim--word" aria-hidden="true"><span>one photo &middot; a few looks &middot; one human</span></div>
       <p class="lede">For bridge inspectors reviewing high-resolution photos: it finds cracks, spalling and exposed rebar by zooming in only where it needs to, and hands every critical finding to a human to sign off.</p>
       <p class="gloss">It works like a PTZ camera (pan-tilt-zoom), done in software: it pans and zooms across one big photo instead of moving a real camera.</p>
       <div class="cta">
         <button class="btn btn--amber btn--xl" id="guided" type="button"><span>Watch it inspect a bridge <span class="cta__time">(about 45 s)</span></span></button>
         <a class="btn" id="own" href="#step-photo">Try your own photo</a>
-        <a class="cta__link" href="https://github.com/vj-io/drishyam/releases/latest/download/drishyam-demo.mp4" rel="noopener noreferrer">Download the video (MP4)</a>
+        <a class="cta__link" id="video-link" href="#video" hidden>Watch the video</a>
       </div>
+      <p class="stakes">The US has 624,939 bridges (FHWA, 2026), and the rule is a routine inspection at intervals of up to 24 months (23 CFR 650.311). One drone inspection of a single bridge produced 2,536 photos. Someone has to look at every one. <a href="https://github.com/vj-io/drishyam/blob/main/docs/impact-sources.md" rel="noopener noreferrer">Sources</a></p>
       <ol class="claims" aria-label="How to use it">
         <li>Pick a photo</li>
         <li>Watch the agent look, zoom and double-check</li>
         <li>Sign off what it flags</li>
       </ol>
       <ul class="stats" aria-label="Measured so far">
-        <li class="stat" id="stat-recall"><span class="stat__k">defects found vs checking every tile</span><i class="stat__dim" aria-hidden="true"></i><b class="stat__v">see benchmarks</b><span class="stat__s">a hypothesis until it is measured</span></li>
-        <li class="stat" id="stat-cost"><span class="stat__k">$ per image (modelled)</span><i class="stat__dim" aria-hidden="true"></i><b class="stat__v">see benchmarks</b><span class="stat__s">wall time &times; $0.339/h, not billed</span></li>
-        <li class="stat" id="stat-ops"><span class="stat__k">failure drills survived</span><i class="stat__dim" aria-hidden="true"></i><b class="stat__v">see benchmarks</b><span class="stat__s">planner and governor faults</span></li>
+        <li class="stat" id="stat-recall"><span class="stat__k">Synthetic test set</span><i class="stat__dim" aria-hidden="true"></i><b class="stat__v">see benchmarks</b><span class="stat__s">a hypothesis until it is measured</span></li>
+        <li class="stat" id="stat-cost"><span class="stat__k">Stops on its own</span><i class="stat__dim" aria-hidden="true"></i><b class="stat__v">see benchmarks</b><span class="stat__s">how often the stop rule ends a job</span></li>
+        <li class="stat" id="stat-ops"><span class="stat__k">Failure drills</span><i class="stat__dim" aria-hidden="true"></i><b class="stat__v">see benchmarks</b><span class="stat__s">planner and governor faults, injected on purpose</span></li>
         <li class="stat" id="stat-real"></li>
       </ul>
     </div>
@@ -86,7 +97,7 @@
           <pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path d="M0 0V8" class="hatch"/></pattern>
         </defs>
         <text class="t-fig" x="20" y="16">FIG. 1</text>
-        <text class="t-cap" x="72" y="16">ONE PHOTO, THREE LOOKS, ONE HUMAN</text>
+        <text class="t-cap" x="72" y="16">ONE PHOTO, A FEW LOOKS, ONE HUMAN</text>
 
         <!-- the photo and the bridge in it -->
         <path class="d s3 at0" pathLength="1" d="M20 60H420V360H20Z"/>
@@ -99,12 +110,12 @@
         <path class="d s15 at3" pathLength="1" d="M303 176L299 190L306 203L301 219L308 236"/>
         <path class="d s15 at3" pathLength="1" d="M294 252L302 248L314 251L318 262L315 276L304 282L295 276L292 264Z"/>
 
-        <!-- dimension 1:4 over the whole photo -->
+        <!-- dimension 1:8 over the whole photo (the L3 survey) -->
         <g class="dm dm--x at4">
           <path class="ext" d="M20 34V56M420 34V56"/>
           <path class="dimln" d="M24 42H416" marker-start="url(#ah)" marker-end="url(#ah)"/>
           <rect class="lblbg" x="196" y="34" width="48" height="16"/>
-          <text class="t-dim" x="220" y="46" text-anchor="middle">1:4</text>
+          <text class="t-dim" x="220" y="46" text-anchor="middle">1:8</text>
         </g>
 
         <!-- L1 window and its 1:2 dimension -->
@@ -132,12 +143,12 @@
         <g class="co at4">
           <path class="lead" d="M400 76H452"/><circle class="dot" cx="400" cy="76" r="3.5"/>
           <circle class="num" cx="466" cy="76" r="13"/><text class="t-num" x="466" y="81" text-anchor="middle">1</text>
-          <text class="t-co" x="486" y="73">SURVEY</text><text class="t-sub" x="486" y="89">L2 &#183; WHOLE PHOTO</text>
+          <text class="t-co" x="486" y="73">SURVEY</text><text class="t-sub" x="486" y="89">L3 &#183; WHOLE PHOTO</text>
         </g>
         <g class="co at6">
           <path class="lead" d="M365 178L384 160H452"/><circle class="dot" cx="365" cy="178" r="3.5"/>
           <circle class="num" cx="466" cy="160" r="13"/><text class="t-num" x="466" y="165" text-anchor="middle">2</text>
-          <text class="t-co" x="486" y="157">ESCALATE</text><text class="t-sub" x="486" y="173">L1 &#183; UNSURE, ZOOM</text>
+          <text class="t-co" x="486" y="157">ESCALATE</text><text class="t-sub" x="486" y="173">L2 &#8594; L1 &#183; UNSURE</text>
         </g>
         <g class="co at8">
           <path class="lead" d="M336 240L360 230H452"/><circle class="dot" cx="336" cy="240" r="3.5"/>
@@ -154,8 +165,8 @@
         <path class="ext rule" d="M20 404H580"/>
       </svg>
       <ol class="art__key">
-        <li><b>Survey</b> L2 &middot; whole photo</li>
-        <li><b>Escalate</b> L1 &middot; unsure, zoom</li>
+        <li><b>Survey</b> L3 &middot; whole photo at 1/8</li>
+        <li><b>Escalate</b> L2 &rarr; L1 &middot; unsure, zoom</li>
         <li><b>Verify</b> L0 &middot; re-segment</li>
         <li><b>Exposed rebar</b> needs a human</li>
       </ol>
@@ -408,7 +419,10 @@
 
     <figure class="win pop win--wide win--loop" id="loop">
       <div class="win__bar"><span class="win__fig" aria-hidden="true">FIG. 3.0</span><h3 class="win__title">The agent loop: perception, decision, action, human</h3></div>
-      <div class="win__body"><img class="loop__img" src="docs/agent-loop.svg" width="1340" height="1236" loading="lazy" alt="The agent loop: OpenCV perception, the decision rules and planner, the action, and the human sign-off."></div>
+      <div class="win__body stack stack--tight">
+        <a class="loop__link" href="docs/agent-loop.svg"><img class="loop__img" src="docs/agent-loop.svg" width="1340" height="1236" loading="lazy" alt="The agent loop: OpenCV perception, the decision rules and planner, the action, and the human sign-off."></a>
+        <p class="note loop__hint">Tap the drawing to open it full size.</p>
+      </div>
     </figure>
 
     <section class="win pop" aria-labelledby="t-score">
@@ -442,6 +456,8 @@
     <section class="win pop win--wide" aria-labelledby="t-gov">
       <div class="win__bar"><span class="win__fig" aria-hidden="true">FIG. 3.3</span><h3 class="win__title" id="t-gov">Governor schedule</h3></div>
       <div class="win__body">
+        <details class="data">
+        <summary>Six signals the governor watches, and what it does about each</summary>
         <div class="table-wrap" tabindex="0" role="region" aria-label="Governor table">
           <table class="tbl tbl--rows">
             <thead><tr><th scope="col">Signal</th><th scope="col">Action</th><th scope="col">Trace cause</th></tr></thead>
@@ -455,6 +471,23 @@
             </tbody>
           </table>
         </div>
+        </details>
+      </div>
+    </section>
+
+    <section class="win pop" aria-labelledby="t-aws">
+      <div class="win__bar"><span class="win__fig" aria-hidden="true">FIG. 3.4</span><h3 class="win__title" id="t-aws">Where the live demo runs: AWS</h3></div>
+      <div class="win__body stack stack--tight">
+        <a class="aws__link" href="docs/aws-simple.svg"><img class="aws__img" src="docs/aws-simple.svg" width="360" height="660" loading="lazy" alt="Browser to CloudFront with WAF (10 job starts per 120 s per IP), to a Lambda Function URL (AWS_IAM, signed by OAC), to Lambda arm64 running stock OpenCV 5.0.0, which uses DynamoDB kill flags, a Secrets Manager HMAC key and CloudWatch metrics and alarms."></a>
+        <p class="note">The full diagram, with the OpenCV calls and agent parts: <a href="https://github.com/vj-io/drishyam/blob/main/docs/architecture.png" rel="noopener noreferrer">architecture.png</a>.</p>
+      </div>
+    </section>
+
+    <section class="win pop" aria-labelledby="t-live">
+      <div class="win__bar"><span class="win__fig" aria-hidden="true">FIG. 3.5</span><h3 class="win__title" id="t-live">What runs live, and what does not</h3></div>
+      <div class="win__body stack">
+        <p class="say"><b>No LLM runs in this demo.</b> The live agent is the rule policy above, and the drill planners are scripted to fail. The LLM path is the MCP server: in a recorded session Claude chose each call from the numbers the tools measured: saliency priors, entropy, IoU and the budget left (its prompt states the decision rules). <a href="https://github.com/vj-io/drishyam/blob/main/docs/mcp-session/transcript.md" rel="noopener noreferrer">Read the recorded session</a>.</p>
+        <p class="say"><b>OpenCV 5.</b> The live demo uses no OpenCV 5-only API (segmenter classical-v1). The one 5.x-specific call, <code>cv2.dnn</code> <code>ENGINE_NEW</code>, is on the opt-in ONNX segmenter path, exercised by tests and the offline evals.</p>
       </div>
     </section>
 
@@ -487,9 +520,9 @@
     <p class="note win__cite">CODEBRIM: Mundt, Majumder, Murali, Panetsos and Ramesh, &ldquo;Meta-learning Convolutional Neural Architectures for Multi-target Concrete Defect Classification with the COncrete DEfect BRidge IMage Dataset&rdquo;, CVPR 2019. Its licence does not allow sharing the photos, so only the numbers appear here.</p>
   </section>
   <section class="win pop" aria-labelledby="t-bench-cool">
-    <div class="win__bar"><span class="win__fig" aria-hidden="true">FIG. 4.3</span><h3 class="win__title" id="t-bench-cool">COOL on Graviton: three arms</h3></div>
-    <div class="win__body" id="bench-cool"><p class="note">Loading benchmarks&hellip;</p></div>
-    <p class="note win__cite">A: the COOL AMI on c8g.2xlarge (Graviton4). B: the stock <code>opencv-python-headless</code> wheel on the same instance type. C: that wheel version, built for x86, on c7i.2xlarge. COOL gain is A over B; hardware gain is B over C, so it includes the two builds&rsquo; differences. How the arms run: <a href="https://github.com/vj-io/drishyam/blob/main/bench/README.md" rel="noopener noreferrer">bench/README.md</a>.</p>
+    <div class="win__bar"><span class="win__fig" aria-hidden="true">FIG. 4.3</span><h3 class="win__title" id="t-bench-cool">COOL on Graviton: not run</h3></div>
+    <div class="win__body" id="bench-cool"><p class="say">The COOL Marketplace AMI could not be subscribed from our AWS account (a payment-method restriction); the three-arm scripts are in <a href="https://github.com/vj-io/drishyam/tree/main/bench" rel="noopener noreferrer">bench/</a>.</p></div>
+    <p class="note win__cite">The three arms, as scripted: A, the COOL AMI on c8g.2xlarge (Graviton4); B, the stock <code>opencv-python-headless</code> wheel on the same instance type; C, that wheel version, built for x86, on c7i.2xlarge. How they would run: <a href="https://github.com/vj-io/drishyam/blob/main/bench/README.md" rel="noopener noreferrer">bench/README.md</a>.</p>
   </section>
   <dl class="tblock tblock--mini" aria-hidden="true">
     <div><dt>Drawn by</dt><dd>eval harness</dd></div>
@@ -540,6 +573,7 @@
           <li><b>Privacy blur.</b> Faces, people and vehicles are found with OpenCV DNN models and blurred before any look is taken. A photo in which one person fills more than a quarter of the frame is refused: this inspects structures, not people.</li>
           <li><b>Signed work orders.</b> The work order is signed with HMAC-SHA256 and every sign-off returns a new signature, so an edited order no longer verifies. The download includes the signature.</li>
         </ol>
+        <p class="note guards__llm">No LLM runs in this demo. The live agent is the rule policy (FIG. 3.2), and the drill planners are scripted to fail. The LLM path is the MCP server: in a recorded session Claude chose each call from the numbers the tools measured (its prompt states the decision rules). <a href="https://github.com/vj-io/drishyam/blob/main/docs/mcp-session/transcript.md" rel="noopener noreferrer">Read the recorded session</a>.</p>
       </div>
     </section>
     <section class="win pop win--wide" aria-labelledby="t-auto">
@@ -580,7 +614,7 @@
   <dl class="faq">
     <div class="faq__item">
       <dt>Is this live or recorded?</dt>
-      <dd>Live. The photo goes to the API and every look is computed on the spot with stock OpenCV 5. The page then shows the decisions at reading speed; the agent itself is much faster, and the status bar says how long it really took. <a href="?mock=1#demo">Watch a recorded run</a> replays a saved job instead, and is labelled recorded.</dd>
+      <dd>Live. The photo goes to the API and every look is computed on the spot with stock OpenCV 5. The page then shows the decisions at reading speed; the agent itself is much faster. The status bar shows the agent&rsquo;s own time; the upload, decode and privacy blur on the server come on top of it. <a href="?mock=1#demo">Watch a recorded run</a> replays a saved job instead, and is labelled recorded.</dd>
     </div>
     <div class="faq__item">
       <dt>What is OpenCV doing here?</dt>
@@ -606,7 +640,8 @@
   <div class="win">
     <div class="win__bar"><span class="win__fig" aria-hidden="true">END</span><h2 class="win__title" id="h-docs">Docs and links</h2></div>
     <div class="win__body stack">
-      <p class="banner banner--honest"><b id="live-where">Live demo: stock OpenCV 5 on AWS Lambda (arm64) &mdash; not COOL.</b> <span id="cool-status">The same code is meant to run from <code>/opt/cool</code> on COOL/Graviton; that run needs an AWS account and has not been done yet.</span></p>
+      <figure class="video" id="video" hidden></figure>
+      <p class="banner banner--honest"><b id="live-where">Live demo: stock OpenCV 5 on AWS Lambda (arm64) &mdash; not COOL.</b> <span id="cool-status">COOL on Graviton: not run. The COOL Marketplace AMI could not be subscribed from our AWS account (a payment-method restriction); the three-arm scripts are in bench/.</span></p>
       <nav aria-label="Project links">
         <ul class="links">
           <li><a href="https://github.com/vj-io/drishyam" rel="noopener noreferrer">GitHub repo</a></li>
@@ -614,7 +649,9 @@
           <li><a href="https://github.com/vj-io/drishyam/blob/main/docs/PRD.md" rel="noopener noreferrer">PRD</a></li>
           <li><a href="https://github.com/vj-io/drishyam/blob/main/docs/api-contract.md" rel="noopener noreferrer">API contract</a></li>
           <li><a href="https://github.com/vj-io/drishyam/blob/main/docs/mcp.md" rel="noopener noreferrer">MCP usage</a></li>
-          <li><a href="https://github.com/vj-io/drishyam/releases/latest/download/drishyam-demo.mp4" rel="noopener noreferrer">Demo video (MP4 download)</a></li>
+          <li><a href="https://github.com/vj-io/drishyam/blob/main/docs/mcp-session/transcript.md" rel="noopener noreferrer">Claude drives it over MCP (recorded)</a></li>
+          <li><a href="https://github.com/vj-io/drishyam/blob/main/docs/architecture.png" rel="noopener noreferrer">Architecture diagram</a></li>
+          <li><a href="https://github.com/vj-io/drishyam/blob/main/docs/impact-sources.md" rel="noopener noreferrer">Impact sources</a></li>
           <li><a href="?mock=1#demo">Recorded run</a></li>
         </ul>
       </nav>

@@ -1,4 +1,4 @@
-// Benchmarks (a hand-drawn blueprint line chart + tables) and the failure plates. Both degrade to a "pending" state.
+// Benchmarks (a hand-drawn blueprint line chart + tables) and the failure plates. Each degrades to a "pending" or empty state.
 import { $, h, svg, num } from './dom.js';
 import { getJSON } from './api.js';
 import { countUp } from './fx.js';
@@ -154,10 +154,12 @@ function versusDownscale(hs) {
   return ci[0] > 1 ? '; it beats one downscale' : ci[1] < 1 ? '; one downscale does better' : '; one downscale does as well';
 }
 
-/** Hero chips, each a measured fact with its caveat. `real` (CODEBRIM) fills #stat-real when the page has that slot. */
+/** Hero chips, each a measured fact with its caveat, every pixel figure a share of the image's own pixels.
+ * `real` (CODEBRIM) fills #stat-real when the page has that slot. */
 function heroChips(sum, real) {
   // Exhaustive tiling (the most pixels) is the PRD's reference point for the headline ratio.
-  const tilingOf = (s) => points(s?.policies?.tiling).pop();
+  const tiling = points(sum.policies?.tiling).pop();
+  const hs = sum.headline_stats ?? {};
   const fill = (id, key, value, opts, sub) => {
     const el = $(`#${id}`);
     if (!el) return;  // a slot the page does not have (yet)
@@ -171,46 +173,73 @@ function heroChips(sum, real) {
     el.classList.add('is-measured');
   };
   const drishyam = headline(sum.policies);
-  const tiling = tilingOf(sum);
   if (drishyam && tiling?.recall > 0) {
-    const target = sum.headline_stats?.target?.recall_ratio;
-    fill('stat-recall', null, Math.round((100 * drishyam.recall) / tiling.recall), { suffix: ' % of tiling' },
-      `recall, with ${pct(drishyam.pixels_frac / tiling.pixels_frac)} of its pixels${num(target) ? `; target was ${pct(target)}` : ''}${versusDownscale(sum.headline_stats)} (synthetic)`);
+    const ratio = num(hs.recall_ratio_vs_tiling) ? hs.recall_ratio_vs_tiling : drishyam.recall / tiling.recall;
+    const target = hs.target?.recall_ratio;
+    const ds = interval(hs.recall_ratio_vs_downscale_ci);
+    const vsDown = !ds ? '' : ds[0] > 1 ? ' It beats one downscaled pass' : ds[1] < 1 ? ' One downscaled pass does better' : ' One downscaled pass does about as well';
+    fill('stat-recall', `Synthetic test set${num(sum.n_images) ? ` (${sum.n_images} photos)` : ''}`, Math.round(100 * ratio), { suffix: ' %' },
+      `of what checking every tile finds, reading ${pct(drishyam.pixels_frac)} of the image's pixels (tiling reads ${pct(tiling.pixels_frac)}${tiling.pixels_frac > 1 ? ': its tiles overlap' : ''}).`
+      + `${num(target) ? ` Target was ${pct(target)}: ${ratio >= target ? 'met' : 'missed'}.` : ''}`
+      + `${vsDown ? `${vsDown} (${dec(hs.recall_ratio_vs_downscale)}×, 95 % CI ${dec(ds[0])}–${dec(ds[1])}).` : ''}`);
   }
   const rd = headline(real?.policies);
-  const rt = tilingOf(real);
-  if (rd && rt?.recall > 0) {
-    const all = [...points(real.policies.downscale), ...points(real.policies.tiling), rd].map((p) => p.recall);
-    const [lo, hi] = [Math.min(...all), Math.max(...all)];
-    const strict = num(rd.recall_iou_only) && rt.recall_iou_only > 0 ? rd.recall_iou_only / rt.recall_iou_only : null;
-    const sci = interval(real.headline_stats?.recall_ratio_iou_only_vs_tiling_ci);
-    fill('stat-real', 'real photos (CODEBRIM)', rd.recall / rt.recall, { decimals: 2, suffix: '× tiling' },
-      `recall at ${(rd.pixels_frac / rt.pixels_frac).toFixed(2)}× its pixels${strict ? ` (${strict.toFixed(2)}× with IoU-only matching${sci ? `, 95 % CI ${sci[0].toFixed(2)}–${sci[1].toFixed(2)}` : ''})` : ''}; ${hi - lo <= 0.05 ? `every policy about ${((lo + hi) / 2).toFixed(1)}` : `policies ${lo.toFixed(2)}–${hi.toFixed(2)}`}${num(rd.chance_recall) ? ` (its boxes at random places: ${rd.chance_recall.toFixed(2)})` : ''}, limited by the segmenter`);
+  if (rd) {
+    const others = [...points(real.policies.downscale), ...points(real.policies.tiling)].map((p) => p.recall);
+    const [lo, hi] = [Math.min(rd.recall, ...others), Math.max(rd.recall, ...others)];
+    const mid = (lo + hi) / 2;
+    const plain = hi - lo <= 0.05 && mid > 0;  // every policy within 0.05 of the others: one plain number for all of them
+    const u = (v) => (plain && v > 0 ? `about 1 in ${Math.round(1 / v)}` : dec(v));  // and the card keeps that one unit
+    const chance = num(rd.chance_recall) ? ` Its boxes at random places ${plain ? 'find' : 'score'} ${u(rd.chance_recall)}.` : '';
+    const strict = num(rd.recall_iou_only) && num(rd.chance_recall_iou_only)
+      ? ` With strict IoU matching it ${plain ? 'finds' : 'is'} ${u(rd.recall_iou_only)} against ${u(rd.chance_recall_iou_only)} by chance.` : '';
+    const why = ' The classical segmenter is the bottleneck, not where it looks.';
+    const key = `Real bridge photos (CODEBRIM${num(real.n_images) ? `, ${real.n_images}` : ''})`;
+    if (plain) fill('stat-real', key, Math.round(1 / mid), { prefix: 'about 1 in ' }, `defects found by every method, ours included.${chance}${strict}${why}`);
+    else fill('stat-real', key, rd.recall, { decimals: 2, prefix: 'recall ' }, `ours; the other methods ${dec(Math.min(...others))}–${dec(Math.max(...others))}.${chance}${strict}${why}`);
   }
-  // The uncapped run: where the stop rule (value per ms) ended the job by itself.
+  // The uncapped run: where the stop rule (value per ms) ended the job by itself, and how often the headline cap binds first.
   const am = sum.agent_metrics ?? {};
   const uncapped = points(sum.policies?.drishyam).pop();
+  const total = (halts) => Object.values(halts).reduce((a, b) => a + b, 0);
   const halts = am.by_budget?.['1.0']?.halt_causes;
-  if (uncapped && tiling?.recall > 0 && halts) {
+  const capped = am.by_budget?.[String(hs.budget)]?.halt_causes;
+  if (uncapped && halts) {
     const stops = halts['stop-rule'] ?? 0;
-    const jobs = Object.values(halts).reduce((a, b) => a + b, 0);
-    fill('stat-cost', stops * 2 >= jobs ? 'stops itself' : 'uncapped run', Math.round(100 * uncapped.pixels_frac), { suffix: ' % of pixels' },
-      `with ${(uncapped.recall / tiling.recall).toFixed(2)}× exhaustive tiling's recall; the stop rule ended ${stops} of ${jobs} jobs (synthetic)`);
+    fill('stat-cost', stops * 2 >= total(halts) ? 'Stops on its own' : 'Uncapped run', stops, { suffix: ` of ${total(halts)} jobs` },
+      `uncapped, at ${pct(uncapped.pixels_frac)} of the image's pixels on average, the stop rule ended them when the next look was worth less than it cost`
+      + `${capped ? `; under the ${pct(hs.budget)} cap the cap binds first (${capped['cap-hit'] ?? 0} of ${total(capped)})` : ''}`);
   }
-  // Agentic evidence: every step's cause is logged, and injected planner and governor faults are recovered from.
+  // Agentic evidence: injected planner and governor faults, and how many the agent recovered from.
   const fired = (am.planner_recovery?.timeout?.fired ?? 0) + (am.planner_recovery?.malformed?.fired ?? 0) + (am.governor_response?.fired ?? 0);
   const ok = (am.planner_recovery?.recovered_total ?? 0) + (am.governor_response?.recovered ?? 0);
-  const injected = (am.planner_recovery?.injected_total ?? 0) + (am.governor_response?.injected ?? 0);
-  if (num(am.steps_with_cause_pct)) {
-    fill('stat-ops', 'steps carry a cause', Math.round(am.steps_with_cause_pct), { suffix: ' %' },
-      fired > 0 ? `${ok} of ${fired} planner and governor faults that fired were recovered (${injected} injected)` : 'every decision in the trace names what caused it');
+  if (fired > 0) {
+    fill('stat-ops', 'Failure drills', ok, { suffix: ` / ${fired} recovered` },
+      'planner timeouts, malformed replies and slow-segmenter faults, injected on purpose');
   }
 }
 
-function renderBench(sum, id, file, note, model, iou = false) {
+/** The machine was busy: its 1-minute load average was at or above its logical CPU count. */
+const busy = (prov) => {
+  const cpus = Number(/(\d+) logical CPUs/.exec(String(prov?.machine ?? ''))?.[1]);
+  return Array.isArray(prov?.load_avg) && cpus > 0 && prov.load_avg[0] >= cpus;
+};
+
+/** Where a summary's timings were taken, in plain words. The published runs are from a busy x86 laptop, not Graviton. */
+function place(prov) {
+  const machine = String(prov?.machine ?? '');
+  if (!/^Darwin .*x86_64/.test(machine)) return machine;
+  const cpu = String(prov.cpu ?? '').replace(/\((R|TM)\)| Core| CPU.*$/g, '');  // "Intel(R) Core(TM) i9-9880H CPU @ 2.30GHz" -> "Intel i9-9880H"
+  return `local x86 laptop${cpu ? ` (${cpu})` : ''}${busy(prov) ? ', under load' : ''}`;
+}
+
+/** `extra` (optional) adds lines to the folded provenance block. */
+function renderBench(sum, id, file, note, model, iou = false, extra = null) {
   const root = $(`#${id}`);
   if (!sum?.policies) return root.replaceChildren(pending('benchmarks', file));
   const prov = Object.entries(sum.provenance ?? {});
+  const micro = Array.isArray(sum.micro) && sum.micro.length;
+  const where = place(sum.provenance);
   const withModel = points(model?.policies?.drishyam).length > 0;
   const series = withModel ? [...SERIES, MODEL] : SERIES;
   const policies = withModel ? { ...sum.policies, model: model.policies.drishyam } : sum.policies;
@@ -219,13 +248,16 @@ function renderBench(sum, id, file, note, model, iou = false) {
   NARROW.addEventListener('change', () => plot.firstElementChild.replaceWith(chart(policies, series, iou)));
   root.replaceChildren(h('div', { class: 'stack' },
     h('p', { class: 'dataset' }, h('span', { class: 'dataset__k' }, 'dataset'), h('b', {}, String(sum.dataset ?? 'unlabelled'))),
-    note?.(sum) ?? null,
     h('div', { class: 'bench' },
       plot,
       h('div', { class: 'stack' },
-        Array.isArray(sum.micro) && sum.micro.length ? microTable(sum.micro) : null,
-        prov.length ? h('div', { class: 'prov' }, h('h4', { class: 'label' }, 'provenance'),
-          h('dl', { class: 'kv' }, prov.map(([k, v]) => h('div', {}, h('dt', {}, k), h('dd', {}, String(v)))))) : null))));
+        note?.(sum) ?? null,
+        micro || prov.length ? h('details', { class: 'data' },
+          h('summary', {}, `${micro ? 'Micro-benchmarks and provenance' : 'Provenance'}${where ? `: ${where}` : ''}`),
+          h('div', { class: 'stack' },
+            micro ? microTable(sum.micro) : null,
+            prov.length ? h('div', { class: 'prov' }, h('h4', { class: 'label' }, 'provenance'),
+              h('dl', { class: 'kv' }, prov.map(([k, v]) => h('div', {}, h('dt', {}, k), h('dd', {}, String(v))))), extra) : null)) : null))));
   return true;
 }
 
@@ -260,53 +292,20 @@ function synthNotes(large, live) {
   const vd = at(live);
   const gov = live?.agent_metrics?.governor_activity_in_eval ?? {};
   if (vd && num(gov['p95>SLA'])) {
-    const load = live.provenance?.load_avg;
-    out.push(h('p', { class: 'note' }, `On measured wall time instead of fixed costs${Array.isArray(load) ? ` (machine load ${load[0]})` : ''}, `
-      + `Drishyam found ${vd.recall.toFixed(2)} at ${pct(vd.pixels_frac)} of the pixels; the governor switched the model ${gov['p95>SLA']} times`
-      + `${num(gov['warp-spike']) ? ` and shrank the gaze on ${gov['warp-spike']} warp spikes` : ''}. Live timings move with the machine, so the chart uses fixed costs.`));
+    const acts = [gov['p95>SLA'] > 0 && `switched the model ${gov['p95>SLA']} times`,
+      gov['warp-spike'] > 0 && `shrank the gaze on ${gov['warp-spike']} warp spikes`].filter(Boolean);  // a count of 0 is not an event
+    out.push(h('p', { class: 'note' }, 'On measured wall time instead of fixed costs, '
+      + `Drishyam found ${vd.recall.toFixed(2)} at ${pct(vd.pixels_frac)} of the pixels${acts.length ? `; the governor ${acts.join(' and ')}` : ''}`
+      + '. Live timings move with the machine, so the chart uses fixed costs.'));
   }
   return out;
 }
 
-const times = (v) => (num(v) ? `${v}×` : '–');
-const span = (r) => (Array.isArray(r) && r.length === 2 && r.every(num) ? `${r[0]}–${r[1]}×` : null);
-const sig = (v, prefix = '') => (num(v) ? `${prefix}${+v.toPrecision(3)}` : '–');
-const raw = (v) => (num(v) ? String(v) : '–');
-
-/** FIG. 4.3 and the footer banner, from results/cool.json (the --summary file of `python -m bench.compare_arms`). */
-function renderCool(cool) {
-  const root = $('#bench-cool');
-  const arms = Object.entries(cool?.arms ?? {}).filter(([, a]) => a && typeof a === 'object');
-  const e2e = cool?.end_to_end ?? {};
-  if (!arms.length || !num(e2e.cool_gain)) return root.replaceChildren(pending('COOL benchmark', 'results/cool.json', 'bench.compare_arms (after the AWS run)'));
-  const op = cool.op_level_geomean ?? {};
-  const ex = cool.expected ?? {};
-  const par = cool.parity_a_vs_b ?? {};
-  const gains = [  // [label, measured, the PRD's expected range]
-    ['COOL gain, whole job', times(e2e.cool_gain), span(ex.end_to_end)],
-    ['COOL gain, single ops (geomean)', times(op.cool_gain), span(ex.op_level)],
-    ['hardware gain, whole job', times(e2e.hardware_gain)],
-    ['hardware gain, single ops (geomean)', times(op.hardware_gain)],
-    ['A over C, whole job', times(e2e.a_over_c)],
-    [`mask pixel agreement, A vs B${num(par.crops) ? ` (${par.crops} crops)` : ''}`, raw(par.pixel_agreement)],
-    ['worst crop agreement, A vs B', raw(par.worst_crop_agreement)],
-  ];
-  const cols = ['instance', 'cv2', 'images/s', '$ / h', '$ / 1k images'];
-  const rows = arms.map(([r, a]) => h('tr', {},
-    h('th', { scope: 'row' }, a.what ? `${r}: ${a.what}` : r),
-    [String(a.instance_type ?? '–'), `${String(a.cv2 ?? '–')}${a.cv2_from_opt_cool ? ', /opt/cool' : ''}`,
-      sig(a.images_per_s), sig(a.usd_per_hour, '$'), sig(a.usd_per_1k_images, '$')]
-      .map((v, i) => h('td', { 'data-label': cols[i], class: i > 1 ? 'n' : null }, v))));
-  root.replaceChildren(h('div', { class: 'stack' },
-    h('p', { class: 'dataset' }, h('span', { class: 'dataset__k' }, 'measured'), h('b', {}, `COOL gain ${times(e2e.cool_gain)} on a whole job`)),
-    h('div', { class: 'bench' },
-      h('div', { class: 'table-wrap', tabindex: '0', role: 'region', 'aria-label': 'Three arms' },
-        h('table', { class: 'tbl tbl--tight tbl--rows tbl--pairs' }, h('caption', {}, 'three arms, whole job, one worker'),
-          h('thead', {}, h('tr', {}, ['arm', ...cols].map((t, i) => h('th', { scope: 'col', class: i > 2 ? 'n' : null }, t)))), h('tbody', {}, rows))),
-      h('div', { class: 'prov' }, h('h4', { class: 'label' }, 'speed-ups and mask parity'),
-        h('dl', { class: 'kv kv--nums' }, gains.map(([k, v, x]) => h('div', {},
-          h('dt', {}, k, x ? h('span', { class: 'kv__sub' }, `PRD expects ${x}`) : null), h('dd', {}, v))))))));
-  $('#cool-status').textContent = `The COOL/Graviton run has been measured (FIG. 4.3): a whole job ran at ${times(e2e.cool_gain)} the speed of the stock wheel on the same instance type${num(e2e.a_over_c) ? `, and at ${e2e.a_over_c}× the speed of the stock wheel on x86` : ''}.`;
+/** FIG. 4.1's folded provenance: how busy the machine was during the measured-wall-time run. */
+function liveLoad(live) {
+  return busy(live?.provenance) && headline(live.policies)
+    ? h('p', { class: 'note' }, `Measured-wall-time run: machine load ${live.provenance.load_avg[0]} (the laptop was busy; the fixed-cost runs are the fair comparison).`)
+    : null;
 }
 
 function failureImage(path) {
@@ -354,22 +353,23 @@ function realFailures(real, n) {
       h('tbody', {}, rows.map(([head, ...cells]) => h('tr', {}, h('th', { scope: 'row' }, head),
         cells.map((v, i) => h('td', { 'data-label': cols[i + 1] }, v)))))));
   const byRule = [...Map.groupBy(real, (f) => String(f.category ?? ''))];
-  return h('div', { class: 'stack' },
-    h('h4', { class: 'label' }, `FIG. 5.${n} · Real-photo failures (described; photos not redistributable)`),
-    h('p', { class: 'note' }, `${real.length} cases from the CODEBRIM evaluation, written out because its licence does not allow sharing the photos.`),
-    table('Real-photo failures', ['photo', 'class', 'what happened'],
-      real.map((f) => [String(f.id ?? ''), String(f.class ?? '–'), String(f.what_happened)])),
-    table('Rules that would catch them', ['failure', 'rule that would catch it'],
-      byRule.map(([category, cases]) => [category, String(cases[0].rule_that_would_catch_it ?? '')])));
+  return h('details', { class: 'data' },
+    h('summary', {}, `FIG. 5.${n} · Real-photo failures (described; photos not redistributable)`),
+    h('div', { class: 'stack' },
+      h('p', { class: 'note' }, `${real.length} cases from the CODEBRIM evaluation, written out because its licence does not allow sharing the photos.`),
+      table('Real-photo failures', ['photo', 'class', 'what happened'],
+        real.map((f) => [String(f.id ?? ''), String(f.class ?? '–'), String(f.what_happened)])),
+      table('Rules that would catch them', ['failure', 'rule that would catch it'],
+        byRule.map(([category, cases]) => [category, String(cases[0].rule_that_would_catch_it ?? '')]))));
 }
 
 export async function initResults() {
-  const [sum, real, cool, fails, realFails, large, live, synthModel, realModel] = await Promise.all(
-    ['results/summary.json', 'results/codebrim/summary.json', 'results/cool.json', 'results/failures.json',
-      'results/codebrim/failures_text.json', 'results/large/summary.json', 'results/live/summary.json',
-      'results/synth_dacl10k/summary.json', 'results/codebrim_dacl10k/summary.json'].map(getJSON));
-  if (renderBench(sum, 'bench', 'results/summary.json', () => synthNotes(large, live), synthModel)) heroChips(sum, real);
-  renderBench(real, 'bench-real', 'results/codebrim/summary.json', realNote, realModel, true);
-  renderCool(cool);
+  // The trained segmenter's summaries (results/synth_dacl10k, results/codebrim_dacl10k) are not published yet; pass
+  // them as renderBench's `model` once they are. COOL was not run, so FIG. 4.3 is static text.
+  const [sum, real, fails, realFails, large, live] = await Promise.all(
+    ['results/summary.json', 'results/codebrim/summary.json', 'results/failures.json',
+      'results/codebrim/failures_text.json', 'results/large/summary.json', 'results/live/summary.json'].map(getJSON));
+  if (renderBench(sum, 'bench', 'results/summary.json', () => synthNotes(large, live), null, false, liveLoad(live))) heroChips(sum, real);
+  renderBench(real, 'bench-real', 'results/codebrim/summary.json', realNote, null, true);
   renderFailures(fails, realFails);
 }

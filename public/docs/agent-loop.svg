@@ -265,9 +265,7 @@
 <path class="edge red" d="M690 916 L690 824"/>
 <rect class="lbg" x="696.0" y="857" width="34.4" height="16"/>
 <text x="700" y="868" class="el red" xml:space="preserve">KILL</text>
-<text x="60" y="1120" class="fs" xml:space="preserve">Amber edge and callout: one deterministic run of tests/test_agent.py::test_opencv_output_changes_the_next_tool_call (conftest scene, FakeClock, pixel_cap=1.0).</text>
-<text x="60" y="1138" class="fs" xml:space="preserve">That test asserts the first such follow-up (step 2, verify-new-mask, L2 → L1) is one level finer, inside the previous look's window, on the same region;</text>
-<text x="60" y="1156" class="fs" xml:space="preserve">steps 4, 8 and 10 of the same run are entropy&gt;tau escalations. A planner event's status is accepted, rejected or fallback; a failed proposal's step cause is planner-fallback.</text>
+<text x="60" y="1156" class="fs" xml:space="preserve">A planner event's status is accepted, rejected or fallback; a failed proposal's step cause is planner-fallback.</text>
 <text x="60" y="1196" class="fs" xml:space="preserve"><tspan class="cv">cv2.call</tspan> OpenCV call · <tspan class="ca">cause</tspan> trace cause · amber: the measured qualifying edge · dashed sky: alternative driver · red: human gate, kill</text>
 <text x="1280" y="1196" class="fs" text-anchor="end" xml:space="preserve">SHEET A-2 · DRAWN 2026-10-18 · SCALE NTS</text>
 </svg>

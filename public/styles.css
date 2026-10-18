@@ -103,7 +103,7 @@ img, canvas, svg { max-width: 100%; }
 .hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.02fr); gap: 40px; align-items: stretch; padding: 30px 0 6px; }
 .hero__side { display: flex; flex-direction: column; justify-content: space-between; gap: 24px; min-width: 0; padding-top: 18px; }
 .hero__main { container-type: inline-size; display: grid; grid-template-columns: minmax(0, 1fr); gap: 22px; justify-items: start; min-width: 0; }
-.eyebrow { margin: 0; font: 500 12px/1.5 var(--f-mono); text-transform: uppercase; letter-spacing: .14em; color: var(--line-2); }
+.eyebrow { margin: 0; text-wrap: balance; font: 500 12px/1.5 var(--f-mono); text-transform: uppercase; letter-spacing: .14em; color: var(--line-2); }
 .eyebrow__fig { display: inline-block; margin-right: 10px; padding: 2px 7px; border: 2px solid var(--amber); color: var(--amber); font-weight: 700; }
 .wordmark { margin: 0 0 -6px; font: 700 min(9.6rem, 17.5cqw)/.84 var(--f-title); letter-spacing: .035em; color: var(--line); white-space: nowrap; }  /* 17.5cqw: still fits if the webfont falls back to a wider face */
 
@@ -117,7 +117,7 @@ img, canvas, svg { max-width: 100%; }
 .claims li { counter-increment: c; display: flex; align-items: center; gap: 14px; font: 700 clamp(1.05rem, 1.7vw, 1.3rem)/1.15 var(--f-title); letter-spacing: .04em; text-transform: uppercase; }
 .claims li::before { content: counter(c); flex: none; display: grid; place-items: center; width: 32px; height: 32px; border: 2.5px solid var(--amber); border-radius: 50%; color: var(--amber); font: 700 14px/1 var(--f-mono); }
 
-.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; width: 100%; margin: 0; padding: 0; list-style: none; }
+.stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; width: 100%; margin: 0; padding: 0; list-style: none; }
 .stat { position: relative; display: grid; gap: 6px; align-content: start; padding: 12px 14px 14px; border: 2px solid var(--line); background: rgba(7, 34, 71, .55); }
 .stat::before { content: ''; position: absolute; right: -2px; bottom: -2px; width: 14px; height: 14px; border-right: 2.5px solid var(--amber); border-bottom: 2.5px solid var(--amber); }
 .stat__k { min-height: 2.5em; font: 500 11px/1.25 var(--f-mono); text-transform: uppercase; letter-spacing: .1em; color: var(--line-2); }
@@ -176,6 +176,9 @@ img, canvas, svg { max-width: 100%; }
 /* hero: what it is, for whom, and how to start */
 .lede { max-width: 40em; margin: 0; font: 400 clamp(15px, 1.35vw, 17px)/1.55 var(--f-mono); color: var(--line); }
 .gloss { max-width: 40em; margin: -10px 0 0; font-size: 13px; line-height: 1.5; color: var(--line-2); }
+.namegloss { margin: -8px 0 0; font: 500 12px/1.3 var(--f-mono); letter-spacing: .1em; color: var(--line-2); }
+.stakes { max-width: 40em; margin: 0; padding-left: 12px; border-left: 3px solid var(--amber); font-size: 13.5px; line-height: 1.55; color: var(--line); }
+.stakes a { color: var(--amber); }
 .cta { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; }
 .cta .btn--xl { text-align: left; }
 .cta__time { font-weight: 500; letter-spacing: .04em; text-transform: none; }
@@ -292,10 +295,11 @@ img, canvas, svg { max-width: 100%; }
 .win--view > .win__body { padding: 12px; }
 @keyframes chest { 0% { opacity: 0; transform: translateY(28px); clip-path: inset(0 -40px 100% -40px); } 35% { opacity: 1; } 100% { opacity: 1; transform: none; clip-path: inset(-40px -40px -40px -40px); } }
 /* Hidden-until-scrolled only once app.js has wired the observer (it sets .js), and never in print:
-   a script that fails to load or throws leaves every sheet visible. */
+   a script that fails to load or throws leaves every sheet visible. The demo's own windows are never hidden: the app
+   jumps between them, and a window still sliding in read as an empty gap under the trace. */
 @media screen and (prefers-reduced-motion: no-preference) {
-  .js .win.pop:not(.is-in) { opacity: 0; }
-  .win.pop.is-in { animation: chest .75s cubic-bezier(.2, .8, .25, 1) both; animation-delay: var(--d, 0s); }
+  .js .win.pop:not(.is-in):not(#demo *) { opacity: 0; }
+  .win.pop.is-in:not(#demo *) { animation: chest .75s cubic-bezier(.2, .8, .25, 1) both; animation-delay: var(--d, 0s); }
   .strip__no.is-in b { animation: sheetstamp .6s .25s cubic-bezier(.2, 1.4, .4, 1) both; }
   .js .art:not(.is-in) .d { stroke-dasharray: 1 1; stroke-dashoffset: 1; }
   .js .art:not(.is-in) :is(.dm, .co, .fade) { opacity: 0; }
@@ -678,7 +682,7 @@ input:checked + .switch__ui::after { transform: translateX(22px); background: va
 .sw--downscale { border-top-style: dotted; border-color: var(--sky); }
 .sw--model { border-top-style: dashed; border-color: var(--red); }
 .data summary { cursor: pointer; font: 500 12px/1.2 var(--f-mono); color: var(--amber); }
-.data .table-wrap { margin-top: 8px; }
+.data .table-wrap, .data > .stack { margin-top: 8px; }
 .prov { padding: 12px; border: 2px dashed var(--line-3); background: var(--deep); }
 .prov .kv { grid-template-columns: 1fr; margin: 0; }
 .kv__sub { display: block; font-size: 11px; color: var(--line-3); }
@@ -715,7 +719,14 @@ input:checked + .switch__ui::after { transform: translateX(22px); background: va
 .faq dt { margin-bottom: 6px; font: 700 18px/1.2 var(--f-title); letter-spacing: .05em; text-transform: uppercase; color: var(--amber); }
 .faq dd { margin: 0; font-size: 13.5px; line-height: 1.6; }
 .faq a { color: var(--amber); }
+.win--loop { margin: 0; }  /* a <figure>: without this the browser's 40 px side margins inset it */
 .loop__img { display: block; width: 100%; height: auto; }
+.loop__link, .aws__link { display: block; }
+.loop__hint { display: none; }  /* phones only: the drawing is too dense to read at 375 px, so it opens full size */
+.aws__img { display: block; width: 100%; max-width: 360px; height: auto; margin-inline: auto; }
+.guards__llm { margin-top: 18px; }
+.video { margin: 0; }
+.video video { display: block; width: 100%; height: auto; border: 2.5px solid var(--line); background: var(--deep); }
 
 /* ---------- footer ---------- */
 .footer { max-width: var(--max); margin: 0 auto; padding: 18px var(--gutter) 72px; }
@@ -786,6 +797,7 @@ input:checked + .switch__ui::after { transform: translateX(22px); background: va
   .finding__where { flex-basis: 100%; order: 3; }
   .stats { grid-template-columns: minmax(0, 1fr); }
   .stat__k { min-height: 0; }
+  .loop__hint { display: block; }
   .taskbar__id { display: none; }
   .taskbar__actions { margin-left: 0; width: 100%; }
   /* running on a phone: the two controls that matter (Skip to end, KILL), then one line of status, which says it is a replay */
