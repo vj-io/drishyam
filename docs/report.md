@@ -31,8 +31,8 @@ failure drills they can trigger, a live endpoint and honest failure cases. The *
 account needs caps, a budget alert and one command that stops all spending.
 
 Not built yet: approval from an SNS email link (approval is the web review or `drishyam review`); the COOL
-benchmark (section 6); the 5-minute video; delivery of alarms and budget alerts (the SNS topic has no subscriber,
-section 5); a budget stop action or auto-stop schedule (the stop is `scripts/aws.sh stop`); a live LLM planner (the
+benchmark (section 6); the 5-minute video; delivery of alarms and budget alerts (the SNS topic's one email
+subscription awaits confirmation, section 5); a budget stop action or auto-stop schedule (the stop is `scripts/aws.sh stop`); a live LLM planner (the
 drills use scripted planners, section 3). Dropped: the Hugging Face Space mirror; the demo runs only on AWS.
 
 ## 3. How it works
@@ -55,8 +55,8 @@ Each job is a loop of camera moves over an image pyramid (L0 = full resolution, 
 6. **Govern.** Before every step: kill switch, pixel / $ / seconds caps, p95 latency against the SLA (switch to the
    fast model, then a coarser level), warp spikes, and a $ ≥ 80 % mode that verifies only critical classes.
 7. **Stop** when the best remaining expected value per ms falls below a quarter of the realised value per ms so far.
-   Under a pixel cap the cap usually binds first: at the 30 % cap, 152 of 200 synthetic and 195 of 200 CODEBRIM
-   jobs end on the cap; uncapped, the stop rule ends 182 of 200 synthetic jobs and all 200 CODEBRIM jobs.
+   Under a pixel cap the cap usually binds first: at the 30 % cap, 125 of 200 synthetic and 183 of 200 CODEBRIM
+   jobs end on the cap; uncapped, the stop rule ends 183 of 200 synthetic jobs and 197 of 200 CODEBRIM jobs.
 
 Critical findings (exposed rebar; spalling above 40 000 px²) wait in `pending_review`. Only a human — the web review
 or `drishyam review` — can approve or reject them; nothing the agent, the MCP tools or the planner can call reaches
@@ -94,13 +94,13 @@ limits and the cost table, is [aws.md](aws.md).
   another Lambda environment); Secrets Manager holds the HMAC key that signs work orders. The function's role can do
   only that plus writing its own logs and X-Ray traces, and `tests/test_infra.py` fails if it gains anything else.
 - **Observability.** One EMF log line per job, a CloudWatch dashboard, 4 alarms (Errors, Throttles, Duration p95,
-  AppErrors) and X-Ray tracing. The alarms and a 20 USD monthly budget publish to one SNS topic, which has no
-  subscriber yet, so today they reach nobody.
-- **Smoke test** (`scripts/aws.sh smoke`, `scripts/smoke.sh`): `smoke 2026-10-17T23:12:36Z result=pass`: a job ran
+  AppErrors) and X-Ray tracing. The alarms and a 20 USD monthly budget publish to one SNS topic; its one email
+  subscription awaits confirmation, so until it is confirmed they reach nobody.
+- **Smoke test** (`scripts/aws.sh smoke`, `scripts/smoke.sh`): `smoke 2026-10-18T07:12:25Z result=pass`: a job ran
   to `awaiting_review`; KILL, sent after step 2 streamed, halted the second job after 3 steps (before step 4) with
-  cause `kill-switch`; a `POST` without the body hash and a direct Function URL call both got 403; and the step p95
-  was 88 ms on aarch64, over the 6 steps of one job.
-  That run was against a build of commit d34f74b from a tree with uncommitted changes.
+  cause `kill-switch`; a `POST` without the body hash and a direct Function URL call both got 403; the WAF answered
+  429 at the 14th empty-bodied job start; and the step p95 was 67.7 ms on aarch64, over the 6 steps of one job.
+  That run was against the deployed build of commit ca69037, the commit `/api/health` reports.
 - **Cost.** Spent so far: not measured yet; the month-to-date figure from AWS Billing is still to be added. The
   list-price estimate is about 10 USD a month at 1,000 jobs a month, 8 of it the WAF ([aws.md](aws.md)). The $ shown
   in the UI and the evals is *modelled*: timed op milliseconds × 0.339 USD/h, the c8g.2xlarge rate plus the COOL
@@ -144,11 +144,13 @@ arms (COOL on c8g, stock on c8g, stock on c7i), each set to terminate itself aft
 bench.compare_arms results/A results/B results/C` would write `docs/cool_benchmark.md` against the PRD's expected
 1.2–1.8× op-level and 1.2–1.3× end-to-end range. None of it has run on AWS.
 
-**What COOL could buy end to end, from the x86 laptop.** An 8-image macro run on the local x86 laptop
-([results/local-macos-x86/macro.json](../results/local-macos-x86/macro.json)) puts 9 % of a job in the stages it
-labels KleidiCV-covered imgproc (pyramid, saliency, warp, quality gate), 69 % in the classical segmenter (imgproc
-plus NumPy), 3 % in crack thinning, 8 % in decode and 12 % in Python. So if COOL made the covered ops 1.8× faster, a
-whole job would get about 1.04× faster. The gaze path itself is cheap; most of the time is in segmentation, which is
+**What COOL could buy end to end, from GitHub's arm64 runner.** A 50-image macro run with the stock aarch64 wheel
+on GitHub's `ubuntu-24.04-arm` runner (Neoverse-N2, one thread; a GitHub Actions VM, not the Lambda;
+[results/linux-aarch64/macro.json](../results/linux-aarch64/macro.json)) puts 8 % of a job in the stages it labels
+KleidiCV-covered imgproc (pyramid, saliency, warp, quality gate), 75 % in the classical segmenter (imgproc plus
+NumPy), 4 % in crack thinning, 8 % in decode and 6 % in Python. So if COOL made the covered ops 1.8× faster, a whole
+job would get about 1.04× faster; the x86 laptop's 8-image run
+([results/local-macos-x86/macro.json](../results/local-macos-x86/macro.json)) gives the same 1.04×. The gaze path itself is cheap; most of the time is in segmentation, which is
 where a COOL or DNN speed-up would have to land.
 
 ## 7. Related work
@@ -194,7 +196,7 @@ Drishyam combines old ideas; this section says which, and what it adds.
 
 **What is not new:** coarse-to-fine pyramids, saliency priors, steering a high-resolution window from a
 low-resolution map, and tiling. On these images a single downscale and a coarse tiling grid match or beat
-Drishyam's recall at equal or lower pixel cost (section 8), so the combination has not yet paid off in recall.
+Drishyam's recall at similar or lower pixel cost (section 8), so the combination has not yet paid off in recall.
 
 1. P. J. Burt and E. H. Adelson, "The Laplacian Pyramid as a Compact Image Code", *IEEE Transactions on
    Communications*, vol. COM-31, no. 4, pp. 532–540, April 1983.
@@ -211,11 +213,10 @@ Drishyam's recall at equal or lower pixel cost (section 8), so the combination h
 
 ## 8. Evaluation
 
-Measured on **200 held-out labelled synthetic images** (seed 7; policy changes were tuned only on a separate 60-image dev split, seed 4242, `make eval-dev`, unpublished), one segmenter and one matching rule for every policy (a ground-truth box is found by a same-class component with IoU ≥ 0.3 or containing its centre; "IoU-only" drops the centre clause). The 95 % intervals are a bootstrap over images, paired across policies. "Chance" moves each policy's own boxes (same class and size) to random places in the photo and scores them again. Precision is one-to-one: in confidence order each prediction claims at most one ground-truth box, so a defect reported again from a second look is a false box; "hits per matched box" counts the predictions that land on each box found (1 = no duplicates). All of it runs on the **fixed cost model** (`--cost-model fixed`): every op the agent times costs its p50 from the `job_ops` table in `results/local-macos-x86/micro.json` on every call, so t̂, the stop rule and the governor see the same costs on a busy machine as on an idle one, and a re-run reproduces the numbers exactly. $ is that modelled time × $0.339/h (untimed Python is not charged).
+Measured on **200 held-out labelled synthetic images** (seed 7; policy changes were tuned only on a separate 60-image dev split, seed 4242, `make eval-dev`, unpublished), one segmenter and one matching rule for every policy (a ground-truth box is found by a same-class component with IoU ≥ 0.3 or containing its centre; "IoU-only" drops the centre clause). The 95 % intervals are a bootstrap over images, paired across policies. "Chance" moves each policy's own boxes (same class and size) to random places in the photo and scores them again. Precision is one-to-one: in confidence order each prediction claims at most one ground-truth box, so a defect reported again from a second look is a false box; "hits per matched box" counts the predictions that land on each box found (1 = no duplicates). All of it runs on the **fixed cost model** (`--cost-model fixed`): every op the agent times costs its p50 from the `job_ops` table in `results/linux-aarch64/micro.json` (the stock aarch64 wheel on GitHub's `ubuntu-24.04-arm` runner, Neoverse-N2, one thread) on every call, so t̂, the stop rule and the governor see the same costs on a busy machine as on an idle one, and a re-run (`MICRO_ARM=linux-aarch64`; the Makefile's default is the x86 laptop's table) reproduces the numbers exactly. The jobs themselves ran on the x86 laptop; only their costs are the arm64 ones. $ is that modelled time × $0.339/h (untimed Python is not charged). In this comparison the governor's model, level and gaze-size overrides are off (caps and the kill switch stay), so Drishyam segments every look with the same accurate model as the baselines; turning them on changes nothing under fixed costs (the governor-on ablation below).
 
-The FR-21 ablations (random gaze order, no uncertainty term, no survey look, no verify step, no governor; the
-switches exist in `JobConfig`) have not been run, so nothing here yet shows that the image-driven choices beat the
-same budget spent without them. The per-cap tables and per-class recall are in the
+The FR-21 ablations (random gaze order, no uncertainty term, no survey look, no verify step, governor on) are under
+[Ablations](#ablations-fr-21) below. The per-cap tables and per-class recall are in the
 [appendix](#appendix-per-cap-tables).
 
 ### Synthetic, 2048×1536 (200 images)
@@ -226,36 +227,36 @@ same budget spent without them. The per-cap tables and per-class recall are in t
 | tiling, L2 grid | 0.06 | 0.44 (0.41–0.48) | 0.40 | 0.02 (0.01) | 8.5 |
 | tiling, L1 grid | 0.50 | 0.55 (0.52–0.59) | 0.48 | 0.02 (0.01) | 17.3 |
 | tiling, L0 (exhaustive, 20 % overlap) | 1.67 | 0.55 (0.51–0.59) | 0.47 | 0.03 (0.01) | 83.4 |
-| **Drishyam**, cap 30 % | 0.25 | **0.47** (0.44–0.51) | 0.43 | 0.02 (0.01) | 14.5 |
-| **Drishyam**, uncapped | 0.46 | **0.53** (0.50–0.57) | 0.47 | 0.05 (0.02) | 24.4 |
+| **Drishyam**, cap 30 % | 0.23 | **0.47** (0.43–0.51) | 0.42 | 0.04 (0.02) | 13.9 |
+| **Drishyam**, uncapped | 0.35 | **0.51** (0.48–0.55) | 0.45 | 0.03 (0.01) | 19.1 |
 
-- At a **30 % cap** Drishyam finds **0.47** of the defects using **0.25** of the image's pixels, against 0.55 for
-  exhaustive 512-px tiling with 20 % overlap, which reads 1.67× the image. That is **0.86×** tiling's recall (95 % CI
-  0.80–0.93) at **0.15×** its pixels. **Verdict on the PRD hypothesis (≥ 0.9× tiling recall at ≤ 0.3× its pixels):
-  not met**, though the interval reaches 0.93, so 0.9 is not ruled out either.
-- **One downscale does as well**: against a single 1024-px downscale at the same pixels (0.50 at 0.25), Drishyam is
-  0.96× (95 % CI 0.90–1.02).
-- Against the other grids it is 0.86× L1 tiling (0.55 at 0.50 of the pixels, the best grid) and 1.07× L2 tiling
-  (0.44 at 0.06). When a match needs IoU ≥ 0.3 (no contains-the-centre clause), it is 0.92× L0 tiling (95 % CI
-  0.85–0.99).
+- At a **30 % cap** Drishyam finds **0.47** of the defects using **0.23** of the image's pixels, against 0.55 for
+  exhaustive 512-px tiling with 20 % overlap, which reads 1.67× the image. That is **0.85×** tiling's recall (95 % CI
+  0.79–0.91) at **0.14×** its pixels. **Verdict on the PRD hypothesis (≥ 0.9× tiling recall at ≤ 0.3× its pixels):
+  not met**, though the interval reaches 0.91, so 0.9 is not ruled out either.
+- **One downscale does at least as well**: against a single 1024-px downscale at about the same pixels (0.50 at
+  0.25), Drishyam is 0.94× (95 % CI 0.89–1.00); the interval only just reaches 1.
+- Against the other grids it is 0.84× L1 tiling (0.55 at 0.50 of the pixels, the best grid) and 1.06× L2 tiling
+  (0.44 at 0.06). When a match needs IoU ≥ 0.3 (no contains-the-centre clause), it is 0.91× L0 tiling (95 % CI
+  0.84–0.98).
 - How predictions are boxed changes the ratio. Every number here gives each policy one box per connected component.
-  With one box per class per view for every policy, the 30 % ratio to L0 tiling is 0.75×; with Drishyam's finding
-  boxes against the baselines' components (the as-specified mix, which favours Drishyam) it is 1.23×
+  With one box per class per view for every policy, the 30 % ratio to L0 tiling is 0.73×; with Drishyam's finding
+  boxes against the baselines' components (the as-specified mix, which favours Drishyam) it is 1.21×
   (`agent_metrics.box_convention` in the summary).
-- At a **50 % cap**: 0.52 at 0.35 of the pixels, 0.95× tiling's recall at 0.21× its pixels. Uncapped, the stop rule
-  ends 182 of 200 jobs by itself, at 0.46 of the pixels with 0.97× tiling's recall.
-- **Above chance**: the same boxes at random places score 0.00 to 0.05 for every policy.
-- **False boxes**: precision 0.099 for Drishyam at 30 % (14.5 false boxes per image) against 0.120 for one
+- At a **50 % cap**: 0.51 at 0.31 of the pixels, 0.92× tiling's recall at 0.19× its pixels. Uncapped, the stop rule
+  ends 183 of 200 jobs by itself, at 0.35 of the pixels with 0.94× tiling's recall.
+- **Above chance**: the same boxes at random places score 0.00 to 0.04 for every policy.
+- **False boxes**: precision 0.102 for Drishyam at 30 % (13.9 false boxes per image) against 0.120 for one
   downscale (12.2) and 0.021 for exhaustive tiling (83.4). Drishyam reports a defect again from each look in its
   evidence trail (1.49 predictions per matched box, against 1.03 for one downscale).
 - **Hairline cracks** (87 of the 227 crack boxes are 1–2 px wide; the flag is in the ground truth): exhaustive tiling
-  finds 0.25 of them, one downscale 0.10, Drishyam 0.09 at the 30 % cap and 0.17 uncapped. Only 16 boxes are under
+  finds 0.25 of them, one downscale 0.10, Drishyam 0.08 at the 30 % cap and 0.13 uncapped. Only 16 boxes are under
   96² px, too few to read anything into.
 - The segmenter's crack hysteresis, added with this policy (a faint crack pixel counts when it is connected to a
   confident one, as in Canny), lifted every baseline too, so it is not a Drishyam-only gain.
-- Critical false-accept rate (critical prediction with no critical ground truth): Drishyam at 30 % 0.52 against
+- Critical false-accept rate (critical prediction with no critical ground truth): Drishyam at 30 % 0.51 against
   exhaustive tiling 0.79 (the PRD asks for ≤ tiling); a single downscale (0.49) and L2 tiling (0.42) are lower still.
-- Agent: 100 % of steps carry a cause; escalation rate 17 %; at the 30 % cap, 3 looks and 0.27 of the pixels per
+- Agent: 100 % of steps carry a cause; escalation rate 19 %; at the 30 % cap, 3 looks and 0.27 of the pixels per
   image (p50 = p95).
 
 The images are procedural (`evals/synth.py`): 2048×1536 weathered concrete with drawn cracks, spalls, efflorescence, exposed rebar and rust run-off, plus graffiti, formwork lines, water stains, blur and glare as distractors. The eight bundled samples in `public/samples/` come from the same generator.
@@ -266,7 +267,7 @@ The images are procedural (`evals/synth.py`): 2048×1536 weathered concrete with
 
 Full numbers: [public/results/summary.json](../public/results/summary.json); every prediction and trace: [public/results/per_image.json.gz](../public/results/per_image.json.gz).
 
-**Fixed costs against measured wall time.** `make eval-live` reruns the synthetic set the way the app runs, on measured wall time ([public/results/live/summary.json](../public/results/live/summary.json)), here with the machine's load average near 39 from other jobs: Drishyam at 30 % found 0.48 (0.45–0.52) at 0.25 of the pixels, 0.88× tiling (0.82–0.94), and the governor never switched the model but shrank the gaze and batched on 6 warp spikes. The stop rule ended fewer jobs at the 30 % cap (29 of 200, against 47 with fixed costs), because a measured step includes the Python around each look while the fixed model charges only the timed ops. Live numbers move with the machine; the fixed ones are the comparison.
+**Fixed costs against measured wall time.** `make eval-live` reruns the synthetic set the way the app runs, on measured wall time ([public/results/live/summary.json](../public/results/live/summary.json)), here with the machine's load average near 39 from other jobs: Drishyam at 30 % found 0.48 (0.45–0.52) at 0.25 of the pixels, 0.88× tiling (0.82–0.94), and the governor never switched the model but shrank the gaze and batched on 6 warp spikes. The stop rule ended fewer jobs at the 30 % cap (29 of 200, against 71 with fixed costs), because a measured step includes the Python around each look while the fixed model charges only the timed ops; this run also timed the x86 laptop, while the fixed table is the arm64 runner's. Live numbers move with the machine; the fixed ones are the comparison.
 
 ### Synthetic at CODEBRIM's size, 4608×3456 (100 images)
 
@@ -278,12 +279,12 @@ Full numbers: [public/results/summary.json](../public/results/summary.json); eve
 | tiling, L2 grid | 0.10 | 0.53 (0.47–0.59) | 0.48 | 0.02 | 70.4 |
 | tiling, L1 grid | 0.40 | 0.53 (0.47–0.59) | 0.45 | 0.02 | 529.5 |
 | tiling, L0 (exhaustive, 20 % overlap) | 1.63 | 0.32 (0.26–0.38) | 0.20 | 0.01 | 215.5 |
-| **Drishyam**, cap 30 % | 0.29 | **0.50** (0.45–0.55) | 0.43 | 0.03 | 95.0 |
-| **Drishyam**, uncapped | 0.54 | **0.51** (0.46–0.57) | 0.45 | 0.03 | 141.9 |
+| **Drishyam**, cap 30 % | 0.28 | **0.51** (0.45–0.56) | 0.44 | 0.04 | 87.8 |
+| **Drishyam**, uncapped | 0.46 | **0.51** (0.46–0.57) | 0.45 | 0.04 | 121.5 |
 
-- Against one downscale, zooming now wins, narrowly: Drishyam at 30 % finds 0.50 against 0.45, 1.10× (95 % CI 1.01–1.20), where on the 2048×1536 set it was 0.96× (0.90–1.02). The downscale shrinks these images 4.5× instead of 2×.
-- A coarse tiling grid still does better: L2 tiling finds 0.53 at 0.10 of the pixels, a third of Drishyam's. Exhaustive L0 tiling falls to 0.32 (spalling 0.16, exposed rebar 0.00): the generator scales spalls with the image, so here they are about 225 to 860 px across and a 512-px full-resolution tile often holds only part of one. The headline ratio against L0 tiling (1.58×, which formally "meets" the 0.9× target) says more about L0 tiling than about Drishyam.
-- Hairline cracks (39 boxes) stay nearly invisible to every policy: 0.15 for L0 tiling, 0.10 for L1, 0.03 to 0.05 for Drishyam, 0.03 for one downscale. Uncapped, the stop rule ends 97 of 100 jobs by itself.
+- Against one downscale, zooming now wins, narrowly: Drishyam at 30 % finds 0.51 against 0.45, 1.12× (95 % CI 1.02–1.22), where on the 2048×1536 set it was 0.94× (0.89–1.00). The downscale shrinks these images 4.5× instead of 2×.
+- A coarse tiling grid still does better: L2 tiling finds 0.53 at 0.10 of the pixels, about a third of Drishyam's. Exhaustive L0 tiling falls to 0.32 (spalling 0.16, exposed rebar 0.00): the generator scales spalls with the image, so here they are about 225 to 860 px across and a 512-px full-resolution tile often holds only part of one. The headline ratio against L0 tiling (1.60×, which formally "meets" the 0.9× target) says more about L0 tiling than about Drishyam.
+- Hairline cracks (39 boxes) stay nearly invisible to every policy: 0.15 for L0 tiling, 0.10 for L1, 0.03 to 0.05 for Drishyam, 0.03 for one downscale. Uncapped, the stop rule ends 88 of 100 jobs by itself (the other 12 end when every candidate has been looked at).
 
 ### Real bridge photos: CODEBRIM (200 images)
 
@@ -295,22 +296,63 @@ The same harness, segmenter and matching rule on **200 real inspection photos** 
 | tiling, L2 grid | 0.10 | 0.21 (0.19–0.24) | 0.08 (0.06–0.10) | 0.09 (0.02) | 254 |
 | tiling, L1 grid | 0.42 | 0.22 (0.19–0.25) | 0.08 (0.06–0.10) | 0.09 (0.02) | 930 |
 | tiling, L0 (exhaustive, 20 % overlap) | 1.62 | 0.21 (0.17–0.24) | 0.06 (0.04–0.07) | 0.08 (0.01) | 3,144 |
-| **Drishyam**, cap 30 % | 0.29 | **0.20** (0.17–0.23) | 0.09 (0.07–0.11) | 0.14 (0.02) | 920 |
-| **Drishyam**, uncapped | 0.44 | **0.22** (0.19–0.26) | 0.10 (0.08–0.12) | 0.14 (0.03) | 1,363 |
+| **Drishyam**, cap 30 % | 0.29 | **0.20** (0.17–0.23) | 0.09 (0.07–0.11) | 0.12 (0.03) | 891 |
+| **Drishyam**, uncapped | 0.42 | **0.22** (0.19–0.25) | 0.10 (0.07–0.12) | 0.14 (0.03) | 1,280 |
 
-- **The PRD's hypothesis test (G1, defined on these photos) passes on paper and means little.** At a 30 % cap Drishyam reaches **0.97×** exhaustive tiling's recall (95 % CI 0.88–1.08, so not clearly above 0.9) at **0.18×** its pixels (1.54×, 1.26–1.92, when a match needs IoU ≥ 0.3), and 1.01× a single 1024-px downscale (0.93–1.10) that uses a quarter of its pixels. Every baseline, and Drishyam from the 20 % cap up, finds only about one labelled defect in five (0.19 to 0.22).
-- **Much of that lenient score is chance.** Each policy's own boxes, moved to random places, already score 0.07 to 0.14 under the lenient rule, because thousands of boxes per image (920 for Drishyam at 30 %, 3,144 for L0 tiling) contain many ground-truth centres by luck. Under IoU-only, recall is 0.04 to 0.10 and chance 0.01 to 0.03: above chance, but low for every policy.
-- **On real photos the segmenter, not where the agent looks, limits recall.** The classical engine was tuned on synthetic images. Precision (one-to-one) is 0.0005 to 0.008, and 98 to 100 % of every policy's critical predictions match no critical ground truth. It finds cracks (0.31) and corrosion (0.53) and effectively misses spalling (0.00) and exposed rebar (0.01).
-- **The agent's control carries over.** 100 % of steps carry a cause; 40 of 40 planner drills and 10 of 10 governor drills recovered. With fixed costs the governor never had to step in. At the 30 % cap a job takes 17 looks (p50; 26 at p95), against 3 on the smaller synthetic images; uncapped, the stop rule ends all 200 jobs, at 0.44 of the pixels.
+- **The PRD's hypothesis test (G1, defined on these photos) passes on paper and means little.** At a 30 % cap Drishyam reaches **0.96×** exhaustive tiling's recall (95 % CI 0.86–1.06, so not clearly above 0.9) at **0.18×** its pixels (1.54×, 1.25–1.92, when a match needs IoU ≥ 0.3), and **0.99×** a single 1024-px downscale (0.91–1.08) that uses a quarter of its pixels: the downscale does as well for far fewer pixels. Every baseline, and Drishyam from the 20 % cap up, finds only about one labelled defect in five (0.18 to 0.22).
+- **Much of that lenient score is chance.** Each policy's own boxes, moved to random places, already score 0.07 to 0.14 under the lenient rule, because thousands of boxes per image (891 for Drishyam at 30 %, 3,144 for L0 tiling) contain many ground-truth centres by luck. Under IoU-only, recall is 0.04 to 0.10 and chance 0.01 to 0.03: above chance, but low for every policy.
+- **On real photos the segmenter, not where the agent looks, limits recall.** The classical engine was tuned on synthetic images. Precision (one-to-one) is 0.0005 to 0.007, and 98 to 100 % of every policy's critical predictions match no critical ground truth. It finds cracks (0.30) and corrosion (0.53) and effectively misses spalling (0.00) and exposed rebar (0.01).
+- **The agent's control carries over.** 100 % of steps carry a cause; 40 of 40 planner drills and 10 of 10 governor drills recovered. At the 30 % cap a job takes 17 looks (p50; 26 at p95), against 3 on the smaller synthetic images; uncapped, the stop rule ends 197 of 200 jobs, at 0.42 of the pixels.
 
 Full numbers: [public/results/codebrim/summary.json](../public/results/codebrim/summary.json), also on the live site (FIG. 4.2). CODEBRIM: Mundt, Majumder, Murali, Panetsos and Ramesh, "Meta-learning Convolutional Neural Architectures for Multi-target Concrete Defect Classification with the COncrete DEfect BRidge IMage Dataset", CVPR 2019.
 
-### The trained segmenter (not yet evaluated)
+### Ablations (FR-21)
+
+`make eval-ablations` and `make eval-ablations-real` rerun the agent with one `JobConfig` switch flipped at a time,
+on the same images, segmenter, matching rule and fixed costs, and compare each variant's recall with the full
+agent's by a paired bootstrap over images ([public/results/ablations.json](../public/results/ablations.json)). Ratio
+to the full agent at the **30 % cap** (95 % CI):
+
+| Variant | synthetic 2048×1536 (200) | synthetic 4608×3456 (100) | CODEBRIM (200) |
+| --- | --- | --- | --- |
+| full agent (recall) | 0.47 | 0.51 | 0.20 |
+| random gaze order, seeds 0–2 (pooled CI only) | 0.97–1.00 | 0.85–0.94 | 0.92–0.98 |
+| no uncertainty term | 1.00 (identical) | 1.00 (identical) | 1.00 (identical) |
+| no survey look | 0.90 (0.84–0.97) | 0.88 (0.82–0.93) | 0.66 (0.60–0.72) |
+| no verify step | 1.03 (1.00–1.07) | 1.00 (0.98–1.02) | 1.03 (0.99–1.07) |
+| governor on | 1.00 (identical) | 1.00 (identical) | 1.00 (identical) |
+
+- **The survey look earns its pixels everywhere**: without it recall drops on every set, most on the real photos
+  (0.66×). Uncapped it still costs recall (0.85×, 0.80–0.90, at 2048×1536; 0.89×, 0.83–0.94, at 4608×3456).
+- **The image-driven gaze order beats random order only on the larger photos.** At 4608×3456 and on CODEBRIM the
+  pooled interval is below 1; on the 2048×1536 set it sits inside the 0.95–1.05 margin set in advance, so there
+  random order matches the full agent. Uncapped, random order matches it on both synthetic sets.
+- **Two parts do nothing measurable on these sets.** The uncertainty term `(1+u)` in the score gives identical
+  recall, pixels and verify looks when it is removed, and turning the governor on gives identical results, because
+  under fixed costs its latency rules never fire (its response is shown by the drills instead, section 10).
+- **The verify step buys no recall**: without it recall is never measurably lower, and at the 30 % cap on
+  2048×1536 it is slightly higher, so there the verify looks cost recall; uncapped at 2048×1536 it is 0.99× (0.96–1.02) at 0.31 of the pixels instead of 0.35. Its value is the cross-scale
+  agreement it records for the human reviewer, not recall.
+- None of the variant-against-full intervals is corrected for multiple comparisons. CODEBRIM was run at the 30 % cap
+  only.
+
+### False alarms on images with no damage (51 images)
+
+`make eval-clean` runs the same policies on 50 synthetic images that hold only distractors (one or two of
+formwork lines, water stains, graffiti and glare) plus the demo's clean sample `bridge_08`, so every box is a false alarm
+([public/results/clean/summary.json](../public/results/clean/summary.json)). Per image, with one box per component,
+Drishyam at the 30 % cap reports 6.35 boxes (0.02 critical), one downscale 3.00 (0.00) and exhaustive tiling 36.80
+(0.04); with one box per class per view (what a Drishyam finding is), 1.04, 1.16 and 12.69. Drishyam reports some
+damage on 67 % of these images and a critical finding on 1 of the 51; one downscale reports damage on 88 % and
+exhaustive tiling on all of them. On `bridge_08` itself Drishyam reports nothing at any cap, one downscale 2 crack
+boxes and exhaustive tiling 53.
+
+### The trained segmenter (results pending)
 
 These numbers call for a trained segmenter. A dacl10k-trained UNet ([training/](../training/README.md),
 [models/README.md](../models/README.md)) exists: its validation mIoU over Drishyam's five defect classes is 0.359,
-on the split that also chose its epoch, so no held-out number exists. It has not been evaluated on CODEBRIM or the
-synthetic set here, and it is not the live segmenter. After `scripts/install_model.sh`, `make eval-model
+on the split that also chose its epoch, so no held-out number exists. Its CODEBRIM and synthetic results are pending
+and not published here, and it is not the live segmenter. After `scripts/install_model.sh`, `make eval-model
 DACL10K=<the dacl10k folder> CODEBRIM=data/codebrim` first runs the leakage check between dacl10k and this subset
 (`evals/leakage.py`), then both comparisons with `DRISHYAM_ONNX` set. It refuses to compare unless each summary
 names the segmenter it should, and publishes the model's numbers next to these (`public/results/codebrim_dacl10k/`),
@@ -326,25 +368,24 @@ thresholds 32 and 0.8 separate them; crops that drop 5 % of the frame are not fo
 
 ## 9. Failures
 
-Twelve measured failures from the synthetic run, two per category (FIG. 5 on the live site; [public/results/failures.json](../public/results/failures.json)):
+Eleven measured failures from the synthetic run in six categories, two per category except formwork lines, which has one (FIG. 5 on the live site; [public/results/failures.json](../public/results/failures.json)):
 
 | Plate | Category | What happened | Rule that would catch it |
 | --- | --- | --- | --- |
 | ![FIG. 5.1(a)](../public/results/failures/f01.jpg) | Graffiti read as damage | s0162, drishyam@0.3: a spalling finding (confidence 0.97, step 2 at L1) lies within the bounding box of a graffiti patch and matches no ground-truth box of any class. | Chroma gate before drafting: spray paint is far more saturated than concrete or rust, so a candidate whose median saturation sits well above the surrounding concrete and outside the rust hue band is dropped as non-structural. Not implemented. |
 | ![FIG. 5.1(b)](../public/results/failures/f02.jpg) | Graffiti read as damage | s0160, drishyam@0.3: a spalling finding (confidence 0.96, step 2 at L1) lies within the bounding box of a graffiti patch and matches no ground-truth box of any class. | Chroma gate before drafting: spray paint is far more saturated than concrete or rust, so a candidate whose median saturation sits well above the surrounding concrete and outside the rust hue band is dropped as non-structural. Not implemented. |
-| ![FIG. 5.2(a)](../public/results/failures/f03.jpg) | Formwork line read as crack | s0041, drishyam@1.0: a crack finding (confidence 0.94, step 4 at L0) lies within the bounding box of a formwork line patch and matches no ground-truth box of any class. | Straightness test on the crack mask: a centreline that fits one straight line within about 1.5 px over a length of 20x its width is a formwork seam, not a crack, because real cracks meander (cv2.fitLine residual, minAreaRect aspect). Not implemented. |
-| ![FIG. 5.2(b)](../public/results/failures/f04.jpg) | Formwork line read as crack | s0189, drishyam@1.0: a crack finding (confidence 0.93, step 4 at L0) lies within the bounding box of a formwork line patch and matches no ground-truth box of any class. | Straightness test on the crack mask: a centreline that fits one straight line within about 1.5 px over a length of 20x its width is a formwork seam, not a crack, because real cracks meander (cv2.fitLine residual, minAreaRect aspect). Not implemented. |
-| ![FIG. 5.3(a)](../public/results/failures/f05.jpg) | Glare caught by the quality gate | s0040, drishyam@0.3: step 3 (L0) was refused by the quality gate (glare, sharpness 20.9) because the window covers a blown-out highlight. 0 ground-truth box(es) have their centre in that window. The gate did what it should; the cost is an area the work order silently leaves unassessed. | The gate (more than 20% blown-out pixels) works. The missing rule is bookkeeping: a refused window is written to the work order as 'not assessed' with a re-shoot suggestion, so the area never reads as clean. Not implemented. |
-| ![FIG. 5.3(b)](../public/results/failures/f06.jpg) | Glare caught by the quality gate | s0082, drishyam@0.3: step 3 (L0) was refused by the quality gate (glare, sharpness 19.2) because the window covers a blown-out highlight. 0 ground-truth box(es) have their centre in that window. The gate did what it should; the cost is an area the work order silently leaves unassessed. | The gate (more than 20% blown-out pixels) works. The missing rule is bookkeeping: a refused window is written to the work order as 'not assessed' with a re-shoot suggestion, so the area never reads as clean. Not implemented. |
-| ![FIG. 5.4(a)](../public/results/failures/f07.jpg) | Crack hidden in blur | s0008, drishyam@1.0: a 361x385 px crack inside a blurred patch was not found; it was looked at (step 1, L2) and the quality gate refused the view (blur, sharpness 10.1). | A local sharpness map: where Laplacian variance falls below the gate, report the area as unreadable and ask for a re-shoot; where the gate accepted the view, scale the sharpness threshold to the expected crack width. Not implemented. |
-| ![FIG. 5.4(b)](../public/results/failures/f08.jpg) | Crack hidden in blur | s0004, drishyam@1.0: a 283x366 px crack inside a blurred patch was not found; it was looked at (step 1, L2, sharpness 43.2), the gate accepted the view, and no crack mask came out of it. | A local sharpness map: where Laplacian variance falls below the gate, report the area as unreadable and ask for a re-shoot; where the gate accepted the view, scale the sharpness threshold to the expected crack width. Not implemented. |
-| ![FIG. 5.5(a)](../public/results/failures/f09.jpg) | Crack missed under a small budget | s0094, drishyam@0.3: a 44x96 px crack box is missed under the 30% cap but found by drishyam@1.0 and tiling@L0; it was looked at (step 1, L2) but no crack mask survived. | Reserve a small share of the pixel cap for a coarse sweep of low-saliency regions, or lower the stop-rule epsilon so the job does not stop while unvisited candidates remain. Both trade pixels for recall. Not implemented. |
-| ![FIG. 5.5(b)](../public/results/failures/f10.jpg) | Crack missed under a small budget | s0032, drishyam@0.3: a 354x164 px crack box is missed under the 30% cap but found by drishyam@1.0 and tiling@L0; it was looked at (step 1, L2) but no crack mask survived. | Reserve a small share of the pixel cap for a coarse sweep of low-saliency regions, or lower the stop-rule epsilon so the job does not stop while unvisited candidates remain. Both trade pixels for recall. Not implemented. |
-| ![FIG. 5.6(a)](../public/results/failures/f11.jpg) | Rebar, spall and stain confusion | s0171, drishyam@1.0: ground truth is spalling, the job reported exposed_rebar there (confidence 0.93, step 4 at L0) and no spalling finding overlaps the box. | Shape and co-occurrence rule: exposed bars need rust inside a spall rim and a linear shape (minAreaRect aspect above 3); rust with no spall rim is corrosion. Where two classes clear the threshold on one region, send it to human review instead of choosing. The rust-near-spall part exists; the review-on-ambiguity step does not. |
-| ![FIG. 5.6(b)](../public/results/failures/f12.jpg) | Rebar, spall and stain confusion | s0103, drishyam@0.3: ground truth is spalling, the job reported corrosion there (confidence 0.92, step 3 at L1) and no spalling finding overlaps the box. | Shape and co-occurrence rule: exposed bars need rust inside a spall rim and a linear shape (minAreaRect aspect above 3); rust with no spall rim is corrosion. Where two classes clear the threshold on one region, send it to human review instead of choosing. The rust-near-spall part exists; the review-on-ambiguity step does not. |
+| ![FIG. 5.2(a)](../public/results/failures/f03.jpg) | Formwork line read as crack | s0147, drishyam@0.3: a crack finding (confidence 0.88, step 1 at L2) lies within the bounding box of a formwork line patch and matches no ground-truth box of any class. | Straightness test on the crack mask: a centreline that fits one straight line within about 1.5 px over a length of 20x its width is a formwork seam, not a crack, because real cracks meander (cv2.fitLine residual, minAreaRect aspect). Not implemented. |
+| ![FIG. 5.3(a)](../public/results/failures/f04.jpg) | Glare caught by the quality gate | s0040, drishyam@0.3: step 3 (L0) was refused by the quality gate (glare, sharpness 20.9) because the window covers a blown-out highlight. 0 ground-truth box(es) have their centre in that window. The gate did what it should; the cost is an area the work order silently leaves unassessed. | The gate (more than 20% blown-out pixels) works. The missing rule is bookkeeping: a refused window is written to the work order as 'not assessed' with a re-shoot suggestion, so the area never reads as clean. Not implemented. |
+| ![FIG. 5.3(b)](../public/results/failures/f05.jpg) | Glare caught by the quality gate | s0082, drishyam@0.3: step 3 (L0) was refused by the quality gate (glare, sharpness 19.2) because the window covers a blown-out highlight. 0 ground-truth box(es) have their centre in that window. The gate did what it should; the cost is an area the work order silently leaves unassessed. | The gate (more than 20% blown-out pixels) works. The missing rule is bookkeeping: a refused window is written to the work order as 'not assessed' with a re-shoot suggestion, so the area never reads as clean. Not implemented. |
+| ![FIG. 5.4(a)](../public/results/failures/f06.jpg) | Crack hidden in blur | s0085, drishyam@1.0: a 233x460 px crack inside a blurred patch was not found; it was looked at (step 1, L2, sharpness 56.9), the gate accepted the view, and no crack mask came out of it. | A local sharpness map: where Laplacian variance falls below the gate, report the area as unreadable and ask for a re-shoot; where the gate accepted the view, scale the sharpness threshold to the expected crack width. Not implemented. |
+| ![FIG. 5.4(b)](../public/results/failures/f07.jpg) | Crack hidden in blur | s0008, drishyam@1.0: a 361x385 px crack inside a blurred patch was not found; it was looked at (step 1, L2) and the quality gate refused the view (blur, sharpness 10.1). | A local sharpness map: where Laplacian variance falls below the gate, report the area as unreadable and ask for a re-shoot; where the gate accepted the view, scale the sharpness threshold to the expected crack width. Not implemented. |
+| ![FIG. 5.5(a)](../public/results/failures/f08.jpg) | Crack missed under a small budget | s0032, drishyam@0.3: a 354x164 px crack box is missed under the 30% cap but found by drishyam@1.0 and tiling@L0; it was looked at (step 1, L2) but no crack mask survived. | Reserve a small share of the pixel cap for a coarse sweep of low-saliency regions, or lower the stop-rule epsilon so the job does not stop while unvisited candidates remain. Both trade pixels for recall. Not implemented. |
+| ![FIG. 5.5(b)](../public/results/failures/f09.jpg) | Crack missed under a small budget | s0085, drishyam@0.3: a 267x168 px crack box is missed under the 30% cap but found by drishyam@1.0 and tiling@L0; it was looked at (step 1, L2) but no crack mask survived. | Reserve a small share of the pixel cap for a coarse sweep of low-saliency regions, or lower the stop-rule epsilon so the job does not stop while unvisited candidates remain. Both trade pixels for recall. Not implemented. |
+| ![FIG. 5.6(a)](../public/results/failures/f10.jpg) | Rebar, spall and stain confusion | s0051, drishyam@1.0: ground truth is spalling, the job reported exposed_rebar there (confidence 0.93, step 4 at L0) and no spalling finding overlaps the box. | Shape and co-occurrence rule: exposed bars need rust inside a spall rim and a linear shape (minAreaRect aspect above 3); rust with no spall rim is corrosion. Where two classes clear the threshold on one region, send it to human review instead of choosing. The rust-near-spall part exists; the review-on-ambiguity step does not. |
+| ![FIG. 5.6(b)](../public/results/failures/f11.jpg) | Rebar, spall and stain confusion | s0171, drishyam@1.0: ground truth is spalling, the job reported exposed_rebar there (confidence 0.93, step 4 at L0) and no spalling finding overlaps the box. | Shape and co-occurrence rule: exposed bars need rust inside a spall rim and a linear shape (minAreaRect aspect above 3); rust with no spall rim is corrosion. Where two classes clear the threshold on one region, send it to human review instead of choosing. The rust-near-spall part exists; the review-on-ambiguity step does not. |
 
-On CODEBRIM, 8 failure cases (cracks missed under the 30 % cap that the full budget finds, and exposed rebar or
-spalling reported as corrosion) are published as text only, because the licence bars sharing the photos:
+On CODEBRIM, 8 failure cases (cracks missed under the 30 % cap that the full budget finds, and exposed rebar
+reported as corrosion or spalling) are published as text only, because the licence bars sharing the photos:
 [public/results/codebrim/failures_text.json](../public/results/codebrim/failures_text.json), also under FIG. 5 on
 the site.
 
@@ -399,11 +440,14 @@ notes the large spall it missed.
 - The classical engine's probabilities are a softmax over hand-built evidence scores; its confidence and entropy
   are not calibrated.
 - The policy comparison holds on synthetic images, but on 200 real CODEBRIM photos the **classical** segmenter caps
-  every policy at about 0.2 recall. The dacl10k model is trained but not yet evaluated here or deployed (section 8).
-- The FR-21 ablations have not been run (section 8).
+  every policy at about 0.2 recall. The dacl10k model is trained but not deployed, and its results here are pending
+  (section 8).
+- The ablations show that two parts of the policy, the uncertainty term and the governor, change nothing measurable
+  on these sets, and that image-driven gaze order beats random order only on the larger photos (section 8).
 - COOL on Graviton was not run (section 6).
-- Every published timing table comes from one x86 laptop (`results/local-macos-x86/`); the only arm64 number is the
-  smoke test's step p95 over one job (section 5).
+- The arm64 timings come from GitHub's `ubuntu-24.04-arm` runner (`results/linux-aarch64/`, Neoverse-N2, one
+  thread), a GitHub Actions VM, not the deployed Lambda; on the Lambda itself the only number is the smoke test's step
+  p95 over one job (section 5). The evals ran on the x86 laptop with those arm64 costs.
 - The web demo is stateless; the signed `work_order.json` is its audit trail. There is no approval store, and
   human-approval latency is not measured.
 
@@ -413,11 +457,12 @@ notes the large spall it missed.
 - Bhavya Dhoot, design, demo and presentation (site design, video)
 
 ```bash
-uv sync --all-extras && make test && make eval && make bench
+uv sync --all-extras && make test && make eval MICRO_ARM=linux-aarch64 && make bench
 ```
 
-`make eval-large` and `make eval-live` rerun the other synthetic results; `make data` then `make eval-real` the
-CODEBRIM one (an 8.3 GB download). `scripts/aws.sh deploy` and `scripts/aws.sh smoke` deploy and check the AWS
+`make eval-large`, `make eval-ablations`, `make eval-clean` and `make eval-live` rerun the other synthetic results;
+`make data` then `make eval-real` and `make eval-ablations-real` the CODEBRIM ones (an 8.3 GB download). The published
+fixed-cost runs use the arm64 table: add `MICRO_ARM=linux-aarch64` to each of these except `eval-live`. `scripts/aws.sh deploy` and `scripts/aws.sh smoke` deploy and check the AWS
 stack ([aws.md](aws.md)).
 
 ## Appendix: per-cap tables
@@ -426,20 +471,20 @@ Synthetic, 2048×1536, 200 images ([summary.json](../public/results/summary.json
 
 | Policy | pixels (× image) | recall (95 % CI) | IoU-only recall | chance recall (IoU-only) | precision | false boxes / image | hits per matched box | $ / image (modelled) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| downscale once (1024 px) | 0.25 | 0.50 (0.46–0.54) | 0.43 | 0.02 (0.01) | 0.120 | 12.2 | 1.03 | 0.000030 |
-| tiling, L2 grid | 0.06 | 0.44 (0.41–0.48) | 0.40 | 0.02 (0.01) | 0.148 | 8.5 | 1.04 | 0.000008 |
-| tiling, L1 grid | 0.50 | 0.55 (0.52–0.59) | 0.48 | 0.02 (0.01) | 0.096 | 17.3 | 1.05 | 0.000060 |
-| tiling, L0 (exhaustive, 20 % overlap) | 1.67 | 0.55 (0.51–0.59) | 0.47 | 0.03 (0.01) | 0.021 | 83.4 | 1.08 | 0.000196 |
-| **Drishyam**, cap 5 % | 0.02 | **0.00** (no 512² look fits after the overview on a 3 MP image) | 0.00 | 0.00 (0.00) | – | 0.0 | – | 0.000002 |
-| **Drishyam**, cap 10 % | 0.10 | **0.30** (0.27–0.34) | 0.27 | 0.01 (0.00) | 0.125 | 7.0 | 1.05 | 0.000012 |
-| **Drishyam**, cap 20 % | 0.18 | **0.43** (0.39–0.47) | 0.39 | 0.02 (0.01) | 0.114 | 11.2 | 1.45 | 0.000022 |
-| **Drishyam**, cap 30 % | 0.25 | **0.47** (0.44–0.51) | 0.43 | 0.02 (0.01) | 0.099 | 14.5 | 1.49 | 0.000030 |
-| **Drishyam**, cap 50 % | 0.35 | **0.52** (0.49–0.56) | 0.46 | 0.04 (0.02) | 0.083 | 19.4 | 1.64 | 0.000043 |
-| **Drishyam**, cap 100 % | 0.46 | **0.53** (0.50–0.57) | 0.47 | 0.05 (0.02) | 0.069 | 24.4 | 1.79 | 0.000056 |
+| downscale once (1024 px) | 0.25 | 0.50 (0.46–0.54) | 0.43 | 0.02 (0.01) | 0.120 | 12.2 | 1.03 | 0.000017 |
+| tiling, L2 grid | 0.06 | 0.44 (0.41–0.48) | 0.40 | 0.02 (0.01) | 0.148 | 8.5 | 1.04 | 0.000005 |
+| tiling, L1 grid | 0.50 | 0.55 (0.52–0.59) | 0.48 | 0.02 (0.01) | 0.096 | 17.3 | 1.05 | 0.000034 |
+| tiling, L0 (exhaustive, 20 % overlap) | 1.67 | 0.55 (0.51–0.59) | 0.47 | 0.03 (0.01) | 0.021 | 83.4 | 1.08 | 0.000111 |
+| **Drishyam**, cap 5 % | 0.02 | **0.00** (no 512² look fits after the overview on a 3 MP image) | 0.00 | 0.00 (0.00) | – | 0.0 | – | 0.000001 |
+| **Drishyam**, cap 10 % | 0.10 | **0.30** (0.27–0.34) | 0.27 | 0.02 (0.01) | 0.134 | 6.5 | 1.05 | 0.000006 |
+| **Drishyam**, cap 20 % | 0.18 | **0.42** (0.39–0.47) | 0.39 | 0.03 (0.01) | 0.117 | 10.8 | 1.46 | 0.000012 |
+| **Drishyam**, cap 30 % | 0.23 | **0.47** (0.43–0.51) | 0.42 | 0.04 (0.02) | 0.102 | 13.9 | 1.49 | 0.000016 |
+| **Drishyam**, cap 50 % | 0.31 | **0.51** (0.47–0.55) | 0.45 | 0.03 (0.01) | 0.089 | 17.5 | 1.63 | 0.000021 |
+| **Drishyam**, cap 100 % | 0.35 | **0.51** (0.48–0.55) | 0.45 | 0.03 (0.01) | 0.083 | 19.1 | 1.68 | 0.000024 |
 
 | per-class recall | crack | spalling | efflorescence | exposed_rebar | corrosion |
 |---|---|---|---|---|---|
-| Drishyam @30 % | 0.44 | 0.62 | 0.15 | 0.51 | 0.57 |
+| Drishyam @30 % | 0.44 | 0.61 | 0.12 | 0.51 | 0.58 |
 | tiling L0 | 0.47 | 0.70 | 0.25 | 0.52 | 0.75 |
 | downscale | 0.48 | 0.57 | 0.22 | 0.44 | 0.66 |
 
@@ -451,9 +496,9 @@ Synthetic, 4608×3456, 100 images ([large/summary.json](../public/results/large/
 | tiling, L2 grid | 0.10 | 0.53 (0.47–0.59) | 0.48 | 0.02 | 70.4 |
 | tiling, L1 grid | 0.40 | 0.53 (0.47–0.59) | 0.45 | 0.02 | 529.5 |
 | tiling, L0 (exhaustive, 20 % overlap) | 1.63 | 0.32 (0.26–0.38) | 0.20 | 0.01 | 215.5 |
-| **Drishyam**, cap 10 % | 0.10 | **0.43** (0.38–0.50) | 0.38 | 0.03 | 63.9 |
-| **Drishyam**, cap 30 % | 0.29 | **0.50** (0.45–0.55) | 0.43 | 0.03 | 95.0 |
-| **Drishyam**, cap 100 % | 0.54 | **0.51** (0.46–0.57) | 0.45 | 0.03 | 141.9 |
+| **Drishyam**, cap 10 % | 0.10 | **0.43** (0.38–0.49) | 0.38 | 0.03 | 54.2 |
+| **Drishyam**, cap 30 % | 0.28 | **0.51** (0.45–0.56) | 0.44 | 0.04 | 87.8 |
+| **Drishyam**, cap 100 % | 0.46 | **0.51** (0.46–0.57) | 0.45 | 0.04 | 121.5 |
 
 CODEBRIM, 200 real photos ([codebrim/summary.json](../public/results/codebrim/summary.json)):
 
@@ -463,15 +508,15 @@ CODEBRIM, 200 real photos ([codebrim/summary.json](../public/results/codebrim/su
 | tiling, L2 grid | 0.10 | 0.21 (0.19–0.24) | 0.08 (0.06–0.10) | 0.09 (0.02) | 254 |
 | tiling, L1 grid | 0.42 | 0.22 (0.19–0.25) | 0.08 (0.06–0.10) | 0.09 (0.02) | 930 |
 | tiling, L0 (exhaustive, 20 % overlap) | 1.62 | 0.21 (0.17–0.24) | 0.06 (0.04–0.07) | 0.08 (0.01) | 3,144 |
-| **Drishyam**, cap 5 % | 0.04 | **0.11** (0.08–0.14) | 0.04 (0.03–0.05) | 0.07 (0.01) | 95 |
-| **Drishyam**, cap 10 % | 0.09 | **0.13** (0.11–0.17) | 0.05 (0.04–0.07) | 0.09 (0.01) | 265 |
-| **Drishyam**, cap 20 % | 0.19 | **0.19** (0.16–0.22) | 0.08 (0.06–0.10) | 0.12 (0.03) | 601 |
-| **Drishyam**, cap 30 % | 0.29 | **0.20** (0.17–0.23) | 0.09 (0.07–0.11) | 0.14 (0.02) | 920 |
-| **Drishyam**, cap 50 % | 0.42 | **0.22** (0.19–0.26) | 0.10 (0.08–0.12) | 0.14 (0.03) | 1,324 |
-| **Drishyam**, cap 100 % | 0.44 | **0.22** (0.19–0.26) | 0.10 (0.08–0.12) | 0.14 (0.03) | 1,363 |
+| **Drishyam**, cap 5 % | 0.04 | **0.10** (0.07–0.14) | 0.04 (0.03–0.05) | 0.07 (0.01) | 95 |
+| **Drishyam**, cap 10 % | 0.09 | **0.14** (0.11–0.17) | 0.05 (0.04–0.07) | 0.09 (0.02) | 263 |
+| **Drishyam**, cap 20 % | 0.19 | **0.18** (0.15–0.21) | 0.08 (0.06–0.10) | 0.12 (0.03) | 589 |
+| **Drishyam**, cap 30 % | 0.29 | **0.20** (0.17–0.23) | 0.09 (0.07–0.11) | 0.12 (0.03) | 891 |
+| **Drishyam**, cap 50 % | 0.40 | **0.22** (0.19–0.25) | 0.10 (0.07–0.12) | 0.13 (0.03) | 1,242 |
+| **Drishyam**, cap 100 % | 0.42 | **0.22** (0.19–0.25) | 0.10 (0.07–0.12) | 0.14 (0.03) | 1,280 |
 
 | per-class recall | crack | spalling | efflorescence | exposed_rebar | corrosion |
 |---|---|---|---|---|---|
-| Drishyam @30 % | 0.31 | 0.00 | 0.05 | 0.01 | 0.53 |
+| Drishyam @30 % | 0.30 | 0.00 | 0.05 | 0.01 | 0.53 |
 | tiling L0 | 0.31 | 0.01 | 0.02 | 0.00 | 0.58 |
 | downscale | 0.29 | 0.01 | 0.06 | 0.00 | 0.55 |
