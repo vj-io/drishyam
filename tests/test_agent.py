@@ -419,6 +419,30 @@ def test_a_check_of_an_absorbed_class_counts_for_the_finding_that_absorbed_it():
                for e in after(s))
 
 
+def test_review_requests_say_their_reason_in_fields_too():
+    """bridge_03 asks for all four kinds of review; each event's iou, levels and classes match its reason."""
+    from pathlib import Path
+
+    img = cv2.imread(str(Path(__file__).resolve().parent.parent / "public" / "samples" / "bridge_03.jpg"))
+    _, events = run(img)
+    reqs = [e for e in events if e["type"] == "review_request"]
+    kinds = set()
+    for e in reqs:
+        assert 0 <= e["level_b"] <= 3
+        if e["iou"] is not None:
+            assert f"iou {e['iou']:g} < 0.5 between L{e['level_a']} and L{e['level_b']}" in e["reason"]
+            assert e["level_a"] > e["level_b"] and len(e["classes"]) == 2
+            kinds.add("unconfirmed" if e["reason"].startswith("unconfirmed: ") else "disagree")
+        elif e["reason"].startswith("ambiguous: "):
+            kept, absorbed = e["classes"]
+            assert e["reason"].startswith(f"ambiguous: {absorbed} ") and f"inside {kept} " in e["reason"]
+            kinds.add("ambiguous")
+        else:
+            assert e["level_a"] is None and e["reason"] == f"{e['classes'][0]} is critical"
+            kinds.add("critical")
+    assert kinds == {"critical", "ambiguous", "disagree", "unconfirmed"}
+
+
 def test_the_clean_concrete_sample_drafts_no_crack_on_its_formwork_groove():
     """bridge_08 has one straight formwork groove, which used to be drafted as a 93 % crack ([2049, 1250, 581, 798]
     in run j_d60376). Every look that sees it now logs it as a straight line, and no finding comes from it: the

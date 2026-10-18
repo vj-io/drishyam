@@ -73,7 +73,7 @@ class Region:
     next_level: int
     entropy: float = 0.0
     cls: str | None = None
-    looks: list = field(default_factory=list)  # (level, class mask, to_l0)
+    looks: list = field(default_factory=list)  # (level, class mask, to_l0, class of that mask or None)
     done: bool = False
     verified: bool = False
     extra_used: bool = False
@@ -368,8 +368,8 @@ class Job:
             mask = seg.mask(best) if best else np.zeros(seg.labels.shape, np.uint8)
             prev = next((lk for lk in reversed(r.looks) if lk[1].any()), None)
             iou = look_iou(prev[1], prev[2], mask, to_l0) if (prev is not None and best) else None
-            prev_level = prev[0] if prev is not None else None
-            r.looks.append((level, mask, to_l0))
+            prev_level, prev_cls = (prev[0], prev[3]) if prev is not None else (None, None)
+            r.looks.append((level, mask, to_l0, best))
             new_events, follow = [], None
             batch = self.settings.batch
             if not q["ok"]:
@@ -398,20 +398,19 @@ class Job:
                         # Review on ambiguity: two classes clear A_min on one spot and the agent kept one of them.
                         if (f.id, c) not in asked:
                             asked.add((f.id, c))
-                            new_events.append({"type": "review_request", "finding_id": f.id, "reason": (
+                            new_events.append(review(f.id, (
                                 f"ambiguous: {c} {seg.areas[c]} px (>= A_min {cfg.a_min}) is mostly inside {f.cls} {f.id}; "
-                                f"recorded as {f.cls} only")})
+                                f"recorded as {f.cls} only"), level, [f.cls, c]))
                         continue
                     new_events.append({"type": "finding", "finding": f.to_dict()})
                     if f.critical:
                         critical = critical or f
                         if kind == "new":
-                            new_events.append({"type": "review_request", "finding_id": f.id,
-                                               "reason": f"{c} is critical"})
+                            new_events.append(review(f.id, f"{c} is critical", level, [c]))
                 disagree = f"iou {iou:g} < {IOU_AGREE} between L{prev_level} and L{level}" if iou is not None else ""
                 if iou is not None and iou < IOU_AGREE and critical:
                     f = checked if checked and checked.critical else critical  # the finding whose mask was compared
-                    new_events.append({"type": "review_request", "finding_id": f.id, "reason": disagree})
+                    new_events.append(review(f.id, disagree, level, [prev_cls, best], iou, prev_level))
                     r.done = True
                 elif iou is not None and iou < IOU_AGREE and not r.extra_used and level > 0 and cfg.verify:
                     r.extra_used = True
@@ -423,8 +422,8 @@ class Job:
                     r.verified = iou is not None and iou >= IOU_AGREE
                     r.done = True
                     if iou is not None and iou < IOU_AGREE and checked:  # no further look will settle it
-                        new_events.append({"type": "review_request", "finding_id": checked.id,
-                                           "reason": f"unconfirmed: {disagree}"})
+                        new_events.append(review(checked.id, f"unconfirmed: {disagree}", level, [prev_cls, best], iou,
+                                                 prev_level))
             else:
                 r.done = True
             # While replaying, the trace already holds the follow-ups; only the last replayed look may queue one.
@@ -520,6 +519,16 @@ def survey_look(cands, l0_size, size, first, max_level, looks) -> tuple[int, int
     x1, y1 = min(W, max(c.box[0] + c.box[2] for c in cands)), min(H, max(c.box[1] + c.box[3] for c in cands))
     level = min(max_level, math.ceil(math.log2(max(x1 - x0, y1 - y0, 1) / size)))
     return ((x0 + x1) // 2, (y0 + y1) // 2, level) if level > first else None
+
+
+def review(finding_id: str, reason: str, level: int, classes: list, iou: float | None = None,
+           level_a: int | None = None) -> dict:
+    """A review_request event. `reason` is the sentence traces and MCP clients read; the rest says the same in
+    fields: level_b is the look that asked, level_a the coarser look it was compared with (iou: their mask IoU),
+    and `classes` is [class at level_a, class at level_b] for a comparison, [kept, absorbed] for an ambiguity,
+    [class] for a new critical finding."""
+    return {"type": "review_request", "finding_id": finding_id, "reason": reason, "iou": iou, "level_a": level_a,
+            "level_b": level, "classes": classes}
 
 
 def _inside(a, b) -> float:

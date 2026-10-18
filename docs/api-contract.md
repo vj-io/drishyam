@@ -95,7 +95,8 @@ Event types, in order:
   "critical_step": null, "critical_area_px": null, "critical_rule": null,
   "verify_iou": 0.71, "verified": true, "crop_jpeg_b64": "<256 px JPEG>"}}
 
-{"type": "review_request", "finding_id": "f2", "reason": "exposed_rebar is critical"}
+{"type": "review_request", "finding_id": "f2", "reason": "exposed_rebar is critical",
+ "iou": null, "level_a": null, "level_b": 1, "classes": ["exposed_rebar"]}
 
 {"type": "planner", "step": 5, "status": "fallback", "reason": "timeout", "proposal": null}
 // status: accepted | rejected | fallback
@@ -133,6 +134,11 @@ A `review_request` asks a person to look; it changes no state (only a critical f
   level, or the region's one extra look is spent); the finding has `verified: false`;
 - `"ambiguous: crack 5232 px (>= A_min 64) is mostly inside spalling f2; recorded as spalling only"`: two classes
   cleared `A_min` on one spot and the agent kept the dominant one (once per finding and class).
+
+The same in fields, so a client need not parse `reason`: `level_b` is the level of the look that asked; for
+the two disagreements `level_a` is the coarser look it was compared with and `iou` their mask IoU, and
+`classes` is `[class at level_a, class at level_b]`; for an ambiguity `classes` is `[kept, absorbed]`, for a
+new critical finding `[class]`, with `iou` and `level_a` `null`. (The MCP server's records carry `reason` only.)
 
 A finding event repeats, with the same `id`, whenever another look sees the same
 defect. The finding is its evidence trail: `step` is the look that found it,
