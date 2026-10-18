@@ -23,6 +23,7 @@ DONE = ("needs sign-off", "signed", "done", "halted", "budget spent")
 OPTIONAL = ("/results/",)  # the page shows a pending state without these
 JARGON = re.compile(r"\b\d+(?:\.\d+)?e[-+]?\d+\b|\b[a-z]+_[a-z_]+\b")  # scientific notation, snake_case
 RATE_LIMITED = "Too many jobs from this address: 10 starts per 2 minutes. Wait a minute and retry."
+BUSY = "The demo is busy: no server is free right now. Wait a few seconds and retry."
 
 
 def start_local():
@@ -194,14 +195,26 @@ def run(base, server_log=None):
         else:
             print("ok  KILL: the trace shows the server's kill-switch halt (server log not available for a remote base)")
 
-        # 3. The WAF's rate rule answers 429; the page says what that means. Stubbed: a test must not trip the real limit.
+        # 3. 429s, stubbed: a test must not trip the real limit. Lambda's own 429 (every environment busy, no `error`
+        #    field) refuses the Resume: the killed run, its trace and Resume stay.
+        steps = page.locator("#trace .trace__line[data-step]").count()
+        page.route("**/api/jobs*", lambda r: r.fulfill(status=429, content_type="application/json", body=json.dumps({"Message": "Rate Exceeded."})))
+        page.locator("#resume").click()
+        expect(page.locator("#job-text")).to_have_text(BUSY, timeout=15000)
+        expect(page.locator("#job-pill")).to_have_text("error")
+        expect(page.locator("#resume")).to_be_visible()
+        expect(page.locator("#trace .trace__line[data-step]")).to_have_count(steps)
+        expect(page.locator("#narrator")).to_have_text(BUSY)
+        page.unroute("**/api/jobs*")
+        #    The WAF's rate rule answers 429 with its own body: the per-address limit.
         page.route("**/api/jobs*", lambda r: r.fulfill(status=429, content_type="application/json",
                                                         body=json.dumps({"error": "rate limited: 10 job starts per 2 min per IP; wait and retry"})))
         page.locator("#look").click()
         expect(page.locator("#job-text")).to_have_text(RATE_LIMITED, timeout=15000)
         expect(page.locator("#job-pill")).to_have_text("error")
+        expect(page.locator("#narrator")).not_to_contain_text("Sending the photo")
         page.unroute("**/api/jobs*")
-        print("ok  429: the rate-limit message")
+        print("ok  429: a refused Resume keeps the killed run; busy and per-address messages in the bar and the NOTE")
         p.clean()
         print("ok  no CSP violations, no console errors")
 

@@ -105,6 +105,7 @@ function setMode(mode, text) {
   el.look.disabled = el.runBar.disabled = running || !S.image;
   el.guided.disabled = running;
   if (!running) el.count.textContent = '';
+  if (['error', 'killed'].includes(mode) && !S.events.length) narrate(el.text.textContent);  // nothing arrived: the NOTE still says "Sending"
   if (onBar && !running) (el.resume.hidden ? el.look : el.resume).focus({ preventScroll: true });
   syncSteps();
 }
@@ -251,7 +252,7 @@ function showFinding(f) {
 /** Present one event; returns how long it stays on screen before the next one (ms). */
 function handle(ev) {
   switch (ev.type) {
-    case 'job': {  // run() has cleared the last job, and any `stage` record before this one has lit its stage
+    case 'job': {  // the last job is cleared (run(), or a Resume's first record), and any `stage` record before this one has lit its stage
       S.job = ev;
       viewport.reset(ev);
       S.steps = viewport.steps;
@@ -397,6 +398,8 @@ function serverTotal(seconds) {
 }
 
 function arrive(ev) {
+  // a Resume keeps the killed run (and Resume) until the server's first record: a refused re-send loses nothing
+  if (S.opts.replay && !S.events.length && !['end', 'error'].includes(ev.type)) clearJob();
   if (ev.type === 'done') {
     S.arrived = ev;
     if (Q.timer || Q.items.length) {
@@ -580,7 +583,7 @@ async function run(opts = {}) {
   Object.assign(Q, { items: [], timer: 0, skip: Boolean(opts.killHint) });  // a KILL drill is shown live: never behind the job it asks to stop
   const active = document.activeElement;  // all hidden or disabled while running
   const refocus = [el.look, el.runBar, el.resume, el.guided].includes(active) || el.recap.contains(active);
-  clearJob();  // the last run goes at once: the page answers the click before the server does
+  if (!opts.replay) clearJob();  // the last run goes at once: the page answers the click before the server does
   setMode('running', MOCK ? 'Recorded run: replaying a saved job (no server).'
     : opts.replay ? 'Resuming: re-sending the photo and replaying the moves so far…' : undefined);
   narrate(MOCK ? 'Loading the recorded job…' : `Sending the photo (${(S.image.blob.size / 1e6).toFixed(1)} MB). On the server it is decoded, `
@@ -621,7 +624,7 @@ function kill() {
     S.note = `The job had already finished on the server (the agent took ${S.arrived.summary.seconds} s) before KILL could reach it; here is its result.`;
     return skip();
   }
-  if (MOCK || !S.job) return stop('');  // a recording (or a job not started yet) stops here
+  if (MOCK || !S.job || !S.events.length) return stop('');  // a recording, or a job (a Resume too) the server has not started yet
   postKill(S.job.job, S.job.kill_token);  // the server halts before its next look and sends the kill-switch record
   skip();
   el.text.textContent = 'KILL sent: the agent halts before its next look…';

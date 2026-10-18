@@ -51,8 +51,11 @@ async function* ndjson(body) {
   if ((buf += dec.decode()).trim()) yield JSON.parse(buf);
 }
 
-// 429 is the WAF's custom response to its rate rule (infra/drishyam_stack.py): 10 job starts per 2 minutes per IP.
-const JOB_ERRORS = { 429: 'Too many jobs from this address: 10 starts per 2 minutes. Wait a minute and retry.' };
+// A 429 is a WAF per-IP rate rule (infra/drishyam_stack.py; its body's error starts "rate limited"), or Lambda refusing
+// because every environment is busy or the demo is stopped (any other body): docs/api-contract.md.
+const BUSY = 'The demo is busy: no server is free right now. Wait a few seconds and retry.';
+const JOB_LIMIT = 'Too many jobs from this address: 10 starts per 2 minutes. Wait a minute and retry.';
+const throttled = (body, perIp) => (String(body?.error).startsWith('rate limited') ? perIp : BUSY);
 
 /** Async generator of job events. `replay` is a list of [action, x, y, level] to resume from; `params` may carry pace_ms. */
 export async function* streamJob({ blob, params, replay, signal }) {
@@ -62,7 +65,8 @@ export async function* streamJob({ blob, params, replay, signal }) {
   const res = await post(`/api/jobs?${new URLSearchParams(params)}`, blob, headers, { signal });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw Object.assign(new Error(JOB_ERRORS[res.status] ?? `${res.status}: ${body.error ?? 'the server refused the job'}`), { status: res.status });
+    throw Object.assign(new Error(res.status === 429 ? throttled(body, JOB_LIMIT) : `${res.status}: ${body.error ?? 'the server refused the job'}`),
+      { status: res.status });
   }
   yield* ndjson(res.body);
 }
@@ -78,7 +82,7 @@ export async function postReview(body) {
   if (MOCK) return mockReview(body);
   const res = await post('/api/review', JSON.stringify(body), { 'Content-Type': 'application/json' });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(`${res.status}: ${REVIEW_ERRORS[res.status] ?? data.error ?? 'review failed'}`);
+  if (!res.ok) throw new Error(`${res.status}: ${res.status === 429 ? throttled(data, REVIEW_ERRORS[429]) : REVIEW_ERRORS[res.status] ?? data.error ?? 'review failed'}`);
   return data;
 }
 
