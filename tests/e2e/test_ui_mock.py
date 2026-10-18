@@ -119,6 +119,8 @@ REAL = {**SUMMARY, "dataset": "CODEBRIM (test fixture)", "policies": {
     "drishyam": [{"pixels_frac": 0.09, "recall": 0.13, "recall_iou_only": 0.05},
                  {"pixels_frac": 0.29, "recall": 0.2, "recall_iou_only": 0.09, "chance_recall": 0.14, "chance_recall_iou_only": 0.02},
                  {"pixels_frac": 0.44, "recall": 0.22, "recall_iou_only": 0.1}]}}
+# the run on measured wall time: the governor never switched the model, so the note must not say "0 times"
+WALL = {**SUMMARY, "agent_metrics": {**SUMMARY["agent_metrics"], "governor_activity_in_eval": {"p95>SLA": 0, "warp-spike": 6}}}
 FAILURES = [{"image": "failures/f01.jpg", "category": "graffiti read as damage",
              "what_happened": "A spray-painted line was drafted as a crack.",
              "rule_that_would_catch_it": "reject masks with saturated paint hues"}]
@@ -130,6 +132,7 @@ DATA = {
     "/results/summary.json": ("application/json", json.dumps(SUMMARY).encode()),
     "/results/codebrim/summary.json": ("application/json", json.dumps(REAL).encode()),
     "/results/failures.json": ("application/json", json.dumps(FAILURES).encode()),
+    "/results/live/summary.json": ("application/json", json.dumps(WALL).encode()),
     "/results/failures/f01.jpg": ("image/jpeg", MOCK_JPG),
 }
 
@@ -424,6 +427,7 @@ def test_desktop_mock(browser, base):
     expect(p.locator("#bench .chart__plot path[d*='l10 10']")).to_have_count(0)
     expect(p.locator("#bench details.data summary").last).to_have_text("Micro-benchmarks and provenance: test rig")  # folded away
     expect(p.locator("#bench .tbl caption")).to_be_hidden()
+    expect(p.locator("#bench")).to_contain_text("of the pixels; the governor shrank the gaze on 6 warp spikes. Live timings")
     expect(p.locator("#fail .fail")).to_have_count(1)
     expect(p.locator("#t-bench-cool")).to_have_text("COOL on Graviton: not run")  # FIG. 4.3 and the banner say why, nothing pending
     expect(p.locator("#bench-cool")).to_contain_text("The COOL Marketplace AMI could not be subscribed")

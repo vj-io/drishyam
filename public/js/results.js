@@ -291,9 +291,11 @@ function synthNotes(large, live) {
   const vd = at(live);
   const gov = live?.agent_metrics?.governor_activity_in_eval ?? {};
   if (vd && num(gov['p95>SLA'])) {
+    const acts = [gov['p95>SLA'] > 0 && `switched the model ${gov['p95>SLA']} times`,
+      gov['warp-spike'] > 0 && `shrank the gaze on ${gov['warp-spike']} warp spikes`].filter(Boolean);  // a count of 0 is not an event
     out.push(h('p', { class: 'note' }, 'On measured wall time instead of fixed costs, '
-      + `Drishyam found ${vd.recall.toFixed(2)} at ${pct(vd.pixels_frac)} of the pixels; the governor switched the model ${gov['p95>SLA']} times`
-      + `${num(gov['warp-spike']) ? ` and shrank the gaze on ${gov['warp-spike']} warp spikes` : ''}. Live timings move with the machine, so the chart uses fixed costs.`));
+      + `Drishyam found ${vd.recall.toFixed(2)} at ${pct(vd.pixels_frac)} of the pixels${acts.length ? `; the governor ${acts.join(' and ')}` : ''}`
+      + '. Live timings move with the machine, so the chart uses fixed costs.'));
   }
   return out;
 }
