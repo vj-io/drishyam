@@ -61,6 +61,9 @@ def test_job_streams_contract_events(photo):
     assert r.status_code == 200 and r.headers["content-type"].startswith("application/x-ndjson")
     ev = lines(r)
     assert ev[0]["type"] == "job" and ev[0]["privacy"]["boxes"] == []
+    prep = ev[0]["prep_ms"]  # read, decode, privacy pass: before the job's clock starts
+    assert set(prep) == {"read", "decode", "privacy"}
+    assert all(type(v) is int and v >= 0 for v in prep.values())
     assert ev[1]["type"] == "overview" and base64.b64decode(ev[1]["heatmap_png_b64"])[:4] == b"\x89PNG"
     done = ev[-1]
     assert done["type"] == "done" and findings.verify(done["token"], KEY)["job"] == done["work_order"]["job"]
@@ -330,7 +333,8 @@ def test_one_emf_line_per_job_on_lambda(photo, monkeypatch, capsys):
     from drishyam import web
 
     monkeypatch.setattr(web, "HOST", "aws-lambda")
-    done = lines(post(photo, params="?pixel_cap=0.2"))[-1]
+    ev = lines(post(photo, params="?pixel_cap=0.2"))
+    done = ev[-1]
     emf = [json.loads(x) for x in capsys.readouterr().out.splitlines() if x.startswith('{"_aws"')]
     assert len(emf) == 1
     (m,) = emf
@@ -340,7 +344,37 @@ def test_one_emf_line_per_job_on_lambda(photo, monkeypatch, capsys):
     s = done["summary"]
     assert (m["Status"], m["JobSeconds"], m["PixelsFrac"], m["Steps"], m["Findings"]) == (
         done["status"], s["seconds"], s["pixels_frac"], s["steps"], s["findings"])
+    assert m["prep_ms"] == ev[0]["prep_ms"]  # a logged field, not a metric
     assert isinstance(m["_aws"]["Timestamp"], int)
+
+
+def test_one_emf_line_per_review_on_lambda_with_hashes_only(photo, monkeypatch, capsys):
+    """The audit trail of human decisions: one record per accepted review, none for a refused one; the
+    reviewer and the tokens appear only as SHA-256, and the hashes chain one review to the next."""
+    import hashlib
+
+    from drishyam import web
+
+    def sha(s):
+        return hashlib.sha256(s.encode()).hexdigest()
+
+    monkeypatch.setattr(web, "HOST", "aws-lambda")
+    done = lines(post(photo, params="?pixel_cap=1"))[-1]
+    fid = next(f["id"] for f in done["work_order"]["findings"] if f["state"] == "pending_review")
+    capsys.readouterr()
+    body = {"token": done["token"], "finding_id": fid, "decision": "reject", "reviewer": " Test Engineer "}
+    out = client.post("/api/review", json=body).json()["token"]
+    assert client.post("/api/review", json={**body, "token": out}).status_code == 409  # refused: not logged
+    printed = capsys.readouterr().out
+    (m,) = [json.loads(x) for x in printed.splitlines() if x.startswith('{"_aws"')]
+    (spec,) = m["_aws"]["CloudWatchMetrics"]
+    assert spec == {"Namespace": "Drishyam", "Dimensions": [["Decision"]],
+                    "Metrics": [{"Name": "Reviews", "Unit": "Count"}]}
+    wo_id = done["work_order"]["id"]
+    assert (m["Reviews"], m["Decision"], m["wo"], m["finding"]) == (1, "reject", wo_id, fid)
+    assert (m["reviewer_sha256"], m["token_in_sha256"], m["token_out_sha256"]) == (
+        sha("Test Engineer"), sha(done["token"]), sha(out))
+    assert "Test Engineer" not in printed and done["token"] not in printed and out not in printed
 
 
 def test_signing_key_fails_closed_on_a_deployment(monkeypatch):
