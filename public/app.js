@@ -31,9 +31,10 @@ const S = {
   found: [], sent: [], crit: null, slow: false,  // what the step on screen found and sent to a person, its critical NOTE; replayed slowly?
 };
 // The presentation queue: stream events wait here and are shown one decision at a time. A step's findings and
-// review requests arrive with it and join it on screen, so they never wait behind its pause.
+// review requests arrive with it and join it on screen, so they never wait behind its pause; so does the overview's
+// drawing (the heatmap), while its NOTE waits for the photo line's read time.
 const Q = { items: [], timer: 0, skip: false };
-const JOINS = new Set(['finding', 'review_request']);
+const JOINS = new Set(['finding', 'review_request', 'overview']);
 
 const viewport = new Viewport($('#stage'), (k) => goto(k));
 const budget = new Budget($('#budget'));
@@ -122,6 +123,11 @@ const overviewLevel = () => {
   const i = S.job?.levels?.findIndex(([w, hh]) => w * hh === S.overview?.pixels_used) ?? -1;
   return i >= 0 ? i : null;
 };
+
+function photoText() {
+  const pv = S.job.privacy ?? {};
+  return `Photo received: ${S.job.width} × ${S.job.height} px. Before any look, faces and people are blurred (${pv.faces_blurred ?? 0} faces and ${pv.people_blurred ?? 0} people here).`;
+}
 
 function overviewText() {
   const n = S.overview.candidates?.length ?? 0;
@@ -263,7 +269,7 @@ function handle(ev) {
       stage('photo', `photo received · ${ev.width} × ${ev.height} px${took(ev.prep_ms?.decode, 'decoded in')}`);
       stage('privacy', `privacy blur · ${pv.faces_blurred ?? 0} faces, ${pv.people_blurred ?? 0} people${took(ev.prep_ms?.privacy, 'in')}`);
       showCam(0);
-      narrate(`Photo received: ${ev.width} × ${ev.height} px. Before any look, faces and people are blurred (${pv.faces_blurred ?? 0} faces and ${pv.people_blurred ?? 0} people here).`);
+      narrate(photoText());
       if (!S.arrived) {
         el.text.textContent = S.opts.killHint ? `${MOCK ? 'Recorded run' : 'Live'}: each look is shown the moment it arrives. Press KILL in this bar while it is looking.`
           : MOCK ? 'Recorded run: replaying a saved job from fixtures (no server), at reading speed.'
@@ -280,8 +286,13 @@ function handle(ev) {
       stage('saliency', 'saliency map (the heatmap)');
       stage('regions', `${n} candidate region${n === 1 ? '' : 's'}`);
       goto(0);
-      return 2400;
+      narrate(photoText());  // the photo line keeps its read time; the overview's NOTE follows in the queue
+      Q.items.unshift({ type: 'overview-note' });
+      return 0;
     }
+    case 'overview-note':  // no step has arrived yet: the viewer is on the overview
+      narrate(overviewText());
+      return 2400;
     case 'stage': {  // the server's preparation, lit as each part finishes
       const li = [...el.stages.children].find((x) => x.dataset.stage === ev.name);
       stage(ev.name, li && num(ev.ms) ? `${li.dataset.text} · ${Math.round(ev.ms)} ms` : null);

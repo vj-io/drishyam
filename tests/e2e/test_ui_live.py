@@ -230,6 +230,13 @@ def run(base, server_log=None):
         expect(page.locator("#narrator")).not_to_contain_text("Sending the photo")
         page.unroute("**/api/jobs*")
         print("ok  429: a refused Resume keeps the killed run; busy and per-address messages in the bar and the NOTE")
+        #    The overview (heatmap, pyramid, regions) is shown the moment it arrives, not after the job record's pause.
+        page.route("**/api/jobs*", lambda r: r.fulfill(status=200, content_type="application/x-ndjson", body="".join(f"{ln}\n" for ln in lines if json.loads(ln)["type"] in ("stage", "job", "overview"))))
+        page.locator("#look").click()
+        expect(page.locator("#stages li[data-stage='photo']")).to_have_class(re.compile(r"\bis-on\b"), timeout=15000)  # the job record
+        expect(page.locator("#stages li[data-stage='saliency']")).to_have_class(re.compile(r"\bis-on\b"), timeout=500)  # not 900 ms later
+        page.unroute("**/api/jobs*")
+        print("ok  the overview is lit at once")
         p.clean()
         print("ok  no CSP violations, no console errors")
 
