@@ -213,7 +213,7 @@ Drishyam's recall at similar or lower pixel cost (section 8), so the combination
 
 ## 8. Evaluation
 
-Measured on **200 held-out labelled synthetic images** (seed 7; policy changes were tuned only on a separate 60-image dev split, seed 4242, `make eval-dev`, unpublished), one segmenter and one matching rule for every policy (a ground-truth box is found by a same-class component with IoU ≥ 0.3 or containing its centre; "IoU-only" drops the centre clause). The 95 % intervals are a bootstrap over images, paired across policies. "Chance" moves each policy's own boxes (same class and size) to random places in the photo and scores them again. Precision is one-to-one: in confidence order each prediction claims at most one ground-truth box, so a defect reported again from a second look is a false box; "hits per matched box" counts the predictions that land on each box found (1 = no duplicates). All of it runs on the **fixed cost model** (`--cost-model fixed`): every op the agent times costs its p50 from the `job_ops` table in `results/linux-aarch64/micro.json` (the stock aarch64 wheel on GitHub's `ubuntu-24.04-arm` runner, Neoverse-N2, one thread) on every call, so t̂, the stop rule and the governor see the same costs on a busy machine as on an idle one, and a re-run (`MICRO_ARM=linux-aarch64`; the Makefile's default is the x86 laptop's table) reproduces the numbers exactly. The jobs themselves ran on the x86 laptop; only their costs are the arm64 ones. $ is that modelled time × $0.339/h (untimed Python is not charged). In this comparison the governor's model, level and gaze-size overrides are off (caps and the kill switch stay), so Drishyam segments every look with the same accurate model as the baselines; turning them on changes nothing under fixed costs (the governor-on ablation below).
+Measured on **200 held-out labelled synthetic images** (seed 7; policy changes were tuned only on a separate 60-image dev split, seed 4242, `make eval-dev`, unpublished), one segmenter and one matching rule for every policy (a ground-truth box is found by a same-class component with IoU ≥ 0.3 or containing its centre; "IoU-only" drops the centre clause). The 95 % intervals are a bootstrap over images, paired across policies. "Chance" moves each policy's own boxes (same class and size) to random places in the photo and scores them again. Precision is one-to-one: in confidence order each prediction claims at most one ground-truth box, so a defect reported again from a second look is a false box; "hits per matched box" counts the predictions that land on each box found (1 = no duplicates). All of it runs on the **fixed cost model** (`--cost-model fixed`): every op the agent times costs its p50 from the `job_ops` table in `results/linux-aarch64/micro.json` (the stock aarch64 wheel on GitHub's `ubuntu-24.04-arm` runner, Neoverse-N2, one thread) on every call, so t̂, the stop rule and the governor see the same costs on a busy machine as on an idle one, and a re-run (`make eval`, whose `MICRO_ARM` defaults to `linux-aarch64`) reproduces the numbers exactly, however busy the machine. The jobs themselves ran on the x86 laptop; only their costs are the arm64 ones. $ is that modelled time × $0.339/h (untimed Python is not charged). In this comparison the governor's model, level and gaze-size overrides are off (caps and the kill switch stay), so Drishyam segments every look with the same accurate model as the baselines; turning them on changes nothing under fixed costs at the 30 % and 100 % caps, the only caps the governor-on ablation ran (30 % only on CODEBRIM; [Ablations](#ablations-fr-21) below).
 
 The FR-21 ablations (random gaze order, no uncertainty term, no survey look, no verify step, governor on) are under
 [Ablations](#ablations-fr-21) below. The per-cap tables and per-class recall are in the
@@ -457,12 +457,13 @@ notes the large spall it missed.
 - Bhavya Dhoot, design, demo and presentation (site design, video)
 
 ```bash
-uv sync --all-extras && make test && make eval MICRO_ARM=linux-aarch64 && make bench
+uv sync --all-extras && make test && make eval && make bench
 ```
 
 `make eval-large`, `make eval-ablations`, `make eval-clean` and `make eval-live` rerun the other synthetic results;
 `make data` then `make eval-real` and `make eval-ablations-real` the CODEBRIM ones (an 8.3 GB download). The published
-fixed-cost runs use the arm64 table: add `MICRO_ARM=linux-aarch64` to each of these except `eval-live`. `scripts/aws.sh deploy` and `scripts/aws.sh smoke` deploy and check the AWS
+fixed-cost runs use the arm64 table, the Makefile's default (`MICRO_ARM=linux-aarch64`); `MICRO_ARM=local-macos-x86`
+charges the x86 laptop's table instead, and `eval-live` uses no table. `scripts/aws.sh deploy` and `scripts/aws.sh smoke` deploy and check the AWS
 stack ([aws.md](aws.md)).
 
 ## Appendix: per-cap tables
