@@ -531,7 +531,7 @@ def test_desktop_mock(browser, base):
     expect(p.locator(".fgroup")).to_have_count(len(REGIONS))
     for fid, f in FINDINGS.items():
         c = card(p, fid)
-        expect(c.locator(".chip--cls")).to_have_text(f["cls"])
+        expect(c.locator(".chip--cls")).to_have_text(f["cls"].replace("_", " ").capitalize())
         later = f.get("steps", [])[1:]
         refined = f", refined at {', '.join(map(str, later))}" if later else ""
         expect(c.locator(".finding__where")).to_have_text(f"found at step {f['step']}{refined}, L{f['level']}")
@@ -745,12 +745,12 @@ def test_guided(browser, base):
     assert p.locator(".trace__line[data-step]").count() < N_STEPS, "a guided run is shown at reading speed, not in a burst"
     expect(p.locator("#narrator")).to_contain_text("whole photo")       # step 1 in plain words
     s.shot("desktop-guided-mid.png")
-    # the first critical finding is the hand-off moment: its NOTE outlasts an ordinary decision (5 s)
+    # the first critical finding is the hand-off moment: its NOTE outlasts an ordinary decision (3.5 s)
     expect(p.locator("#narrator")).to_contain_text("Critical:", timeout=T)
     t0 = time.time()
     until(lambda: "Critical:" not in p.locator("#narrator").inner_text(), "the critical NOTE to give way")
     held = time.time() - t0
-    assert held >= 7, f"the critical NOTE stayed {held:.1f} s, no longer than an ordinary decision"
+    assert 4 <= held <= 6, f"the critical NOTE stayed {held:.1f} s: it should outlast a decision (3.5 s) and give way within about 5 s"
     p.click("#skip")
     expect(p.locator("#job-pill")).to_have_text(DONE_LABEL, timeout=T)
     # it ends on the recap, on screen below the bars, and Sign them off hands over to the reviewer field
