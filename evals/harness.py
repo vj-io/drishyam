@@ -704,7 +704,13 @@ def clean_headline(fa: dict, n: int, primary: str) -> str:
 
 # ---------------------------------------------------------------- run
 PROV_KEYS = ("cv2", "build_info_sha256", "cv2_baseline", "cv2_dispatch", "cv2_parallel_framework", "cv2_custom_hal",
-             "machine", "cpu", "python", "timestamp", "build", "load_avg_start", "load_avg")  # load_avg: at the end
+             "machine", "cpu", "python", "timestamp", "build", "load_avg", "load_avg_start", "load_avg_end")
+
+
+def run_provenance(load_start: list[float]) -> dict:
+    """provenance() taken at the end of a run, its load named as in bench/: load_avg is the start (= load_avg_start)."""
+    p = provenance()
+    return {**p, "load_avg": load_start, "load_avg_start": load_start, "load_avg_end": p["load_avg"]}
 
 
 def short_provenance(prov: dict, workers: int, threads, micro_arm: str, data_id: dict, synthetic: bool) -> dict:
@@ -809,7 +815,7 @@ def run(data_dir="data/synth200", n=200, out_dir="public/results", results_dir="
     if rows:
         am["timing"]["note"] = "wall times are modelled (--cost-model fixed): micro.json job_ops p50 per call, not measured"
     prev = Path(results_dir) / "eval_raw.json"  # a re-score keeps the machine, load and time of the run it re-scores
-    prov = json.loads(prev.read_text())["provenance"] if reuse and prev.exists() else {**provenance(), "load_avg_start": load_start}
+    prov = json.loads(prev.read_text())["provenance"] if reuse and prev.exists() else run_provenance(load_start)
     keep = short_provenance(prov, workers, am["timing"]["cv2_threads_per_worker"], micro_arm, data_id, synthetic)
     fa = false_alarms(records, results, keys, primary_boxes) if clean else None
     summary = {
@@ -956,7 +962,7 @@ def run_ablations(data_dir="data/synth200", n=200, out_dir="public/results", res
                       "model_usage": usage[f"{v}@{cap}"]}
         by_cap[str(cap)] = out
     threads = sorted({r["cv2_threads"] for r in results})
-    prov = {**provenance(), "load_avg_start": load_start}
+    prov = run_provenance(load_start)
     entry = {"dataset": label, "n_images": n_img, "segmenter": seg.name, "box_convention": primary_boxes,
              "cost_model": {"kind": "fixed", "source": f"results/{micro_arm}/micro.json job_ops (p50 ms per call)"},
              "variants": {v: switches(v) for v in ABLATIONS}, "by_cap": by_cap,

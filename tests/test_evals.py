@@ -342,8 +342,9 @@ def test_three_image_run_writes_valid_summary_and_gallery(tmp_path):
     assert set(on_disk["per_class"]["downscale"]) == set(synth.CLASSES)
     prov = on_disk["provenance"]
     assert set(prov) - {"cv2_custom_hal", "cv2_parallel_framework", "cv2_dispatch", "cv2_baseline"} == {
-        "cv2", "build_info_sha256", "machine", "cpu", "python", "timestamp", "build", "load_avg_start", "load_avg",
+        "cv2", "build_info_sha256", "machine", "cpu", "python", "timestamp", "build", "load_avg", "load_avg_start", "load_avg_end",
         "dataset_gt_sha256", "dataset_images_sha256", "dataset_generator_version"}
+    assert prov["load_avg"] == prov["load_avg_start"] and len(prov["load_avg_end"]) == 3  # start and end, named as in bench/
     assert prov["dataset_gt_sha256"] == harness.dataset_sha256(harness.load_records(data, 3)[0])["dataset_gt_sha256"]
     am = on_disk["agent_metrics"]
     assert am["steps_with_cause_pct"] == 100.0 and set(am["box_convention"]["recall"]) == {"components", "union", "as_specified"}
