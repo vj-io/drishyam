@@ -283,7 +283,7 @@
 <line class="band" x1="80" y1="1290" x2="359" y2="1290"/>
 <text x="90" y="1304" xml:space="preserve"><tspan class="cv">cv2.warpPerspective</tspan>: 512² view</text>
 <text x="90" y="1320" xml:space="preserve">pan, zoom = pyramid level,</text>
-<text x="90" y="1336" xml:space="preserve">yaw/pitch de-warp via the MCP tool</text>
+<text x="90" y="1336" xml:space="preserve">MCP tool only: synthetic yaw/pitch</text>
 <text x="90" y="1352" xml:space="preserve"><tspan class="cv">cv2.perspectiveTransform</tspan> → L0 px</text>
 </g>
 <g class="node" data-box="387 1260 279 120">
