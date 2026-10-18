@@ -321,7 +321,8 @@ candidates, and normalised cross-correlation confirms them. Calibrated on CODEBR
 --codebrim data/codebrim`: resized, rotated, recompressed and re-exposed copies of 50 eval images sit at hash
 distance ≤ 10 and correlation ≥ 0.93, and each eval image's nearest other CODEBRIM photo at ≥ 56 and ≤ 0.43, so the
 thresholds 32 and 0.8 separate them; crops that drop 5 % of the frame are not found. The 9×8 dHash it replaces put
-70 of the 200 eval images within 10 of 64 of an unrelated CODEBRIM photo. It has not yet been run against dacl10k.
+70 of the 200 eval images within 10 of 64 of an unrelated CODEBRIM photo. It has been run against dacl10k
+(2026-10-18); its output is not yet published.
 
 ## 9. Failures
 
