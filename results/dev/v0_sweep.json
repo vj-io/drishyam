@@ -1,0 +1,541 @@
+{
+ "what": "Dev-only sweep that chose JobConfig.v0 (the stop floor), with the base agent and two seeding ablations beside it. Never a held-out set.",
+ "code": {
+  "rows v0_*, nounc, noseed": "agent at 86f92e3 (tree 4b30674)",
+  "row base": "agent at d84480e (tree ab3e7e3: the same agent plus the CODEBRIM dev split), no floor, no seeding"
+ },
+ "costs": "fixed: job_ops p50s from results/linux-aarch64/micro.json; governor overrides off (harness.run_drishyam)",
+ "command": "python -m evals.dev_sweep <synth_dev|clean|real> <cap> \"v0_0=v0:0;v0_1=v0:1;v0_2=v0:2;v0_3=v0:3;v0_4=v0:4;nounc=use_uncertainty:False;noseed=seed_from_looks:False\" --out <file>  (base: the same tool run in the base tree with \"base=\")",
+ "variants": {
+  "v0_N": "v0 = N (v0_2 is the default agent)",
+  "nounc": "use_uncertainty=False (v0 2)",
+  "noseed": "seed_from_looks=False (v0 2)",
+  "base": "the agent before this branch"
+ },
+ "splits": {
+  "synth_dev_0.3": {
+   "label": "synth_dev (60, seed 4242), 30 % cap",
+   "rows": {
+    "base": {
+     "recall": 0.5,
+     "pixels_frac": 0.2295,
+     "fp_per_image": 13.1,
+     "boxes_per_image": 14.75,
+     "halt": {
+      "stop-rule": 26,
+      "cap-hit": 34
+     },
+     "looks_mean": 2.5667,
+     "images_with_any": 0.9667
+    },
+    "v0_0": {
+     "recall": 0.505,
+     "pixels_frac": 0.2628,
+     "fp_per_image": 16.6167,
+     "boxes_per_image": 18.3,
+     "halt": {
+      "cap-hit": 58,
+      "stop-rule": 2
+     },
+     "looks_mean": 2.9667,
+     "images_with_any": 0.9667
+    },
+    "v0_1": {
+     "recall": 0.505,
+     "pixels_frac": 0.2628,
+     "fp_per_image": 16.6167,
+     "boxes_per_image": 18.3,
+     "halt": {
+      "cap-hit": 58,
+      "stop-rule": 2
+     },
+     "looks_mean": 2.9667,
+     "images_with_any": 0.9667
+    },
+    "v0_2": {
+     "recall": 0.505,
+     "pixels_frac": 0.26,
+     "fp_per_image": 16.2167,
+     "boxes_per_image": 17.9,
+     "halt": {
+      "cap-hit": 56,
+      "stop-rule": 4
+     },
+     "looks_mean": 2.9333,
+     "images_with_any": 0.9667
+    },
+    "v0_3": {
+     "recall": 0.5,
+     "pixels_frac": 0.2573,
+     "fp_per_image": 15.5333,
+     "boxes_per_image": 17.2,
+     "halt": {
+      "cap-hit": 54,
+      "stop-rule": 6
+     },
+     "looks_mean": 2.9,
+     "images_with_any": 0.9667
+    },
+    "v0_4": {
+     "recall": 0.5,
+     "pixels_frac": 0.2573,
+     "fp_per_image": 15.5333,
+     "boxes_per_image": 17.2,
+     "halt": {
+      "cap-hit": 54,
+      "stop-rule": 6
+     },
+     "looks_mean": 2.9,
+     "images_with_any": 0.9667
+    },
+    "nounc": {
+     "recall": 0.495,
+     "pixels_frac": 0.2545,
+     "fp_per_image": 16.05,
+     "boxes_per_image": 17.7,
+     "halt": {
+      "cap-hit": 52,
+      "stop-rule": 8
+     },
+     "looks_mean": 2.8667,
+     "images_with_any": 0.9667
+    },
+    "noseed": {
+     "recall": 0.495,
+     "pixels_frac": 0.2281,
+     "fp_per_image": 12.85,
+     "boxes_per_image": 14.5,
+     "halt": {
+      "stop-rule": 27,
+      "cap-hit": 33
+     },
+     "looks_mean": 2.55,
+     "images_with_any": 0.9667
+    }
+   }
+  },
+  "synth_dev_1.0": {
+   "label": "synth_dev, 100 % cap",
+   "rows": {
+    "base": {
+     "recall": 0.53,
+     "pixels_frac": 0.3115,
+     "fp_per_image": 16.3167,
+     "boxes_per_image": 18.0667,
+     "halt": {
+      "stop-rule": 59,
+      "exhausted": 1
+     },
+     "looks_mean": 3.55,
+     "images_with_any": 0.9833
+    },
+    "v0_0": {
+     "recall": 0.565,
+     "pixels_frac": 0.499,
+     "fp_per_image": 31.6333,
+     "boxes_per_image": 33.5167,
+     "halt": {
+      "stop-rule": 53,
+      "exhausted": 7
+     },
+     "looks_mean": 5.8,
+     "images_with_any": 0.9833
+    },
+    "v0_1": {
+     "recall": 0.565,
+     "pixels_frac": 0.4809,
+     "fp_per_image": 30.85,
+     "boxes_per_image": 32.7333,
+     "halt": {
+      "stop-rule": 55,
+      "exhausted": 5
+     },
+     "looks_mean": 5.5833,
+     "images_with_any": 0.9833
+    },
+    "v0_2": {
+     "recall": 0.555,
+     "pixels_frac": 0.4531,
+     "fp_per_image": 28.55,
+     "boxes_per_image": 30.4,
+     "halt": {
+      "stop-rule": 57,
+      "exhausted": 3
+     },
+     "looks_mean": 5.25,
+     "images_with_any": 0.9833
+    },
+    "v0_3": {
+     "recall": 0.545,
+     "pixels_frac": 0.4198,
+     "fp_per_image": 24.1333,
+     "boxes_per_image": 25.95,
+     "halt": {
+      "stop-rule": 60
+     },
+     "looks_mean": 4.85,
+     "images_with_any": 0.9833
+    },
+    "v0_4": {
+     "recall": 0.545,
+     "pixels_frac": 0.4198,
+     "fp_per_image": 24.1333,
+     "boxes_per_image": 25.95,
+     "halt": {
+      "stop-rule": 60
+     },
+     "looks_mean": 4.85,
+     "images_with_any": 0.9833
+    },
+    "nounc": {
+     "recall": 0.52,
+     "pixels_frac": 0.3893,
+     "fp_per_image": 23.7167,
+     "boxes_per_image": 25.45,
+     "halt": {
+      "stop-rule": 60
+     },
+     "looks_mean": 4.4833,
+     "images_with_any": 0.9833
+    },
+    "noseed": {
+     "recall": 0.525,
+     "pixels_frac": 0.3004,
+     "fp_per_image": 15.85,
+     "boxes_per_image": 17.6,
+     "halt": {
+      "stop-rule": 60
+     },
+     "looks_mean": 3.4167,
+     "images_with_any": 0.9833
+    }
+   }
+  },
+  "clean_0.3": {
+   "label": "synth_clean_dev (30, no damage, seed 4243), 30 % cap",
+   "rows": {
+    "base": {
+     "recall": null,
+     "pixels_frac": 0.2462,
+     "fp_per_image": 11.2667,
+     "boxes_per_image": 11.2667,
+     "halt": {
+      "cap-hit": 23,
+      "exhausted": 2,
+      "stop-rule": 5
+     },
+     "looks_mean": 2.7667,
+     "images_with_any": 0.7
+    },
+    "v0_0": {
+     "recall": null,
+     "pixels_frac": 0.2573,
+     "fp_per_image": 12.4667,
+     "boxes_per_image": 12.4667,
+     "halt": {
+      "cap-hit": 27,
+      "exhausted": 2,
+      "stop-rule": 1
+     },
+     "looks_mean": 2.9,
+     "images_with_any": 0.7
+    },
+    "v0_1": {
+     "recall": null,
+     "pixels_frac": 0.2573,
+     "fp_per_image": 12.4667,
+     "boxes_per_image": 12.4667,
+     "halt": {
+      "cap-hit": 27,
+      "exhausted": 2,
+      "stop-rule": 1
+     },
+     "looks_mean": 2.9,
+     "images_with_any": 0.7
+    },
+    "v0_2": {
+     "recall": null,
+     "pixels_frac": 0.2545,
+     "fp_per_image": 12.1333,
+     "boxes_per_image": 12.1333,
+     "halt": {
+      "cap-hit": 26,
+      "exhausted": 2,
+      "stop-rule": 2
+     },
+     "looks_mean": 2.8667,
+     "images_with_any": 0.7
+    },
+    "v0_3": {
+     "recall": null,
+     "pixels_frac": 0.2517,
+     "fp_per_image": 12.1,
+     "boxes_per_image": 12.1,
+     "halt": {
+      "cap-hit": 25,
+      "exhausted": 2,
+      "stop-rule": 3
+     },
+     "looks_mean": 2.8333,
+     "images_with_any": 0.7
+    },
+    "v0_4": {
+     "recall": null,
+     "pixels_frac": 0.2517,
+     "fp_per_image": 12.1,
+     "boxes_per_image": 12.1,
+     "halt": {
+      "cap-hit": 25,
+      "exhausted": 2,
+      "stop-rule": 3
+     },
+     "looks_mean": 2.8333,
+     "images_with_any": 0.7
+    },
+    "nounc": {
+     "recall": null,
+     "pixels_frac": 0.2545,
+     "fp_per_image": 12.1333,
+     "boxes_per_image": 12.1333,
+     "halt": {
+      "cap-hit": 26,
+      "exhausted": 2,
+      "stop-rule": 2
+     },
+     "looks_mean": 2.8667,
+     "images_with_any": 0.7
+    },
+    "noseed": {
+     "recall": null,
+     "pixels_frac": 0.2462,
+     "fp_per_image": 11.2667,
+     "boxes_per_image": 11.2667,
+     "halt": {
+      "cap-hit": 23,
+      "exhausted": 2,
+      "stop-rule": 5
+     },
+     "looks_mean": 2.7667,
+     "images_with_any": 0.7
+    }
+   }
+  },
+  "clean_1.0": {
+   "label": "synth_clean_dev, 100 % cap",
+   "rows": {
+    "base": {
+     "recall": null,
+     "pixels_frac": 0.4629,
+     "fp_per_image": 13.4667,
+     "boxes_per_image": 13.4667,
+     "halt": {
+      "stop-rule": 16,
+      "exhausted": 13,
+      "cap-hit": 1
+     },
+     "looks_mean": 5.3667,
+     "images_with_any": 0.8
+    },
+    "v0_0": {
+     "recall": null,
+     "pixels_frac": 0.5379,
+     "fp_per_image": 20.3333,
+     "boxes_per_image": 20.3333,
+     "halt": {
+      "stop-rule": 13,
+      "exhausted": 16,
+      "cap-hit": 1
+     },
+     "looks_mean": 6.2667,
+     "images_with_any": 0.8
+    },
+    "v0_1": {
+     "recall": null,
+     "pixels_frac": 0.4573,
+     "fp_per_image": 20.3333,
+     "boxes_per_image": 20.3333,
+     "halt": {
+      "stop-rule": 23,
+      "exhausted": 6,
+      "cap-hit": 1
+     },
+     "looks_mean": 5.3,
+     "images_with_any": 0.8
+    },
+    "v0_2": {
+     "recall": null,
+     "pixels_frac": 0.4129,
+     "fp_per_image": 15.8333,
+     "boxes_per_image": 15.8333,
+     "halt": {
+      "stop-rule": 24,
+      "exhausted": 5,
+      "cap-hit": 1
+     },
+     "looks_mean": 4.7667,
+     "images_with_any": 0.8
+    },
+    "v0_3": {
+     "recall": null,
+     "pixels_frac": 0.4017,
+     "fp_per_image": 15.7,
+     "boxes_per_image": 15.7,
+     "halt": {
+      "stop-rule": 24,
+      "exhausted": 5,
+      "cap-hit": 1
+     },
+     "looks_mean": 4.6333,
+     "images_with_any": 0.8
+    },
+    "v0_4": {
+     "recall": null,
+     "pixels_frac": 0.4017,
+     "fp_per_image": 15.7,
+     "boxes_per_image": 15.7,
+     "halt": {
+      "stop-rule": 24,
+      "exhausted": 5,
+      "cap-hit": 1
+     },
+     "looks_mean": 4.6333,
+     "images_with_any": 0.8
+    },
+    "nounc": {
+     "recall": null,
+     "pixels_frac": 0.4073,
+     "fp_per_image": 15.8333,
+     "boxes_per_image": 15.8333,
+     "halt": {
+      "stop-rule": 24,
+      "exhausted": 5,
+      "cap-hit": 1
+     },
+     "looks_mean": 4.7,
+     "images_with_any": 0.8
+    },
+    "noseed": {
+     "recall": null,
+     "pixels_frac": 0.3545,
+     "fp_per_image": 12.1,
+     "boxes_per_image": 12.1,
+     "halt": {
+      "stop-rule": 27,
+      "exhausted": 3
+     },
+     "looks_mean": 4.0667,
+     "images_with_any": 0.8
+    }
+   }
+  },
+  "real_0.3": {
+   "label": "codebrim_dev100 (evals/codebrim_dev100.txt, seed 4244), 30 % cap",
+   "rows": {
+    "base": {
+     "recall": 0.1541,
+     "pixels_frac": 0.2806,
+     "fp_per_image": 826.44,
+     "boxes_per_image": 827.66,
+     "halt": {
+      "stop-rule": 8,
+      "cap-hit": 89,
+      "exhausted": 3
+     },
+     "looks_mean": 14.89,
+     "images_with_any": 0.99
+    },
+    "v0_0": {
+     "recall": 0.1529,
+     "pixels_frac": 0.2819,
+     "fp_per_image": 868.66,
+     "boxes_per_image": 869.87,
+     "halt": {
+      "cap-hit": 92,
+      "stop-rule": 5,
+      "exhausted": 3
+     },
+     "looks_mean": 14.96,
+     "images_with_any": 0.99
+    },
+    "v0_1": {
+     "recall": 0.1529,
+     "pixels_frac": 0.2819,
+     "fp_per_image": 868.66,
+     "boxes_per_image": 869.87,
+     "halt": {
+      "cap-hit": 92,
+      "stop-rule": 5,
+      "exhausted": 3
+     },
+     "looks_mean": 14.96,
+     "images_with_any": 0.99
+    },
+    "v0_2": {
+     "recall": 0.1529,
+     "pixels_frac": 0.2815,
+     "fp_per_image": 866.73,
+     "boxes_per_image": 867.94,
+     "halt": {
+      "stop-rule": 6,
+      "cap-hit": 91,
+      "exhausted": 3
+     },
+     "looks_mean": 14.95,
+     "images_with_any": 0.99
+    },
+    "v0_3": {
+     "recall": 0.1529,
+     "pixels_frac": 0.2815,
+     "fp_per_image": 866.73,
+     "boxes_per_image": 867.94,
+     "halt": {
+      "stop-rule": 6,
+      "cap-hit": 91,
+      "exhausted": 3
+     },
+     "looks_mean": 14.95,
+     "images_with_any": 0.99
+    },
+    "v0_4": {
+     "recall": 0.1529,
+     "pixels_frac": 0.2815,
+     "fp_per_image": 866.73,
+     "boxes_per_image": 867.94,
+     "halt": {
+      "stop-rule": 6,
+      "cap-hit": 91,
+      "exhausted": 3
+     },
+     "looks_mean": 14.95,
+     "images_with_any": 0.99
+    },
+    "nounc": {
+     "recall": 0.1529,
+     "pixels_frac": 0.2815,
+     "fp_per_image": 854.21,
+     "boxes_per_image": 855.41,
+     "halt": {
+      "stop-rule": 6,
+      "cap-hit": 91,
+      "exhausted": 3
+     },
+     "looks_mean": 14.95,
+     "images_with_any": 0.99
+    },
+    "noseed": {
+     "recall": 0.1541,
+     "pixels_frac": 0.2806,
+     "fp_per_image": 823.05,
+     "boxes_per_image": 824.27,
+     "halt": {
+      "stop-rule": 8,
+      "cap-hit": 89,
+      "exhausted": 3
+     },
+     "looks_mean": 14.89,
+     "images_with_any": 0.99
+    }
+   }
+  }
+ }
+}

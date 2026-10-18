@@ -42,7 +42,11 @@ REPLAY_ACTIONS = ("gaze", "escalate", "verify")
 DOMINATED_BY = {"corrosion": ("exposed_rebar",), "crack": ("spalling", "exposed_rebar"),
                 "efflorescence": ("spalling", "exposed_rebar")}
 MAX_REPLAY = 200
-V0 = 2.0  # JobConfig.v0 default: the largest v0 tried (0-4) that lost no recall on the dev splits (synth_dev, codebrim_dev100)
+# JobConfig.v0 default: the largest v0 tried (0-4) that lost no recall at the 30 % cap on the dev splits (synth_dev,
+# codebrim_dev100). Uncapped it costs recall on synth_dev (0.555 against 0.565 for v0 <= 1, at 0.45 of the pixels
+# instead of 0.48-0.50) and saves false alarms on the clean dev split (15.8 boxes per photo instead of 20.3);
+# results/dev/v0_sweep.json.
+V0 = 2.0
 
 
 @dataclass
