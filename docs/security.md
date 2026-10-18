@@ -56,8 +56,10 @@ the control that stops it. Every control named here has a test in `tests/` (the 
   the one uvicorn process) that the running job reads after every step; the
   governor then halts before the next look. The flag is needed because a Lambda
   Function URL does not pass the browser's disconnect through to the function,
-  so an aborted stream alone does not stop a job. The operator-wide switch is `DRISHYAM_KILL_SWITCH=1`
-  (env) or the `DRISHYAM_KILL_FILE` flag file.
+  so an aborted stream alone does not stop a job. The job id and its kill token arrive in the job's first
+  record, so a KILL pressed before that record is held by the page and sent the moment it arrives; the page
+  never reports a kill the server did not make (`tests/e2e/test_ui_mock.py::test_kill_before_the_first_record`).
+  The operator-wide switch is `DRISHYAM_KILL_SWITCH=1` (env) or the `DRISHYAM_KILL_FILE` flag file.
 - Anyone holding a token can review it: there is no multi-tenant auth (a PRD
   non-goal).
 - Within the kill-and-review WAF limit a caller can write junk KILL flags (each a small DynamoDB

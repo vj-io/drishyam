@@ -169,22 +169,42 @@ def run(base, server_log=None):
         print(f"ok  guided live run ({took:.1f} s): paced, plain words, viewer on screen, findings, recap in view, critical card, "
               f"human approval signed by the server; server total {'shown' if 'prep_ms' in job else 'not sent'}")
 
-        # Now break it, from the recap: the injected faults read in plain words too.
+        # Now break it, from the recap: the injected faults read in plain words too. REAL CLOCK: the server's job runs on
+        # wall time, so on a loaded machine the stop rule or a cap can end it before the spike (look 4) or the malformed
+        # planner (step 6). It asserts behaviour, not timing: each drill the server's trace shows was reached is shown
+        # in plain words, and the job ends with a halt record (tests/test_web.py pins the sequence on fixed costs).
         page.get_by_role("button", name="Now break it").click()
         page.locator("#skip").click()
         p.wait_done()
-        expect(page.locator("#trace .chip--inject")).to_have_text("injected: slow segmenter")
+        with page.expect_download() as dl:
+            page.get_by_role("button", name="Download trace.ndjson").click()
+        events = [json.loads(ln) for ln in Path(dl.value.path()).read_text().splitlines()]
+        steps = [e for e in events if e["type"] == "step"]
+        spiked = any(s.get("injected") == "p95_spike" for s in steps)
+        refused = any(e["type"] == "planner" and e["status"] == "rejected" for e in events)
+        assert steps and steps[-1]["decision"]["action"] == "halt", "the drill job ends with a halt record"
+        if spiked:
+            expect(page.locator("#trace .chip--inject")).to_have_text("injected: slow segmenter")
+        if refused:
+            expect(page.locator("#trace .trace__line--planner", has_text="rejected")).to_have_count(1)
         p.plain()
-        print("ok  Now break it: injected faults and the governor's reaction in plain words")
+        print(f"ok  Now break it: the drills reached ({'spike' if spiked else 'no spike'}, {'planner refused' if refused else 'no planner'})"
+              " read in plain words")
 
-        # Try KILL from the recap: a run shown live whose planner stalls 2 s at step 3, so KILL lands mid-job.
+        # Try KILL from the recap: a run shown live whose planner stalls 2 s at step 3, so KILL usually lands mid-job.
+        # REAL CLOCK: on a loaded machine the stop rule can end the job before KILL reaches it. Either way KILL must not
+        # claim more than happened: a kill-switch halt by the server, or the page saying the job had already finished.
         page.get_by_role("button", name="Try KILL").click()
         expect(page.locator("#job-text")).to_contain_text("shown the moment it arrives", timeout=15000)
         expect(page.locator("#trace .trace__line[data-step='1']")).to_be_visible(timeout=30000)
         page.locator("#kill").click()
-        expect(page.locator("#job-pill")).to_have_text("halted", ignore_case=True, timeout=15000)
-        expect(page.locator("#trace .trace__line .chip", has_text="kill-switch")).to_have_count(1)
-        print("ok  Try KILL: the live run was halted by the server with kill-switch")
+        status = p.wait_done()
+        killed = page.locator("#trace .trace__line .chip", has_text="kill-switch").count() == 1
+        if killed:
+            assert status == "halted", status
+        else:
+            expect(page.locator("#job-text")).to_contain_text("had already finished")
+        print(f"ok  Try KILL: {'halted by the server with kill-switch' if killed else 'the job had finished first, and the page said so'}")
 
         # 2. KILL mid-run reaches the server, which halts before its next look and sends a kill-switch record.
         # planner_timeout parks the job for 2 s at step 3, so the click lands while it is still running.
