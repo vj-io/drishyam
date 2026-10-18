@@ -10,8 +10,9 @@
 #    (FP16 against FP32 too: over 5e-2, the FP16 file is dropped and FP32 installed alone), before touching the repo;
 # 2. copies them to models/drishyam_dacl10k.onnx and .fp16.onnx (and the metrics.json and run_info.json found beside
 #    best.onnx to models/drishyam_dacl10k.metrics.json and .run_info.json), and records sizes, sha256, validation mIoU,
-#    the training run's package versions and source, and the licence in models/README.md, and names their
-#    CC BY-NC 4.0 licence in README.md's Licence line;
+#    the training run's package versions and source (or, without run_info.json, the hand-recorded
+#    models/drishyam_dacl10k.provenance.json when its sha256 matches), and the licence in models/README.md
+#    (README.md's own Licence section is hand-written and left alone);
 # 3. runs 3 sample images through `drishyam run` with DRISHYAM_ONNX set (runs/model-smoke/);
 # 4. runs evals.model_eval on --n images of data/synth200: this model (fixed cost model, its own job_ops timing)
 #    against the classical engine, into runs/model-eval/ (never public/results; `make eval-model` adds the
@@ -27,7 +28,7 @@ N=200 MODEL="" FP16=""
 while [ $# -gt 0 ]; do
   case $1 in
     --n) [ $# -ge 2 ] || usage; N=$2; shift 2 ;;
-    -h|--help) sed -n '2,18p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,22p' "$0"; exit 0 ;;
     -*) usage ;;
     *) if [ -z "$MODEL" ]; then MODEL=$(abspath "$1"); elif [ -z "$FP16" ]; then FP16=$(abspath "$1"); else usage; fi
        shift ;;
@@ -119,6 +120,11 @@ if mp.exists():
              "numbers: `drishyam_dacl10k.metrics.json`.")
 rp = Path("models/drishyam_dacl10k.run_info.json")
 run = "No `run_info.json` came with the weights (notebooks built before it was added do not write one)."
+pp = Path("models/drishyam_dacl10k.provenance.json")  # hand-recorded, for weights that came without run_info.json
+if not rp.exists() and pp.exists():
+    prov = json.loads(pp.read_text())
+    if prov["sha256"]["drishyam_dacl10k.onnx"] == hashlib.sha256(Path("models/drishyam_dacl10k.onnx").read_bytes()).hexdigest():
+        run += "\n\n" + prov["known"]
 if rp.exists():
     sessions = json.loads(rp.read_text())
     last = sessions[-1]  # the session that exported the weights
@@ -152,15 +158,6 @@ text = text.replace("# Bundled models (third-party, permissive licences)",
                     "# Bundled models (third-party; permissive licences, except the CC BY-NC 4.0 `drishyam_dacl10k`)")
 readme.write_text(text + "\n\n" + section)
 print(f"models/README.md: {head[3:]} section written")
-top, old = Path("README.md"), "from OpenCV Zoo, see [models/README.md]"
-new = ("from OpenCV Zoo, and the `drishyam_dacl10k` segmenter, which is "
-       "[CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) (non-commercial; trained on "
-       "[dacl10k](https://github.com/phiyodr/dacl10k-toolkit)), see [models/README.md]")
-lic = top.read_text()
-if new not in lic:
-    assert old in lic, "README.md's Licence line changed: name the CC BY-NC 4.0 dacl10k weights there by hand"
-    top.write_text(lic.replace(old, new))
-print("README.md: Licence line names the CC BY-NC 4.0 weights")
 EOF
 export DRISHYAM_ONNX="$PWD/$DST"
 if [ -n "$FP16" ]; then export DRISHYAM_ONNX_FP16="$PWD/$DST16"; else unset DRISHYAM_ONNX_FP16; fi
@@ -182,7 +179,7 @@ fi
 "$PY" -m evals.model_eval --onnx "$DST" --n "$N" --skip-codebrim
 
 echo "== 5/5 to make the live site use it (not run here; the weights are CC BY-NC 4.0, see models/README.md)"
-ADD="$DST models/README.md README.md"
+ADD="$DST models/README.md"
 for f in "$DST16" models/drishyam_dacl10k.metrics.json models/drishyam_dacl10k.run_info.json; do  # written, or removed after an earlier commit
   if [ -f "$f" ] || git ls-files --error-unmatch "$f" >/dev/null 2>&1; then ADD="$ADD $f"; fi
 done

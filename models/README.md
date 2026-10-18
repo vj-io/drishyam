@@ -31,12 +31,7 @@ Epoch 23 of 24, chosen on the mean validation IoU of Drishyam's five defect clas
 
 No `run_info.json` came with the weights (notebooks built before it was added do not write one).
 
-What is known about this run without it: the notebook ran on Colab (the cell in `training/README.md`, section 4; the
-install commit 03af85b says so). `drishyam_dacl10k.metrics.json` holds 24 epochs (0 to 23) of 433 steps each, which is
-6,935 // 16, the whole dacl10k train split at the default batch size 16 with `drop_last`. Epoch 23 is the last of
-them, so the selection above picked the final checkpoint. The exported graph is a UNet (its decoder nodes are
-`decoder/blocks.0` to `.4`). Not recorded: package versions, the notebook source hash, the flags, the seed and the
-run time.
+What is known about this run without it (`drishyam_dacl10k.provenance.json`): the notebook ran on Colab (the cell in `training/README.md`, section 4; the install commit 03af85b says so). `drishyam_dacl10k.metrics.json` holds 24 epochs (0 to 23) of 433 steps each, which is 6,935 // 16, the whole dacl10k train split at the default batch size 16 with `drop_last`. Epoch 23 is the last of them, so the selection above picked the final checkpoint. The exported graph is a UNet (its decoder nodes are `decoder/blocks.0` to `.4`). Not recorded: package versions, the notebook source hash, the flags, the seed and the run time.
 
 **Licence: [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/), non-commercial; not the permissive licences
 above and not the repo's MIT.** The weights are adapted from (trained on) [dacl10k](https://github.com/phiyodr/dacl10k-toolkit)

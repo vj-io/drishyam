@@ -286,7 +286,7 @@ Train on dacl10k, evaluate on 200 CODEBRIM originals, and keep both datasets out
 - **Eval subset:** 200 CODEBRIM originals chosen by a fixed seed, stratified so each of the 5 classes has ≥40 boxes; the file list `evals/codebrim_eval200.txt` is committed so anyone can rebuild it. The remaining 1,390 images are a final sweep only if Day 8 leaves time.
 - **Class mapping for scoring:** dacl10k damage classes collapse to CODEBRIM's five (crack, spallation, efflorescence, exposed bars, corrosion stain); the mapping table is committed and reported, including which dacl10k classes are dropped.
 - **Leakage check:** compare bridge identifiers and perceptual hashes (imagehash, BSD) between dacl10k and the eval subset; any overlap is removed from the subset and the count is reported.
-- **Model weights:** our fine-tuned ONNX files are trained on dacl10k, so they inherit its CC BY-NC 4.0 licence (non-commercial); `scripts/install_model.sh` writes that into `models/README.md` and the README's Licence line.
+- **Model weights:** our fine-tuned ONNX files are trained on dacl10k, so they inherit its CC BY-NC 4.0 licence (non-commercial); `scripts/install_model.sh` writes that into `models/README.md`, and the README's Licence section states it.
 - **Redistribution:** download scripts only (`make data`), with checksums; no image is committed.
 
 ## Evaluation and success metrics

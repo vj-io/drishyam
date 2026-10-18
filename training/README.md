@@ -296,7 +296,7 @@ The install overwrites `models/drishyam_dacl10k.*`, including real trained weigh
 smoke test in a checkout without them, or copy them aside first. Then undo the install (smoke weights are noise):
 
 ```
-git checkout models/README.md README.md models/drishyam_dacl10k.metrics.json
+git checkout models/README.md models/drishyam_dacl10k.metrics.json
 rm -f models/drishyam_dacl10k.onnx models/drishyam_dacl10k.fp16.onnx models/drishyam_dacl10k.run_info.json
 ```
 
