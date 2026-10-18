@@ -85,7 +85,11 @@ Event types, in order:
  "observation": {"entropy": 0.62, "saliency_max": 0.81, "mask_area_px": 41, "sharpness": 212.4,
                  "exposure": 0.48, "classes": {"crack": 41}},
  "quality": {"ok": true, "reason": null},
- "verify": {"iou": 0.71, "against_level": 2},          // only on verify / escalate steps
+ "verify": {"iou": 0.71, "class": "crack", "against_level": 2, "class_now": "crack", "iou_any": 0.71},
+                                                        // only on a look at a region an earlier look saw a class in
+ "seeded": [{"region": "r4", "entropy": 0.41, "cls": "crack", "from_level": 2}],
+                                                        // only when this look set unvisited candidates' uncertainty
+                                                        // and class (cls null: no class there)
  "rejected": [{"cls": "crack", "cause": "straight line: formwork or joint", "box": [2232, 1250, 20, 320],
                "length_px": 318.2, "width_px": 6.56, "residual_px": 1.26}],
                                                         // only when the look dropped crack components that are
@@ -113,8 +117,9 @@ Event types, in order:
   "critical_step": null, "critical_area_px": null, "critical_rule": null,
   "verify_iou": 0.71, "verified": true, "crop_jpeg_b64": "<256 px JPEG>"}}
 
-{"type": "review_request", "finding_id": "f2", "reason": "exposed_rebar is critical",
+{"type": "review_request", "finding_id": "f2", "kind": "critical", "reason": "exposed_rebar is critical",
  "iou": null, "level_a": null, "level_b": 1, "classes": ["exposed_rebar"]}
+// kind: critical | ambiguous | disagree | class-change | unconfirmed
 
 {"type": "planner", "step": 5, "status": "fallback", "reason": "timeout", "proposal": null}
 // status: accepted | rejected | fallback
@@ -124,6 +129,9 @@ Event types, in order:
  "summary": {"steps": 14, "pixels_used": 1950000, "pixels_frac": 0.289, "usd": 0.0008,
              "seconds": 8.4, "findings": 3, "critical_pending": 1},
  "coverage": 0.62, "unvisited": ["r9", "r10"],
+ "drills_not_reached": ["planner_malformed"],          // requested chaos drills whose fixed step (timeout 3,
+                                                        // spike 4, malformed 6) the job never reached: they tested
+                                                        // nothing; [] when every requested drill fired
  "work_order": { /* see below */ }, "token": "<signed work order>"}
 
 {"type": "error", "message": "..."}
@@ -139,32 +147,61 @@ example is from one local run of `public/samples/bridge_03.jpg` (3000x2250) on a
 
 Severity classes: `crack`, `spalling`, `efflorescence`, `exposed_rebar`,
 `corrosion`. Critical = `exposed_rebar` always, `spalling` above
-`40000` px² area. Finding states: `draft`, `pending_review`, `approved`,
-`rejected`. `critical_rule` says which rule made a finding critical, with the area the
-`critical_step` look measured: `"exposed_rebar: always critical"` or
-`"spalling 48,568 px² >= 40,000 px²"` (`null` while it is not critical).
+`40000` px² area, or a finding a class change put one of those on (see `class-change` below). Finding states:
+`draft`, `pending_review`, `approved`, `rejected`. `critical_rule` says which rule made a finding critical, with
+the area the `critical_step` look measured: `"exposed_rebar: always critical"`,
+`"spalling 48,568 px² >= 40,000 px²"` or `"class change: exposed_rebar at L1 here (exposed_rebar: always
+critical)"` (`null` while it is not critical).
 
-`verify_iou` is the mask IoU of the latest cross-level check of the finding (a finer look
-against the coarser look before it) and `verified` is `verify_iou >= 0.5`; both are `null`
-when no check compared two looks of it. A check whose mask is a class the finding absorbed (rust on
-its bars, a crack in a spall's rim) is a check of that finding, and repeats its finding event. `verified: false` means unconfirmed: the looks disagreed.
+A step's `verify` compares this look with the last coarser look at the same region that saw a class, class by
+class: `class` is that coarser look's best class, `iou` the IoU of its `class` mask with this look's mask of the
+**same** class (0 when the class is gone here), `class_now` this look's best class (`null`: it sees no defect) and
+`iou_any` the geometric IoU of the two looks' best masks whatever their classes (equal to `iou` when the class
+is the same). Masks are compared in the finer look's frame with a 2-px tolerance. There is no `verify` when no
+pixel of the coarser mask lies in this look: nothing was compared, whatever this look shows elsewhere. The
+check reads one of three ways: agreement (`iou >= 0.5`); a **class change** (`iou < 0.5` but `iou_any >= 0.5`:
+the finer look sees the same place as another class, so it keeps that class and the coarser one is recorded in
+`verify.class`); or a geometric disagreement (both below 0.5). A finer look that sees no defect at all
+(`class_now` `null`, `iou` 0) is a disagreement too: at a level above L0 it spends the region's one extra look.
 
-A `review_request` asks a person to look; it changes no state (only a critical finding is
-`pending_review`). `reason` is one of:
+`verify_iou` on a finding is that same-class `iou` from the latest check of the class it holds, and `verified` is
+`verify_iou >= 0.5`; both are `null` when no check compared two looks of it. Only a finding of the compared class
+takes a check: the one this look drafted that class into, else the one the coarser look drafted it into (the
+class is gone here, under `A_min`, or absorbed into another finding), which then repeats its finding event with
+the low IoU. A finding that absorbed the compared class (rust on its bars, a crack in a spall's rim) holds another
+class, so the check leaves it as it was, and no disagreement names it; the check stays in the step's `verify`.
+`verified: false` means unconfirmed: the two looks of its class disagreed, or the finer one saw another class.
 
-- `"<class> is critical"`: a new critical finding;
-- `"iou 0.19 < 0.5 between L3 and L2"`: a look that logged a critical finding disagrees with the coarser one;
-  it names the compared finding when that one is critical (it then has `verified: false`), else the look's
-  first critical finding;
-- `"unconfirmed: iou 0.07 < 0.5 between L1 and L0"`: a disagreement no further look will settle (no finer
-  level, or the region's one extra look is spent); the finding has `verified: false`;
-- `"ambiguous: crack 5232 px (>= A_min 64) is mostly inside spalling f2; recorded as spalling only"`: two classes
-  cleared `A_min` on one spot and the agent kept the dominant one (once per finding and class).
+A `review_request` asks a person to look; the request itself changes no state (only a critical finding is
+`pending_review`, and a `class-change` request that involves a critical class names a critical finding). Its
+`kind` and `reason` are one of:
+
+- `critical`, `"<class> is critical"`: a finding became critical on this look (new, or a later look measured it
+  over the area threshold);
+- `disagree`, `"iou 0.19 < 0.5 between L3 and L2"`: the same class's masks disagree across the two looks and the
+  finding of that class is critical (it then has `verified: false`);
+- `class-change`, `"class change: spalling at L1, corrosion at L0 (same place, iou 0.62)"`: the finer look sees the
+  same place as another class (`iou` here is `iou_any`) and either CLASS is critical (exposed rebar at any area,
+  spalling over the area threshold, its largest component measured as a finding's is, on the look that saw it)
+  or either finding is. It names the critical finding, else the coarser finding, else the finer one: a coarser
+  look that escalated (its mask under `A_min`) drafted nothing, and the request then names the finer look's
+  finding, whose own class no check has compared (its `verify_iou` stays `null`). When the finding it names is not
+  critical, the agent first makes it critical (`pending_review`, a `finding` event, `critical_rule` `"class change:
+  exposed_rebar at L1 here (exposed_rebar: always critical)"`), so the work order is `blocked` and the job
+  `awaiting_review` until a human approves or rejects it. A class change with nothing critical, or with no finding
+  at all (both masks under `A_min`), sends no request: the step's `verify` records it and the coarser finding has
+  `verified: false`;
+- `unconfirmed`, `"unconfirmed: iou 0.07 < 0.5 between L1 and L0"`: a disagreement no further look will settle
+  (no finer level, the region's one extra look is spent, or this look logged a critical finding, so a human
+  reviews the region anyway and no look is spent on it); the finding has `verified: false`;
+- `ambiguous`, `"ambiguous: crack 5232 px (>= A_min 64) is mostly inside spalling f2; recorded as spalling only"`:
+  two classes cleared `A_min` on one spot and the agent kept the dominant one (once per finding and class).
 
 The same in fields, so a client need not parse `reason`: `level_b` is the level of the look that asked; for
-the two disagreements `level_a` is the coarser look it was compared with and `iou` their mask IoU, and
-`classes` is `[class at level_a, class at level_b]`; for an ambiguity `classes` is `[kept, absorbed]`, for a
-new critical finding `[class]`, with `iou` and `level_a` `null`. (The MCP server's records carry `reason` only.)
+`disagree`, `unconfirmed` and `class-change`, `level_a` is the coarser look it was compared with, `iou` the IoU
+named in the reason, and `classes` is `[class at level_a, class at level_b]` (for the two disagreements both are
+the compared class); for an ambiguity `classes` is `[kept, absorbed]`, for a new critical finding `[class]`, with
+`iou` and `level_a` `null`. (The MCP server's records carry `reason` only.)
 
 A finding event repeats, with the same `id`, whenever another look sees the same
 defect. The finding is its evidence trail: `step` is the look that found it,
@@ -184,8 +221,23 @@ the first override when several were pending), and a planner consultation to its
 neither replaces `cause`. The last `step` record has `decision.action` `halt` and the halt `cause`;
 when the governor changed a setting on that same step before the job stopped (say `p95>SLA`
 switched the model, then the stop rule ended the job), the halt record carries the same `governor`
-object. Every `best-score` rationale ends with the stop threshold it beat:
-`"argmax score 4.10e-03: prior 0.81, unseen 0.92, t_hat 61 ms; lambda 3.04e-03"`.
+object. Every `best-score` rationale names each term of the score and ends with the stop threshold it beat:
+`"argmax score 4.10e-03: prior 0.81, severity 1.5 (crack seen at L2), uncertainty 0.62, unseen 0.92, t_hat 61 ms;
+lambda 3.04e-03"`. The score of an unvisited candidate is prior x severity x (1 + uncertainty) x unseen / t_hat:
+`severity` and `uncertainty` come from the finest look that showed the candidate (the latest of equals) and
+passed the quality gate: its `seeded` entry, the most severe class whose area inside the candidate's first-look
+window would clear `A_min` at the candidate's first-look level, and the binary damage-vs-background entropy over
+that window. A look shows a candidate only when it sees at least half of that window (a look one level finer
+covers a quarter of it at most, so it does not); the
+rationale says `(crack seen at L2)`, `(no class seen at L2)`, or `(not seen yet)` when no look has shown it
+(severity 1, uncertainty 0; `(seeding off)` under the no-seed ablation). The stop rule halts when the best score is below
+lambda = max(eps x value found / ms spent, eps x v0 / t_hat), with eps 0.25 and v0 2.0: the second term is the
+floor, the value of a look that finds nothing, so a photo with nothing to find can stop before its cap. The floor
+holds only once every candidate still worth a look (unseen > 0) has been shown by a look at least as fine as its
+own first look (L1 by default): a coarser look (the survey, L2 or L3) cannot resolve what that look would, a
+hairline crack for one, so its seed orders candidates but never ends a job. A job therefore never stops on a saliency prior and a coarse view alone,
+nor before it has seen anything; on a photo whose candidates lie apart the floor rarely binds and the cap ends it. A `stop-rule` halt names the binding term:
+`"best score 1.2e-04 < lambda 2.0e-04 (floor: eps x v0 / t_hat)"` or `"... (eps x value/cost)"`.
 
 Step `decision.action` values: `gaze` (first look at a region, or the survey), `escalate`
 (one level finer, same centre, because the last look was uncertain), `verify`

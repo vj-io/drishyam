@@ -1,7 +1,8 @@
 """Findings, the human-approval state machine, work orders and their signatures.
 
 The rule this module exists to enforce: a critical finding (exposed rebar, or
-spalling above the area threshold) can only leave `pending_review` through a
+spalling above the area threshold, or a finding at a place another look saw as
+one of those: `Finding.hold`) can only leave `pending_review` through a
 human decision, and the agent can never make a finding less critical.
 """
 
@@ -114,6 +115,14 @@ class Finding:
             self.critical, self.state = True, "pending_review"
             self.critical_step, self.critical_area_px = step, measure.get("area_px", 0)
             self.critical_rule = critical_rule(self.cls, self.critical_area_px)
+
+    def hold(self, step: int, area_px: int, rule: str) -> None:
+        """A class change put a critical class at this finding's place (one look saw exposed rebar there, the other
+        corrosion): it waits in pending_review for a human like a critical finding, and `rule` says why. A no-op on
+        a critical finding; criticality only rises."""
+        if not self.critical:
+            self.critical, self.state = True, "pending_review"
+            self.critical_step, self.critical_area_px, self.critical_rule = step, area_px, rule
 
     def to_dict(self, crop: bool = True) -> dict:
         d = asdict(self)

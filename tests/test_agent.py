@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 
 from drishyam import imaging
-from drishyam.agent import Job, JobConfig, gaze_path_from_trace, validate_replay
+from drishyam.agent import REVIEW_KINDS, Job, JobConfig, gaze_path_from_trace, look_iou, validate_replay
 from drishyam.findings import SPALL_CRITICAL_AREA_PX, ForbiddenTransition, decide
 from drishyam.segment import CLASSES, finish, segment_view
 
@@ -149,6 +149,255 @@ class DarkIsSpall:
         return finish(probs, time.perf_counter(), model)
 
 
+class Flip:
+    """Dark pixels are one crisp class: `coarse` while the dark blob is small in the crop (a coarse view of it),
+    `fine` once it fills more of the crop (a finer view of the same place). A class flip with no change of place."""
+
+    def __init__(self, coarse, fine, k=30000):
+        self.coarse, self.fine, self.k = coarse, fine, k
+
+    def predict(self, crop, model="accurate"):
+        dark = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY) < 105
+        probs = np.zeros((len(CLASSES), *dark.shape), np.float32)
+        probs[0], probs[CLASSES.index(self.fine if np.count_nonzero(dark) > self.k else self.coarse)] = ~dark, dark
+        return finish(probs, time.perf_counter(), model)
+
+
+def disc_scene():
+    """A dark disc of radius 130 px (53k px^2: a critical area for spalling) on 1100 x 900 concrete."""
+    from .conftest import concrete
+
+    img = concrete(900, 1100, 6)
+    cv2.circle(img, (550, 450), 130, (40, 40, 40), -1)
+    return img
+
+
+def test_a_class_flip_is_a_class_change_not_a_disagreement():
+    """The published 'unconfirmed rebar, IoU 0.003' compared a coarse spalling mask with a fine corrosion mask. A
+    check compares the SAME class across levels; when the coarser class is gone but the finer look's best mask
+    covers the same place, that is a class change: a human is asked when either class is critical, and the coarser
+    finding is unconfirmed (its same-class IoU), never a 'disagreement' about where the defect is."""
+    def job(coarse, fine):
+        j = Job(disc_scene(), JobConfig(thumbs=False, pixel_cap=1.0), clock=FakeClock(), segmenter=Flip(coarse, fine))
+        ev = list(j.run())
+        (chk,) = [s["verify"] for s in steps(ev) if "verify" in s]
+        return j, ev, chk
+
+    j, ev, chk = job("spalling", "corrosion")  # a critical spall at L1, rust at L0, the same pixels
+    assert chk["class"] == "spalling" and chk["class_now"] == "corrosion" and chk["against_level"] == 1
+    assert chk["iou"] == 0 and chk["iou_any"] >= 0.9
+    reqs = [e for e in ev if e["type"] == "review_request"]
+    assert [e["kind"] for e in reqs] == ["critical", "class-change"]
+    spall = next(f for f in j.findings if f.cls == "spalling")
+    assert reqs[1] == {"type": "review_request", "finding_id": spall.id, "kind": "class-change",
+                       "reason": f"class change: spalling at L1, corrosion at L0 (same place, iou {chk['iou_any']:g})",
+                       "iou": chk["iou_any"], "level_a": 1, "level_b": 0, "classes": ["spalling", "corrosion"]}
+    assert spall.critical and spall.verify_iou == 0 and spall.verified is False
+    assert any(f.cls == "corrosion" for f in j.findings)  # the finer class is kept
+
+    j, ev, chk = job("corrosion", "efflorescence")  # nothing critical: recorded, no human asked
+    assert (chk["class"], chk["class_now"], chk["iou"]) == ("corrosion", "efflorescence", 0) and chk["iou_any"] >= 0.9
+    assert not any(e["type"] == "review_request" for e in ev)
+    assert next(f for f in j.findings if f.cls == "corrosion").verified is False
+    assert any(f.cls == "efflorescence" for f in j.findings)
+
+
+def test_a_critical_class_seen_only_by_an_escalating_look_still_reaches_a_human():
+    """L1 sees an 11 px dark disc as exposed_rebar, 37 px: under A_min, so it escalates and drafts nothing. L0 sees
+    the same place as corrosion (149 px) and keeps that. A class change goes to a human when either CLASS is
+    critical, so the request names the corrosion finding; its verify_iou stays null (no check of corrosion ran). The
+    finding is held in pending_review, so the work order waits for that human and the review API can decide it."""
+    from .conftest import concrete
+
+    img = concrete(900, 1100, 6)
+    cv2.circle(img, (550, 450), 7, (40, 40, 40), -1)
+    job = Job(img, JobConfig(thumbs=False, pixel_cap=1.0), clock=FakeClock(), segmenter=Flip("exposed_rebar", "corrosion", 80),
+              replay=[["gaze", 550, 450, 1]])
+    events = list(job.run())
+    chk = steps(events)[1]["verify"]
+    assert (chk["class"], chk["class_now"], chk["iou"]) == ("exposed_rebar", "corrosion", 0) and chk["iou_any"] >= 0.5
+    (f,) = job.findings
+    (req,) = [e for e in events if e["type"] == "review_request"]
+    assert f.cls == "corrosion" and f.verify_iou is None and f.verified is None
+    assert req["kind"] == "class-change" and req["finding_id"] == f.id and req["classes"] == ["exposed_rebar", "corrosion"]
+    assert req["reason"] == f"class change: exposed_rebar at L1, corrosion at L0 (same place, iou {chk['iou_any']:g})"
+    assert f.critical and f.state == "pending_review" and f.critical_step == 2
+    assert f.critical_rule == "class change: exposed_rebar at L1 here (exposed_rebar: always critical)"
+    assert [e["finding"]["state"] for e in events if e["type"] == "finding"][-1] == "pending_review"
+    done = events[-1]
+    assert done["status"] == "awaiting_review" and done["work_order"]["status"] == "blocked"
+    (wf,) = done["work_order"]["findings"]
+    decide(wf, "approve", "human")
+    assert wf["state"] == "approved"
+
+
+def test_a_class_change_is_critical_by_the_largest_component_as_a_finding_is():
+    """Two 25k px^2 dark discs: 51k px^2 of spalling in all, but each spall is under the 40k critical area, so the
+    spalling finding is not critical, and nor is the class change to corrosion: it is recorded in the step's verify
+    and no human is asked (counting the class's total area asked one)."""
+    from .conftest import concrete
+
+    img = concrete(900, 1100, 6)
+    for x in (430, 670):
+        cv2.circle(img, (x, 450), 90, (40, 40, 40), -1)
+    job = Job(img, JobConfig(thumbs=False, pixel_cap=1.0), clock=FakeClock(), segmenter=Flip("spalling", "corrosion"),
+              replay=[["gaze", 550, 450, 1]])
+    events = list(job.run())
+    chk = steps(events)[1]["verify"]
+    assert (chk["class"], chk["class_now"]) == ("spalling", "corrosion") and chk["iou_any"] >= 0.5
+    spall = next(f for f in job.findings if f.cls == "spalling")
+    assert not spall.critical and spall.measure["area_px"] < SPALL_CRITICAL_AREA_PX < 2 * spall.measure["area_px"]
+    assert not any(e["type"] == "review_request" for e in events) and events[-1]["work_order"]["status"] == "ready"
+
+
+def test_a_check_compares_nothing_when_the_coarser_mask_lies_outside_the_finer_view():
+    """None means nothing was compared: no pixel of the coarser mask lies in the finer view. A finer view that shows
+    the same class somewhere else is not a disagreement about it (that read iou 0, 'disagree')."""
+    prev, cur = np.zeros((64, 64), np.uint8), np.zeros((64, 64), np.uint8)
+    prev[10:20, 10:20] = 1  # an L1 view: crop px x 2 = L0 px, so this mask is at L0 20..40
+    cur[30:40, 30:40] = 1
+    to_l1 = np.diag([2.0, 2.0, 1.0])
+    inside = np.array([[1.0, 0, 60], [0, 1, 60], [0, 0, 1]])  # an L0 view of L0 60..124, inside the L1 view (0..128)
+    assert look_iou(prev, to_l1, cur, inside) is None
+    assert look_iou(prev, to_l1, cur, np.eye(3)) is not None  # the coarser mask is in this view: compared
+
+
+def test_a_finer_seed_is_never_overwritten_by_a_coarser_look(scene):
+    """An L1 look, then an L3 look, both show the same unvisited candidate: it keeps the L1 seed (the finer view of
+    it), and the L3 look does not list it under `seeded`."""
+    probe = Job(scene, JobConfig(thumbs=False), clock=FakeClock())
+    it = probe.run()
+    next(it)
+    cands = next(it)["candidates"]
+    c = cands[0]
+    x, y = c["box"][0] + c["box"][2] // 2 + 60, c["box"][1] + c["box"][3] // 2 + 60  # near it, not its centre
+    job = Job(scene, JobConfig(thumbs=False, pixel_cap=1.0), clock=FakeClock(), replay=[["gaze", x, y, 1], ["gaze", x, y, 3]])
+    st = steps(list(job.run()))
+    fine = [z for z in st[0]["seeded"] if z["region"] == c["id"]]
+    assert fine and fine[0]["from_level"] == 1
+    assert st[1]["decision"]["args"]["level"] == 3 and st[1]["seeded"]  # the L3 look seeds others it shows ...
+    assert not any(z["region"] == c["id"] for z in st[1]["seeded"])  # ... but not the one an L1 look already showed
+
+
+def test_a_look_that_sees_under_half_of_a_candidates_window_neither_shows_nor_seeds_it(scene):
+    """An L0 look covers at most a quarter of an L1 candidate's first-look window: it neither shows the candidate (so
+    the floor still waits for a look that sees it) nor seeds it from that quarter; an L1 look that covers most of
+    the window then seeds it, at L1."""
+    probe = Job(scene, JobConfig(thumbs=False), clock=FakeClock())
+    it = probe.run()
+    next(it)
+    c = next(it)["candidates"][0]
+    x, y = c["box"][0] + c["box"][2] // 2 + 100, c["box"][1] + c["box"][3] // 2  # near it, not its centre
+    job = Job(scene, JobConfig(thumbs=False, pixel_cap=1.0), clock=FakeClock(), replay=[["gaze", x, y, 0], ["gaze", x, y, 1]])
+    st = steps(list(job.run()))
+    assert st[0]["decision"]["args"]["level"] == 0 and st[0]["quality"]["ok"]
+    assert not any(z["region"] == c["id"] for z in st[0].get("seeded", []))
+    assert [z["from_level"] for z in st[1]["seeded"] if z["region"] == c["id"]] == [1]
+
+
+def test_the_floor_never_stops_a_job_while_a_candidate_has_had_only_a_coarse_view(scene):
+    """At a floor halt, every unvisited candidate still worth a look (unseen > 0) has been shown by a look at least
+    as fine as its own first look: one that only the survey, or no look, has shown keeps the job going."""
+    from pathlib import Path
+
+    b01 = cv2.imread(str(Path(__file__).resolve().parent.parent / "public" / "samples" / "bridge_01.jpg"))
+    floors = 0
+    for img in (scene, b01):
+        for cap in (0.3, 1.0):
+            job, events = run(img, pixel_cap=cap)
+            if not steps(events)[-1]["rationale"].endswith("(floor: eps x v0 / t_hat)"):
+                continue
+            floors += 1
+            for r in job.regions.values():
+                level, win = job._first_look(r)
+                if not r.looks and not r.done and job._unseen(win, level) > 0:
+                    assert r.shown_level is not None and r.shown_level <= level, (cap, r.id, r.shown_level)
+    assert floors
+
+
+def test_a_finding_that_becomes_critical_on_a_later_look_is_sent_to_a_human():
+    """An L0 look sees only part of a 53k px^2 dark disc (spalling, under the 40k critical area); an L1 look then
+    sees all of it and the same finding becomes critical: a 'critical' request follows that look, as for a new one."""
+    img = disc_scene()
+    job = Job(img, JobConfig(thumbs=False, pixel_cap=1.0, verify=False), clock=FakeClock(), segmenter=DarkIsSpall(),
+              replay=[["gaze", 1000, 450, 0], ["gaze", 550, 450, 1]])
+    events = list(job.run())
+    (f,) = [f for f in job.findings if f.cls == "spalling"]
+    assert f.step == 1 and f.critical and f.critical_step == 2 and f.state == "pending_review"
+    reqs = [e for e in events if e["type"] == "review_request" and e["kind"] == "critical"]
+    assert [(e["finding_id"], e["reason"], e["level_b"]) for e in reqs] == [(f.id, "spalling is critical", 1)]
+
+
+def test_seeded_uncertainty_and_class_reorder_the_argmax(scene):
+    """The judges found 81 of 81 argmax scores with severity 1 and uncertainty 0: entropy and class were set only on
+    regions already looked at, and only unvisited ones are scored. Every look now seeds the unvisited candidates it
+    shows, the argmax reads those seeds (each pick's rationale names them), and that changes the order of looks."""
+    from drishyam.findings import SEVERITY
+
+    def run_(**cfg):
+        _, events = run(scene, pixel_cap=1.0, v0=0.0, **cfg)
+        return steps(events)
+
+    seeded, plain = run_(), run_(seed_from_looks=False)
+    picks = lambda st: [s["region"] for s in st if s["cause"] == "best-score"]
+    assert picks(seeded) != picks(plain)
+    assert all("severity 1 (seeding off), uncertainty 0.00," in s["rationale"] for s in plain if s["cause"] == "best-score")
+    assert not any("seeded" in s for s in plain)
+    latest, terms = {}, []
+    for s in seeded:
+        if s["cause"] == "best-score":
+            seed = latest[s["region"]]  # the survey showed every candidate of this scene
+            sev = SEVERITY.get(seed["cls"], 1.0)
+            assert (f"severity {sev:g} ({seed['cls'] or 'no class'} seen at L{seed['from_level']}), "
+                    f"uncertainty {seed['entropy']:.2f}," in s["rationale"])
+            terms.append((sev, seed["entropy"]))
+        for x in s.get("seeded", []):
+            assert x["region"] != s["region"] and x["from_level"] == s["decision"]["args"]["level"]
+            if x["region"] in latest:
+                assert x["from_level"] <= latest[x["region"]]["from_level"]  # a coarser look never overwrites
+            latest[x["region"]] = x
+    assert terms and any(sev != 1 for sev, _ in terms) and any(u > 0 for _, u in terms)
+    assert steps(run(scene, pixel_cap=1.0)[1])[0]["seeded"]  # the survey seeds first of all
+
+
+def test_a_clean_photo_stops_on_the_floor_once_a_first_level_look_has_shown_what_is_left():
+    """lambda was eps x value / cost: 0 until something is found, so a photo with nothing to find could stop only at
+    its cap or once every candidate had a look. The floor eps x v0 / t_hat ends it on the rule when the best
+    candidate left is worth less than a look, and the halt says the floor was the binding term. Here r2's L1 look
+    shows r3 (seeded at L1, its own first-look level, with no class): the job stops instead of looking at r3. Without
+    the floor it looks at r3 too."""
+    from evals import synth
+
+    img, gt, _ = synth.render(2, 1600, 1200, {"distractors": ["water_stain"]})
+    assert not gt
+
+    def once(**cfg):
+        _, events = run(img, pixel_cap=1.0, **cfg)
+        return events[-1], steps(events)
+
+    done, st = once()
+    assert done["cause"] == "stop-rule" and st[-1]["rationale"].endswith("(floor: eps x v0 / t_hat)")
+    assert any(x["from_level"] == 1 and x["cls"] is None for s in st for x in s.get("seeded", []))
+    assert done["summary"]["pixels_frac"] < 1 and done["summary"]["findings"] == 0
+    done0 = once(v0=0.0)[0]
+    assert done0["cause"] != "stop-rule" and done0["summary"]["steps"] > done["summary"]["steps"]
+
+
+def test_a_coarse_look_alone_never_puts_the_stop_floor_on():
+    """bridge_01: five 1-2 px cracks, at the web default 30 % cap. The L3 survey cannot resolve them and seeds every
+    candidate 'no class, uncertainty 0'; when that alone put the floor on, the job stopped after the survey with
+    nothing found. The floor needs a look at least as fine as the candidate's own first look (L1 here)."""
+    from pathlib import Path
+
+    img = cv2.imread(str(Path(__file__).resolve().parent.parent / "public" / "samples" / "bridge_01.jpg"))
+    job, events = run(img)
+    st = steps(events)
+    assert st[0]["cause"] == "survey" and st[0]["seeded"] and all(x["cls"] is None for x in st[0]["seeded"])
+    assert len(job.gaze_path) > 1 and any(f.cls == "crack" for f in job.findings)
+    if st[-1]["rationale"].endswith("(floor: eps x v0 / t_hat)"):
+        assert any(s["decision"]["args"]["level"] <= 1 for s in st[:-1])
+
+
 def test_reflection_does_not_inflate_spall_area_to_critical(monkeypatch):
     """A half-disc spall on the top edge, 30k px^2 inside the image, is mirrored by every view that runs past the
     edge; counted twice it is over the 40k critical area, and criticality can never be taken back."""
@@ -208,9 +457,9 @@ def test_forced_p95_spike_changes_next_steps_model(scene):
 
 
 def test_governor_override_on_a_halting_step_reaches_the_trace(scene):
-    """PRD rule 5: every override writes a cause. With eps = 0.7 the stop rule ends the job on the step right
-    after the spike, the same step on which the governor switched the model; the halt record carries it."""
-    job, events = run(scene, pixel_cap=1.0, chaos=("p95_spike",), eps=0.7)
+    """PRD rule 5: every override writes a cause. With three candidates the stop rule's floor ends the job on the
+    step right after the spike, the same step on which the governor switched the model; the halt record carries it."""
+    job, events = run(scene, pixel_cap=1.0, chaos=("p95_spike",), max_candidates=3)
     spike = next(s for s in steps(events) if s.get("injected") == "p95_spike")
     halt = steps(events)[-1]
     assert halt["step"] == spike["step"] + 1 and halt["cause"] == "stop-rule"  # the case this test exists for
@@ -232,6 +481,21 @@ def test_planner_drills_fall_back_and_job_continues(scene):
     assert by_step[3]["cause"] in LOOK_CAUSES and by_step[6]["cause"] in LOOK_CAUSES
     assert not any("planner_status" in s for n, s in by_step.items() if n not in (3, 6))
     assert events[-1]["type"] == "done"
+
+
+def test_a_drill_the_job_ends_before_is_reported_not_silently_skipped(scene):
+    """Each drill fires on a fixed step. With the default config at a 30 % cap the scene ends after three looks,
+    before the spike (step 4) and the malformed planner (step 6): the done event names them, so a drill that tested
+    nothing never reads as passed. At the full cap every drill fires and the list is empty."""
+    drills = ("p95_spike", "planner_timeout", "planner_malformed")
+    for cap, missed in ((0.3, ["p95_spike", "planner_malformed"]), (1.0, [])):
+        _, events = run(scene, pixel_cap=cap, chaos=drills, planner_timeout_s=0.05)
+        fired = {e["status"] for e in events if e["type"] == "planner"}
+        spiked = any(s.get("injected") == "p95_spike" for s in steps(events))
+        assert events[-1]["drills_not_reached"] == missed
+        assert spiked is ("p95_spike" not in missed) and ("rejected" in fired) is ("planner_malformed" not in missed)
+        assert "fallback" in fired
+    assert run(scene, pixel_cap=0.3)[1][-1]["drills_not_reached"] == []
 
 
 def test_replay_reproduces_gaze_path_from_trace_alone(scene):
@@ -374,72 +638,106 @@ def test_every_argmax_rationale_states_lambda(scene):
         assert score >= lam
 
 
-def test_a_failed_verification_is_unconfirmed_and_sent_to_a_human(scene):
-    """IoU < 0.5 with no further look to settle it: the finding says `verified: false` and a human is asked."""
-    job, events = run(scene, pixel_cap=1.0)
-    wo = {f["id"]: f for f in events[-1]["work_order"]["findings"]}
-    checked = [f for f in job.findings if f.verify_iou is not None]
-    assert checked and all(f.verified is (f.verify_iou >= 0.5) for f in checked)
-    assert all(wo[f.id]["verify_iou"] == f.verify_iou and wo[f.id]["verified"] is f.verified for f in checked)
-    asked = [e for e in events if e["type"] == "review_request" and e["reason"].startswith("unconfirmed: ")]
-    assert asked, "the scene has a look that disagrees with its coarser look at L0"
-    for e in asked:
-        f = next(f for f in job.findings if f.id == e["finding_id"])
-        assert f.verified is False and f"iou {f.verify_iou:g} < 0.5 between L" in e["reason"]
-        assert f.state == ("pending_review" if f.critical else "draft")  # a request changes no state
-    assert all(f.verify_iou is None and f.verified is None for f in job.findings if f not in checked)
+class Part(Flip):
+    """Like Flip, but the finer view labels only the left quarter of the dark disc: the same class, elsewhere in
+    extent. A geometric disagreement (no class change)."""
+
+    def predict(self, crop, model="accurate"):
+        out = super().predict(crop, model)
+        if out.areas[self.fine] > self.k:  # the finer view
+            xs = np.nonzero(out.labels)[1]
+            keep = np.arange(crop.shape[1]) < xs.min() + (xs.max() - xs.min()) // 4
+            probs = out.probs.copy()
+            probs[0][:, ~keep] += probs[CLASSES.index(self.fine)][:, ~keep]
+            probs[CLASSES.index(self.fine)][:, ~keep] = 0
+            out = finish(probs, time.perf_counter(), model)
+        return out
 
 
-def test_a_check_of_an_absorbed_class_counts_for_the_finding_that_absorbed_it():
-    """bridge_03: a look's best mask can be a class absorbed into another finding (rust on exposed bars, a crack in
-    a spall's rim). Its IoU is evidence about that finding: the finding carries it, and the disagreement review
-    names it, so the review and the finding's `verified` never contradict each other."""
+def test_verification_fields_agree_everywhere_on_the_scene(scene):
+    """On a realistic scene and several budgets: `verified` is `verify_iou >= 0.5` wherever a check ran, the work
+    order mirrors both fields, and a finding no check compared has both null."""
+    for cap in (0.3, 1.0):
+        for extra in ({}, {"v0": 0.0}):
+            job, events = run(scene, pixel_cap=cap, **extra)
+            wo = {f["id"]: f for f in events[-1]["work_order"]["findings"]}
+            for f in job.findings:
+                assert f.verified is (None if f.verify_iou is None else f.verify_iou >= 0.5)
+                assert wo[f.id]["verify_iou"] == f.verify_iou and wo[f.id]["verified"] is f.verified
+
+
+def test_a_failed_verification_is_unconfirmed_and_sent_to_a_human():
+    """The kind and fields of a same-class disagreement: the finer look's mask of the same class covers another
+    extent (IoU < 0.5) at L0, where no further look can settle it. A non-critical finding is unconfirmed (`verified:
+    false`) and a human is asked (`unconfirmed`); a critical one is sent at once (`disagree`). A request changes no
+    state."""
+    for cls, kind, reason in (("corrosion", "unconfirmed", "unconfirmed: "), ("spalling", "disagree", "")):
+        job = Job(disc_scene(), JobConfig(thumbs=False, pixel_cap=1.0), clock=FakeClock(), segmenter=Part(cls, cls))
+        events = list(job.run())
+        (chk,) = [s["verify"] for s in steps(events) if "verify" in s]
+        assert chk["class"] == chk["class_now"] == cls and chk["iou"] == chk["iou_any"] < 0.5
+        (f,) = job.findings
+        assert f.verify_iou == chk["iou"] and f.verified is False
+        wo = events[-1]["work_order"]["findings"][0]
+        assert wo["verify_iou"] == f.verify_iou and wo["verified"] is False
+        asked = [e for e in events if e["type"] == "review_request" and e["kind"] == kind]
+        assert [e["reason"] for e in asked] == [f"{reason}iou {chk['iou']:g} < 0.5 between L1 and L0"]
+        assert asked[0]["finding_id"] == f.id and asked[0]["classes"] == [cls, cls] and asked[0]["iou"] == chk["iou"]
+        assert f.state == ("pending_review" if f.critical else "draft") and f.critical is (cls == "spalling")
+
+
+def test_a_check_judges_only_a_finding_of_the_class_it_compared():
+    """bridge_03 and bridge_05: a look's compared class can be absorbed into a finding of another class (rust on
+    exposed bars, a crack in a spall's rim). Its IoU says nothing about that finding's own class, so the finding that
+    absorbed it keeps its verify_iou, and no disagreement names it: a finding's verify_iou is always the same-class
+    IoU of a check of the class it holds, and every disagreement names a finding of the compared class."""
     from pathlib import Path
 
-    img = cv2.imread(str(Path(__file__).resolve().parent.parent / "public" / "samples" / "bridge_03.jpg"))
-    job, events = run(img)
-    ids = {f.id: f for f in job.findings}
-
-    def after(s):  # the finding and review events that follow a step record
-        rest = events[events.index(s) + 1:]
-        return rest[:next(i for i, e in enumerate(rest) if e["type"] not in ("finding", "review_request"))]
-
-    disagreements = [(e, s) for s in steps(events) if s.get("verify") for e in after(s)
-                     if e["type"] == "review_request" and f"iou {s['verify']['iou']:g} < 0.5" in e["reason"]]
-    assert {e["reason"].startswith("unconfirmed: ") for e, _ in disagreements} == {True, False}
-    for e, s in disagreements:
-        f = ids[e["finding_id"]]
-        assert f.verified is False and f.verify_iou == pytest.approx(s["verify"]["iou"])
-    # the L0 verify whose only confident classes were absorbed (bridge_03 step 4) still reaches a human
-    s = next(s for s in steps(events) if s["decision"]["action"] == "verify" and s["decision"]["args"]["level"] == 0
-             and s["verify"]["iou"] < 0.5)
-    (fe,) = [e["finding"] for e in after(s) if e["type"] == "finding"]
-    assert fe["verified"] is False and fe["verify_iou"] == pytest.approx(s["verify"]["iou"])
-    assert any(e["type"] == "review_request" and e["finding_id"] == fe["id"] and e["reason"].startswith("unconfirmed: ")
-               for e in after(s))
+    for name in ("bridge_03", "bridge_05"):
+        img = cv2.imread(str(Path(__file__).resolve().parent.parent / "public" / "samples" / f"{name}.jpg"))
+        job, events = run(img)
+        ids, st = {f.id: f for f in job.findings}, steps(events)
+        checks = [s["verify"] for s in st if "verify" in s]
+        for f in job.findings:
+            if f.verify_iou is not None:
+                assert any(c["class"] == f.cls and c["iou"] == f.verify_iou for c in checks), (name, f.id, f.cls)
+        reqs = [e for e in events if e["type"] == "review_request"]
+        for e in reqs:
+            if e["kind"] in ("disagree", "unconfirmed"):
+                assert ids[e["finding_id"]].cls == e["classes"][0] == e["classes"][1], (name, e)
+            elif e["kind"] == "class-change":
+                assert ids[e["finding_id"]].cls in e["classes"], (name, e)
+        # the case this test exists for: a compared class that this look absorbed into a finding of another class
+        absorbed = [(s, e) for s in st if "verify" in s for e in events[events.index(s) + 1:][:12]
+                    if e["type"] == "review_request" and e["kind"] == "ambiguous" and e["classes"][1] == s["verify"]["class"]
+                    and e["level_b"] == s["decision"]["args"]["level"]]
+        if name == "bridge_03":
+            assert absorbed, "bridge_03 has a check of a class absorbed into another finding"
 
 
 def test_review_requests_say_their_reason_in_fields_too():
-    """bridge_03 asks for all four kinds of review; each event's iou, levels and classes match its reason."""
+    """bridge_03 and bridge_05 between them ask for four kinds of review; each event's kind, iou, levels and classes
+    match its reason."""
     from pathlib import Path
 
-    img = cv2.imread(str(Path(__file__).resolve().parent.parent / "public" / "samples" / "bridge_03.jpg"))
-    _, events = run(img)
-    reqs = [e for e in events if e["type"] == "review_request"]
     kinds = set()
-    for e in reqs:
-        assert 0 <= e["level_b"] <= 3
-        if e["iou"] is not None:
-            assert f"iou {e['iou']:g} < 0.5 between L{e['level_a']} and L{e['level_b']}" in e["reason"]
-            assert e["level_a"] > e["level_b"] and len(e["classes"]) == 2
-            kinds.add("unconfirmed" if e["reason"].startswith("unconfirmed: ") else "disagree")
-        elif e["reason"].startswith("ambiguous: "):
-            kept, absorbed = e["classes"]
-            assert e["reason"].startswith(f"ambiguous: {absorbed} ") and f"inside {kept} " in e["reason"]
-            kinds.add("ambiguous")
-        else:
-            assert e["level_a"] is None and e["reason"] == f"{e['classes'][0]} is critical"
-            kinds.add("critical")
+    for name in ("bridge_03", "bridge_05"):
+        img = cv2.imread(str(Path(__file__).resolve().parent.parent / "public" / "samples" / f"{name}.jpg"))
+        _, events = run(img)
+        for e in (e for e in events if e["type"] == "review_request"):
+            assert 0 <= e["level_b"] <= 3 and e["kind"] in REVIEW_KINDS
+            kinds.add(e["kind"])
+            if e["kind"] in ("disagree", "unconfirmed"):
+                prefix = "unconfirmed: " if e["kind"] == "unconfirmed" else ""
+                assert e["reason"] == f"{prefix}iou {e['iou']:g} < 0.5 between L{e['level_a']} and L{e['level_b']}"
+                assert e["level_a"] > e["level_b"] and len(e["classes"]) == 2 and e["classes"][0] == e["classes"][1]
+            elif e["kind"] == "class-change":
+                assert e["reason"].startswith(f"class change: {e['classes'][0]} at L{e['level_a']}, {e['classes'][1]} at ")
+            elif e["kind"] == "ambiguous":
+                kept, absorbed = e["classes"]
+                assert e["reason"].startswith(f"ambiguous: {absorbed} ") and f"inside {kept} " in e["reason"]
+            else:
+                assert e["level_a"] is None and e["iou"] is None and e["reason"] == f"{e['classes'][0]} is critical"
     assert kinds == {"critical", "ambiguous", "disagree", "unconfirmed"}
 
 

@@ -11,7 +11,7 @@ MAX_LOAD ?=
 MICRO_ARM ?= linux-aarch64
 EVAL = $(PY) -m evals.harness --cost-model fixed --micro-arm $(MICRO_ARM) $(if $(MAX_LOAD),--max-load $(MAX_LOAD))
 
-.PHONY: test e2e eval eval-real eval-large eval-dev eval-live eval-model eval-ablations eval-ablations-real eval-clean bench data serve lint
+.PHONY: test e2e eval eval-real eval-large eval-dev eval-dev-clean eval-dev-real eval-live eval-model eval-ablations eval-ablations-real eval-clean bench data serve lint
 
 test:  ## unit, API, MCP, CLI and eval tests (same as CI)
 	$(PY) -m pytest -q --ignore=tests/e2e
@@ -34,6 +34,13 @@ eval-large:  ## 100 synthetic images at CODEBRIM's 4608x3456 (seed 7): does zoom
 eval-dev:  ## the 60-image dev split (seed 4242) used while tuning; never published
 	$(EVAL) --data data/synth_dev --n 60 --seed 4242 --out runs/eval-dev --results-dir runs/eval-dev
 
+eval-dev-clean:  ## the 30-image no-damage dev split (seed 4243) used while tuning the stop floor; never published
+	test -f data/synth_clean_dev/annotations.json || $(PY) -m evals.synth dataset --clean --out data/synth_clean_dev --n 30 --seed 4243
+	$(EVAL) --data data/synth_clean_dev --n 30 --seed 4243 --chaos 0,0,0 --out runs/eval-dev-clean --results-dir runs/eval-dev-clean
+
+eval-dev-real:  ## the 100-image CODEBRIM dev split (evals/codebrim_dev100.txt: seed 4244, none in eval200) used while tuning; never published
+	$(EVAL) --data $(CODEBRIM) --list evals/codebrim_dev100.txt --n 100 --chaos 0,0,0 --out runs/eval-dev-real --results-dir runs/eval-dev-real
+
 eval-live:  ## deployment behaviour: measured wall time and the governor on (load changes the agent's choices) -> public/results/live
 	$(PY) -m evals.harness --cost-model live --governor $(if $(MAX_LOAD),--max-load $(MAX_LOAD)) --data $(DATA) --n $(N) --seed 7 --out runs/eval-live --results-dir runs/eval-live
 	mkdir -p public/results/live && cp runs/eval-live/summary.json public/results/live/summary.json
@@ -41,7 +48,7 @@ eval-live:  ## deployment behaviour: measured wall time and the governor on (loa
 eval-model:  ## after scripts/install_model.sh: leakage check, then the ONNX on CODEBRIM and synth200 vs the classical runs
 	$(PY) -m evals.model_eval --publish --onnx $(or $(ONNX),models/drishyam_dacl10k.onnx) --codebrim $(CODEBRIM) $(if $(DACL10K),--dacl10k $(DACL10K)) $(if $(MAX_LOAD),--max-load $(MAX_LOAD))
 
-eval-ablations:  ## FR-21 ablations (7 variants vs the full agent, caps 0.3 and 1.0, fixed costs) on synth200 and the 4608 set -> public/results/ablations.json
+eval-ablations:  ## FR-21 ablations (evals.harness.ABLATIONS vs the full agent, caps 0.3 and 1.0, fixed costs) on synth200 and the 4608 set -> public/results/ablations.json
 	$(EVAL) --ablation --data $(DATA) --n $(N) --seed 7 --out $(OUT) --results-dir runs/ablations/synth
 	$(EVAL) --ablation --data data/synth_large --n 100 --seed 7 --size 4608x3456 --out $(OUT) --results-dir runs/ablations/large
 

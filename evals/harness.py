@@ -67,16 +67,25 @@ BOOT_N, BOOT_SEED, CHANCE_SEED = 1000, 0, 1
 SMALL_PX = 96 * 96  # GT boxes below this area form the small-box stratum
 PER_IMAGE_OPS = ("pyrDown", "saliency", "downscale")  # their cost grows with the image; per-look ops read 512x512
 REPO = Path(__file__).resolve().parents[1]
-SWITCHES = ("order", "seed", "use_uncertainty", "survey", "verify", "governor")  # JobConfig fields a variant may flip
+SWITCHES = ("order", "seed", "use_uncertainty", "seed_from_looks", "v0", "survey", "verify",
+            "governor")  # JobConfig fields a variant may flip
 ABLATION_CAPS = (0.3, 1.0)
 ABLATIONS = {  # FR-21: each variant flips one switch of the compared agent (governor off, as in every comparison)
     "full": {},
     **{f"random-order-s{s}": {"order": "random", "seed": s} for s in (0, 1, 2)},
     "no-uncertainty": {"use_uncertainty": False},
+    "no-seed": {"seed_from_looks": False},  # no look sets an unvisited candidate's entropy or class: score = prior x unseen
+    "no-floor": {"v0": 0.0},  # the stop rule's lambda is 0 until something is found
+    # A score term also moves the stop floor (it compares the score with eps x v0), so turning one off changes when a
+    # job stops as well as where it looks. These two take the floor away too and are compared with no-floor (REFERENCE):
+    # that ratio is the term's effect on gaze order alone.
+    "no-uncertainty+no-floor": {"use_uncertainty": False, "v0": 0.0},
+    "no-seed+no-floor": {"seed_from_looks": False, "v0": 0.0},
     "no-survey": {"survey": False},
     "no-verify": {"verify": False},
     "governor-on": {"governor": True},  # deployment behaviour: may switch to the fast net, so not like for like
 }
+REFERENCE = {"no-uncertainty+no-floor": "no-floor", "no-seed+no-floor": "no-floor"}  # also scored against these
 GOVERNOR_USE = {
     False: "policy comparison: the governor's model, level and gaze-size overrides are off (caps and the kill switch "
            "stay), so Drishyam segments every look with the same accurate net as the baselines",
@@ -310,7 +319,7 @@ def run_drishyam(img: np.ndarray, cap: float, costs: dict | None = None, **switc
               "level": r["decision"]["args"].get("level"), "window": r.get("window"),
               "q_ok": r.get("quality", {}).get("ok", True), "q_reason": r.get("quality", {}).get("reason"),
               "sharpness": r.get("observation", {}).get("sharpness"), "model": r.get("model"),
-              "governor": r.get("governor", {}).get("cause")} for r in job.trace]
+              "governor": r.get("governor", {}).get("cause"), "seeded": len(r.get("seeded", ()))} for r in job.trace]
     net = net_px(rec_seg.log)
     return {"preds": finding_components(job, rec_seg.log), "preds_union": preds, "pixels_frac": done["summary"]["pixels_frac"],
             "net_pixels_frac": None if net is None else net / (img.shape[0] * img.shape[1]), "wall_s": wall,
@@ -426,12 +435,15 @@ CONVENTIONS = {"components": lambda key: "preds", "union": lambda key: "preds_un
                "as_specified": lambda key: "preds_union" if key.startswith("drishyam") else "preds"}
 
 
-def load_records(data_dir, n: int, kind: str = "auto", seed: int = 7, size=(2048, 1536)) -> tuple[list[dict], str]:
+def load_records(data_dir, n: int, kind: str = "auto", seed: int = 7, size=(2048, 1536),
+                 list_file=None) -> tuple[list[dict], str]:
     """Records and a dataset label. A missing synthetic set is built with `seed` and `size` (w, h); an existing one
-    must have been built with `seed`."""
+    must have been built with `seed`. `list_file`: the CODEBRIM image list to score (default <data_dir>/eval200.txt;
+    evals/codebrim_dev100.txt is the dev split tuning may read)."""
     d = Path(data_dir)
     if kind == "auto":
-        kind = "synth" if (d / "annotations.json").exists() or not (d / "eval200.txt").exists() else "codebrim"
+        kind = "codebrim" if list_file or (
+            (d / "eval200.txt").exists() and not (d / "annotations.json").exists()) else "synth"
     if kind == "synth":
         if not (d / "annotations.json").exists():
             print(f"{d}/annotations.json missing: building synthetic-{n} at {size[0]}x{size[1]}, seed {seed}", flush=True)
@@ -447,6 +459,9 @@ def load_records(data_dir, n: int, kind: str = "auto", seed: int = 7, size=(2048
         if ann.get("clean"):
             return recs, f"synthetic clean set, {len(recs)} images with distractors and no damage (labelled synthetic)"
         return recs, f"synthetic-{len(recs)} at {recs[0]['width']}x{recs[0]['height']} (labelled synthetic)"
+    if list_file:
+        recs = codebrim.load_eval(d, Path(list_file))[:n]
+        return recs, f"CODEBRIM {Path(list_file).stem} subset ({len(recs)} images)"
     recs = codebrim.load_eval(d, d / "eval200.txt")[:n]
     return recs, f"CODEBRIM eval subset ({len(recs)} images)"
 
@@ -733,12 +748,12 @@ def segmenter_id(seg) -> str:
 def run(data_dir="data/synth200", n=200, out_dir="public/results", results_dir="results", workers=None,
         chaos=(20, 20, 10), kind="auto", micro_arm="local-macos-x86", primary_boxes="components", reuse=False,
         log=lambda msg: print(msg, flush=True), cost_model="fixed", seed=7, size=(2048, 1536), governor=False,
-        max_load=None) -> dict:
+        max_load=None, list_file=None) -> dict:
     from evals import failures
 
     t_start, load_start = time.time(), check_load(max_load)
     workers = max(1, min(8, (mp.cpu_count() or 2) // 2)) if workers is None else workers
-    records, label = load_records(data_dir, n, kind, seed, size)
+    records, label = load_records(data_dir, n, kind, seed, size, list_file)
     synthetic, data_id = label.startswith("synthetic"), dataset_sha256(records)
     out, repo = Path(out_dir).resolve(), REPO
     kept_local = [repo / "results" / "codebrim", repo / "runs"]  # git-ignored, and outside public/, which is all the site serves
@@ -883,7 +898,7 @@ def ablation_image(rec: dict, caps=ABLATION_CAPS, cost_rows: list | None = None)
 
 def check_variants(results: list[dict], caps) -> None:
     """Refuse to compare unless every output ran its label's switches (read from the job's own config) and shows it:
-    no verify look with verify off, no survey look with the survey off."""
+    no verify look with verify off, no survey look with the survey off, no seeded candidate with seeding off."""
     for res in results:
         for v in ABLATIONS:
             want = switches(v)
@@ -892,7 +907,8 @@ def check_variants(results: list[dict], caps) -> None:
                 if c["switches"] != want:
                     raise SystemExit(f"{res['id']} {v}@{cap} ran {c['switches']}, not its label's {want}")
                 if (not want["verify"] and any(t["action"] == "verify" for t in c["trace"])) or (
-                        not want["survey"] and any(t["cause"] == "survey" for t in c["trace"])):
+                        not want["survey"] and any(t["cause"] == "survey" for t in c["trace"])) or (
+                        not want["seed_from_looks"] and any(t.get("seeded") for t in c["trace"])):
                     raise SystemExit(f"{res['id']} {v}@{cap}: the trace shows a look its switches turn off")
 
 
@@ -929,12 +945,12 @@ def random_order_note(rows: dict, cap: float, pooled_ci: list, n: int) -> str:
 
 def run_ablations(data_dir="data/synth200", n=200, out_dir="public/results", results_dir="runs/ablations", workers=None,
                   kind="auto", micro_arm="local-macos-x86", primary_boxes="components", caps=ABLATION_CAPS,
-                  log=lambda msg: print(msg, flush=True), seed=7, size=(2048, 1536), max_load=None) -> dict:
+                  log=lambda msg: print(msg, flush=True), seed=7, size=(2048, 1536), max_load=None, list_file=None) -> dict:
     """The ABLATIONS variants at `caps` on fixed costs, each against the full agent (paired bootstrap) and its own
     chance baseline. Merges this dataset's entry into <out_dir>/ablations.json; writes no image."""
     t_start, load_start = time.time(), check_load(max_load)
     workers = max(1, min(8, (mp.cpu_count() or 2) // 2)) if workers is None else workers
-    records, label = load_records(data_dir, n, kind, seed, size)
+    records, label = load_records(data_dir, n, kind, seed, size, list_file)
     data_id, seg = dataset_sha256(records), default_segmenter()
     rows = cost_rows(micro_arm, seg.name)
     log(f"{len(records)} images, {workers} worker(s); ablations {list(ABLATIONS)} at caps {caps}")
@@ -960,13 +976,23 @@ def run_ablations(data_dir="data/synth200", n=200, out_dir="public/results", res
                       "steps_p50": _r(np.percentile([sum(t["action"] != "halt" for t in trace) for trace in tr], 50), 1),
                       "verify_looks": sum(t["action"] == "verify" for t in steps),
                       "survey_looks": sum(t["cause"] == "survey" for t in steps),
+                      # how the jobs ended: a variant that stops earlier also spends fewer pixels (pixels_frac)
+                      "halt_causes": dict(collections.Counter(r["configs"][f"{v}@{cap}"]["halt_cause"] for r in results)),
                       "model_usage": usage[f"{v}@{cap}"]}
+            if ref := REFERENCE.get(v):
+                mr, ci_ref = m[f"{ref}@{cap}"], ratio_ci(mv, m[f"{ref}@{cap}"], n_img)
+                out[v] |= {"ref": ref, "ratio_vs_ref": _r(mv["recall"] / mr["recall"]) if mr["recall"] else None,
+                           "ratio_vs_ref_ci": ci_ref, "vs_ref": vs_full(ci_ref).replace("the full agent", ref)}
         by_cap[str(cap)] = out
     threads = sorted({r["cv2_threads"] for r in results})
     prov = run_provenance(load_start)
     entry = {"dataset": label, "n_images": n_img, "segmenter": seg.name, "box_convention": primary_boxes,
              "cost_model": {"kind": "fixed", "source": f"results/{micro_arm}/micro.json job_ops (p50 ms per call)"},
              "variants": {v: switches(v) for v in ABLATIONS}, "by_cap": by_cap,
+             "coupling": ("no-uncertainty and no-seed lower every score, so the stop floor (eps x v0) also ends their "
+                          "jobs sooner: their ratio_vs_full mixes the term's effect on where the agent looks with a "
+                          "smaller pixel spend (see pixels_frac and halt_causes). The '+no-floor' rows remove the floor "
+                          "as well; their ratio_vs_ref, against no-floor, is the term's effect on gaze order alone."),
              "random_order": [random_order_note(by_cap[str(c)], c, ratio_ci(pooled_seeds(m, c), m[f"full@{c}"], n_img), n_img)
                               for c in caps],
              "provenance": short_provenance(prov, workers, threads[0] if len(threads) == 1 else threads, micro_arm, data_id,
@@ -993,6 +1019,7 @@ def main(argv=None) -> None:
     ap.add_argument("--workers", type=int, default=None, help="default: min(8, cpus/2); 1 runs inline")
     ap.add_argument("--chaos", default="20,20,10", help="planner_timeout,planner_malformed,p95_spike job counts")
     ap.add_argument("--kind", choices=("auto", "synth", "codebrim"), default="auto")
+    ap.add_argument("--list", help="CODEBRIM image list to score (default <data>/eval200.txt)")
     ap.add_argument("--micro-arm", default="local-macos-x86", help="results/<arm>/micro.json to embed")
     ap.add_argument("--reuse", action="store_true", help="re-score and re-draw from results/eval_per_image.json (last run)")
     ap.add_argument("--primary-boxes", choices=tuple(CONVENTIONS), default="components",
@@ -1013,10 +1040,12 @@ def main(argv=None) -> None:
         if a.cost_model != "fixed" or a.governor or a.reuse:
             ap.error("--ablation runs on fixed costs, with the governor as each variant says, and never --reuse")
         run_ablations(a.data, a.n, a.out, a.results_dir, a.workers, a.kind, a.micro_arm, a.primary_boxes,
-                      tuple(float(c) for c in a.ablation_caps.split(",")), seed=a.seed, size=size, max_load=a.max_load)
+                      tuple(float(c) for c in a.ablation_caps.split(",")), seed=a.seed, size=size, max_load=a.max_load,
+                      list_file=a.list)
         return
     run(a.data, a.n, a.out, a.results_dir, a.workers, tuple(int(x) for x in a.chaos.split(",")), a.kind, a.micro_arm,
-        a.primary_boxes, a.reuse, cost_model=a.cost_model, seed=a.seed, size=size, governor=a.governor, max_load=a.max_load)
+        a.primary_boxes, a.reuse, cost_model=a.cost_model, seed=a.seed, size=size, governor=a.governor, max_load=a.max_load,
+        list_file=a.list)
 
 
 if __name__ == "__main__":

@@ -54,9 +54,13 @@ Each job is a loop of camera moves over an image pyramid (L0 = full resolution, 
    confident mask one level finer by mask IoU; log findings with length, width, area and orientation in pixels.
 6. **Govern.** Before every step: kill switch, pixel / $ / seconds caps, p95 latency against the SLA (switch to the
    fast model, then a coarser level), warp spikes, and a $ ≥ 80 % mode that verifies only critical classes.
-7. **Stop** when the best remaining expected value per ms falls below a quarter of the realised value per ms so far.
-   Under a pixel cap the cap usually binds first: at the 30 % cap, 125 of 200 synthetic and 183 of 200 CODEBRIM
-   jobs end on the cap; uncapped, the stop rule ends 183 of 200 synthetic jobs and 197 of 200 CODEBRIM jobs.
+7. **Stop** when the best remaining expected value per ms falls below a quarter of the realised value per ms so far,
+   or below a floor, the value of a look that finds nothing (ε·v0/t̂, v0 = 2), once every candidate left has been
+   shown by a look as fine as its own first look (a coarse survey alone never ends a job). Under a pixel cap the cap
+   usually binds first: at the 30 % cap, 125 of 200 synthetic and 183 of 200 CODEBRIM jobs end on the cap; uncapped,
+   the stop rule ends 183 of 200 synthetic jobs and 197 of 200 CODEBRIM jobs (these counts are from the published
+   runs, made before the floor and the seeding of unvisited candidates existed; they have not been re-run on this
+   code).
 
 Critical findings (exposed rebar; spalling above 40 000 px²) wait in `pending_review`. Only a human — the web review
 or `drishyam review` — can approve or reject them; nothing the agent, the MCP tools or the planner can call reaches
@@ -190,10 +194,14 @@ Drishyam combines old ideas; this section says which, and what it adds.
    the job's own measured p95 of warp and segment time (in the published evals, a fixed table of p50s, so a re-run
    reproduces them).
 2. A stop rule: the job ends when the best remaining look is worth less than a quarter of the value per ms realised
-   so far.
-3. Cross-scale verification: a new confident mask is looked at again one pyramid level finer and compared by mask
-   IoU through the two views' homographies; if the IoU stays below 0.5, the finding goes to human review with the
-   measured IoU as the reason.
+   so far, or than a floor (ε·v0/t̂, the value of a look that finds nothing) once every candidate left has been
+   seen by a look as fine as its own first look.
+3. Cross-scale verification: a new confident mask is looked at again one pyramid level finer and compared, class by
+   class, by mask IoU through the two views' homographies. Below 0.5 for the same class with the same place seen
+   as another class (IoU ≥ 0.5 between the two looks' best masks) it is a class change, otherwise a disagreement;
+   the finding of that class is then `verified: false`, and a human is asked when it is critical, when no finer
+   look can settle it, or when a class change involves a critical class (the finding named then waits in
+   `pending_review`), with the measured IoU as the reason.
 4. A governor that checks kill, caps and p95 latency before every step and writes a cause for each override, so
    every step in the trace says why it happened.
 5. A human gate: critical findings wait in `pending_review`, and no agent, MCP or planner call can approve them.
@@ -219,7 +227,7 @@ yet paid off in recall.
 
 ## 8. Evaluation
 
-Measured on **200 held-out labelled synthetic images** (seed 7; policy changes were tuned only on a separate 60-image dev split, seed 4242, `make eval-dev`, unpublished), one segmenter and one matching rule for every policy (a ground-truth box is found by a same-class component with IoU ≥ 0.3 or containing its centre; "IoU-only" drops the centre clause). The 95 % intervals are a bootstrap over images, paired across policies. "Chance" moves each policy's own boxes (same class and size) to random places in the photo and scores them again. Precision is one-to-one: in confidence order each prediction claims at most one ground-truth box, so a defect reported again from a second look is a false box; "hits per matched box" counts the predictions that land on each box found (1 = no duplicates). All of it runs on the **fixed cost model** (`--cost-model fixed`): every op the agent times costs its p50 from the `job_ops` table in `results/linux-aarch64/micro.json` (the stock aarch64 wheel on GitHub's `ubuntu-24.04-arm` runner, Neoverse-N2, one thread) on every call, so t̂, the stop rule and the governor see the same costs on a busy machine as on an idle one, and a re-run (`make eval`, whose `MICRO_ARM` defaults to `linux-aarch64`) reproduces the numbers exactly on an x86 machine, however busy it is (on arm64 the synthetic images themselves come out slightly different: the aarch64 HAL rounds some pixel ops differently). The jobs themselves ran on the x86 laptop; only their costs are the arm64 ones. $ is that modelled time × $0.339/h (untimed Python is not charged). In this comparison the governor's model, level and gaze-size overrides are off (caps and the kill switch stay), so Drishyam segments every look with the same accurate model as the baselines; turning them on changes nothing under fixed costs at the 30 % and 100 % caps, the only caps the governor-on ablation ran (30 % only on CODEBRIM; [Ablations](#ablations-fr-21) below).
+Measured on **200 held-out labelled synthetic images** (seed 7; policy changes were tuned only on dev splits, unpublished: 60 synthetic images, seed 4242, `make eval-dev`; 30 synthetic images with no damage, seed 4243, `make eval-dev-clean`; and 100 CODEBRIM photos, seed 4244, none of them in the 200 below, `make eval-dev-real`), one segmenter and one matching rule for every policy (a ground-truth box is found by a same-class component with IoU ≥ 0.3 or containing its centre; "IoU-only" drops the centre clause). The 95 % intervals are a bootstrap over images, paired across policies. "Chance" moves each policy's own boxes (same class and size) to random places in the photo and scores them again. Precision is one-to-one: in confidence order each prediction claims at most one ground-truth box, so a defect reported again from a second look is a false box; "hits per matched box" counts the predictions that land on each box found (1 = no duplicates). All of it runs on the **fixed cost model** (`--cost-model fixed`): every op the agent times costs its p50 from the `job_ops` table in `results/linux-aarch64/micro.json` (the stock aarch64 wheel on GitHub's `ubuntu-24.04-arm` runner, Neoverse-N2, one thread) on every call, so t̂, the stop rule and the governor see the same costs on a busy machine as on an idle one, and a re-run (`make eval`, whose `MICRO_ARM` defaults to `linux-aarch64`) reproduces the numbers exactly on an x86 machine, however busy it is (on arm64 the synthetic images themselves come out slightly different: the aarch64 HAL rounds some pixel ops differently). The jobs themselves ran on the x86 laptop; only their costs are the arm64 ones. $ is that modelled time × $0.339/h (untimed Python is not charged). In this comparison the governor's model, level and gaze-size overrides are off (caps and the kill switch stay), so Drishyam segments every look with the same accurate model as the baselines; turning them on changes nothing under fixed costs at the 30 % and 100 % caps, the only caps the governor-on ablation ran (30 % only on CODEBRIM; [Ablations](#ablations-fr-21) below).
 
 The FR-21 ablations (random gaze order, no uncertainty term, no survey look, no verify step, governor on) are under
 [Ablations](#ablations-fr-21) below. The per-cap tables and per-class recall are in the
@@ -336,7 +344,10 @@ to the full agent at the **30 % cap** (95 % CI):
   random order matches the full agent. Uncapped, random order matches it on both synthetic sets.
 - **Two parts do nothing measurable on these sets.** The uncertainty term `(1+u)` in the score gives identical
   recall, pixels and verify looks when it is removed, and turning the governor on gives identical results, because
-  under fixed costs its latency rules never fire (its response is shown by the drills instead, section 10).
+  under fixed costs its latency rules never fire (its response is shown by the drills instead, section 10). The
+  uncertainty result is a property of the code that ran, not of the term: then only regions already looked at had
+  an entropy and only unvisited ones are scored, so every argmax read u = 0 (and severity 1). Every look now seeds
+  the unvisited candidates it shows; the ablations have not been re-run on that code.
 - **The verify step buys no recall**: without it recall is never measurably lower, and at the 30 % cap on
   2048×1536 it is slightly higher, so there the verify looks cost recall; uncapped at 2048×1536 it is 0.99× (0.96–1.02) at 0.31 of the pixels instead of 0.35. Its value is the cross-scale
   agreement it records for the human reviewer, not recall.
@@ -401,23 +412,33 @@ the site.
 Every step's action is a logged function of an OpenCV output or a runtime
 statistic, with a `cause`. A recorded trace (synthetic sample `bridge_03`, 30 % pixel cap, the published fixed arm64
 costs on a virtual clock, so machine load does not change it and a re-run on x86 gives the same file:
-[trace-bridge_03.ndjson](trace-bridge_03.ndjson), from `python -m evals.trace_sample`), its first four steps abridged:
+[trace-bridge_03.ndjson](trace-bridge_03.ndjson), from `python -m evals.trace_sample`), its first four steps abridged
+(the seeds without their entropy):
 
 ```json
-{"step": 1, "decision": {"action": "gaze", "args": {"x": 1500, "y": 1125, "level": 3}}, "observation": {"entropy": 0.6931, "mask_area_px": 894}, "cause": "survey", "rationale": "one L3 look covers all 4 candidates before zooming; 7 looks affordable"}
-{"step": 2, "decision": {"action": "escalate", "args": {"x": 1374, "y": 1226, "level": 2}}, "observation": {"entropy": 0.3441, "mask_area_px": 10740}, "cause": "entropy>tau", "rationale": "entropy 0.69 > 0.5 at L3"}
-{"step": 3, "decision": {"action": "gaze", "args": {"x": 1840, "y": 1456, "level": 1}}, "observation": {"entropy": 0.4331, "mask_area_px": 28209}, "cause": "best-score", "rationale": "argmax score 1.13e-02: prior 0.69, unseen 1.00, t_hat 61 ms; lambda 4.88e-03"}
-{"step": 4, "decision": {"action": "verify", "args": {"x": 1597, "y": 1542, "level": 0}}, "observation": {"entropy": 0.3343, "mask_area_px": 57395}, "cause": "verify-new-mask", "rationale": "new spalling mask at L1; confirming at L0"}
+{"step": 1, "decision": {"action": "gaze", "args": {"x": 1500, "y": 1125, "level": 3}}, "observation": {"entropy": 0.6931, "mask_area_px": 894}, "cause": "survey", "rationale": "one L3 look covers all 4 candidates before zooming; 7 looks affordable", "seeded": [{"region": "r1", "cls": "crack", "from_level": 3}, {"region": "r2", "cls": "crack", "from_level": 3}, {"region": "r3", "cls": "crack", "from_level": 3}, {"region": "r4", "cls": "crack", "from_level": 3}]}
+{"step": 2, "decision": {"action": "escalate", "args": {"x": 1374, "y": 1226, "level": 2}}, "observation": {"entropy": 0.3441, "mask_area_px": 10740}, "cause": "entropy>tau", "rationale": "entropy 0.69 > 0.5 at L3", "verify": {"iou": 0.189, "class": "crack", "against_level": 3, "class_now": "crack", "iou_any": 0.189}, "seeded": [{"region": "r1", "cls": "exposed_rebar", "from_level": 2}, {"region": "r2", "cls": "spalling", "from_level": 2}, {"region": "r4", "cls": "exposed_rebar", "from_level": 2}]}
+{"step": 3, "decision": {"action": "gaze", "args": {"x": 1840, "y": 1456, "level": 1}}, "observation": {"entropy": 0.4331, "mask_area_px": 28209}, "cause": "best-score", "rationale": "argmax score 4.69e-02: prior 0.69, severity 3 (exposed_rebar seen at L2), uncertainty 0.38, unseen 1.00, t_hat 61 ms; lambda 4.88e-03"}
+{"step": 4, "decision": {"action": "verify", "args": {"x": 1597, "y": 1542, "level": 0}}, "observation": {"entropy": 0.3343, "mask_area_px": 57395}, "cause": "verify-new-mask", "rationale": "new spalling mask at L1; confirming at L0", "verify": {"iou": 0.0, "class": "spalling", "against_level": 1, "class_now": "corrosion", "iou_any": 0.003}}
 ```
 
 The entropy OpenCV measured on the coarse survey (0.69 > τ = 0.5) changed the next tool call from "next candidate"
-to "zoom one level finer, centred on the uncertain pixels". That L2 look drafted an exposed-rebar finding (`f1`,
-critical, so it waits in `pending_review`), and the L1 look at step 3 extended it (`steps: [2, 3]`). Step 3 also
-drew a new spalling mask, so step 4 verified one level finer; the mask IoU between L1 and L0 was 0.003, and `f1`
-goes to the human with the review request "unconfirmed: iou 0.003 < 0.5 between L1 and L0". At step 6 a second
-verify confirmed a spalling finding at IoU 0.69, and at step 7 the stop rule ended the job at 0.25 of the pixels.
+to "zoom one level finer, centred on the uncertain pixels", and the survey seeded all four candidates with what it
+saw there (crack). That L2 look drafted an exposed-rebar finding (`f1`) and a spalling finding (`f2`), both critical,
+so both wait in `pending_review`; its crack (5232 px) lay inside the spall and was recorded as spalling only, with a
+review request saying so. The step's `verify` compared the L3 crack with the L2 crack (IoU 0.189): it is kept in the
+step, but it judges no finding, because the only finding there holds another class. The same look re-seeded r1 and
+r4 as exposed rebar, and step 3's argmax went to r1 for it: severity 3 and uncertainty 0.38 from that seed (each
+term is in the rationale). Its lambda (4.88e-03) is eps × the value found per ms: the stop floor does not apply
+yet, because only looks coarser than the candidates' own first look (L1) had shown them; the L1 and L0 looks that
+follow see too little of the other candidates' L1 windows to seed them, and the floor never applies in this job. The L1 look extended `f1` (`steps:
+[2, 3]`) and drew a new spalling mask (`f4`), so step 4 verified it one level finer. L0 saw no spalling there (IoU
+0) and its best class, corrosion, overlaps the L1 spall by 0.003, so this is a disagreement about where, not a class
+change; with no finer level to settle it, `f4` is `verified: false` and goes to a human as "unconfirmed: iou 0 < 0.5
+between L1 and L0". At step 6 a second verify confirmed a third spalling finding (`f5`, critical) at IoU 0.691, step
+7 drafted a crack, and at step 8 the pixel cap ended the job at 0.2875 of the pixels with r4 not looked at.
 
-Failure drills, each runnable from the UI (`chaos` toggles) and covered by tests:
+Failure drills, each runnable from the UI (`chaos` toggles) and covered by tests. A drill fires on a fixed step (planner timeout on step 3, p95 spike on 4, malformed planner on 6); a job that ends before that step names the drill in its `done` event's `drills_not_reached`, so a drill that tested nothing does not read as passed:
 
 | Drill | Result |
 | --- | --- |
@@ -454,7 +475,9 @@ notes the large spall it missed.
   every policy at about 0.2 recall. The dacl10k model is trained but not deployed, and its results here are pending
   (section 8).
 - The ablations show that two parts of the policy, the uncertainty term and the governor, change nothing measurable
-  on these sets, and that image-driven gaze order beats random order only on the larger photos (section 8).
+  on these sets, and that image-driven gaze order beats random order only on the larger photos (section 8). The
+  uncertainty term was inert by construction in that run (no unvisited candidate had an entropy); it has not been
+  re-measured since candidates are seeded.
 - COOL on Graviton was not run (section 6).
 - The arm64 timings come from GitHub's `ubuntu-24.04-arm` runner (`results/linux-aarch64/`, Neoverse-N2, one
   thread), a GitHub Actions VM, not the deployed Lambda; on the deployed Lambda build the only numbers are the two smoke runs'

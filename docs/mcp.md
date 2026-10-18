@@ -23,7 +23,7 @@ npx @modelcontextprotocol/inspector uv run --directory /abs/path/to/drishyam dri
 | `enhance(job, gaze_id, why="")` | CLAHE re-look. Replaces that gaze's crop; segment again afterwards. |
 | `segment(job, gaze_id, model)` | Per-class areas, confidence, entropy, latency. `model` is `accurate` or `fast`. Crack components that are one straight line (formwork, joints) are dropped and listed under `rejected`, as in the agent's step records. |
 | `measure(job, gaze_id, cls)` | Length, width, area, orientation of one class, in L0 pixels. |
-| `verify(job, gaze_id, why="")` | Looks one level finer at the same centre, segments, returns the mask IoU against the coarser look (below 0.5 is disagreement). |
+| `verify(job, gaze_id, why="")` | Looks one level finer at the same centre, segments, and compares with the coarser look's best class (`cls`): `iou` is that class's mask against the finer look's mask of the same class, `class_now` the finer look's best class, `iou_any` the two looks' best masks whatever their classes, and `kind` is `agree` (iou ≥ 0.5), `class-change` (the same place seen as another class: iou_any ≥ 0.5) or `disagree`. All null when the finer look fails the quality gate or shows none of the coarser mask. |
 | `runtime_stats(job)` | p50/p95 per op, CPU %, $ so far, budget against caps, what the governor changed. |
 | `set_budget(job, pixel_cap, usd_cap, seconds_cap, why="")` | Lowers caps (0.02-1.0, 0.0001-0.05, 1-30). Raising one is refused. |
 | `log_finding(job, gaze_id, cls, why="")` | Records a class that the last segmentation shows. Critical ones become `pending_review`. A crack shorter than 8x its mean width is refused as a pore or bug hole. |

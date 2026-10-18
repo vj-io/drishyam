@@ -137,6 +137,14 @@ def select_eval(records: list[dict], n: int = 200, seed: int = 7, min_per_class:
     return sorted((records[i] for i in chosen), key=lambda r: r["id"]), shortfall
 
 
+def select_dev(records: list[dict], exclude, n: int = 100, seed: int = 4244) -> list[dict]:
+    """n records drawn with a fixed seed from those whose image is not in `exclude` (the held-out eval list's file
+    names): the dev split that tuning may read (evals/codebrim_dev100.txt)."""
+    pool = [r for r in records if Path(r["path"]).name not in set(exclude)]
+    pick = np.random.default_rng(seed).choice(len(pool), size=min(n, len(pool)), replace=False)
+    return sorted((pool[i] for i in pick), key=lambda r: r["id"])
+
+
 def write_list(subset: list[dict], out) -> None:
     Path(out).parent.mkdir(parents=True, exist_ok=True)
     Path(out).write_text("".join(Path(r["path"]).name + "\n" for r in subset))
@@ -158,14 +166,23 @@ def main(argv=None) -> None:
     ap.add_argument("--root", default="data/codebrim")
     ap.add_argument("--out", default="data/eval200.txt")
     ap.add_argument("--n", type=int, default=200)
-    ap.add_argument("--seed", type=int, default=7)
+    ap.add_argument("--seed", type=int, default=None, help="default 7, or 4244 with --dev (evals/codebrim_dev100.txt)")
     ap.add_argument("--min-per-class", type=int, default=40)
+    ap.add_argument("--dev", type=int, metavar="N", help="instead: N images (seed --seed) not in the committed eval list; "
+                    "--dev 100 --out evals/codebrim_dev100.txt regenerates the committed dev list")
     a = ap.parse_args(argv)
+    if a.seed is None:
+        a.seed = 4244 if a.dev else 7
     if a.unpack:
         print(f"unpacked {unpack(a.unpack, a.root)} images and annotations from {a.unpack} to {a.root}")
     records = load(a.root)
     if not records:
         raise SystemExit(f"no annotated images found under {a.root}; run `make data` first")
+    if a.dev:
+        held_out = Path(__file__).with_name("codebrim_eval200.txt").read_text().split()
+        write_list(select_dev(records, held_out, a.dev, a.seed), a.out)
+        print(f"wrote {a.dev} dev images (seed {a.seed}, none in codebrim_eval200.txt) to {a.out}")
+        return
     subset, shortfall = select_eval(records, a.n, a.seed, a.min_per_class)
     write_list(subset, a.out)
     counts = {c: sum(b["cls"] == c for r in subset for b in r["boxes"]) for c in CLASSES}

@@ -252,8 +252,12 @@ def test_ablations_assert_each_variant_ran_its_switches(tmp_path):
     doc = json.loads((tmp_path / "pub" / "ablations.json").read_text())
     assert doc["datasets"] == {"abl": json.loads(json.dumps(entry))} and "NaN" not in json.dumps(doc)
     rows = entry["by_cap"]["1.0"]
-    assert set(rows) == set(harness.ABLATIONS) == set(entry["variants"]) and len(harness.ABLATIONS) == 8  # full + 7
+    assert set(rows) == set(harness.ABLATIONS) == set(entry["variants"]) and len(harness.ABLATIONS) == 12  # full + 11
     assert rows["full"]["ratio_vs_full"] == 1.0 and rows["full"]["vs_full"] == "no measurable difference"
+    # a score term moves the stop floor too: its floor-free twin is scored against no-floor, and every row says how it ended
+    for v in ("no-seed+no-floor", "no-uncertainty+no-floor"):
+        assert rows[v]["ref"] == "no-floor" and len(rows[v]["ratio_vs_ref_ci"]) == 2 and "vs_ref" in rows[v]
+    assert all(sum(r["halt_causes"].values()) == 1 for r in rows.values()) and "no-floor" in entry["coupling"]
     assert rows["no-verify"]["verify_looks"] == rows["no-survey"]["survey_looks"] == 0
     assert set(rows["no-survey"]["model_usage"]) == {"accurate"} and len(rows["full"]["ratio_vs_full_ci"]) == 2
     assert entry["variants"]["random-order-s2"] == {**harness.switches("full"), "order": "random", "seed": 2}
@@ -270,6 +274,29 @@ def test_ablations_assert_each_variant_ran_its_switches(tmp_path):
     cfg["trace"].insert(0, {"action": "gaze", "cause": "survey"})  # right switches, but the trace has a survey look
     with pytest.raises(SystemExit, match="trace shows a look"):
         harness.check_variants(saved, (1.0,))
+    cfg["trace"].pop(0)
+    harness.check_variants(saved, (1.0,))
+    saved[0]["configs"]["no-seed@1.0"]["trace"][0]["seeded"] = 2  # labelled no-seed, but a look seeded candidates
+    with pytest.raises(SystemExit, match="trace shows a look"):
+        harness.check_variants(saved, (1.0,))
+
+
+def test_no_seed_and_no_floor_ablations_switch_one_term_off_and_change_the_run(scene):
+    """'no-seed' (no look seeds an unvisited candidate) and 'no-floor' (v0 = 0: lambda is 0 until something is found)
+    each flip one switch, and each changes what the agent does: without seeds the argmax order changes; without the
+    floor a photo with nothing to find runs on to its cap or until every candidate is looked at."""
+    from drishyam.agent import JobConfig
+
+    full = harness.switches("full")
+    assert harness.switches("no-seed") == {**full, "seed_from_looks": False} and full["seed_from_looks"] is True
+    assert harness.switches("no-floor") == {**full, "v0": 0.0} and full["v0"] == JobConfig().v0 > 0
+    looks = lambda out: [(t["action"], t["x"], t["y"], t["level"]) for t in out["trace"]]
+    full_run, no_seed = (harness.run_drishyam(scene, 1.0, **harness.ABLATIONS[v]) for v in ("full", "no-seed"))
+    assert no_seed["switches"] == harness.switches("no-seed") and looks(no_seed) != looks(full_run)
+    clean = synth.render(2, 1600, 1200, {"distractors": ["water_stain"]})[0]  # nothing to find
+    full_run, no_floor = (harness.run_drishyam(clean, 1.0, **harness.ABLATIONS[v]) for v in ("full", "no-floor"))
+    assert no_floor["switches"] == harness.switches("no-floor") and full_run["halt_cause"] == "stop-rule"
+    assert len(looks(no_floor)) > len(looks(full_run)) and no_floor["halt_cause"] != "stop-rule"
 
 
 def test_random_order_matches_only_inside_the_margin():
@@ -601,3 +628,34 @@ def test_parity_compare_saved_files(tmp_path):
     assert res["class_iou"]["crack"] == pytest.approx(48 / 64) and res["class_iou"]["spalling"] is None
     with pytest.raises(ValueError):
         parity.compare(a, b[:1])
+
+
+def test_codebrim_dev_split_is_disjoint_from_the_held_out_list():
+    """Tuning reads evals/codebrim_dev100.txt only: 100 images, none of them in the held-out eval200 list."""
+    evals_dir = Path(codebrim.__file__).parent
+    dev = (evals_dir / "codebrim_dev100.txt").read_text().split()
+    held = set((evals_dir / "codebrim_eval200.txt").read_text().split())
+    assert len(dev) == len(set(dev)) == 100 and not held & set(dev)
+    records = [{"id": f"image_{i}", "path": f"/x/image_{i}.jpg", "boxes": []} for i in range(10)]
+    picked = codebrim.select_dev(records, ["image_1.jpg", "image_2.jpg"], n=5, seed=3)
+    assert len(picked) == 5 and not {"image_1", "image_2"} & {r["id"] for r in picked}
+    assert picked == codebrim.select_dev(records, ["image_1.jpg", "image_2.jpg"], n=5, seed=3)
+
+
+def test_dev_sweep_reads_variants_and_only_dev_splits():
+    from evals import dev_sweep
+
+    assert dev_sweep.parse("a=v0:2,seed_from_looks:False;b=") == {"a": {"v0": 2.0, "seed_from_looks": False}, "b": {}}
+    assert {d for d, _, _ in dev_sweep.SPLITS.values()} == {"data/synth_dev", "data/synth_clean_dev"}  # never held out
+
+
+def test_dev_sweep_runs_end_to_end_and_writes_its_rows(tmp_path, monkeypatch):
+    from evals import dev_sweep
+
+    synth.build_dataset(tmp_path / "tiny", n=2, seed=3, width=640, height=480)
+    monkeypatch.setitem(dev_sweep.SPLITS, "tiny", (tmp_path / "tiny", 2, 3))
+    out = tmp_path / "rows.json"
+    dev_sweep.main(["tiny", "1.0", "a=v0:0;b=v0:2", "--workers", "1", "--out", str(out)])
+    rows = json.loads(out.read_text())
+    assert rows["split"] == "tiny" and rows["n"] == 2 and set(rows["rows"]) == {"a", "b"}
+    assert all(0 < r["pixels_frac"] <= 1 and sum(r["halt"].values()) == 2 for r in rows["rows"].values())
