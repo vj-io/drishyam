@@ -113,13 +113,16 @@ if [ "${WAF_LOOP:-}" = 1 ]; then  # empty bodies: the app answers 400 at once, s
   : >"$TMP/empty"
   codes=""
   for i in $(seq 40); do
-    c=$(post /api/jobs text/plain "$TMP/empty" -o /dev/null -w '%{http_code}' --max-time 30) || true
+    c=$(post /api/jobs text/plain "$TMP/empty" -o "$TMP/waf.json" -w '%{http_code}' --max-time 30) || true
     codes="$codes $c"
-    [ "$c" = 429 ] && break  # the stack's WAF block response (an older deploy answered 403)
+    # The stack's WAF block response (an older deploy answered 403). Lambda's own throttle is also a 429,
+    # so only the WAF's JSON body counts.
+    waf=0; [ "$c" = 429 ] && jq -e '.error | startswith("rate limited")' "$TMP/waf.json" >/dev/null 2>&1 && waf=1
+    [ $waf = 1 ] && break
     sleep 1.5
   done
   # The job starts above count too, so the block can come a few requests early; never on the first.
-  if [ "$c" = 429 ] && [ "$i" -gt 1 ]; then pass waf "blocked at request $i:$codes"
+  if [ $waf = 1 ] && [ "$i" -gt 1 ]; then pass waf "blocked at request $i:$codes"
   else fail waf "codes:$codes"; fi
 fi
 

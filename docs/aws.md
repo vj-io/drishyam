@@ -220,7 +220,8 @@ classical engine. Making the CC BY-NC 4.0 dacl10k model the live segmenter is an
 6. With `E2E=1`: `tests/e2e/test_ui_live.py <url>`, the browser flows (needs Playwright in `.venv`, see
    the README). It starts about 3 jobs.
 7. With `WAF_LOOP=1`: empty-bodied job starts (the app answers 400 without running a job) until the WAF
-   answers 429 (not yet live: the current build answers 403, so this check fails on it),
+   answers 429 with its `rate limited` JSON body (a Lambda throttle 429 does not count; not yet live: the
+   current build answers 403, so this check fails on it),
    expected after about 10 in 120 s, fewer if the checks above started jobs. Job starts from
    that IP stay blocked until its rate falls back under the limit, up to two minutes after the loop.
 
