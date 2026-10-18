@@ -17,3 +17,4 @@ brag-output*/
 build/
 .venv-infra/
 cdk.out/
+private-assets/
