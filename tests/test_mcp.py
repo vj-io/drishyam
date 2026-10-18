@@ -273,6 +273,32 @@ async def test_a_straight_line_and_a_bug_hole_are_rejected_with_their_cause(d, t
     await d.refused("log_finding", PORE_CAUSE, job=job, gaze_id=g["gaze"], cls="crack")
 
 
+async def test_verify_compares_the_same_class_and_names_a_class_change(d, tmp_path, monkeypatch):
+    """verify compares the coarser look's class with the finer look's mask of the SAME class: a spall seen as rust
+    at the same place is a class change (iou 0, iou_any ~1), not agreement and not a disagreement about where."""
+    from .test_agent import Flip, disc_scene
+
+    root = tmp_path / "images"
+    root.mkdir()
+    cv2.imwrite(str(root / "disc.png"), disc_scene())
+    monkeypatch.setenv("DRISHYAM_IMAGE_ROOT", str(root))
+    monkeypatch.setattr(mcp_server, "default_segmenter", lambda: Flip("spalling", "corrosion"))
+    job = await d.open(root / "disc.png")
+    g, _ = await d.ok("gaze", job=job, x=550, y=450, level=1)
+    assert (await d.ok("segment", job=job, gaze_id=g["gaze"]))[0]["best"] == "spalling"
+    v, _ = await d.ok("verify", job=job, gaze_id=g["gaze"])
+    assert (v["cls"], v["class_now"], v["iou"], v["kind"], v["agrees"]) == ("spalling", "corrosion", 0.0, "class-change", False)
+    assert v["iou_any"] >= 0.9
+    rec = next(t for t in trace_of(tmp_path, job) if t.get("tool") == "verify")["verify"]
+    assert rec == {"iou": 0.0, "class": "spalling", "against_level": 1, "class_now": "corrosion", "iou_any": v["iou_any"]}
+    monkeypatch.setattr(mcp_server, "default_segmenter", lambda: Flip("spalling", "spalling"))
+    job = await d.open(root / "disc.png")
+    g, _ = await d.ok("gaze", job=job, x=550, y=450, level=1)
+    await d.ok("segment", job=job, gaze_id=g["gaze"])
+    v, _ = await d.ok("verify", job=job, gaze_id=g["gaze"])
+    assert v["kind"] == "agree" and v["iou"] == v["iou_any"] >= 0.9 and v["agrees"]
+
+
 async def test_a_blown_out_band_is_not_assessed_once_the_overview_ran(d, tmp_path, monkeypatch):
     """The overview gives a large blown-out area no candidates, so the work order lists it from the overview."""
     root = tmp_path / "images"
