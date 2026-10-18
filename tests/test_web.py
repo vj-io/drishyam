@@ -121,18 +121,54 @@ def test_replay_header_validation(photo):
     assert ok.status_code == 200 and steps[0]["cause"] == "replay"
 
 
-def test_chaos_drills_over_http(scene, monkeypatch):
+def drill_records(ev):
+    """(the step after the injected spike or None, the step-6 planner event or None) of a drill job's events."""
+    steps = [e for e in ev if e["type"] == "step"]
+    spike = next((s for s in steps if s.get("injected") == "p95_spike"), None)
+    after = spike and next((s for s in steps if s["step"] == spike["step"] + 1), None)
+    planned = next((e for e in ev if e["type"] == "planner" and e["step"] == 6), None)
+    return after, planned
+
+
+def test_chaos_drills_over_http_on_fixed_costs(scene, monkeypatch):
+    """The drills through the HTTP path on the published fixed costs (a virtual clock, as the evaluations run them),
+    so the outcome cannot move with load: the spike on look 4 makes the next record carry p95>SLA, and the malformed
+    planner on step 6 is rejected while the rule planner's look stands."""
+    import functools
+
+    from drishyam import agent, segment, web
+    from evals.harness import FixedCostJob, cost_rows, op_costs
+
+    rows = cost_rows("linux-aarch64", segment.default_segmenter().name)
+    monkeypatch.setattr(web, "JobConfig", functools.partial(agent.JobConfig, eps=0.0))  # 6+ looks: no stop-rule halt
+    monkeypatch.setattr(web, "Job", lambda img, cfg, clock=None, **kw: FixedCostJob(
+        img, cfg, op_costs(rows, img.shape[1], img.shape[0]), **kw))
+    ev = lines(post(jpeg(scene), params="?pixel_cap=1&chaos=p95_spike,planner_malformed"))
+    after, planned = drill_records(ev)
+    assert after and (after.get("governor") or after)["cause"] == "p95>SLA"
+    assert planned and planned["status"] == "rejected" and planned["proposal"] is None
+    step6 = next(e for e in ev if e["type"] == "step" and e["step"] == 6)
+    assert step6["planner_status"]["status"] == "rejected" and step6["planner"] == "rule"
+
+
+def test_chaos_drills_over_http_on_the_real_clock(scene, monkeypatch):
+    """REAL CLOCK, so it depends on machine load: a busy machine trips p95>SLA on its own and can reach the 30 s cap
+    before look 6. It asserts behaviour every path guarantees, never a timing: the job ends with a done record,
+    every governor override carries its cause, and each drill that was reached was answered (the fixed-cost test
+    above pins the full sequence)."""
     import functools
 
     from drishyam import agent, web
 
-    # The drills need a job of 6+ looks: the scene (several defects) with eps = 0, so the stop rule cannot end it
-    # before the spike (injected on look 4) and the malformed planner (step 6).
     monkeypatch.setattr(web, "JobConfig", functools.partial(agent.JobConfig, eps=0.0))
-    ev = lines(post(jpeg(scene), params="?pixel_cap=1&chaos=p95_spike,planner_malformed"))
-    assert any(e.get("governor", {}).get("cause") == "p95>SLA" for e in ev)
-    assert any(e["type"] == "planner" and e["status"] == "rejected" for e in ev)
-    assert any(e.get("planner_status", {}).get("status") == "rejected" for e in ev)
+    ev = lines(post(jpeg(scene), params="?pixel_cap=1&seconds_cap=30&chaos=p95_spike,planner_malformed"))
+    assert ev[-1]["type"] == "done"
+    assert all(e["governor"]["cause"] for e in ev if e.get("governor"))
+    after, planned = drill_records(ev)
+    if after:
+        assert "p95>SLA" in {after["cause"], (after.get("governor") or {}).get("cause")}
+    if planned:
+        assert planned["status"] == "rejected"
 
 
 def test_jobs_consult_the_configured_planner(scene, monkeypatch):
