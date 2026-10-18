@@ -1,0 +1,719 @@
+{
+ "arm": "linux-aarch64",
+ "config": {
+  "repeats": 50,
+  "warmup": 5,
+  "cv2_threads": 1,
+  "requested_threads": 1,
+  "sizes": [
+   "1024x768",
+   "2048x1536",
+   "4000x3000"
+  ],
+  "gaze_view_px": 512
+ },
+ "provenance": {
+  "cv2": "5.0.0",
+  "build_info_sha256": "4460ffe25568d7f496997f0593f568f4d91ee4740c97f057b2986c237e8a386c",
+  "cv2_baseline": "NEON FP16",
+  "cv2_dispatch": "NEON_DOTPROD NEON_FP16 NEON_BF16",
+  "cv2_parallel_framework": "pthreads",
+  "cv2_custom_hal": "YES (carotene (ver 0.0.1) KleidiCV (ver 26.03))",
+  "cv2_file": "/home/runner/work/drishyam/drishyam/.venv/lib/python3.13/site-packages/cv2/__init__.py",
+  "under_opt_cool": false,
+  "build": "stock (not COOL)",
+  "machine": "Linux 6.17.0-1022-azure aarch64",
+  "platform": "Linux-6.17.0-1022-azure-aarch64-with-glibc2.39",
+  "cpu": "Neoverse-N2",
+  "logical_cpus": 4,
+  "cv2_threads": 1,
+  "python": "3.13.16",
+  "numpy": "2.5.4",
+  "timestamp": "2026-10-18T06:58:35Z",
+  "load_avg": [
+   0.97,
+   0.36,
+   0.17
+  ],
+  "label": "GitHub arm64 runner (ubuntu-24.04-arm), not Lambda"
+ },
+ "results": [
+  {
+   "op": "pyrDown",
+   "size": "1024x768",
+   "n": 50,
+   "min_ms": 0.643,
+   "p50_ms": 0.653,
+   "p95_ms": 0.667,
+   "p99_ms": 0.677,
+   "mean_ms": 0.655
+  },
+  {
+   "op": "warpPerspective",
+   "size": "1024x768",
+   "n": 50,
+   "min_ms": 1.552,
+   "p50_ms": 1.559,
+   "p95_ms": 1.569,
+   "p99_ms": 1.574,
+   "mean_ms": 1.56
+  },
+  {
+   "op": "remap",
+   "size": "1024x768",
+   "n": 50,
+   "min_ms": 1.445,
+   "p50_ms": 1.459,
+   "p95_ms": 1.476,
+   "p99_ms": 1.512,
+   "mean_ms": 1.461
+  },
+  {
+   "op": "resize",
+   "size": "1024x768",
+   "n": 50,
+   "min_ms": 0.331,
+   "p50_ms": 0.336,
+   "p95_ms": 0.345,
+   "p99_ms": 0.345,
+   "mean_ms": 0.338
+  },
+  {
+   "op": "resize_area",
+   "size": "1024x768",
+   "n": 50,
+   "min_ms": 0.087,
+   "p50_ms": 0.089,
+   "p95_ms": 0.113,
+   "p99_ms": 0.116,
+   "mean_ms": 0.092
+  },
+  {
+   "op": "GaussianBlur",
+   "size": "1024x768",
+   "n": 50,
+   "min_ms": 0.23,
+   "p50_ms": 0.231,
+   "p95_ms": 0.252,
+   "p99_ms": 0.257,
+   "mean_ms": 0.236
+  },
+  {
+   "op": "Sobel",
+   "size": "1024x768",
+   "n": 50,
+   "min_ms": 0.725,
+   "p50_ms": 0.75,
+   "p95_ms": 0.762,
+   "p99_ms": 0.766,
+   "mean_ms": 0.746
+  },
+  {
+   "op": "adaptiveThreshold",
+   "size": "1024x768",
+   "n": 50,
+   "min_ms": 1.302,
+   "p50_ms": 1.312,
+   "p95_ms": 1.327,
+   "p99_ms": 1.331,
+   "mean_ms": 1.314
+  },
+  {
+   "op": "morphologyEx",
+   "size": "1024x768",
+   "n": 50,
+   "min_ms": 1.706,
+   "p50_ms": 1.724,
+   "p95_ms": 1.741,
+   "p99_ms": 1.78,
+   "mean_ms": 1.726
+  },
+  {
+   "op": "CLAHE",
+   "size": "1024x768",
+   "n": 50,
+   "min_ms": 3.14,
+   "p50_ms": 3.156,
+   "p95_ms": 3.185,
+   "p99_ms": 3.202,
+   "mean_ms": 3.158
+  },
+  {
+   "op": "inRange",
+   "size": "1024x768",
+   "n": 50,
+   "min_ms": 0.551,
+   "p50_ms": 0.567,
+   "p95_ms": 0.571,
+   "p99_ms": 0.576,
+   "mean_ms": 0.562
+  },
+  {
+   "op": "cvtColor",
+   "size": "1024x768",
+   "n": 50,
+   "min_ms": 0.313,
+   "p50_ms": 0.315,
+   "p95_ms": 0.332,
+   "p99_ms": 0.372,
+   "mean_ms": 0.321
+  },
+  {
+   "op": "cvtColor_hsv",
+   "size": "1024x768",
+   "n": 50,
+   "min_ms": 1.553,
+   "p50_ms": 1.559,
+   "p95_ms": 1.574,
+   "p99_ms": 1.578,
+   "mean_ms": 1.561
+  },
+  {
+   "op": "pyrDown",
+   "size": "2048x1536",
+   "n": 50,
+   "min_ms": 2.559,
+   "p50_ms": 2.575,
+   "p95_ms": 2.594,
+   "p99_ms": 2.617,
+   "mean_ms": 2.577
+  },
+  {
+   "op": "warpPerspective",
+   "size": "2048x1536",
+   "n": 50,
+   "min_ms": 1.559,
+   "p50_ms": 1.566,
+   "p95_ms": 1.576,
+   "p99_ms": 1.58,
+   "mean_ms": 1.566
+  },
+  {
+   "op": "remap",
+   "size": "2048x1536",
+   "n": 50,
+   "min_ms": 1.454,
+   "p50_ms": 1.463,
+   "p95_ms": 1.472,
+   "p99_ms": 1.485,
+   "mean_ms": 1.463
+  },
+  {
+   "op": "resize",
+   "size": "2048x1536",
+   "n": 50,
+   "min_ms": 1.326,
+   "p50_ms": 1.336,
+   "p95_ms": 1.36,
+   "p99_ms": 1.383,
+   "mean_ms": 1.338
+  },
+  {
+   "op": "resize_area",
+   "size": "2048x1536",
+   "n": 50,
+   "min_ms": 0.345,
+   "p50_ms": 0.352,
+   "p95_ms": 0.373,
+   "p99_ms": 0.38,
+   "mean_ms": 0.358
+  },
+  {
+   "op": "GaussianBlur",
+   "size": "2048x1536",
+   "n": 50,
+   "min_ms": 0.866,
+   "p50_ms": 0.894,
+   "p95_ms": 0.914,
+   "p99_ms": 0.927,
+   "mean_ms": 0.894
+  },
+  {
+   "op": "Sobel",
+   "size": "2048x1536",
+   "n": 50,
+   "min_ms": 2.931,
+   "p50_ms": 2.962,
+   "p95_ms": 2.992,
+   "p99_ms": 3.006,
+   "mean_ms": 2.964
+  },
+  {
+   "op": "adaptiveThreshold",
+   "size": "2048x1536",
+   "n": 50,
+   "min_ms": 5.053,
+   "p50_ms": 5.087,
+   "p95_ms": 5.109,
+   "p99_ms": 5.151,
+   "mean_ms": 5.088
+  },
+  {
+   "op": "morphologyEx",
+   "size": "2048x1536",
+   "n": 50,
+   "min_ms": 6.73,
+   "p50_ms": 6.762,
+   "p95_ms": 6.799,
+   "p99_ms": 6.838,
+   "mean_ms": 6.766
+  },
+  {
+   "op": "CLAHE",
+   "size": "2048x1536",
+   "n": 50,
+   "min_ms": 12.481,
+   "p50_ms": 12.503,
+   "p95_ms": 12.54,
+   "p99_ms": 12.552,
+   "mean_ms": 12.507
+  },
+  {
+   "op": "inRange",
+   "size": "2048x1536",
+   "n": 50,
+   "min_ms": 2.223,
+   "p50_ms": 2.246,
+   "p95_ms": 2.261,
+   "p99_ms": 2.267,
+   "mean_ms": 2.245
+  },
+  {
+   "op": "cvtColor",
+   "size": "2048x1536",
+   "n": 50,
+   "min_ms": 1.259,
+   "p50_ms": 1.269,
+   "p95_ms": 1.284,
+   "p99_ms": 1.32,
+   "mean_ms": 1.27
+  },
+  {
+   "op": "cvtColor_hsv",
+   "size": "2048x1536",
+   "n": 50,
+   "min_ms": 6.195,
+   "p50_ms": 6.224,
+   "p95_ms": 6.256,
+   "p99_ms": 6.28,
+   "mean_ms": 6.227
+  },
+  {
+   "op": "pyrDown",
+   "size": "4000x3000",
+   "n": 50,
+   "min_ms": 11.261,
+   "p50_ms": 11.55,
+   "p95_ms": 11.624,
+   "p99_ms": 11.642,
+   "mean_ms": 11.537
+  },
+  {
+   "op": "warpPerspective",
+   "size": "4000x3000",
+   "n": 50,
+   "min_ms": 1.556,
+   "p50_ms": 1.562,
+   "p95_ms": 1.571,
+   "p99_ms": 1.608,
+   "mean_ms": 1.564
+  },
+  {
+   "op": "remap",
+   "size": "4000x3000",
+   "n": 50,
+   "min_ms": 1.45,
+   "p50_ms": 1.46,
+   "p95_ms": 1.469,
+   "p99_ms": 1.478,
+   "mean_ms": 1.459
+  },
+  {
+   "op": "resize",
+   "size": "4000x3000",
+   "n": 50,
+   "min_ms": 5.118,
+   "p50_ms": 5.255,
+   "p95_ms": 5.359,
+   "p99_ms": 5.37,
+   "mean_ms": 5.257
+  },
+  {
+   "op": "resize_area",
+   "size": "4000x3000",
+   "n": 50,
+   "min_ms": 1.509,
+   "p50_ms": 1.607,
+   "p95_ms": 1.708,
+   "p99_ms": 1.759,
+   "mean_ms": 1.616
+  },
+  {
+   "op": "GaussianBlur",
+   "size": "4000x3000",
+   "n": 50,
+   "min_ms": 3.39,
+   "p50_ms": 3.424,
+   "p95_ms": 3.508,
+   "p99_ms": 3.555,
+   "mean_ms": 3.432
+  },
+  {
+   "op": "Sobel",
+   "size": "4000x3000",
+   "n": 50,
+   "min_ms": 13.526,
+   "p50_ms": 13.65,
+   "p95_ms": 13.786,
+   "p99_ms": 13.814,
+   "mean_ms": 13.652
+  },
+  {
+   "op": "adaptiveThreshold",
+   "size": "4000x3000",
+   "n": 50,
+   "min_ms": 19.57,
+   "p50_ms": 19.865,
+   "p95_ms": 20.002,
+   "p99_ms": 20.067,
+   "mean_ms": 19.856
+  },
+  {
+   "op": "morphologyEx",
+   "size": "4000x3000",
+   "n": 50,
+   "min_ms": 26.53,
+   "p50_ms": 26.893,
+   "p95_ms": 27.119,
+   "p99_ms": 27.208,
+   "mean_ms": 26.88
+  },
+  {
+   "op": "CLAHE",
+   "size": "4000x3000",
+   "n": 50,
+   "min_ms": 47.533,
+   "p50_ms": 47.596,
+   "p95_ms": 47.72,
+   "p99_ms": 47.74,
+   "mean_ms": 47.611
+  },
+  {
+   "op": "inRange",
+   "size": "4000x3000",
+   "n": 50,
+   "min_ms": 8.526,
+   "p50_ms": 8.719,
+   "p95_ms": 8.789,
+   "p99_ms": 8.808,
+   "mean_ms": 8.705
+  },
+  {
+   "op": "cvtColor",
+   "size": "4000x3000",
+   "n": 50,
+   "min_ms": 4.827,
+   "p50_ms": 4.899,
+   "p95_ms": 4.947,
+   "p99_ms": 4.974,
+   "mean_ms": 4.896
+  },
+  {
+   "op": "cvtColor_hsv",
+   "size": "4000x3000",
+   "n": 50,
+   "min_ms": 25.084,
+   "p50_ms": 25.225,
+   "p95_ms": 25.352,
+   "p99_ms": 25.424,
+   "mean_ms": 25.229
+  }
+ ],
+ "job_ops": {
+  "segmenter": "classical-v1",
+  "cv2_threads": 1,
+  "provenance": {
+   "cv2": "5.0.0",
+   "build_info_sha256": "4460ffe25568d7f496997f0593f568f4d91ee4740c97f057b2986c237e8a386c",
+   "cv2_baseline": "NEON FP16",
+   "cv2_dispatch": "NEON_DOTPROD NEON_FP16 NEON_BF16",
+   "cv2_parallel_framework": "pthreads",
+   "cv2_custom_hal": "YES (carotene (ver 0.0.1) KleidiCV (ver 26.03))",
+   "cv2_file": "/home/runner/work/drishyam/drishyam/.venv/lib/python3.13/site-packages/cv2/__init__.py",
+   "under_opt_cool": false,
+   "build": "stock (not COOL)",
+   "machine": "Linux 6.17.0-1022-azure aarch64",
+   "platform": "Linux-6.17.0-1022-azure-aarch64-with-glibc2.39",
+   "cpu": "Neoverse-N2",
+   "logical_cpus": 4,
+   "cv2_threads": 1,
+   "python": "3.13.16",
+   "numpy": "2.5.4",
+   "timestamp": "2026-10-18T06:58:16Z",
+   "load_avg": [
+    0.86,
+    0.29,
+    0.15
+   ],
+   "label": "GitHub arm64 runner (ubuntu-24.04-arm), not Lambda"
+  },
+  "results": [
+   {
+    "op": "pyrDown",
+    "size": "1024x768",
+    "n": 50,
+    "min_ms": 0.855,
+    "p50_ms": 0.871,
+    "p95_ms": 0.88,
+    "p99_ms": 0.887,
+    "mean_ms": 0.871
+   },
+   {
+    "op": "saliency",
+    "size": "1024x768",
+    "n": 50,
+    "min_ms": 1.091,
+    "p50_ms": 1.114,
+    "p95_ms": 1.157,
+    "p99_ms": 1.178,
+    "mean_ms": 1.12
+   },
+   {
+    "op": "warp",
+    "size": "1024x768",
+    "n": 50,
+    "min_ms": 1.605,
+    "p50_ms": 1.615,
+    "p95_ms": 1.633,
+    "p99_ms": 1.639,
+    "mean_ms": 1.617
+   },
+   {
+    "op": "quality",
+    "size": "1024x768",
+    "n": 50,
+    "min_ms": 0.863,
+    "p50_ms": 0.892,
+    "p95_ms": 0.91,
+    "p99_ms": 0.913,
+    "mean_ms": 0.89
+   },
+   {
+    "op": "segment:accurate",
+    "size": "1024x768",
+    "n": 50,
+    "min_ms": 58.909,
+    "p50_ms": 59.458,
+    "p95_ms": 59.899,
+    "p99_ms": 60.159,
+    "mean_ms": 59.461
+   },
+   {
+    "op": "segment:fast",
+    "size": "1024x768",
+    "n": 50,
+    "min_ms": 29.622,
+    "p50_ms": 29.936,
+    "p95_ms": 30.114,
+    "p99_ms": 30.188,
+    "mean_ms": 29.935
+   },
+   {
+    "op": "downscale",
+    "size": "1024x768",
+    "n": 50,
+    "min_ms": 0.071,
+    "p50_ms": 0.081,
+    "p95_ms": 0.106,
+    "p99_ms": 0.117,
+    "mean_ms": 0.083
+   },
+   {
+    "op": "pyrDown",
+    "size": "2048x1536",
+    "n": 50,
+    "min_ms": 3.52,
+    "p50_ms": 3.573,
+    "p95_ms": 3.65,
+    "p99_ms": 3.665,
+    "mean_ms": 3.575
+   },
+   {
+    "op": "saliency",
+    "size": "2048x1536",
+    "n": 50,
+    "min_ms": 3.184,
+    "p50_ms": 3.226,
+    "p95_ms": 3.27,
+    "p99_ms": 3.306,
+    "mean_ms": 3.23
+   },
+   {
+    "op": "warp",
+    "size": "2048x1536",
+    "n": 50,
+    "min_ms": 1.606,
+    "p50_ms": 1.614,
+    "p95_ms": 1.632,
+    "p99_ms": 1.66,
+    "mean_ms": 1.617
+   },
+   {
+    "op": "quality",
+    "size": "2048x1536",
+    "n": 50,
+    "min_ms": 0.854,
+    "p50_ms": 0.899,
+    "p95_ms": 0.914,
+    "p99_ms": 0.927,
+    "mean_ms": 0.895
+   },
+   {
+    "op": "segment:accurate",
+    "size": "2048x1536",
+    "n": 50,
+    "min_ms": 58.358,
+    "p50_ms": 59.068,
+    "p95_ms": 59.466,
+    "p99_ms": 59.553,
+    "mean_ms": 59.031
+   },
+   {
+    "op": "segment:fast",
+    "size": "2048x1536",
+    "n": 50,
+    "min_ms": 29.158,
+    "p50_ms": 29.513,
+    "p95_ms": 29.724,
+    "p99_ms": 29.795,
+    "mean_ms": 29.504
+   },
+   {
+    "op": "downscale",
+    "size": "2048x1536",
+    "n": 50,
+    "min_ms": 0.346,
+    "p50_ms": 0.366,
+    "p95_ms": 0.406,
+    "p99_ms": 0.424,
+    "mean_ms": 0.368
+   },
+   {
+    "op": "pyrDown",
+    "size": "4000x3000",
+    "n": 50,
+    "min_ms": 14.877,
+    "p50_ms": 15.049,
+    "p95_ms": 15.233,
+    "p99_ms": 15.314,
+    "mean_ms": 15.059
+   },
+   {
+    "op": "saliency",
+    "size": "4000x3000",
+    "n": 50,
+    "min_ms": 11.059,
+    "p50_ms": 11.155,
+    "p95_ms": 11.241,
+    "p99_ms": 11.306,
+    "mean_ms": 11.155
+   },
+   {
+    "op": "warp",
+    "size": "4000x3000",
+    "n": 50,
+    "min_ms": 1.607,
+    "p50_ms": 1.621,
+    "p95_ms": 1.639,
+    "p99_ms": 1.671,
+    "mean_ms": 1.624
+   },
+   {
+    "op": "quality",
+    "size": "4000x3000",
+    "n": 50,
+    "min_ms": 0.851,
+    "p50_ms": 0.889,
+    "p95_ms": 0.907,
+    "p99_ms": 0.909,
+    "mean_ms": 0.889
+   },
+   {
+    "op": "segment:accurate",
+    "size": "4000x3000",
+    "n": 50,
+    "min_ms": 58.937,
+    "p50_ms": 59.579,
+    "p95_ms": 60.029,
+    "p99_ms": 60.213,
+    "mean_ms": 59.565
+   },
+   {
+    "op": "segment:fast",
+    "size": "4000x3000",
+    "n": 50,
+    "min_ms": 29.416,
+    "p50_ms": 29.806,
+    "p95_ms": 30.111,
+    "p99_ms": 30.161,
+    "mean_ms": 29.821
+   },
+   {
+    "op": "downscale",
+    "size": "4000x3000",
+    "n": 50,
+    "min_ms": 33.064,
+    "p50_ms": 33.326,
+    "p95_ms": 33.443,
+    "p99_ms": 33.526,
+    "mean_ms": 33.327
+   }
+  ]
+ },
+ "dnn": {
+  "onnx": null,
+  "onnx_fp16": null,
+  "provenance": {
+   "cv2": "5.0.0",
+   "build_info_sha256": "4460ffe25568d7f496997f0593f568f4d91ee4740c97f057b2986c237e8a386c",
+   "cv2_baseline": "NEON FP16",
+   "cv2_dispatch": "NEON_DOTPROD NEON_FP16 NEON_BF16",
+   "cv2_parallel_framework": "pthreads",
+   "cv2_custom_hal": "YES (carotene (ver 0.0.1) KleidiCV (ver 26.03))",
+   "cv2_file": "/home/runner/work/drishyam/drishyam/.venv/lib/python3.13/site-packages/cv2/__init__.py",
+   "under_opt_cool": false,
+   "build": "stock (not COOL)",
+   "machine": "Linux 6.17.0-1022-azure aarch64",
+   "platform": "Linux-6.17.0-1022-azure-aarch64-with-glibc2.39",
+   "cpu": "Neoverse-N2",
+   "logical_cpus": 4,
+   "cv2_threads": 1,
+   "python": "3.13.16",
+   "numpy": "2.5.4",
+   "timestamp": "2026-10-18T06:58:50Z",
+   "load_avg": [
+    0.98,
+    0.39,
+    0.19
+   ],
+   "label": "GitHub arm64 runner (ubuntu-24.04-arm), not Lambda"
+  },
+  "results": [
+   {
+    "op": "nanodet",
+    "size": "416x416",
+    "n": 50,
+    "min_ms": 40.904,
+    "p50_ms": 41.132,
+    "p95_ms": 41.347,
+    "p99_ms": 41.437,
+    "mean_ms": 41.129
+   }
+  ]
+ },
+ "load_avg_end": [
+  0.98,
+  0.39,
+  0.19
+ ]
+}
