@@ -1,10 +1,11 @@
 # Drishyam
 
-**A virtual-PTZ inspector for bridge photos**, entered in the OpenCV AI Competition 2026, powered by AWS. Drishyam
-(Sanskrit: *that which is seen*) decides where to look in a huge photo, zooms until it is sure, drafts findings with
-pixel measurements, asks a human to sign anything critical, and stops looking when the next look is worth less than
-it costs; under a pixel cap the cap binds first (152 of 200 synthetic and 195 of 200 CODEBRIM jobs at the 30 % cap;
-uncapped, the stop rule ends 182 of 200 synthetic jobs). Every camera move is an OpenCV `pyrDown` /
+**A virtual-PTZ inspector for bridge photos**, entered in the OpenCV AI Competition 2026, powered by AWS. It is for
+bridge inspectors working through photo backlogs (624,939 US bridges, 41,148 in poor condition, each routinely
+inspected at intervals of up to 24 months; [docs/impact-sources.md](docs/impact-sources.md)). Drishyam (Sanskrit:
+*that which is seen*) decides where to look in a huge photo, zooms until it is sure, drafts findings with pixel
+measurements, asks a human to sign anything critical, and stops looking when the next look is worth less than it
+costs. Every camera move is an OpenCV `pyrDown` /
 `warpPerspective` / `resize` call. The live demo runs the stock opencv-python-headless 5.0.0 wheel on Lambda arm64,
 whose build already includes KleidiCV 26.03 and carotene (`cv2.getBuildInformation()`: "Custom HAL: YES (carotene
 (ver 0.0.1) KleidiCV (ver 26.03))").
@@ -79,7 +80,7 @@ Every policy uses one segmenter and one matching rule; the 95 % intervals are a 
 - **200 held-out synthetic images (2048×1536):** at a 30 % pixel cap Drishyam finds 0.47 of the defects using 0.25 of the image's pixels: 0.86× exhaustive tiling's recall (95 % CI 0.80–0.93) at 0.15× its pixels, so the PRD hypothesis (≥ 0.9× tiling recall at ≤ 0.3× its pixels) is **not met**. A single 1024-px downscale at the same pixels does as well (0.96×, 95 % CI 0.90–1.02). Chance scores 0.02.
 - **100 synthetic images at CODEBRIM's 4608×3456:** zooming beats one downscale, narrowly (0.50 against 0.45, 1.10×, 95 % CI 1.01–1.20), but a coarse L2 tiling grid finds 0.53 with a third of Drishyam's pixels.
 - **200 real CODEBRIM photos:** every policy, Drishyam included, finds about one labelled defect in five (Drishyam at 30 %: 0.20, chance 0.14; IoU-only 0.09, chance 0.02). The classical segmenter, tuned on synthetic images, is the limit: it misses spalling (0.00) and exposed rebar (0.01). CODEBRIM's licence bars sharing the photos, so only numbers and text descriptions of the failures are published.
-- **Agent control:** 100 % of steps carry a cause; 40 of 40 planner drills and 10 of 10 governor drills recovered. The FR-21 ablations (random gaze order, no uncertainty term, no survey, no verify, no governor) have not been run, so nothing yet shows that the image-driven choices beat the same budget spent without them.
+- **Agent control:** 100 % of steps carry a cause; 40 of 40 planner drills and 10 of 10 governor drills recovered. At the 30 % pixel cap the cap, not the stop rule, ends 152 of 200 synthetic and 195 of 200 CODEBRIM jobs; uncapped, the stop rule ends 182 of 200 synthetic jobs. The FR-21 ablations (random gaze order, no uncertainty term, no survey, no verify, no governor) have not been run, so nothing yet shows that the image-driven choices beat the same budget spent without them.
 
 ![Recall against pixels processed](docs/recall_vs_pixels.png)
 

@@ -129,9 +129,8 @@ so it uses no OpenCV-5-only API; it runs on the stock OpenCV 5.0.0 wheel.
 That wheel's aarch64 build already includes Arm's KleidiCV and carotene: `cv2.getBuildInformation()` in the
 `opencv-python-headless` 5.0.0.93 package built for Lambda reads "Custom HAL: YES (carotene (ver 0.0.1) KleidiCV
 (ver 26.03))" and "Baseline: NEON FP16". The camera moves use ops KleidiCV covers in some formats (`pyrDown`,
-`resize`, `warpPerspective`). The stock aarch64 wheel the live demo runs already links KleidiCV 26.03, so a COOL gain
-would have to come on top of that. Whether the 3-channel `BORDER_REFLECT_101` `warpPerspective` used here takes the
-HAL path has not been measured. There is no `filter2D` and no NumPy pixel loop on the gaze path; the classical
+`resize`, `warpPerspective`), so a COOL gain would have to come on top of the KleidiCV the wheel already has.
+Whether the 3-channel `BORDER_REFLECT_101` `warpPerspective` used here takes the HAL path has not been measured. There is no `filter2D` and no NumPy pixel loop on the gaze path; the classical
 segmenter adds `connectedComponentsWithStats` and a NumPy softmax, and measurement adds `findContours`.
 
 ### COOL on Graviton (not run)
@@ -252,7 +251,8 @@ same budget spent without them. The per-cap tables and per-class recall are in t
 - **Hairline cracks** (87 of the 227 crack boxes are 1–2 px wide; the flag is in the ground truth): exhaustive tiling
   finds 0.25 of them, one downscale 0.10, Drishyam 0.09 at the 30 % cap and 0.17 uncapped. Only 16 boxes are under
   96² px, too few to read anything into.
-- The hysteresis segmenter shipped with this policy lifted every baseline too, so it is not a Drishyam-only gain.
+- The segmenter's crack hysteresis, added with this policy (a faint crack pixel counts when it is connected to a
+  confident one, as in Canny), lifted every baseline too, so it is not a Drishyam-only gain.
 - Critical false-accept rate (critical prediction with no critical ground truth): Drishyam at 30 % 0.52 against
   exhaustive tiling 0.79 (the PRD asks for ≤ tiling); a single downscale (0.49) and L2 tiling (0.42) are lower still.
 - Agent: 100 % of steps carry a cause; escalation rate 17 %; at the 30 % cap, 3 looks and 0.27 of the pixels per
