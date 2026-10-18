@@ -180,4 +180,4 @@ Full numbers: [public/results/codebrim/summary.json](public/results/codebrim/sum
 
 ## Licence
 
-MIT. Bundled models: YuNet (MIT) and NanoDet-Plus (Apache 2.0) from OpenCV Zoo, see [models/README.md](models/README.md). Fonts: SIL OFL 1.1.
+MIT. Bundled models: YuNet (MIT) and NanoDet-Plus (Apache 2.0) from OpenCV Zoo, and the `drishyam_dacl10k` segmenter, which is [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) (non-commercial; trained on [dacl10k](https://github.com/phiyodr/dacl10k-toolkit)), see [models/README.md](models/README.md). Fonts: SIL OFL 1.1.
