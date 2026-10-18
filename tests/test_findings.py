@@ -103,6 +103,19 @@ def test_work_order_signing_and_review():
         F.apply_review(token2, KEY, "f1", "reject", "Ann")
 
 
+def test_two_decisions_forked_from_one_token_are_visible_siblings():
+    """Nothing stops one pre-review token being signed into both an approve and a reject; each order names the
+    token it came from (prev_mac), so the fork is visible, and a chained review names its own parent."""
+    two = [make(), make("spalling", F.SPALL_CRITICAL_AREA_PX, fid="f2")]  # both critical
+    token = F.sign(F.work_order("j_x", two, []), KEY)
+    (ta, a), (tr, r) = (F.apply_review(token, KEY, "f1", d, "Ann") for d in ("approve", "reject"))
+    assert F.verify(ta, KEY)["approvals"] == a["approvals"]  # both orders are validly signed
+    assert F.verify(tr, KEY)["approvals"] == r["approvals"]
+    assert a["approvals"][0]["prev_mac"] == r["approvals"][0]["prev_mac"] == token.split(".")[1]
+    _, chained = F.apply_review(ta, KEY, "f2", "approve", "Ann")
+    assert [x["prev_mac"] for x in chained["approvals"]] == [token.split(".")[1], ta.split(".")[1]]
+
+
 def test_tampering_expiry_and_reviewer_validation():
     token = F.sign(F.work_order("j_x", [make()], []), KEY)
     body, mac = token.split(".")
