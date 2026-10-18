@@ -150,6 +150,37 @@ def test_onnx_engine_new_dynamic_hw(tiny_onnx, shape):
     assert seg.model == "accurate"
 
 
+class BrightNet:
+    """A stand-in net that keeps its input and answers 'crack' wherever the input is bright."""
+
+    def setInput(self, blob):
+        self.blob = blob.copy()
+
+    def forward(self):
+        logits = np.zeros((1, len(CLASSES), *self.blob.shape[2:]), np.float32)
+        logits[0, CLASSES.index("crack")] = 8.0 * (self.blob[0].mean(0) > 1.0)
+        return logits
+
+
+def test_onnx_letterboxes_a_non_square_crop(tiny_onnx):
+    """A 1024 x 768 crop reaches the 512 x 512 input at one scale (512 x 384, the rest the normalised mean),
+    and comes back 768 x 1024 with its horizontal stripe where it was. Squashed, the stripe would sit at rows
+    200-226 of the input and the net would see a 4:3 view stretched to 1:1."""
+    seg = OnnxSegmenter(tiny_onnx)
+    seg.nets = {"accurate": BrightNet(), "fp16": BrightNet()}
+    crop = np.full((768, 1024, 3), 90, np.uint8)
+    crop[300:340] = 250
+    out = seg.predict(crop)
+    seen = seg.nets["accurate"].blob
+    assert seen.shape == (1, 3, 512, 512) and not seen[0, :, 384:].any()
+    rows = np.flatnonzero((seen[0].mean(0) > 1.0).any(1))
+    assert (rows.min(), rows.max()) == (150, 169)
+    assert out.probs.shape == (len(CLASSES), 768, 1024) and out.net_px == 512 * 512
+    ys, xs = np.nonzero(out.mask("crack"))
+    assert abs(ys.min() - 300) <= 2 and abs(ys.max() - 339) <= 2 and xs.min() == 0 and xs.max() == 1023
+    assert seg.predict(crop, "fast").net_px == 256 * 256 and SEG.predict(crop).net_px == 768 * 1024
+
+
 def test_onnx_class_map_merges_channels(tiny_onnx):
     seg = OnnxSegmenter(tiny_onnx, class_map=[0, 0, 1, 1, 2, 2]).predict(concrete(128, 128, 18))
     assert np.allclose(seg.probs[3:], 0) and np.allclose(seg.probs.sum(axis=0), 1, atol=1e-4)

@@ -39,6 +39,7 @@ class Segmentation:
     confidence: dict[str, float]  # mean probability over each class's pixels
     latency_ms: float
     model: str
+    net_px: int = 0  # pixels the engine computed on: the net's input tensor (pad included), or the classical work image
     lines: list = field(default_factory=list)  # crack components dropped as straight lines (`drop_straight_lines`)
 
     def mask(self, cls: str) -> np.ndarray:
@@ -112,11 +113,13 @@ def _entropy(probs: np.ndarray) -> float:
     return round(float((-(q * np.log2(q) + (1 - q) * np.log2(1 - q))).mean()), 4)
 
 
-def finish(probs: np.ndarray, t0: float, model: str) -> Segmentation:
-    """Labels, areas, confidences and entropy from a (C, H, W) probability stack."""
+def finish(probs: np.ndarray, t0: float, model: str, net_px: int | None = None) -> Segmentation:
+    """Labels, areas, confidences and entropy from a (C, H, W) probability stack. `net_px`: the pixels the engine
+    computed on (default: the stack's own H x W)."""
     labels = probs.argmax(axis=0).astype(np.uint8)
     areas, conf = _clean(labels, probs, range(1, len(CLASSES)))
-    return Segmentation(probs, labels, _entropy(probs), areas, conf, (time.perf_counter() - t0) * 1000, model)
+    return Segmentation(probs, labels, _entropy(probs), areas, conf, (time.perf_counter() - t0) * 1000, model,
+                        probs[0].size if net_px is None else net_px)
 
 
 def restrict(seg: Segmentation, valid: np.ndarray) -> Segmentation:
@@ -135,7 +138,7 @@ def restrict(seg: Segmentation, valid: np.ndarray) -> Segmentation:
     areas.update(a)
     conf.update(c)
     return Segmentation(probs, labels, _entropy(probs), areas, conf,
-                        seg.latency_ms + (time.perf_counter() - t0) * 1000, seg.model)
+                        seg.latency_ms + (time.perf_counter() - t0) * 1000, seg.model, seg.net_px)
 
 
 def drop_straight_lines(seg: Segmentation, scale: float = 1.0) -> Segmentation:
@@ -249,12 +252,15 @@ class ClassicalSegmenter:
         probs = _softmax(logits)
         if work is not crop:
             probs = np.stack([cv2.resize(p, (w, h), interpolation=cv2.INTER_LINEAR) for p in probs])
-        return finish(probs, t0, model)
+        return finish(probs, t0, model, work.shape[0] * work.shape[1])
 
 
 class OnnxSegmenter:
-    """A segmentation ONNX (N, C, H, W logits, dynamic H x W) on the OpenCV 5 DNN new engine.
+    """A segmentation ONNX (N, C, H, W logits) on the OpenCV 5 DNN new engine.
 
+    Each crop is letterboxed into the square `input_size` input (`input_size // 2` for the fast model): one scale
+    for both axes, the rest padded with the normalised mean (zero). The logits are cropped back to the letterbox's
+    content before they are resized to the crop, so a non-square crop is never squashed.
     `class_map[i]` is the Drishyam class index that model channel i adds to, so a
     19-class dacl10k head collapses onto CODEBRIM's five defects plus background.
     """
@@ -281,13 +287,17 @@ class OnnxSegmenter:
         t0 = time.perf_counter()
         h, w = crop.shape[:2]
         size = self.size if model == "accurate" else self.size // 2
-        rgb = cv2.cvtColor(cv2.resize(crop, (size, size), interpolation=cv2.INTER_AREA), cv2.COLOR_BGR2RGB)
-        blob = ((rgb.astype(np.float32).transpose(2, 0, 1) / 255.0 - self.mean) / self.std)[None]
+        k = size / max(h, w)
+        nw, nh = max(1, round(w * k)), max(1, round(h * k))
+        rgb = cv2.cvtColor(cv2.resize(crop, (nw, nh), interpolation=cv2.INTER_AREA), cv2.COLOR_BGR2RGB)
+        blob = np.zeros((1, 3, size, size), np.float32)
+        blob[0, :, :nh, :nw] = (rgb.astype(np.float32).transpose(2, 0, 1) / 255.0 - self.mean) / self.std
         net = self.nets["fp16" if model in ("fp16", "fast") else "accurate"]
         with self.lock:
-            net.setInput(np.ascontiguousarray(blob, np.float32))
+            net.setInput(blob)
             logits = np.asarray(net.forward())[0].astype(np.float32)
-        probs = _softmax(logits)
+        oh, ow = logits.shape[1:]  # the output may be strided: crop the content at the same fraction
+        probs = _softmax(logits[:, : max(1, round(nh * oh / size)), : max(1, round(nw * ow / size))])
         if self.class_map is not None:
             merged = np.zeros((len(CLASSES), *probs.shape[1:]), np.float32)
             for ch, target in enumerate(self.class_map):
@@ -296,7 +306,7 @@ class OnnxSegmenter:
         if probs.shape[0] != len(CLASSES):
             raise ValueError(f"model has {probs.shape[0]} classes; pass class_map to reach {len(CLASSES)}")
         probs = np.stack([cv2.resize(p, (w, h), interpolation=cv2.INTER_LINEAR) for p in probs])
-        return finish(probs, t0, model)
+        return finish(probs, t0, model, size * size)
 
 
 def mask_iou(a: np.ndarray, b: np.ndarray) -> float:
