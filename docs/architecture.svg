@@ -128,7 +128,7 @@
 <text x="590" y="532" class="h" xml:space="preserve">CLOUDWATCH</text>
 <line class="band" x1="580" y1="542" x2="920" y2="542"/>
 <text x="590" y="556" xml:space="preserve">EMF metrics: one log line per job</text>
-<text x="590" y="572" xml:space="preserve">dashboard; alarms → SNS (no subscriber)</text>
+<text x="590" y="572" xml:space="preserve">dashboard; alarms → SNS (email unconfirmed)</text>
 </g>
 <g class="node" data-box="580 604 340 72">
 <rect class="box" x="580" y="604" width="340" height="72"/>
@@ -318,7 +318,7 @@
 <path class="edge " d="M359 1320 L387 1320"/>
 <path class="edge " d="M666 1320 L694 1320"/>
 <path class="edge " d="M973 1320 L1001 1320"/>
-<text x="80" y="1404" class="fs" xml:space="preserve">★ OpenCV-5-specific: the engine=<tspan class="cv">cv2.dnn.ENGINE_NEW</tspan> argument (segment.py:239). Every other call above also exists in OpenCV 4.x.</text>
+<text x="80" y="1404" class="fs" xml:space="preserve">★ OpenCV-5-specific: the engine=<tspan class="cv">cv2.dnn.ENGINE_NEW</tspan> argument (segment.py, OnnxSegmenter._load). Every other call above also exists in OpenCV 4.x.</text>
 <path class="edge " d="M60 914 L40 914 L40 1540 L60 1540"/>
 <rect class="frame" x="60" y="1460" width="800" height="140"/>
 <circle class="n" cx="82" cy="1480" r="11"/>
@@ -351,5 +351,5 @@
 <text x="926" y="1523" class="fs" xml:space="preserve">built and tested</text>
 <text x="896" y="1545" class="fs" xml:space="preserve"><tspan class="cv">cv2.call</tspan> OpenCV call · <tspan class="ca">cause</tspan> trace cause</text>
 <text x="896" y="1566" class="fs" xml:space="preserve"><tspan class="rd">red</tspan> human gate or kill · ★ OpenCV-5-only</text>
-<text x="896" y="1593" class="fs" xml:space="preserve">DRAWN 2026-10-18 · SCALE NTS · REV 03af85b</text>
+<text x="896" y="1593" class="fs" xml:space="preserve">DRAWN 2026-10-18 · SCALE NTS · REV 1.1.0</text>
 </svg>

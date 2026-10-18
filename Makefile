@@ -7,8 +7,8 @@ RAW ?= results
 CODEBRIM ?= data/codebrim
 # MAX_LOAD=4: evals and benchmarks exit at start if the 1-min load average is at or above it (checked in the process)
 MAX_LOAD ?=
-# the fixed cost table: results/$(MICRO_ARM)/micro.json job_ops (e.g. linux-aarch64 from the bench-arm64 workflow)
-MICRO_ARM ?= local-macos-x86
+# the fixed cost table: results/$(MICRO_ARM)/micro.json job_ops; the published runs use linux-aarch64 (bench-arm64 workflow)
+MICRO_ARM ?= linux-aarch64
 EVAL = $(PY) -m evals.harness --cost-model fixed --micro-arm $(MICRO_ARM) $(if $(MAX_LOAD),--max-load $(MAX_LOAD))
 
 .PHONY: test e2e eval eval-real eval-large eval-dev eval-live eval-model eval-ablations eval-ablations-real eval-clean bench data serve lint

@@ -679,7 +679,7 @@ input:checked + .switch__ui::after { transform: translateX(22px); background: va
 .sw { display: inline-block; width: 30px; height: 0; border-top: 3px solid; }
 .sw--drishyam { border-color: var(--amber); }
 .sw--tiling { border-top-style: dashed; border-color: var(--line); }
-.sw--downscale { border-top-style: dotted; border-color: var(--sky); }
+.sw--downscale { width: 11px; height: 11px; border: 2.5px solid var(--sky); }  /* one point, no line: the swatch is its square marker */
 .sw--model { border-top-style: dashed; border-color: var(--red); }
 .data summary { cursor: pointer; font: 500 12px/1.2 var(--f-mono); color: var(--amber); }
 .data .table-wrap, .data > .stack { margin-top: 8px; }
