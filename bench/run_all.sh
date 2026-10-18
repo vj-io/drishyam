@@ -5,7 +5,8 @@
 # data/synth200), N (images, 200), PIXEL_CAP (0.3), THREADS (cv2 threads per worker, 1), WORKERS (space-separated
 # worker counts for the macro run, "1"; e.g. "1 2 4 8" for the scaling sweep), USD_PER_HOUR (0.339),
 # PARITY_INPUTS (another arm's parity.npz, so both arms segment identical crops), DRISHYAM_ON_EC2=1 (record IMDSv2
-# instance metadata in the provenance block; nothing else ever calls IMDS).
+# instance metadata in the provenance block; nothing else ever calls IMDS), MAX_LOAD (micro and macro exit before
+# timing if the 1-min load average is at or above it), BENCH_LABEL (where this ran, in words: provenance.label).
 set -euo pipefail
 
 arm="${1:?usage: bench/run_all.sh <arm-name>}"
@@ -21,12 +22,12 @@ if [ ! -f "$data/annotations.json" ]; then
 fi
 
 echo "== micro ($arm)"
-"$py" -m bench.micro --arm "$arm" --threads "${THREADS:-1}"
+"$py" -m bench.micro --arm "$arm" --threads "${THREADS:-1}" ${MAX_LOAD:+--max-load "$MAX_LOAD"}
 
 for w in ${WORKERS:-1}; do
   echo "== macro ($arm, $w worker(s))"
   "$py" -m bench.macro --arm "$arm" --data "$data" --n "${N:-200}" --pixel-cap "${PIXEL_CAP:-0.3}" \
-    --workers "$w" --threads "${THREADS:-1}" --usd-per-hour "${USD_PER_HOUR:-0.339}"
+    --workers "$w" --threads "${THREADS:-1}" --usd-per-hour "${USD_PER_HOUR:-0.339}" ${MAX_LOAD:+--max-load "$MAX_LOAD"}
 done
 
 echo "== parity ($arm)"

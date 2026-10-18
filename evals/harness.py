@@ -6,7 +6,9 @@ Every policy uses `drishyam.segment.default_segmenter()` (the classical engine, 
 names: summary.json says which), so only the looking policy differs:
   downscale   one read of the whole image resized to 1024 px on the long side, segmented once
   tiling      512 px tiles with 20 % overlap at L0, plus the same grid read from pyramid levels 1 and 2
-  drishyam    `Job` with pixel_cap in BUDGETS, thumbs off
+  drishyam    `Job` with pixel_cap in BUDGETS, thumbs off, and the governor's model/level/gaze overrides off, so it
+              segments with the same accurate net as the baselines (--governor: on, labelled deployment behaviour);
+              a comparison in which any policy used another net is refused, and summary.json counts each net's calls
 
 A ground-truth box is FOUND when a prediction of the same class overlaps it at IoU >= 0.3 or contains its
 centre (PRD); `recall_iou_only` drops the centre clause. Each policy also gets precision (one-to-one: in confidence
@@ -15,7 +17,12 @@ several looks counts once), false positives per image, a 95 % bootstrap interval
 images (paired across policies, so ratios get one too) and a chance baseline: the policy's own boxes, same
 class and size, moved to seeded uniform positions. Pixels are counted as pixels fed to the segmenter (tile
 overlap and re-looks included, the saliency overview included for Drishyam) over the L0 pixel count, so
-exhaustive 20 %-overlap tiling costs 1.67x the image. $/image = seconds x $0.339/3600.
+exhaustive 20 %-overlap tiling costs 1.67x the image; `net_pixels_frac` counts what the network was fed instead
+(Segmentation.net_px, None if the segmenter does not report it), and the fixed cost model charges that when known.
+$/image = seconds x $0.339/3600. A set with no ground-truth box (synth --clean) is scored as false alarms per image.
+
+Provenance records the sha256 of the scored ground truth and of the image bytes, and a synthetic set built by
+another evals.synth GENERATOR_VERSION is refused. --ablation runs the FR-21 variants (ABLATIONS) instead.
 
 --cost-model fixed (the default, and every published number): each op the agent times costs its p50 from the
 `job_ops` table of results/<micro-arm>/micro.json (bench.micro) on every call, on a virtual clock, so t-hat, the
@@ -26,6 +33,7 @@ measures wall time instead (what the app does), so machine load changes the agen
 from __future__ import annotations
 
 import argparse
+import collections
 import functools
 import gzip
 import hashlib
@@ -40,7 +48,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from bench.micro import provenance
+from bench.micro import check_load, provenance, set_threads
 from drishyam import imaging
 from drishyam.agent import PLANNER_MALFORMED_STEP, PLANNER_TIMEOUT_STEP, Job, JobConfig
 from drishyam.findings import SPALL_CRITICAL_AREA_PX, is_critical
@@ -59,6 +67,21 @@ BOOT_N, BOOT_SEED, CHANCE_SEED = 1000, 0, 1
 SMALL_PX = 96 * 96  # GT boxes below this area form the small-box stratum
 PER_IMAGE_OPS = ("pyrDown", "saliency", "downscale")  # their cost grows with the image; per-look ops read 512x512
 REPO = Path(__file__).resolve().parents[1]
+SWITCHES = ("order", "seed", "use_uncertainty", "survey", "verify", "governor")  # JobConfig fields a variant may flip
+ABLATION_CAPS = (0.3, 1.0)
+ABLATIONS = {  # FR-21: each variant flips one switch of the compared agent (governor off, as in every comparison)
+    "full": {},
+    **{f"random-order-s{s}": {"order": "random", "seed": s} for s in (0, 1, 2)},
+    "no-uncertainty": {"use_uncertainty": False},
+    "no-survey": {"survey": False},
+    "no-verify": {"verify": False},
+    "governor-on": {"governor": True},  # deployment behaviour: may switch to the fast net, so not like for like
+}
+GOVERNOR_USE = {
+    False: "policy comparison: the governor's model, level and gaze-size overrides are off (caps and the kill switch "
+           "stay), so Drishyam segments every look with the same accurate net as the baselines",
+    True: "deployment behaviour: the governor is on, as in the app, and may switch Drishyam to the fast net, so this "
+          "is not a like-for-like policy comparison"}
 
 
 # ---------------------------------------------------------------- matching
@@ -180,16 +203,24 @@ def seg_seconds(costs: dict, px: int) -> float:
     return costs["segment:accurate"] * px / TILE**2 / 1000
 
 
+def net_px(segs) -> int | None:
+    """Pixels the segmenter's network was fed over these predictions (`Segmentation.net_px`: an ONNX net resizes
+    every crop to its input), or None when the segmenter does not report it: unknown, never guessed."""
+    vals = [getattr(s, "net_px", None) for s in segs]
+    return None if None in vals else int(sum(vals))
+
+
 def run_downscale(img: np.ndarray, seg, costs: dict | None = None) -> dict:
     t0 = time.perf_counter()
     h, w = img.shape[:2]
     k = min(1.0, LONG_SIDE / max(h, w))
     small = img if k == 1.0 else cv2.resize(img, (round(w * k), round(h * k)), interpolation=cv2.INTER_AREA)
     out, to_l0 = seg.predict(small), np.diag([1 / k, 1 / k, 1.0])
-    px = small.shape[0] * small.shape[1]
-    wall = time.perf_counter() - t0 if costs is None else (costs["downscale"] if k < 1 else 0) / 1000 + seg_seconds(costs, px)
+    px, net = small.shape[0] * small.shape[1], net_px([out])
+    wall = time.perf_counter() - t0 if costs is None else (
+        (costs["downscale"] if k < 1 else 0) / 1000 + seg_seconds(costs, px if net is None else net))
     return {"preds": preds_from_seg(out, to_l0), "preds_union": union_from_seg(out, to_l0), "pixels_frac": px / (h * w),
-            "wall_s": wall}
+            "net_pixels_frac": None if net is None else net / (h * w), "wall_s": wall, "models": {"accurate": 1}}
 
 
 def run_tiling(img: np.ndarray, seg, level: int, costs: dict | None = None) -> dict:
@@ -197,16 +228,20 @@ def run_tiling(img: np.ndarray, seg, level: int, costs: dict | None = None) -> d
     t0 = time.perf_counter()
     h, w = img.shape[:2]
     base, s = imaging.build_pyramid(img, level + 1)[level], 2.0**level
-    preds, union, px = [], [], 0
+    preds, union, px, outs = [], [], 0, []
     for x0, y0, x1, y1 in slice_boxes(*base.shape[:2]):
         crop = np.ascontiguousarray(base[y0:y1, x0:x1])
         px += crop.shape[0] * crop.shape[1]
         out, to_l0 = seg.predict(crop), np.array([[s, 0, s * x0], [0, s, s * y0], [0, 0, 1.0]])
+        outs.append(out)
         preds += preds_from_seg(out, to_l0)
         union += union_from_seg(out, to_l0)
+    net = net_px(outs)
     # ponytail: L1/L2 are charged the whole 5-level pyramid (at most a third more than the levels they build)
-    wall = time.perf_counter() - t0 if costs is None else (costs["pyrDown"] if level else 0) / 1000 + seg_seconds(costs, px)
-    return {"preds": merge_boxes(preds), "preds_union": merge_boxes(union), "pixels_frac": px / (h * w), "wall_s": wall}
+    wall = time.perf_counter() - t0 if costs is None else (
+        (costs["pyrDown"] if level else 0) / 1000 + seg_seconds(costs, px if net is None else net))
+    return {"preds": merge_boxes(preds), "preds_union": merge_boxes(union), "pixels_frac": px / (h * w),
+            "net_pixels_frac": None if net is None else net / (h * w), "wall_s": wall, "models": {"accurate": len(outs)}}
 
 
 class RecordingSegmenter:
@@ -259,10 +294,12 @@ class FixedCostJob(Job):
         return out, ms
 
 
-def run_drishyam(img: np.ndarray, cap: float, costs: dict | None = None) -> dict:
+def run_drishyam(img: np.ndarray, cap: float, costs: dict | None = None, **switches) -> dict:
+    """One Job at pixel cap `cap`. `switches` are JobConfig ablation fields; the governor's overrides are off unless
+    governor=True, so a policy comparison runs the accurate net on every look, as the baselines do."""
     t0 = time.perf_counter()
     rec_seg = RecordingSegmenter()
-    cfg = JobConfig(pixel_cap=cap, thumbs=False)
+    cfg = JobConfig(pixel_cap=cap, thumbs=False, **{"governor": False, **switches})
     job = Job(img, cfg, segmenter=rec_seg) if costs is None else FixedCostJob(img, cfg, costs, segmenter=rec_seg)
     done = list(job.run())[-1]
     wall = time.perf_counter() - t0 if costs is None else job.now
@@ -274,12 +311,15 @@ def run_drishyam(img: np.ndarray, cap: float, costs: dict | None = None) -> dict
               "q_ok": r.get("quality", {}).get("ok", True), "q_reason": r.get("quality", {}).get("reason"),
               "sharpness": r.get("observation", {}).get("sharpness"), "model": r.get("model"),
               "governor": r.get("governor", {}).get("cause")} for r in job.trace]
-    return {"preds": finding_components(job, rec_seg.log), "preds_union": preds,
-            "pixels_frac": done["summary"]["pixels_frac"], "wall_s": wall, "trace": trace,
-            "status": done["status"], "halt_cause": done["cause"]}
+    net = net_px(rec_seg.log)
+    return {"preds": finding_components(job, rec_seg.log), "preds_union": preds, "pixels_frac": done["summary"]["pixels_frac"],
+            "net_pixels_frac": None if net is None else net / (img.shape[0] * img.shape[1]), "wall_s": wall,
+            "trace": trace, "status": done["status"], "halt_cause": done["cause"],
+            "models": dict(collections.Counter(t["model"] for t in trace if t["action"] != "halt")),
+            "switches": {k: getattr(job.cfg, k) for k in SWITCHES}}  # what the job read, not what was asked
 
 
-def eval_image(rec: dict, budgets=BUDGETS, cost_rows: list | None = None) -> dict:
+def eval_image(rec: dict, budgets=BUDGETS, cost_rows: list | None = None, governor: bool = False) -> dict:
     """Every policy on one image (a worker task). `cost_rows`: the job_ops table for --cost-model fixed."""
     img = cv2.imread(rec["path"], cv2.IMREAD_COLOR)
     seg = default_segmenter()
@@ -288,8 +328,8 @@ def eval_image(rec: dict, budgets=BUDGETS, cost_rows: list | None = None) -> dic
     for lvl in TILE_LEVELS:
         cfg[f"tiling@L{lvl}"] = run_tiling(img, seg, lvl, costs)
     for cap in budgets:
-        cfg[f"drishyam@{cap}"] = run_drishyam(img, cap, costs)
-    return {"id": rec["id"], "width": img.shape[1], "height": img.shape[0], "configs": cfg}
+        cfg[f"drishyam@{cap}"] = run_drishyam(img, cap, costs, governor=governor)
+    return {"id": rec["id"], "width": img.shape[1], "height": img.shape[0], "cv2_threads": cv2.getNumThreads(), "configs": cfg}
 
 
 # ---------------------------------------------------------------- fixed cost model
@@ -352,7 +392,7 @@ def chaos_task(arg: tuple[dict, str, list | None]) -> dict:
 
 # ---------------------------------------------------------------- pool
 def _init_worker() -> None:
-    cv2.setNumThreads(1)  # one thread per worker process: what a vCPU-per-worker deployment would run
+    set_threads(1)  # one thread per worker process (read back; exits if it did not take): a vCPU-per-worker deployment
     warm = np.random.default_rng(0).integers(0, 255, (768, 1024, 3)).astype(np.uint8)
     default_segmenter().predict(warm[:512, :512].copy())
     list(Job(warm, JobConfig(pixel_cap=0.5, thumbs=False)).run())
@@ -397,16 +437,31 @@ def load_records(data_dir, n: int, kind: str = "auto", seed: int = 7, size=(2048
             print(f"{d}/annotations.json missing: building synthetic-{n} at {size[0]}x{size[1]}, seed {seed}", flush=True)
             synth.build_dataset(d, n=n, seed=seed, width=size[0], height=size[1])
         ann = json.loads((d / "annotations.json").read_text())
+        if ann.get("generator_version") != synth.GENERATOR_VERSION:  # a set built by older code has other GT
+            raise SystemExit(f"{d} was built by evals.synth generator version {ann.get('generator_version')} (None: before "
+                             f"versioning), not {synth.GENERATOR_VERSION}: delete it and re-run (a missing set is built "
+                             "here), or rebuild it with `python -m evals.synth dataset`")
         if ann.get("seed") != seed:
             raise SystemExit(f"{d} was built with seed {ann.get('seed')}, not --seed {seed}")
         recs = [{**r, "path": str(d / r["file"])} for r in ann["images"]][:n]
+        if ann.get("clean"):
+            return recs, f"synthetic clean set, {len(recs)} images with distractors and no damage (labelled synthetic)"
         return recs, f"synthetic-{len(recs)} at {recs[0]['width']}x{recs[0]['height']} (labelled synthetic)"
     recs = codebrim.load_eval(d, d / "eval200.txt")[:n]
     return recs, f"CODEBRIM eval subset ({len(recs)} images)"
 
 
+def dataset_sha256(records: list[dict]) -> dict:
+    """sha256 of the ground truth scored (each record's id and boxes, in id order) and of the images read (each file's
+    name and sha256, in name order). Two runs are comparable only if both match."""
+    gt = json.dumps(sorted([r["id"], r["boxes"]] for r in records), sort_keys=True)
+    files = sorted([Path(r["path"]).name, hashlib.sha256(Path(r["path"]).read_bytes()).hexdigest()] for r in records)
+    return {"dataset_gt_sha256": hashlib.sha256(gt.encode()).hexdigest(),
+            "dataset_images_sha256": hashlib.sha256(json.dumps(files).encode()).hexdigest()}
+
+
 def _r(x, nd=4):
-    return None if x is None else round(float(x), nd)
+    return None if x is None or math.isnan(x) else round(float(x), nd)
 
 
 def chance_boxes(preds: list[dict], w: int, h: int, rng) -> list[dict]:
@@ -423,7 +478,7 @@ def strata(g: dict) -> list[str]:
 def score_config(key: str, records: list[dict], results: list[dict], field: str = "preds") -> dict:
     tot, fnd, strict = ({c: 0 for c in CLASSES} for _ in range(3))
     crit = crit_false = n_preds = tp = n_hit = 0
-    px, wall, flags, per_image = [], [], {}, []
+    px, net, wall, flags, per_image = [], [], [], {}, []
     st_tot, st_fnd = {"hairline_crack": 0, "small_box": 0}, {"hairline_crack": 0, "small_box": 0}
     rng = np.random.default_rng([CHANCE_SEED, zlib.crc32(key.encode())])  # the same draw for every run of this policy
     for rec, res in zip(records, results, strict=True):
@@ -445,6 +500,7 @@ def score_config(key: str, records: list[dict], results: list[dict], field: str 
         k, bad = critical_counts(preds, boxes)
         crit, crit_false, n_preds, tp, n_hit = crit + k, crit_false + bad, n_preds + len(preds), tp + matched(preds, boxes), n_hit + hit
         px.append(c["pixels_frac"])
+        net.append(c.get("net_pixels_frac"))
         wall.append(c["wall_s"])
     ratio = lambda a, b: a / b if b else None
     n_gt, cols = sum(tot.values()), np.array(per_image).sum(0)
@@ -455,7 +511,8 @@ def score_config(key: str, records: list[dict], results: list[dict], field: str 
             "hits_per_matched_gt": ratio(n_hit, tp),  # predictions hitting some GT box per GT box claimed: 1 = no duplicates
             "per_class": {c: ratio(fnd[c], tot[c]) for c in CLASSES}, "gt_per_class": tot,
             "strata": {k: ratio(st_fnd[k], v) for k, v in st_tot.items()}, "strata_gt": st_tot,
-            "pixels_frac": float(np.mean(px)), "wall_s": float(np.mean(wall)),
+            "pixels_frac": float(np.mean(px)), "net_pixels_frac": None if None in net else float(np.mean(net)),
+            "wall_s": float(np.mean(wall)),
             "usd": float(np.mean(wall)) * USD_PER_HOUR / 3600,
             "critical_predictions": crit, "critical_false": crit_false, "false_accept_rate": ratio(crit_false, crit),
             "predictions_per_image": n_preds / len(records), "flags": flags,
@@ -467,13 +524,15 @@ def boot_ci(stat, n_images: int, n: int = BOOT_N, seed: int = BOOT_SEED) -> list
     so every policy sees the same resamples and a ratio of two policies is a paired bootstrap."""
     rng = np.random.default_rng(seed)
     vals = [stat(rng.integers(0, n_images, n_images)) for _ in range(n)]
+    if np.isnan(vals).all():  # e.g. recall on images with no ground truth
+        return [None, None]
     return [_r(v) for v in np.nanpercentile(vals, [2.5, 97.5])]
 
 
 def recall_of(m: dict, col: int = 0):
     """stat(idx) for boot_ci: the recall of policy metrics `m` on the resampled images (col 1: IoU-only)."""
     a = np.array(m["per_image"])
-    return lambda idx: a[idx, col].sum() / max(1, a[idx, 4].sum())
+    return lambda idx: a[idx, col].sum() / a[idx, 4].sum() if a[idx, 4].sum() else np.nan
 
 
 def ratio_ci(m: dict, base: dict, n_images: int, col: int = 0) -> list:
@@ -505,6 +564,7 @@ def agent_metrics(results: list[dict], chaos: list[dict], budgets, workers: int)
                        "recovered": sum(c["ok"] for c in by_kind(k))}
     timeout, malformed, spike = tally("planner_timeout"), tally("planner_malformed"), tally("p95_spike")
     head = by_budget[str(HEADLINE_BUDGET)]
+    threads = sorted({r.get("cv2_threads") for r in results} - {None})  # read back in the process that ran each image
     return {
         "headline_budget": HEADLINE_BUDGET,
         "escalation_rate": head["escalation_rate"],
@@ -518,9 +578,31 @@ def agent_metrics(results: list[dict], chaos: list[dict], budgets, workers: int)
                              "injected_total": timeout["injected"] + malformed["injected"]},
         "governor_response": spike,
         "governor_activity_in_eval": gov,
-        "timing": {"workers": workers, "cv2_threads_per_worker": 1 if workers > 1 else cv2.getNumThreads(),
+        "model_usage": model_usage(results),
+        "timing": {"workers": workers, "cv2_threads_per_worker": threads[0] if len(threads) == 1 else threads or None,
                    "note": "wall times are per image while the other workers were busy; read ratios, not absolutes"},
     }
+
+
+def model_usage(results: list[dict]) -> dict:
+    """Segmenter calls per model ('accurate', 'fast') of each policy over all images."""
+    total: dict = {}
+    for r in results:
+        for k, c in r["configs"].items():
+            total.setdefault(k, collections.Counter()).update(c.get("models", {}))
+    return {k: dict(v) for k, v in total.items()}
+
+
+def confounded(summary: dict) -> str | None:
+    """Why a summary is not a like-for-like policy comparison, or None: the governor was on, it switched the model
+    for latency, or a policy segmented with anything but the accurate net the baselines use."""
+    am = summary.get("agent_metrics", {})
+    if summary.get("agent_config", {}).get("governor", True):  # summaries from before the field ran it on
+        return "the governor was on (deployment behaviour)"
+    if am.get("governor_activity_in_eval", {}).get("p95>SLA"):
+        return f"the governor switched the model {am['governor_activity_in_eval']['p95>SLA']} times (p95>SLA)"
+    other = {k: u for k, u in am.get("model_usage", {}).items() if set(u) - {"accurate"}}
+    return f"policies used other nets than accurate: {other}" if other else None
 
 
 def micro_rows(arm: str, results_dir) -> list[dict]:
@@ -532,7 +614,10 @@ def micro_rows(arm: str, results_dir) -> list[dict]:
 
 
 def point(m: dict) -> dict:
-    return {"pixels_frac": _r(m["pixels_frac"]), "recall": _r(m["recall"]), "recall_ci": m["recall_ci"],
+    """One policy's published numbers. pixels_frac: image pixels read by the segmenter; net_pixels_frac: pixels its
+    network was fed (None when the segmenter does not report them); both over the image's pixel count."""
+    return {"pixels_frac": _r(m["pixels_frac"]), "net_pixels_frac": _r(m["net_pixels_frac"]),
+            "recall": _r(m["recall"]), "recall_ci": m["recall_ci"],
             "recall_iou_only": _r(m["recall_iou_only"]), "recall_iou_only_ci": m["recall_iou_only_ci"],
             "chance_recall": _r(m["chance_recall"]), "chance_recall_iou_only": _r(m["chance_recall_iou_only"]),
             "precision": _r(m["precision"]), "fp_per_image": _r(m["fp_per_image"], 1),
@@ -557,6 +642,9 @@ def headline_stats(m: dict, n: int) -> dict:
             "recall_ratio_vs_downscale": r(d, s), "recall_ratio_vs_downscale_ci": ratio_ci(d, s, n)}
 
 
+BOX_NAMES = {"components": "per-component", "union": "one-box-per-class", "as_specified": "as-specified mixed"}
+
+
 def headline(scored: dict, primary: str, n: int, label: str) -> str:
     """Two sentences: the hypothesis test against L0 tiling, then every other baseline, as recall ratios."""
     m, key = scored[primary], f"drishyam@{HEADLINE_BUDGET}"
@@ -569,8 +657,7 @@ def headline(scored: dict, primary: str, n: int, label: str) -> str:
                f"meets {hyp} on the point estimate, but the 95% CI includes values below 0.9" if hs["meets_target"] else
                f"does not meet {hyp}")
     ci = lambda v: "" if None in v else f"95% CI {v[0]:.2f}-{v[1]:.2f}, "
-    names = {"components": "per-component", "union": "one-box-per-class", "as_specified": "as-specified mixed"}
-    others = ", ".join(f"{ratio_of(sc, 'tiling@L0'):.2f}x with {names[name]} boxes" for name, sc in scored.items() if name != primary)
+    others = ", ".join(f"{ratio_of(sc, 'tiling@L0'):.2f}x with {BOX_NAMES[name]} boxes" for name, sc in scored.items() if name != primary)
     best = max((f"tiling@L{lv}" for lv in TILE_LEVELS), key=lambda k: m[k]["recall"])
     grids = " and ".join(f"{ratio_of(m, k):.2f}x L{k[-1]} tiling ({m[k]['recall']:.2f} at {m[k]['pixels_frac']:.2f}"
                          f"{', the best grid' if k == best else ''})" for k in ("tiling@L1", "tiling@L2"))
@@ -584,7 +671,57 @@ def headline(scored: dict, primary: str, n: int, label: str) -> str:
             f"({d['chance_recall_iou_only']:.2f} with IoU only).")
 
 
+def false_alarms(records: list[dict], results: list[dict], keys: list[str], primary: str) -> dict:
+    """On images with no damage every box is a false alarm. Per policy: boxes and critical boxes per image (in the
+    primary box convention), boxes per image with one box per class per view (`union_per_image`: for Drishyam, its
+    findings), and the share of images with any (critical) box; and what each policy reported on the demo's clean
+    sample bridge_08, if the set holds it."""
+    out, named = {}, {}
+    for k in keys:
+        cs = [res["configs"][k] for res in results]
+        boxes = [c[CONVENTIONS[primary](k)] for c in cs]
+        crit = [[p for p in b if is_critical(p["cls"], p["area"])] for b in boxes]
+        n = len(cs)
+        out[k] = {"boxes_per_image": _r(sum(map(len, boxes)) / n, 2), "critical_per_image": _r(sum(map(len, crit)) / n, 2),
+                  "union_per_image": _r(sum(len(c["preds_union"]) for c in cs) / n, 2),
+                  "images_with_any": _r(sum(map(bool, boxes)) / n), "images_with_critical": _r(sum(map(bool, crit)) / n)}
+        for rec, b in zip(records, boxes, strict=True):
+            if rec["id"] == "bridge_08":
+                named.setdefault(rec["id"], {})[k] = dict(collections.Counter(p["cls"] for p in b))
+    return {**out, **({"classes_reported": named} if named else {})}
+
+
+def clean_headline(fa: dict, n: int, primary: str) -> str:
+    """Every policy in one box unit per clause: the primary convention, then one box per class per view."""
+    d, s, t = fa[f"drishyam@{HEADLINE_BUDGET}"], fa["downscale"], fa["tiling@L0"]
+    union = (f"; with one box per class per view (a Drishyam finding), {d['union_per_image']:.2f}, {s['union_per_image']:.2f} "
+             f"and {t['union_per_image']:.2f}" if primary != "union" else "")
+    return (f"On {n} synthetic images with no damage (distractors only), every box is a false alarm. In {BOX_NAMES[primary]} "
+            f"boxes per image, Drishyam at a {HEADLINE_BUDGET:.0%} pixel cap reported {d['boxes_per_image']:.2f} "
+            f"({d['critical_per_image']:.2f} critical), a single 1024-px downscale {s['boxes_per_image']:.2f} "
+            f"({s['critical_per_image']:.2f} critical) and 20%-overlap tiling {t['boxes_per_image']:.2f} "
+            f"({t['critical_per_image']:.2f} critical){union}. Drishyam reported some damage on {d['images_with_any']:.0%} of the images.")
+
+
 # ---------------------------------------------------------------- run
+PROV_KEYS = ("cv2", "build_info_sha256", "cv2_baseline", "cv2_dispatch", "cv2_parallel_framework", "cv2_custom_hal",
+             "machine", "cpu", "python", "timestamp", "build", "load_avg", "load_avg_start", "load_avg_end")
+
+
+def run_provenance(load_start: list[float]) -> dict:
+    """provenance() taken at the end of a run, its load named as in bench/: load_avg is the start (= load_avg_start)."""
+    p = provenance()
+    return {**p, "load_avg": load_start, "load_avg_start": load_start, "load_avg_end": p["load_avg"]}
+
+
+def short_provenance(prov: dict, workers: int, threads, micro_arm: str, data_id: dict, synthetic: bool) -> dict:
+    """The published provenance: the run's machine and OpenCV build, how it ran, and which data it scored."""
+    keep = {k: prov[k] for k in PROV_KEYS if k in prov}  # a re-scored older run may predate some fields
+    keep["machine"] += (f", {prov['logical_cpus']} logical CPUs; eval ran {workers} worker(s) x {threads} cv2 thread(s); "
+                        f"micro arm {micro_arm}")
+    return {**keep, **data_id, **({"dataset_generator_version": synth.GENERATOR_VERSION} if synthetic else {})}
+
+
 def segmenter_id(seg) -> str:
     """seg.name plus each ONNX file's name and short sha256: every trained model installs as
     models/drishyam_dacl10k.onnx, and the FP16 net (if any) serves the 'fast' looks, so the name alone does not say
@@ -595,13 +732,14 @@ def segmenter_id(seg) -> str:
 
 def run(data_dir="data/synth200", n=200, out_dir="public/results", results_dir="results", workers=None,
         chaos=(20, 20, 10), kind="auto", micro_arm="local-macos-x86", primary_boxes="components", reuse=False,
-        log=lambda msg: print(msg, flush=True), cost_model="fixed", seed=7, size=(2048, 1536)) -> dict:
+        log=lambda msg: print(msg, flush=True), cost_model="fixed", seed=7, size=(2048, 1536), governor=False,
+        max_load=None) -> dict:
     from evals import failures
 
-    t_start = time.time()
+    t_start, load_start = time.time(), check_load(max_load)
     workers = max(1, min(8, (mp.cpu_count() or 2) // 2)) if workers is None else workers
     records, label = load_records(data_dir, n, kind, seed, size)
-    synthetic = label.startswith("synthetic")
+    synthetic, data_id = label.startswith("synthetic"), dataset_sha256(records)
     out, repo = Path(out_dir).resolve(), REPO
     kept_local = [repo / "results" / "codebrim", repo / "runs"]  # git-ignored, and outside public/, which is all the site serves
     if not synthetic and ("public" in out.parts or (
@@ -623,19 +761,25 @@ def run(data_dir="data/synth200", n=200, out_dir="public/results", results_dir="
                              "DRISHYAM_ONNX and DRISHYAM_ONNX_FP16 as for that run, or run without --reuse")
         if saved.get("cost_model", "live") != cost_model:  # caches from before the field all ran on live latency
             raise SystemExit(f"{cache} was run with --cost-model {saved.get('cost_model', 'live')}, not {cost_model}")
+        if saved.get("dataset") != data_id:
+            raise SystemExit(f"{cache} was run on other images or ground truth (or predates dataset hashes): run without --reuse")
+        if saved.get("governor", True) != governor:  # caches from before the field all ran the governor
+            raise SystemExit(f"{cache} ran the governor {'on' if saved.get('governor', True) else 'off'}: match --governor")
         results = saved["results"]
         log(f"reusing {cache}")
     else:
-        results = pool_map(functools.partial(eval_image, cost_rows=rows), records, workers, log, "eval")
+        results = pool_map(functools.partial(eval_image, cost_rows=rows, governor=governor), records, workers, log, "eval")
         cache.parent.mkdir(parents=True, exist_ok=True)
         cache.write_text(json.dumps({"ids": [r["id"] for r in records], "segmenter": seg_id, "cost_model": cost_model,
-                                     "results": results}, default=lambda o: o.item() if hasattr(o, "item") else str(o)))
+                                     "dataset": data_id, "governor": governor, "results": results},
+                                    default=lambda o: o.item() if hasattr(o, "item") else str(o)))
 
     keys = ["downscale", *(f"tiling@L{lv}" for lv in TILE_LEVELS), *(f"drishyam@{c}" for c in BUDGETS)]
     scored = {conv: {k: score_config(k, records, results, field(k)) for k in keys} for conv, field in CONVENTIONS.items()}
     metrics = scored[primary_boxes]
     for m in metrics.values():
         m["recall_ci"], m["recall_iou_only_ci"] = boot_ci(recall_of(m), len(records)), boot_ci(recall_of(m, 1), len(records))
+    clean = not any(r["boxes"] for r in records)  # a no-damage set: false alarms instead of recall
 
     # fault drills run on images where the full-budget job went long enough to reach the injection step
     full = f"drishyam@{max(BUDGETS)}"
@@ -672,14 +816,14 @@ def run(data_dir="data/synth200", n=200, out_dir="public/results", results_dir="
     if rows:
         am["timing"]["note"] = "wall times are modelled (--cost-model fixed): micro.json job_ops p50 per call, not measured"
     prev = Path(results_dir) / "eval_raw.json"  # a re-score keeps the machine, load and time of the run it re-scores
-    prov = json.loads(prev.read_text())["provenance"] if reuse and prev.exists() else provenance()
-    keep = {k: prov[k] for k in ("cv2", "build_info_sha256", "machine", "cpu", "python", "timestamp", "build", "load_avg")}
-    keep["machine"] += (f", {prov['logical_cpus']} logical CPUs; eval ran {workers} worker(s) x "
-                        f"{am['timing']['cv2_threads_per_worker']} cv2 thread(s); micro arm {micro_arm}")
+    prov = json.loads(prev.read_text())["provenance"] if reuse and prev.exists() else run_provenance(load_start)
+    keep = short_provenance(prov, workers, am["timing"]["cv2_threads_per_worker"], micro_arm, data_id, synthetic)
+    fa = false_alarms(records, results, keys, primary_boxes) if clean else None
     summary = {
         "dataset": label,
         "n_images": len(records),
         "segmenter": seg_name,
+        "agent_config": {"governor": governor, "use": GOVERNOR_USE[governor]},
         "cost_model": {"kind": cost_model, **({"source": f"results/{micro_arm}/micro.json job_ops (p50 ms per call)",
                                                "ms_per_call": {k: round(v, 2) for k, v in op_costs(
                                                    rows, records[0]["width"], records[0]["height"]).items()}}
@@ -689,15 +833,20 @@ def run(data_dir="data/synth200", n=200, out_dir="public/results", results_dir="
             "tiling": [point(metrics[f"tiling@L{lv}"]) for lv in TILE_LEVELS],
             "drishyam": [point(metrics[f"drishyam@{c}"]) for c in BUDGETS],
         },
-        "headline_stats": headline_stats(metrics, len(records)),
+        **({"false_alarms": fa} if clean else {}),
+        "headline_stats": None if clean else headline_stats(metrics, len(records)),
         "strata": {"gt_boxes": metrics["downscale"]["strata_gt"], "small_box_px": SMALL_PX,
                    "recall": {k: {s: _r(v) for s, v in m["strata"].items()} for k, m in metrics.items()}},
         "per_class": per_class,
         "agent_metrics": am,
         "micro": micro_rows(micro_arm, results_dir),
         "provenance": keep,
-        "headline": headline(scored, primary_boxes, len(records), "labelled synthetic images" if synthetic else "CODEBRIM images"),
+        "headline": (clean_headline(fa, len(records), primary_boxes) if clean else
+                     ("Deployment behaviour (governor on). " if governor else "")
+                     + headline(scored, primary_boxes, len(records), "labelled synthetic images" if synthetic else "CODEBRIM images")),
     }
+    if not governor and (why := confounded(summary)):  # every policy must have segmented with the same net
+        raise SystemExit(f"not writing a confounded policy comparison: {why}")
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     (out / "summary.json").write_text(json.dumps(summary, indent=1, ensure_ascii=False))
@@ -717,6 +866,124 @@ def run(data_dir="data/synth200", n=200, out_dir="public/results", results_dir="
     return summary
 
 
+# ---------------------------------------------------------------- ablations (FR-21)
+def switches(variant: str) -> dict:
+    """The JobConfig switches an ablation variant must have run with."""
+    base = JobConfig(governor=False)
+    return {k: getattr(base, k) for k in SWITCHES} | ABLATIONS[variant]
+
+
+def ablation_image(rec: dict, caps=ABLATION_CAPS, cost_rows: list | None = None) -> dict:
+    """Every ablation variant at every cap on one image (a worker task)."""
+    img = cv2.imread(rec["path"], cv2.IMREAD_COLOR)
+    costs = None if cost_rows is None else op_costs(cost_rows, img.shape[1], img.shape[0])
+    return {"id": rec["id"], "width": img.shape[1], "height": img.shape[0], "cv2_threads": cv2.getNumThreads(),
+            "configs": {f"{v}@{cap}": run_drishyam(img, cap, costs, **ABLATIONS[v]) for v in ABLATIONS for cap in caps}}
+
+
+def check_variants(results: list[dict], caps) -> None:
+    """Refuse to compare unless every output ran its label's switches (read from the job's own config) and shows it:
+    no verify look with verify off, no survey look with the survey off."""
+    for res in results:
+        for v in ABLATIONS:
+            want = switches(v)
+            for cap in caps:
+                c = res["configs"][f"{v}@{cap}"]
+                if c["switches"] != want:
+                    raise SystemExit(f"{res['id']} {v}@{cap} ran {c['switches']}, not its label's {want}")
+                if (not want["verify"] and any(t["action"] == "verify" for t in c["trace"])) or (
+                        not want["survey"] and any(t["cause"] == "survey" for t in c["trace"])):
+                    raise SystemExit(f"{res['id']} {v}@{cap}: the trace shows a look its switches turn off")
+
+
+def vs_full(ci: list) -> str:
+    if None in ci:
+        return "undefined"
+    return "no measurable difference" if ci[0] <= 1 <= ci[1] else "below the full agent" if ci[1] < 1 else "above the full agent"
+
+
+MATCH_MARGIN = (0.95, 1.05)  # set before the published ablation run: "matches the full agent" needs the ratio CI inside it
+
+
+def pooled_seeds(m: dict, cap: float) -> dict:
+    """The three random-order seeds as one policy: each image's counts averaged over the seeds (the GT column is equal)."""
+    return {"per_image": np.mean([m[f"random-order-s{s}@{cap}"]["per_image"] for s in (0, 1, 2)], 0)}
+
+
+def random_order_note(rows: dict, cap: float, pooled_ci: list, n: int) -> str:
+    """Says random order matches the full agent only if the pooled ratio CI lies inside MATCH_MARGIN: a CI that
+    merely includes 1 is no measurable difference, not evidence that the two are the same."""
+    seeds = [rows[f"random-order-s{s}"] for s in (0, 1, 2)]
+    rec, lo, hi = [r["recall"] for r in seeds], *pooled_ci
+    span = lambda ci: "undefined" if None in ci else f"{ci[0]:.2f}-{ci[1]:.2f}"
+    verdict = ("undefined" if None in pooled_ci else
+               f"inside the {MATCH_MARGIN[0]}-{MATCH_MARGIN[1]} margin set in advance, so random order matches the full agent"
+               if MATCH_MARGIN[0] <= lo and hi <= MATCH_MARGIN[1] else "random order is below the full agent" if hi < 1 else
+               "random order is above the full agent" if lo > 1 else
+               f"no measurable difference at n={n}, but the CI reaches down to {lo:.2f}, so this does not show that they match")
+    return (f"At a {cap:.0%} pixel cap, random order found {min(rec):.2f}-{max(rec):.2f} of the ground-truth boxes over seeds "
+            f"0-2 and the full agent {rows['full']['recall']:.2f}. Paired 95% CI of the recall ratio over {n} images, the "
+            f"seeds pooled per image: {span(pooled_ci)} (seeds 0, 1, 2 alone: {', '.join(span(r['ratio_vs_full_ci']) for r in seeds)}); "
+            f"{verdict}. None of the {len(rows) - 1} variant-vs-full CIs at this cap is corrected for multiple comparisons.")
+
+
+def run_ablations(data_dir="data/synth200", n=200, out_dir="public/results", results_dir="runs/ablations", workers=None,
+                  kind="auto", micro_arm="local-macos-x86", primary_boxes="components", caps=ABLATION_CAPS,
+                  log=lambda msg: print(msg, flush=True), seed=7, size=(2048, 1536), max_load=None) -> dict:
+    """The ABLATIONS variants at `caps` on fixed costs, each against the full agent (paired bootstrap) and its own
+    chance baseline. Merges this dataset's entry into <out_dir>/ablations.json; writes no image."""
+    t_start, load_start = time.time(), check_load(max_load)
+    workers = max(1, min(8, (mp.cpu_count() or 2) // 2)) if workers is None else workers
+    records, label = load_records(data_dir, n, kind, seed, size)
+    data_id, seg = dataset_sha256(records), default_segmenter()
+    rows = cost_rows(micro_arm, seg.name)
+    log(f"{len(records)} images, {workers} worker(s); ablations {list(ABLATIONS)} at caps {caps}")
+    results = pool_map(functools.partial(ablation_image, caps=caps, cost_rows=rows), records, workers, log, "ablations")
+    raw = Path(results_dir)
+    raw.mkdir(parents=True, exist_ok=True)
+    (raw / "ablation_per_image.json").write_text(json.dumps({"ids": [r["id"] for r in records], "segmenter": segmenter_id(seg),
+                                                             "dataset": data_id, "results": results}, default=str))
+    check_variants(results, caps)
+    field, n_img = CONVENTIONS[primary_boxes]("drishyam"), len(records)
+    m = {f"{v}@{c}": score_config(f"{v}@{c}", records, results, field) for v in ABLATIONS for c in caps}
+    by_cap, usage = {}, model_usage(results)
+    for cap in caps:
+        full, out = m[f"full@{cap}"], {}
+        for v in ABLATIONS:
+            mv, tr = m[f"{v}@{cap}"], [r["configs"][f"{v}@{cap}"]["trace"] for r in results]
+            mv["recall_ci"], mv["recall_iou_only_ci"] = boot_ci(recall_of(mv), n_img), boot_ci(recall_of(mv, 1), n_img)
+            ci = ratio_ci(mv, full, n_img)
+            steps = [t for trace in tr for t in trace]
+            out[v] = {**point(mv), "ratio_vs_full": _r(mv["recall"] / full["recall"]) if full["recall"] else None,
+                      "ratio_vs_full_ci": ci, "vs_full": vs_full(ci),
+                      "ratio_iou_only_vs_full_ci": ratio_ci(mv, full, n_img, col=1),
+                      "steps_p50": _r(np.percentile([sum(t["action"] != "halt" for t in trace) for trace in tr], 50), 1),
+                      "verify_looks": sum(t["action"] == "verify" for t in steps),
+                      "survey_looks": sum(t["cause"] == "survey" for t in steps),
+                      "model_usage": usage[f"{v}@{cap}"]}
+        by_cap[str(cap)] = out
+    threads = sorted({r["cv2_threads"] for r in results})
+    prov = run_provenance(load_start)
+    entry = {"dataset": label, "n_images": n_img, "segmenter": seg.name, "box_convention": primary_boxes,
+             "cost_model": {"kind": "fixed", "source": f"results/{micro_arm}/micro.json job_ops (p50 ms per call)"},
+             "variants": {v: switches(v) for v in ABLATIONS}, "by_cap": by_cap,
+             "random_order": [random_order_note(by_cap[str(c)], c, ratio_ci(pooled_seeds(m, c), m[f"full@{c}"], n_img), n_img)
+                              for c in caps],
+             "provenance": short_provenance(prov, workers, threads[0] if len(threads) == 1 else threads, micro_arm, data_id,
+                                            label.startswith("synthetic"))}
+    out_file = Path(out_dir) / "ablations.json"
+    doc = json.loads(out_file.read_text()) if out_file.exists() else {
+        "note": ("FR-21 ablations: each variant flips one JobConfig switch of the agent as compared (governor off; "
+                 "'governor-on' is deployment behaviour). Same segmenter and fixed costs for all; ratio_vs_full is a "
+                 "paired bootstrap over images; chance_recall is each variant's own boxes at random places."),
+        "datasets": {}}
+    doc["datasets"][Path(data_dir).name] = entry
+    out_file.parent.mkdir(parents=True, exist_ok=True)
+    out_file.write_text(json.dumps(doc, indent=1, ensure_ascii=False))
+    log(f"done in {time.time() - t_start:.0f}s; wrote {out_file} [{Path(data_dir).name}]")
+    return entry
+
+
 def main(argv=None) -> None:
     ap = argparse.ArgumentParser(prog="python -m evals.harness", description=__doc__.split("\n\n")[0])
     ap.add_argument("--data", default="data/synth200")
@@ -734,9 +1001,22 @@ def main(argv=None) -> None:
                     help="fixed: micro.json job_ops costs on a virtual clock (published runs); live: measured wall time")
     ap.add_argument("--seed", type=int, default=7, help="synthetic set seed: builds a missing set, checks an existing one")
     ap.add_argument("--size", default="2048x1536", help="WxH of a synthetic set built here")
+    ap.add_argument("--governor", action="store_true",
+                    help="run Drishyam with the governor's overrides on: deployment behaviour, not a policy comparison")
+    ap.add_argument("--ablation", action="store_true",
+                    help="the FR-21 ablation variants instead of the policy comparison -> <out>/ablations.json (fixed costs)")
+    ap.add_argument("--ablation-caps", default=",".join(map(str, ABLATION_CAPS)), help="pixel caps of the ablation runs")
+    ap.add_argument("--max-load", type=float, help="exit before starting if the 1-min load average is at or above this")
     a = ap.parse_args(argv)
+    size = tuple(int(v) for v in a.size.split("x"))
+    if a.ablation:
+        if a.cost_model != "fixed" or a.governor or a.reuse:
+            ap.error("--ablation runs on fixed costs, with the governor as each variant says, and never --reuse")
+        run_ablations(a.data, a.n, a.out, a.results_dir, a.workers, a.kind, a.micro_arm, a.primary_boxes,
+                      tuple(float(c) for c in a.ablation_caps.split(",")), seed=a.seed, size=size, max_load=a.max_load)
+        return
     run(a.data, a.n, a.out, a.results_dir, a.workers, tuple(int(x) for x in a.chaos.split(",")), a.kind, a.micro_arm,
-        a.primary_boxes, a.reuse, cost_model=a.cost_model, seed=a.seed, size=tuple(int(v) for v in a.size.split("x")))
+        a.primary_boxes, a.reuse, cost_model=a.cost_model, seed=a.seed, size=size, governor=a.governor, max_load=a.max_load)
 
 
 if __name__ == "__main__":
