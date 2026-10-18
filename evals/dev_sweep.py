@@ -16,6 +16,7 @@ split, caps, variants and each row's per-image counts (for paired comparisons ac
 import argparse
 import collections
 import functools
+import gzip
 import json
 from pathlib import Path
 
@@ -27,13 +28,24 @@ from evals import harness
 SPLITS = {"synth_dev": ("data/synth_dev", 60, 4242), "clean": ("data/synth_clean_dev", 30, 4243)}
 
 
+def value(v: str):
+    """True/False, an int, a float, else the string itself (a profile name)."""
+    if v in ("True", "False"):
+        return v == "True"
+    for kind in (int, float):
+        try:
+            return kind(v)
+        except ValueError:
+            pass
+    return v
+
+
 def parse(spec: str) -> dict:
-    """'name=k:v,k:v;name2=...' -> {name: {k: v}}; v is an int, a float or True/False."""
+    """'name=k:v,k:v;name2=...' -> {name: {k: v}}, each v read by `value`."""
     out = {}
     for item in spec.split(";"):
         name, _, kv = item.partition("=")
-        out[name] = {k: (v == "True" if v in ("True", "False") else int(v) if v.lstrip("-").isdigit() else float(v))
-                     for k, v in (x.split(":") for x in kv.split(",") if x)}
+        out[name] = {k: value(v) for k, v in (x.split(":", 1) for x in kv.split(",") if x)}
     return out
 
 
@@ -58,7 +70,8 @@ def row(key: str, records, results, base) -> dict:
            "chance_recall_iou_only": m["chance_recall_iou_only"], "precision": m["precision"],
            "fp_per_image": m["fp_per_image"], "boxes_per_image": m["predictions_per_image"],
            "pixels_frac": m["pixels_frac"], "net_pixels_frac": m["net_pixels_frac"],
-           "images_with_any": sum(bool(c["preds"]) for c in cs) / len(cs)}
+           "images_with_any": sum(bool(c["preds"]) for c in cs) / len(cs),
+           "per_class": {c: None if v is None else round(v, 4) for c, v in m["per_class"].items()}}
     if key != "downscale" and base["recall"]:
         out |= {"vs_downscale": m["recall"] / base["recall"], "vs_downscale_ci": harness.ratio_ci(m, base, n),
                 "vs_downscale_iou_only_ci": harness.ratio_ci(m, base, n, col=1)}
@@ -81,6 +94,7 @@ def main(argv=None) -> None:
     ap.add_argument("--micro-arm", default="linux-aarch64", help="results/<arm>/micro.json job_ops: the fixed costs")
     ap.add_argument("--baselines", action="store_true", help="also tiling at L2, L1 and L0 (the downscale always runs)")
     ap.add_argument("--out", help="also write the rows here, as JSON")
+    ap.add_argument("--dump", help="also write every image's predictions and traces here (gzipped JSON)")
     a = ap.parse_args(argv)
     variants, caps = parse(a.variants), [float(c) for c in a.cap.split(",")]
     if a.split == "real":
@@ -97,6 +111,9 @@ def main(argv=None) -> None:
     for k in results[0]["configs"]:
         out[k] = row(k, records, results, base)
         print(k, json.dumps({x: y for x, y in out[k].items() if x != "per_image"}), flush=True)
+    if a.dump:
+        Path(a.dump).write_bytes(gzip.compress(json.dumps({"ids": [r["id"] for r in records], "results": results},
+                                                          default=lambda o: o.item() if hasattr(o, "item") else str(o)).encode()))
     if a.out:
         Path(a.out).write_text(json.dumps({"split": a.split, "n": len(records), "caps": caps, "segmenter":
                                            harness.segmenter_id(seg), "micro_arm": a.micro_arm, "variants": variants,
