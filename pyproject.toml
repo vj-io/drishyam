@@ -1,7 +1,7 @@
 [project]
 name = "drishyam"
 version = "1.0.2"
-description = "Virtual-PTZ bridge inspector: decides where to look, zooms until it is sure, and spends compute in proportion to risk."
+description = "Virtual-PTZ bridge inspector: decides where to look, zooms until it is sure, and stops when the next look is worth less than it costs."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.12"

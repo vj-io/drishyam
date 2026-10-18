@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1340 1640" width="1340" height="1640" role="img" aria-labelledby="t d">
 <title id="t">Drishyam system architecture</title>
-<desc id="d">Clients (browser UI, drishyam CLI, MCP client) reach one agent core: the browser through CloudFront with OAC and WAF, a Lambda Function URL and an arm64 Lambda running the FastAPI web tier (planned); the CLI and MCP server run it locally. The agent core (policy, governor, planner with allow-list validator, human gate) drives the OpenCV 5 layer and emits an NDJSON trace and a signed work order. DynamoDB holds the kill flag, Secrets Manager the signing key, CloudWatch the metrics and alarms, AWS Budgets the spend alerts.</desc>
+<desc id="d">Clients (browser UI, drishyam CLI, MCP client) reach one agent core: the browser through CloudFront with OAC and WAF, a Lambda Function URL and an arm64 Lambda running the FastAPI web tier (deployed); the CLI and MCP server run it locally. The agent core (policy, governor, planner with allow-list validator, human gate) drives the OpenCV 5 layer and emits an NDJSON trace and a signed work order. DynamoDB holds the kill flag, Secrets Manager the signing key, CloudWatch the metrics and alarms, AWS Budgets the spend alerts.</desc>
 <style>
   .bg { fill: #072247; }
   .sheet { fill: #0F3B73; stroke: #E8F1FF; stroke-width: 3; }
@@ -57,7 +57,7 @@
 <path class="cross" d="M1305 1614H1323M1314 1605V1623"/><circle class="cross" cx="1314" cy="1614" r="4.5"/>
 <text x="60" y="74" class="sheet-title" xml:space="preserve">DRISHYAM · SYSTEM ARCHITECTURE</text>
 <text x="1280" y="56" class="fs" text-anchor="end" xml:space="preserve">FIG. A-1 · OpenCV 5 components, AWS services and agent components</text>
-<text x="1280" y="74" class="fs" text-anchor="end" xml:space="preserve">cv2 calls, modules and causes are real names in drishyam/ at 7a93ec5</text>
+<text x="1280" y="74" class="fs" text-anchor="end" xml:space="preserve">cv2 calls, modules and causes are real names in drishyam/ at 03af85b</text>
 <line class="tbl" x1="36" y1="92" x2="1304" y2="92"/>
 <rect class="frame" x="60" y="108" width="460" height="156"/>
 <circle class="n" cx="82" cy="128" r="11"/>
@@ -128,13 +128,13 @@
 <text x="590" y="532" class="h" xml:space="preserve">CLOUDWATCH</text>
 <line class="band" x1="580" y1="542" x2="920" y2="542"/>
 <text x="590" y="556" xml:space="preserve">EMF metrics: one log line per job</text>
-<text x="590" y="572" xml:space="preserve">dashboard; alarms → SNS email</text>
+<text x="590" y="572" xml:space="preserve">dashboard; alarms → SNS (no subscriber)</text>
 </g>
 <g class="node" data-box="580 604 340 72">
 <rect class="box" x="580" y="604" width="340" height="72"/>
 <text x="590" y="624" class="h" xml:space="preserve">AWS BUDGETS</text>
 <line class="band" x1="580" y1="634" x2="920" y2="634"/>
-<text x="590" y="648" xml:space="preserve">account spend alerts</text>
+<text x="590" y="648" xml:space="preserve">spend alerts → the same SNS topic</text>
 <text x="590" y="664" xml:space="preserve">account level, not on the request path</text>
 </g>
 </g>
@@ -283,7 +283,7 @@
 <line class="band" x1="80" y1="1290" x2="359" y2="1290"/>
 <text x="90" y="1304" xml:space="preserve"><tspan class="cv">cv2.warpPerspective</tspan>: 512² view</text>
 <text x="90" y="1320" xml:space="preserve">pan, zoom = pyramid level,</text>
-<text x="90" y="1336" xml:space="preserve">yaw/pitch de-warp via the MCP tool</text>
+<text x="90" y="1336" xml:space="preserve">MCP tool only: synthetic yaw/pitch</text>
 <text x="90" y="1352" xml:space="preserve"><tspan class="cv">cv2.perspectiveTransform</tspan> → L0 px</text>
 </g>
 <g class="node" data-box="387 1260 279 120">
@@ -351,5 +351,5 @@
 <text x="926" y="1523" class="fs" xml:space="preserve">built and tested</text>
 <text x="896" y="1545" class="fs" xml:space="preserve"><tspan class="cv">cv2.call</tspan> OpenCV call · <tspan class="ca">cause</tspan> trace cause</text>
 <text x="896" y="1566" class="fs" xml:space="preserve"><tspan class="rd">red</tspan> human gate or kill · ★ OpenCV-5-only</text>
-<text x="896" y="1593" class="fs" xml:space="preserve">DRAWN 2026-10-18 · SCALE NTS · REV 7a93ec5</text>
+<text x="896" y="1593" class="fs" xml:space="preserve">DRAWN 2026-10-18 · SCALE NTS · REV 03af85b</text>
 </svg>

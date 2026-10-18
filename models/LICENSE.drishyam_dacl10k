@@ -1,0 +1,29 @@
+drishyam_dacl10k.onnx and drishyam_dacl10k.fp16.onnx (the trained Drishyam segmenter)
+
+These weights are NOT covered by this repository's MIT licence.
+
+They are trained on the dacl10k dataset, whose data licence is Creative Commons
+Attribution-NonCommercial 4.0 International (CC BY-NC 4.0), and they are licensed
+under the same licence:
+
+  https://creativecommons.org/licenses/by-nc/4.0/
+  legal code: https://creativecommons.org/licenses/by-nc/4.0/legalcode
+
+Non-commercial use only, with attribution. They are provided as is, without
+warranties of any kind (see the legal code, section 5).
+
+Attribution
+
+- Dataset and paper: Johannes Flotzinger, Philipp J. Rösch and Thomas Braml,
+  "dacl10k: Benchmark for Semantic Bridge Damage Segmentation", Proceedings of the
+  IEEE/CVF Winter Conference on Applications of Computer Vision (WACV), 2024,
+  pp. 8626-8635. arXiv:2309.00460.
+- dacl10k toolkit: https://github.com/phiyodr/dacl10k-toolkit
+
+Changes made
+
+The dataset authors released data, not these weights. The Drishyam team trained a
+UNet with a MobileNetV3-Large encoder on the dacl10k train split
+(training/train_dacl10k.py) and exported it with the 19 dacl10k classes merged
+onto Drishyam's 6 inside the graph (training/class_map.json). No dacl10k images or
+labels are included in these files or in this repository.

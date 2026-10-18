@@ -4,7 +4,9 @@ Oct 17, 2026 · @Vaibhav Jangid
 
 ## Summary
 
-DRISHYAM is a virtual-PTZ inspector for bridge photos: it decides where to look, zooms until it is sure, drafts work orders a human signs, and spends compute in proportion to risk. Every camera move is an OpenCV 5 `pyrDown`/`warpPerspective`/`remap`/`resize` call, so the agent's own actions are the workload COOL accelerates on Graviton. One codebase targets the Overall, Agentic Vision and Best Use of COOL awards; submission is due Oct 26, 2026 at 11:59 pm PT.
+**Status 2026-10-18:** live demo on AWS Lambda arm64 behind CloudFront, no Hugging Face Space; COOL not run; the stock aarch64 wheel already links KleidiCV 26.03.
+
+DRISHYAM is a virtual-PTZ inspector for bridge photos: it decides where to look, zooms until it is sure, drafts work orders a human signs, and stops looking when the next look is worth less than it costs; under a pixel cap the cap binds first (152 of 200 synthetic and 195 of 200 CODEBRIM jobs at the 30 % cap; uncapped, the stop rule ends 182 of 200 synthetic jobs). Every camera move is an OpenCV `pyrDown`/`warpPerspective`/`resize` call. The live demo runs the stock opencv-python-headless 5.0.0 wheel on Lambda arm64, whose build already includes KleidiCV 26.03 and carotene (`cv2.getBuildInformation()`: "Custom HAL: YES (carotene (ver 0.0.1) KleidiCV (ver 26.03))"). One codebase targets the Overall, Agentic Vision and Best Use of COOL awards; submission is due Oct 26, 2026 at 11:59 pm PT.
 
 - **Headline metric:** defect recall on CODEBRIM boxes vs. fraction of full-resolution pixels processed (and $ per image), against single-downscale and exhaustive tiling. Target hypothesis: ≥0.9× tiling recall at ≤0.3× pixels; the report states the measured number, whatever it is.
 - **Free build:** $0 out of pocket. Software is open source, training runs on Kaggle, the always-on demo runs on a free Hugging Face Space, and the only paid items (COOL on Graviton plus two benchmark arms, ≈$70–100) are paid from AWS Free Tier credits or the competition compute grant, behind hard spend caps.
@@ -122,7 +124,7 @@ Every capability below maps to an existing project; DRISHYAM's own code is the p
 
 | Capability | Reuse (license) | We add | Why this and not a rewrite |
 | --- | --- | --- | --- |
-| Pyramid, virtual PTZ, saliency ops | OpenCV 5 built-ins: `pyrDown`, `warpPerspective`, `remap`, `resize`, `Sobel`, `GaussianBlur`, `adaptiveThreshold`, `morphologyEx`, CLAHE, `inRange` (Apache 2.0) | Composition, per-op timers | These are the KleidiCV-accelerated ops; the whole COOL story rests on calling them, not replacing them |
+| Pyramid, virtual PTZ, saliency ops | OpenCV 5 built-ins: `pyrDown`, `warpPerspective`, `remap`, `resize`, `Sobel`, `GaussianBlur`, `adaptiveThreshold`, `morphologyEx`, CLAHE, `inRange` (Apache 2.0) | Composition, per-op timers | Ops KleidiCV covers in some formats; the whole COOL story rests on calling them, not replacing them |
 | Segmentation model | [segmentation\_models\_pytorch](https://github.com/qubvel-org/segmentation_models.pytorch) UNet/DeepLabV3+ with a timm MobileNetV3 encoder, ImageNet-pretrained (MIT); [dacl10k-toolkit](https://github.com/phiyodr/dacl10k-toolkit) loader and baseline script (check) | Fine-tune on dacl10k on Kaggle; ONNX export at opset 17 with dynamic H×W | Pretrained encoders and a proven training loop; search Hugging Face and GitHub for released dacl10k weights first and fine-tune those if any exist |
 | ONNX graph cleanup | [onnxslim](https://github.com/inisis/OnnxSlim) (MIT) or onnx-simplifier | None | Removes the shape ops that make OpenCV DNN refuse a graph |
 | DNN inference | OpenCV 5 DNN `ENGINE_NEW`; `samples/dnn/segmentation.py` pattern (Apache 2.0) | Pre/post-processing, FP16 variant | Keeps the model on the COOL build; no second runtime to ship |
@@ -286,7 +288,7 @@ Train on dacl10k, evaluate on 200 CODEBRIM originals, and keep both datasets out
 - **Eval subset:** 200 CODEBRIM originals chosen by a fixed seed, stratified so each of the 5 classes has ≥40 boxes; the file list `evals/codebrim_eval200.txt` is committed so anyone can rebuild it. The remaining 1,390 images are a final sweep only if Day 8 leaves time.
 - **Class mapping for scoring:** dacl10k damage classes collapse to CODEBRIM's five (crack, spallation, efflorescence, exposed bars, corrosion stain); the mapping table is committed and reported, including which dacl10k classes are dropped.
 - **Leakage check:** compare bridge identifiers and perceptual hashes (imagehash, BSD) between dacl10k and the eval subset; any overlap is removed from the subset and the count is reported.
-- **Model weights:** our fine-tuned ONNX files are trained on dacl10k, so they inherit its CC BY-NC 4.0 licence (non-commercial); `scripts/install_model.sh` writes that into `models/README.md` and the README's Licence line.
+- **Model weights:** our fine-tuned ONNX files are trained on dacl10k, so they inherit its CC BY-NC 4.0 licence (non-commercial); `scripts/install_model.sh` writes that into `models/README.md`, and the README's Licence section states it.
 - **Redistribution:** download scripts only (`make data`), with checksums; no image is committed.
 
 ## Evaluation and success metrics

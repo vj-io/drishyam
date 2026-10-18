@@ -1,0 +1,22 @@
+{
+  "about": "Hand-recorded provenance of the drishyam_dacl10k weights: only what the files themselves show, null where nothing was recorded. The training run wrote no run_info.json; this file has another name because scripts/install_model.sh reads run_info.json as the notebook's own output. The install script copies the 'known' text into models/README.md while the installed ONNX matches sha256.",
+  "sha256": {
+    "drishyam_dacl10k.onnx": "c49416c10087f3c1baa8443b53fc839a3d8eb227ff27a1b4f7be1da964d6ed4a",
+    "drishyam_dacl10k.fp16.onnx": "f9b06fabbe47a5614c4f61b9170a21c81165d0fd3caf173942ae6ee6e47cb976"
+  },
+  "notebook": "training/drishyam_dacl10k_kaggle.ipynb",
+  "platform": "Colab",
+  "epochs": 24,
+  "steps_per_epoch": 433,
+  "chosen_epoch": 23,
+  "val_miou5": 0.3594,
+  "val_miou19": 0.3529,
+  "python": null,
+  "package_versions": null,
+  "source_sha256": null,
+  "git_sha": null,
+  "flags": null,
+  "seed": null,
+  "run_time": null,
+  "known": "What is known about this run without it (`drishyam_dacl10k.provenance.json`): the notebook ran on Colab (the cell in `training/README.md`, section 4; the install commit 03af85b says so). `drishyam_dacl10k.metrics.json` holds 24 epochs (0 to 23) of 433 steps each, which is 6,935 // 16, the whole dacl10k train split at the default batch size 16 with `drop_last`. Epoch 23 is the last of them, so the selection above picked the final checkpoint. The exported graph is a UNet (its decoder nodes are `decoder/blocks.0` to `.4`). Not recorded: package versions, the notebook source hash, the flags, the seed and the run time."
+}
