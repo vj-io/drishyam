@@ -43,6 +43,29 @@ def test_health_and_security_headers():
     assert h["segmenter"] == "classical-v1" and h["segmenter_licence"] == "MIT (no learned weights)"
     assert r.headers["cache-control"] == "no-store" and r.headers["x-content-type-options"] == "nosniff"
     assert client.get("/docs").status_code == 404 and client.get("/openapi.json").status_code == 404
+    b = h["cv2_build"]  # this process's own build, as cv2.getBuildInformation() prints it
+    info = cv2.getBuildInformation()
+    assert set(b) == {"hal", "cpu_baseline", "cpu_dispatch", "parallel", "dnn_engines"}
+    for key, label in (("hal", "Custom HAL"), ("cpu_baseline", "Baseline"), ("parallel", "Parallel framework")):
+        assert b[key] and f"{label}:" in info and b[key] in info, key
+    assert "new" in b["dnn_engines"]  # OpenCV 5's cv2.dnn.ENGINE_NEW, the opt-in ONNX segmenter's engine
+    assert len(r.content) < 1000  # small: an uptime monitor polls it
+
+
+def test_build_facts_read_the_hal_line_of_an_arm_build(monkeypatch):
+    """The parser keeps each line as printed, so an aarch64 wheel's HALs show as they are; a missing line is None."""
+    from drishyam import web
+
+    arm = ("  CPU/HW features:\n    Baseline:                    NEON FP16\n      requested:                 DETECT\n"
+           "    Dispatched code generation:  NEON_DOTPROD NEON_FP16 NEON_BF16\n"
+           "  Parallel framework:            pthreads\n"
+           "    Custom HAL:                  YES (carotene (ver 0.0.1) KleidiCV (ver 0.6.0))\n")
+    monkeypatch.setattr(web.cv2, "getBuildInformation", lambda: arm)
+    b = web.build_facts()
+    assert b["hal"] == "YES (carotene (ver 0.0.1) KleidiCV (ver 0.6.0))" and b["parallel"] == "pthreads"
+    assert (b["cpu_baseline"], b["cpu_dispatch"]) == ("NEON FP16", "NEON_DOTPROD NEON_FP16 NEON_BF16")
+    monkeypatch.setattr(web.cv2, "getBuildInformation", lambda: "General configuration for OpenCV 5.0.0\n")
+    assert web.build_facts()["hal"] is None
 
 
 def test_health_names_the_dacl10k_licence(monkeypatch):

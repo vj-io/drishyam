@@ -18,8 +18,18 @@ app itself never sends 429.
 ```json
 {"ok": true, "version": "1.1.0", "opencv": "5.0.0", "build": "stock (not COOL)", "segmenter": "classical-v1",
  "segmenter_licence": "MIT (no learned weights)", "max_upload_bytes": 4400000, "max_pixels": 25000000,
- "host": "aws-lambda", "arch": "aarch64", "commit": "7a93ec5..."}
+ "host": "local", "arch": "x86_64", "commit": null,
+ "cv2_build": {"hal": "YES (ipp (ver 0.0.1))", "cpu_baseline": "SSE SSE2 SSE3 SSSE3 SSE4_1",
+               "cpu_dispatch": "SSE4_2 AVX FP16 AVX2 AVX512_SKX", "parallel": "GCD",
+               "dnn_engines": ["auto", "classic", "new", "ort"]}}
 ```
+
+`cv2_build` is read from `cv2.getBuildInformation()` once per process: the `Custom HAL`, CPU `Baseline` and
+`Dispatched code generation`, and `Parallel framework` lines as printed (`null` when the build prints no such line),
+and the `ENGINE_*` names `cv2.dnn` exposes, lower-cased (a name says the constant exists, not that its backend is
+built in; the opt-in ONNX segmenter uses `new`). The example was measured on the macOS x86_64 wheel. The deployed
+Lambda's values (an aarch64 wheel, where ARM HALs such as carotene or KleidiCV are listed on the HAL line) are what
+its own `/api/health` returns; none are copied here.
 
 `host` is `aws-lambda` or `local`; `arch` is `platform.machine()` (`x86_64`, `aarch64`,
 `arm64`); `commit` is `DRISHYAM_COMMIT` (`scripts/aws.sh deploy` sets it to the git SHA it deployed), else `null`.
