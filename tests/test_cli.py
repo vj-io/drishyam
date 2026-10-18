@@ -13,7 +13,9 @@ from drishyam import cli, mcp_server
 from drishyam.agent import gaze_path_from_trace
 
 SAMPLE = Path(__file__).resolve().parent.parent / "public" / "samples" / "bridge_03.jpg"  # has exposed rebar
-CAP = ["--pixel-cap", "0.2"]
+# The published fixed costs on a virtual clock: on the wall clock a loaded machine trips the governor (p95 > SLA ->
+# fast model) or a cap, and the run can end without the critical finding these tests sign off.
+CAP = ["--pixel-cap", "0.2", "--cost-model", "fixed"]
 
 
 @pytest.fixture(autouse=True)
@@ -226,17 +228,55 @@ def test_ctrl_c_halts_gracefully_and_keeps_state(tmp_path, monkeypatch, capsys):
     assert signal.getsignal(signal.SIGINT) is before
 
 
-def test_chaos_and_cap_arguments(tmp_path, capsys):
+def test_fixed_costs_make_the_run_repeatable(ran, tmp_path, capsys):
+    """Two runs on the fixed costs take the same looks for the same reasons, whatever the machine's load, and the
+    trace and the summary say the times are modelled."""
+    assert cli.main(["run", str(SAMPLE), *CAP, "--out", str(tmp_path)]) == 0
+    again = cli.read_trace(next(tmp_path.glob("j_*/trace.jsonl")))
+    first = cli.read_trace(ran.dir / "trace.jsonl")
+    pick = lambda trace: [(t["decision"], t["cause"], t["rationale"]) for t in trace if t["type"] == "step"]
+    assert pick(again) == pick(first) and again[-1]["summary"]["seconds"] == first[-1]["summary"]["seconds"]
+    assert again[0]["cost_model"] == {"kind": "fixed", "micro_arm": "linux-aarch64"}
+    assert "modelled from results/linux-aarch64/micro.json" in capsys.readouterr().out
+    assert any(f["critical"] for f in again[-1]["work_order"]["findings"])  # the governor never dropped it
+
+
+def test_p95_spike_drill_on_fixed_costs(tmp_path):
+    """The drill's behaviour, deterministic: the spike lands on look 4 and the next record (a look, or the halt that
+    carries a pending override under `governor`) has the governor's p95>SLA cause."""
     out = tmp_path / "out"
-    assert cli.main(["run", str(SAMPLE), *CAP, "--chaos", "p95_spike", "--out", str(out)]) == 0
+    assert cli.main(["run", str(SAMPLE), "--pixel-cap", "1", "--cost-model", "fixed", "--chaos", "p95_spike", "--out", str(out)]) == 0
     steps = [t for t in cli.read_trace(next(out.glob("j_*/trace.jsonl"))) if t["type"] == "step"]
-    assert any(t.get("injected") == "p95_spike" for t in steps)
+    (spike,) = [t for t in steps if t.get("injected") == "p95_spike"]
+    after = next(t for t in steps if t["step"] == spike["step"] + 1)
+    assert spike["step"] == 4 and (after.get("governor") or after)["cause"] == "p95>SLA"
+
+
+def test_p95_spike_drill_on_the_real_clock(tmp_path):
+    """REAL CLOCK, so it depends on machine load: a busy machine can trip p95>SLA before the spike, and the stop rule
+    or a cap can end the job before look 4. It asserts only what every path guarantees, never a timing: the job
+    finishes, and every override the governor made is written with its cause (once the spike is injected, the next
+    record carries p95>SLA)."""
+    out = tmp_path / "out"
+    assert cli.main(["run", str(SAMPLE), "--pixel-cap", "1", "--chaos", "p95_spike", "--out", str(out)]) == 0
+    trace = cli.read_trace(next(out.glob("j_*/trace.jsonl")))
+    steps = [t for t in trace if t["type"] == "step"]
+    assert trace[-1]["type"] == "done" and steps[-1]["decision"]["action"] == "halt"
+    assert all(t["cause"] for t in steps) and all(t["governor"]["cause"] for t in steps if t.get("governor"))
+    spike = next((t for t in steps if t.get("injected") == "p95_spike"), None)
+    if spike is not None and spike is not steps[-1]:
+        after = next(t for t in steps if t["step"] == spike["step"] + 1)
+        assert "p95>SLA" in {after["cause"], (after.get("governor") or {}).get("cause")}
+
+
+def test_bad_run_arguments(capsys):
     for bad in (
         ["--pixel-cap", "5"],
         ["--pixel-cap", "x"],
         ["--usd-cap", "0"],
         ["--seconds-cap", "99"],
         ["--chaos", "nonsense"],
+        ["--cost-model", "wall"],
     ):
         with pytest.raises(SystemExit) as exc:
             cli.main(["run", str(SAMPLE), *bad])

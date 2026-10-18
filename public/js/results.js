@@ -181,7 +181,7 @@ function heroChips(sum, real) {
     const ds = interval(hs.recall_ratio_vs_downscale_ci);
     const vsDown = !ds ? '' : ds[0] > 1 ? ' It beats one downscaled pass' : ds[1] < 1 ? ' One downscaled pass does better' : ' One downscaled pass does about as well';
     fill('stat-recall', `Synthetic test set${num(sum.n_images) ? ` (${sum.n_images} photos)` : ''}`, Math.round(100 * ratio), { suffix: ' %' },
-      `of what checking every tile finds, reading ${pct(drishyam.pixels_frac)} of the image's pixels (tiling reads ${pct(tiling.pixels_frac)}${tiling.pixels_frac > 1 ? ': its tiles overlap' : ''}).`
+      `of what checking every tile finds, reading ${pct(drishyam.pixels_frac)} of the image's pixels${num(hs.budget) ? ` under the ${pct(hs.budget)} pixel cap` : ''} (tiling reads ${pct(tiling.pixels_frac)}${tiling.pixels_frac > 1 ? ': its tiles overlap' : ''}).`
       + `${num(target) ? ` Target was ${pct(target)}: ${ratio >= target ? 'met' : 'missed'}.` : ''}`
       + `${vsDown ? `${vsDown} (${dec(hs.recall_ratio_vs_downscale)}×, 95 % CI ${dec(ds[0])}–${dec(ds[1])}).` : ''}`);
   }
@@ -200,17 +200,24 @@ function heroChips(sum, real) {
     if (plain) fill('stat-real', key, Math.round(1 / mid), { prefix: 'about 1 in ' }, `defects found by every method, ours included.${chance}${strict}${why}`);
     else fill('stat-real', key, rd.recall, { decimals: 2, prefix: 'recall ' }, `ours; the other methods ${dec(Math.min(...others))}–${dec(Math.max(...others))}.${chance}${strict}${why}`);
   }
-  // The uncapped run: where the stop rule (value per ms) ended the job by itself, and how often the headline cap binds first.
+  // Two caps, each named: at a 100 % pixel cap (none below the whole image) the stop rule (value per ms) ends the job
+  // by itself; at the headline's cap, the cap binds first. by_budget is keyed by the pixel cap ("1.0", "0.3").
   const am = sum.agent_metrics ?? {};
   const uncapped = points(sum.policies?.drishyam).pop();
   const total = (halts) => Object.values(halts).reduce((a, b) => a + b, 0);
   const halts = am.by_budget?.['1.0']?.halt_causes;
   const capped = am.by_budget?.[String(hs.budget)]?.halt_causes;
+  // every halt cause is counted, so the numbers add up: "exhausted" is a job that had looked at every candidate
+  const other = (h) => Object.entries(h).filter(([k, n]) => n && !['stop-rule', 'cap-hit'].includes(k))
+    .map(([k, n]) => `${n} ${k === 'exhausted' ? 'had looked at every candidate' : `stopped on ${k}`}`);
   if (uncapped && halts) {
     const stops = halts['stop-rule'] ?? 0;
-    fill('stat-cost', stops * 2 >= total(halts) ? 'Stops on its own' : 'Uncapped run', stops, { suffix: ` of ${total(halts)} jobs` },
-      `uncapped, at ${pct(uncapped.pixels_frac)} of the image's pixels on average, the stop rule ended them when the next look was worth less than it cost`
-      + `${capped ? `; under the ${pct(hs.budget)} cap the cap binds first (${capped['cap-hit'] ?? 0} of ${total(capped)})` : ''}`);
+    const rest = [halts['cap-hit'] && `${halts['cap-hit']} hit a time, $ or step cap`, ...other(halts)].filter(Boolean);
+    const at = capped && [`a cap ended ${capped['cap-hit'] ?? 0} of ${total(capped)} first`, `the stop rule ${capped['stop-rule'] ?? 0}`, ...other(capped)];
+    fill('stat-cost', `With no pixel cap (100 %): ${stops * 2 >= total(halts) ? 'stops on its own' : 'the stop rule'}`, stops, { suffix: ` of ${total(halts)} jobs` },
+      `the stop rule ended them when the next look was worth less than it cost, at ${pct(uncapped.pixels_frac)} of the image's pixels on average`
+      + `${rest.length ? `; the other ${rest.join(', ')}` : ''}.`
+      + `${at ? ` At the ${pct(hs.budget)} pixel cap of the headline: ${at.slice(0, -1).join(', ')}, and ${at.at(-1)}.` : ''}`);
   }
   // Agentic evidence: injected planner and governor faults, and how many the agent recovered from.
   const fired = (am.planner_recovery?.timeout?.fired ?? 0) + (am.planner_recovery?.malformed?.fired ?? 0) + (am.governor_response?.fired ?? 0);

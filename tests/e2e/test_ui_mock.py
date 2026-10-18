@@ -19,9 +19,13 @@ Scenarios (a real Chromium, the document served with the production CSP header):
      halt, privacy.boxes blur, halt step.
   3. guided run: pace_ms on the request, the paced-for-viewing label, the viewer in view, the critical NOTE held,
      the recap in view, hand-off to the reviewer, and Try KILL (planner_timeout, shown live) halted by KILL.
-  4. photo, NOTE and newest trace line on one screen (1440x900; 375x812 with the crop and the replay label),
+  4. photo, NOTE and newest trace line on one screen (1440x900; 375x812 with the crop, never over the photo, and the replay label),
   5. keyboard only, 6. KILL after the job had finished, 7. mobile 375 px, 8. prefers-reduced-motion,
-  9. heading names, 10. pending states (no video, no results), 11. halt governor note.
+  9. heading names, 10. pending states (no video, no results), 11. halt governor note, 12. planner_status chip,
+  13. KILL before the first record (live, the operator switch before any look, recorded), 14. KILL the server never
+  confirms, 15. the shared contract in words (review kinds, a class change, verify classes, seeded candidates and the
+  severity they set, a floor-bound stop), 16. focus, contrast and repeats at 1440 and 375 px, 17. the phone tool row
+  at 320/360/375 px (no overlap, no shift when the crop shows).
 Any CSP violation, console error or page error fails the run. wait_for_function is avoided on purpose
 (it is blocked by a strict CSP): every wait uses locators or polls page.evaluate.
 """
@@ -95,8 +99,8 @@ SUMMARY = {
     # the fields the hero cards read; the numbers are made up for the test
     "headline_stats": {"budget": 0.3, "target": {"recall_ratio": 0.9}, "recall_ratio_vs_tiling": 0.946,
                        "recall_ratio_vs_downscale": 1.6, "recall_ratio_vs_downscale_ci": [1.4, 1.8]},
-    "agent_metrics": {"by_budget": {"0.3": {"halt_causes": {"cap-hit": 150, "stop-rule": 50}},
-                                    "1.0": {"halt_causes": {"cap-hit": 10, "stop-rule": 190}}},
+    "agent_metrics": {"by_budget": {"0.3": {"halt_causes": {"cap-hit": 125, "exhausted": 4, "stop-rule": 71}},
+                                    "1.0": {"halt_causes": {"exhausted": 17, "stop-rule": 183}}},
                       "planner_recovery": {"timeout": {"fired": 20}, "malformed": {"fired": 20}, "recovered_total": 40},
                       "governor_response": {"fired": 10, "recovered": 9}},
     "policies": {
@@ -137,17 +141,80 @@ DATA = {
 }
 
 
-def killed_tail(step_no):
-    """What the real server sends once /api/kill lands: a kill-switch halt record and a halted done record."""
-    last = STEPS[-1]
-    halt = {**last, "step": step_no, "cause": "kill-switch", "rationale": "kill switch set; state preserved for resume"}
-    halt.pop("governor", None)
-    return [json.dumps(halt), json.dumps({**DONE, "status": "halted", "cause": "kill-switch",
-                                          "summary": {**DONE["summary"], "steps": max(0, step_no - 1)}})]
+def killed_tail(sent):
+    """What the real server sends once a kill lands, after the events `sent` so far: a kill-switch halt record numbered
+    after the last look, and a halted done record whose summary and work order hold only those looks and findings."""
+    steps = [e for e in sent if e["type"] == "step"]
+    found = {e["finding"]["id"]: e["finding"] for e in sent if e["type"] == "finding"}
+    last = steps[-1] if steps else {"pixels_used": 0, "pixels_frac": 0.0, "usd_used": 0.0, "seconds_used": 0.0}
+    halt = {**{k: v for k, v in STEPS[-1].items() if k != "governor"}, "step": len(steps) + 1, "cause": "kill-switch",
+            "rationale": "kill switch set; state preserved for resume",
+            **{k: last[k] for k in ("pixels_used", "pixels_frac", "usd_used", "seconds_used")}}
+    pending = [f for f in found.values() if f["critical"] and f["state"] == "pending_review"]
+    regions = {s["region"] for s in steps}
+    order = {**DONE["work_order"], "findings": list(found.values()), "status": "blocked" if pending else "ready",
+             "gaze_path": [[s["decision"]["args"][k] for k in ("x", "y", "level")] for s in steps]}
+    done = {**DONE, "status": "halted", "cause": "kill-switch", "work_order": order,
+            "coverage": DONE["coverage"] if steps else 0.0,  # the first look is a survey of the whole photo
+            "unvisited": [c["id"] for c in EVENTS[1]["candidates"] if c["id"] not in regions],
+            "summary": {"steps": len(steps), "pixels_used": last["pixels_used"], "pixels_frac": last["pixels_frac"],
+                        "usd": last["usd_used"], "seconds": last["seconds_used"], "findings": len(found),
+                        "critical_pending": len(pending)}}
+    return [json.dumps(halt), json.dumps(done)]
+
+
+def contract_events():
+    """The fixture with the fields of the contract shared with the agent's workstream, which the recorded fixture
+    predates, patched the way that agent sends them: review_request `kind`; step 4's verify a class change (the crack
+    its L1 look drafted is exposed rebar at L0, same place) whose review names critical f1 in place of the old
+    disagreement; an ambiguity on draft f4; step 6's verify an agreement although the finer look's best class differs;
+    `seeded` candidates on the survey look (crack is all it saw) and argmax rationales in the agent's format that read
+    them; a stop-rule halt bound by its floor; and draft f2 re-measured past the critical area rule, with the done
+    record to match. Once the fixture is regenerated from the agent that sends them, these patches can go."""
+    events = [json.loads(ln) for ln in JOB_LINES]
+    for e in events:
+        if e["type"] == "review_request":
+            e["kind"] = "critical" if e["reason"].endswith(" is critical") else "disagree"
+    step = {e["step"]: e for e in events if e["type"] == "step"}
+    assert [step[k]["region"] for k in (3, 4, 5, 6, 7)] == ["r3", "r3", "r2", "r2", "r1"], "the patches below fit this recording"
+    assert set(step[1]["observation"]["classes"]) == {"crack"} and step[4]["verify"]["against_level"] == 1
+    step[1]["seeded"] = [{"region": "r1", "entropy": 0.58, "cls": "crack", "from_level": 2},
+                         {"region": "r2", "entropy": 0.31, "cls": None, "from_level": 2},
+                         {"region": "r3", "entropy": 0.44, "cls": "crack", "from_level": 2}]
+    terms = {3: "prior 0.45, severity 1.5 (crack seen at L2), uncertainty 0.44, unseen 0.62, t_hat 70 ms",
+             5: "prior 0.50, severity 1 (no class seen at L2), uncertainty 0.31, unseen 0.45, t_hat 64 ms",
+             7: "prior 0.70, severity 1.5 (crack seen at L2), uncertainty 0.58, unseen 0.01, t_hat 26 ms"}
+    for k, t in terms.items():  # the agent's format: "severity {sev:g} ({class} seen at L{n})"
+        step[k]["rationale"] = re.sub(r"(argmax score [^:]+: )[^;]+", lambda m, t=t: m[1] + t, step[k]["rationale"])
+    step[4]["verify"] = {"iou": step[4]["verify"]["iou"], "class": "crack", "against_level": 1, "class_now": "exposed_rebar", "iou_any": 0.62}
+    step[6]["verify"] = {"iou": step[6]["verify"]["iou"], "class": "spalling", "against_level": 1, "class_now": "exposed_rebar", "iou_any": 0.31}
+    halt = max(step)
+    step[halt].update(cause="stop-rule", rationale="best score 1.2e-04 < lambda 2.0e-04 (floor: eps x v0 / t_hat)")
+    events[-1]["cause"] = "stop-rule"
+    (old,) = [e for e in events if e["type"] == "review_request" and e["reason"] == "iou 0.26 < 0.5 between L1 and L0"]
+    old.update(kind="class-change", reason="class change: crack at L1, exposed_rebar at L0 (same place, iou 0.62)", iou=0.62,
+               level_a=1, level_b=0, classes=["crack", "exposed_rebar"])  # the agent sends one or the other, not both
+    f4 = next(i for i, e in enumerate(events) if e["type"] == "finding" and e["finding"]["id"] == "f4" and e["finding"]["steps"] == [3, 4])
+    events.insert(f4 + 1, {"type": "review_request", "kind": "ambiguous", "finding_id": "f4", "iou": None, "level_a": None,
+                           "level_b": 0, "classes": ["spalling", "crack"],
+                           "reason": "ambiguous: crack 5232 px (>= A_min 64) is mostly inside spalling f4; recorded as spalling only"})
+    f2 = [e for e in events if e["type"] == "finding" and e["finding"]["id"] == "f2"][-1]["finding"]
+    assert not f2["critical"] and f2["cls"] == "spalling"
+    f2.update(critical=True, state="pending_review", critical_step=f2["steps"][-1], critical_area_px=52000,
+              critical_rule="spalling 52,000 px² >= 40,000 px²")
+    done = events[-1]
+    done["work_order"]["findings"] = [{**f, **({k: f2[k] for k in ("critical", "state", "critical_step", "critical_area_px")}
+                                             if f["id"] == "f2" else {})} for f in done["work_order"]["findings"]]
+    done["summary"]["critical_pending"] = sum(f["critical"] and f["state"] == "pending_review" for f in done["work_order"]["findings"])
+    return events
 
 
 # ---- a local stand-in for /api/* (streams NDJSON like the real server) --------------------------------
-LIVE = {"plans": [], "jobs": [], "kills": [], "reviews": [], "order": None, "tokens": 0}
+LIVE = {"plans": [], "jobs": [], "kills": [], "reviews": [], "order": None, "tokens": 0, "fixture_delay": 0}
+# build facts in the shape /api/health sends them, aarch64-style values made up for the test (tests/test_web.py checks the parser)
+HEALTH_BUILD = {"hal": "YES (carotene (ver 0.0.1) KleidiCV (ver 0.6.0))", "cpu_baseline": "NEON FP16",
+                "cpu_dispatch": "NEON_DOTPROD NEON_FP16", "parallel": "pthreads", "onnx_runtime": "NO",
+                "dnn_engines": ["auto", "classic", "new"]}
 
 
 def reset_live(plans):
@@ -167,10 +234,17 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self):
-        if urlparse(self.path).path == "/api/health":
+        path = urlparse(self.path).path
+        if path == "/api/health":
             return self.reply(200, {"ok": True, "opencv": "5.0.0", "build": "stock (not COOL)", "segmenter": "classical-v1",
                                     "max_upload_bytes": 4400000, "max_pixels": 25000000,
-                                    "host": "local", "arch": "x86_64", "commit": "0123456789abcdef"})
+                                    "host": "local", "arch": "x86_64", "commit": "0123456789abcdef", "cv2_build": HEALTH_BUILD})
+        if path == "/fixtures/job.ndjson" and LIVE["fixture_delay"]:
+            time.sleep(LIVE["fixture_delay"])  # a recording that has not started yet (KILL before its first record)
+            try:
+                return super().do_GET()
+            except (BrokenPipeError, ConnectionResetError):
+                return                         # the page aborted the fetch: that is the point of the delay
         super().do_GET()
 
     def do_POST(self):
@@ -181,17 +255,21 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if url.path == "/api/jobs":
             LIVE["jobs"].append({"query": parse_qs(url.query), "headers": headers, "size": len(raw), "signed": signed})
             plan = LIVE["plans"].pop(0)
-            self.send_response(200)
-            self.send_header("Content-Type", "application/x-ndjson")
-            self.end_headers()
+            time.sleep(plan.get("lead", 0))           # the server's decode and privacy pass before its first record
             try:
-                step = 0
+                self.send_response(200)
+                self.send_header("Content-Type", "application/x-ndjson")
+                self.end_headers()
+                sent = []
                 for line in plan["lines"]:
-                    is_step = json.loads(line)["type"] == "step"
-                    if plan.get("killable") and LIVE["kills"] and is_step:  # like the server: halt before the next look
-                        self.wfile.write("".join(f"{out}\n" for out in killed_tail(step + 1)).encode())
+                    e = json.loads(line)
+                    # Like the server: a page's KILL is read only after a step record, so the halt comes before the next
+                    # look, never before the first one; "switch_set" is the operator-wide switch, set before the job began.
+                    looked = any(x["type"] == "step" for x in sent)
+                    if e["type"] == "step" and (plan.get("switch_set") or plan.get("killable") and LIVE["kills"] and looked):
+                        self.wfile.write("".join(f"{out}\n" for out in killed_tail(sent)).encode())
                         break
-                    step += is_step
+                    sent.append(e)
                     self.wfile.write((line + "\n").encode())
                     self.wfile.flush()
                     time.sleep(plan["delay"])
@@ -411,12 +489,17 @@ def test_desktop_mock(browser, base):
     head = max((pt for pt in SUMMARY["policies"]["drishyam"] if pt["pixels_frac"] <= hs["budget"]), key=lambda pt: pt["pixels_frac"])
     expect(p.locator("#stat-recall .stat__v")).to_have_text(f"{round(100 * hs['recall_ratio_vs_tiling'])} %", timeout=T)
     expect(p.locator("#stat-recall .stat__k")).to_have_text(f"Synthetic test set ({SUMMARY['n_images']} photos)")
-    expect(p.locator("#stat-recall .stat__s")).to_contain_text(f"reading {round(100 * head['pixels_frac'])} % of the image's pixels (tiling reads 100 %).")
+    expect(p.locator("#stat-recall .stat__s")).to_contain_text(
+        f"reading {round(100 * head['pixels_frac'])} % of the image's pixels under the 30 % pixel cap (tiling reads 100 %).")
     expect(p.locator("#stat-recall .stat__s")).to_contain_text("Target was 90 %: met. It beats one downscaled pass (1.60×, 95 % CI 1.40–1.80).")
+    # the stop-rule count is at the 100 % pixel cap, next to the 30 % headline: each number names its cap
     halts = SUMMARY["agent_metrics"]["by_budget"]
-    expect(p.locator("#stat-cost .stat__k")).to_have_text("Stops on its own")
+    expect(p.locator("#stat-cost .stat__k")).to_have_text("With no pixel cap (100 %): stops on its own")
     expect(p.locator("#stat-cost .stat__v")).to_have_text(f"{halts['1.0']['halt_causes']['stop-rule']} of 200 jobs")
-    expect(p.locator("#stat-cost .stat__s")).to_contain_text(f"under the 30 % cap the cap binds first ({halts['0.3']['halt_causes']['cap-hit']} of 200)")
+    expect(p.locator("#stat-cost .stat__s")).to_contain_text("the stop rule ended them when the next look was worth less than it cost")
+    expect(p.locator("#stat-cost .stat__s")).to_contain_text("; the other 17 had looked at every candidate.")   # 183 + 17 = 200
+    expect(p.locator("#stat-cost .stat__s")).to_contain_text(
+        "At the 30 % pixel cap of the headline: a cap ended 125 of 200 first, the stop rule 71, and 4 had looked at every candidate.")
     expect(p.locator("#stat-ops .stat__v")).to_have_text("49 / 50 recovered")
     expect(p.locator("#stat-real .stat__k")).to_have_text("Real bridge photos (CODEBRIM, 200)")
     expect(p.locator("#stat-real .stat__v")).to_have_text("about 1 in 5")           # every policy within 0.05: recall about 0.21
@@ -433,7 +516,7 @@ def test_desktop_mock(browser, base):
     expect(p.locator("#fail .fail")).to_have_count(1)
     expect(p.locator("#t-bench-cool")).to_have_text("COOL on Graviton: not run")  # FIG. 4.3 and the banner say why, nothing pending
     expect(p.locator("#bench-cool")).to_contain_text("The COOL Marketplace AMI could not be subscribed")
-    expect(p.locator("#cool-status")).to_contain_text("COOL on Graviton: not run.")
+    expect(p.locator("#cool-status")).to_contain_text("COOL on Graviton: not run, because its Marketplace AMI could not be subscribed")
     expect(p.locator("#video")).to_be_hidden()                    # no video shipped yet: no player, no link
     expect(p.locator("#video-link")).to_be_hidden()
     p.keyboard.press("Tab")
@@ -499,6 +582,9 @@ def test_desktop_mock(browser, base):
     expect(p.locator(".trace__line--review")).to_have_count(len(REVIEWS))
     expect(p.locator(".trace__line--review").first).to_contain_text(REVIEWS[0]["reason"])
     expect(p.locator(".trace__line--review").first).to_contain_text("→ human")
+    for i, r in enumerate(REVIEWS):  # a trace recorded before review_request had "kind" (as this fixture was): read from the reason
+        if "kind" not in r and r["reason"].startswith("iou "):
+            expect(p.locator(".trace__line--review").nth(i).locator(".chip")).to_have_text("disagree")
     expect(p.locator(".t-act--halt")).to_have_count(len(HALTS))
     shown = Counter(["replay"] * replayed + live_causes)       # replayed steps are tagged `replay`
     for cause, count in shown.items():
@@ -520,7 +606,12 @@ def test_desktop_mock(browser, base):
     expect(p.locator("#state-4")).to_have_text("Waiting")
     expect(p.locator("#say-4")).to_contain_text(f"Waiting for your sign-off ({pending})")
     expect(p.locator("#recap")).to_contain_text("What you just saw")
-    expect(p.locator("#recap")).to_contain_text(f"{N_STEPS} decisions, every one with a recorded cause")
+    # decisions are step records, looks the ones that moved the camera: the recap's count of looks is the tile's
+    looks = N_STEPS - len(HALTS)
+    expect(p.locator("#recap")).to_contain_text(
+        f"{N_STEPS} decisions ({looks} looks{' and the decision to stop' if HALTS else ''}), every one with a recorded cause")
+    assert looks == DONE["summary"]["steps"], "the fixture's looks and its done summary disagree"
+    expect(p.locator("#done .tile").nth(0)).to_have_text(re.compile(rf"^{looks}\s*looks$"))
     expect(p.locator("#cam-img")).to_be_visible()
     expect(p.locator("#cam-img")).to_have_attribute("src", re.compile(r"^data:image/jpeg;base64,"))
     expect(p.locator("#cam-cap")).to_contain_text(re.compile(r"L\d · 1:\d+"))
@@ -655,6 +746,9 @@ def test_live_api_contract(browser, base):
     expect(p.locator("#api-status")).to_contain_text("stock (not COOL)", timeout=T)
     expect(p.locator("#api-status")).to_contain_text("host local · x86_64 · commit 0123456")   # /api/health host, arch, commit
     expect(p.locator("#live-where")).to_contain_text("on local (x86_64)")
+    expect(p.locator("#api-build")).to_have_text(  # the OpenCV build facts /api/health reads from cv2.getBuildInformation()
+        "Custom HAL: YES (carotene (ver 0.0.1) KleidiCV (ver 0.6.0)) · parallel framework: pthreads · CPU baseline: NEON FP16"
+        " · dispatched: NEON_DOTPROD NEON_FP16 · cv2.dnn engines built in: auto, classic, new · ONNX Runtime: NO")
     expect(p.locator("#recorded")).to_be_hidden()
     expect(p.locator("#look")).to_be_enabled(timeout=T)        # the first sample is preselected
     expect(p.locator(".thumb[aria-pressed='true']")).to_have_count(1)
@@ -781,7 +875,7 @@ def test_guided(browser, base):
 def test_fits_on_screen(browser, base):
     """While a run plays, the photo and its NOTE share one screen: at 1440x900 with the newest trace line too, for the
     overview and every decision of the fixture (it holds the p95>SLA override and both planner drills that "Now break
-    it" shows); at 375x812 with the camera crop over the photo and a visible replay label in the job bar."""
+    it" shows); at 375x812 with the camera crop beside the photo (covering none of it) and a visible replay label in the job bar."""
     for size, phone in (({"width": 1440, "height": 900}, False), ({"width": 375, "height": 812}, True)):
         s = Session(browser, f"fit-{size['width']}", viewport=size, is_mobile=phone, has_touch=phone, reduced_motion="reduce")
         p = s.page
@@ -792,6 +886,11 @@ def test_fits_on_screen(browser, base):
         top = p.evaluate("document.getElementById('stage').getBoundingClientRect().top")   # where run() put the photo
         if phone:
             expect(p.locator("#pip")).to_be_visible()
+            pip, photo = (p.locator(sel).bounding_box() for sel in ("#pip", "#stage"))
+            apart = (pip["x"] >= photo["x"] + photo["width"] or pip["x"] + pip["width"] <= photo["x"]
+                     or pip["y"] >= photo["y"] + photo["height"] or pip["y"] + pip["height"] <= photo["y"])
+            assert apart, f"the camera crop covers part of the photo (a region such as r4 under it): {pip} {photo}"
+            assert pip["y"] >= 0 and pip["y"] + pip["height"] <= size["height"], f"the camera crop is off screen: {pip}"
             assert p.locator("#job-text").evaluate("e => e.getBoundingClientRect().height") > 10, "the replay label is hidden"
         p.click("#skip")
         expect(p.locator("#job-pill")).to_have_text(DONE_LABEL, timeout=T)
@@ -807,6 +906,50 @@ def test_fits_on_screen(browser, base):
         s.check_clean()
         s.context.close()
     print("ok  fits: photo, NOTE and newest trace line on one 1440x900 screen; photo, crop, NOTE and replay label at 375x812")
+
+
+# Every control in the photo's tool row, and each line of its text, as rects: none may cross another (label text included,
+# which can run out of a narrow grid cell without its box showing it).
+TOOL_RECTS = """() => [...document.querySelectorAll('.vtools > :not([hidden])')].flatMap((el) => {
+  const name = el.id || el.querySelector('input')?.id || el.className;
+  const own = [el.getBoundingClientRect()];
+  for (const n of el.childNodes) if (n.nodeType === 3 && n.textContent.trim()) { const r = document.createRange(); r.selectNodeContents(n); own.push(r.getBoundingClientRect()); }
+  return own.map((b) => ({ name, l: b.left, r: b.right, t: b.top, b: b.bottom }));
+})"""
+
+
+# the two switches' offsets inside the tool row (the page scrolls when a run starts, so viewport positions would move)
+SWITCHES = """() => { const row = document.querySelector('.vtools').getBoundingClientRect();
+  return ['heat', 'tiles'].flatMap((id) => { const r = document.getElementById(id).closest('label').getBoundingClientRect(); return [r.left - row.left, r.top - row.top]; }); }"""
+
+
+def tool_overlaps(page):
+    rects = page.evaluate(TOOL_RECTS)
+    return [f"{a['name']} x {b['name']}" for i, a in enumerate(rects) for b in rects[i + 1:]
+            if a["name"] != b["name"] and min(a["r"], b["r"]) - max(a["l"], b["l"]) > 0.5 and min(a["b"], b["b"]) - max(a["t"], b["t"]) > 0.5]
+
+
+def test_phone_tools_never_overlap(browser, base):
+    """At 320, 360 and 375 px the photo's tool row (Run, the heatmap and tiling switches, the camera crop, the key)
+    has no control or label over another, before the run (the crop hidden) and after the first look (shown), and
+    showing the crop moves neither switch."""
+    for width in (320, 360, 375):
+        s = Session(browser, f"tools-{width}", viewport={"width": width, "height": 812}, is_mobile=True, has_touch=True, reduced_motion="reduce")
+        p = s.page
+        p.goto(f"{base}/?mock=1")
+        expect(p.locator("#look")).to_be_enabled(timeout=T)
+        expect(p.locator("#pip")).to_be_hidden()
+        assert not tool_overlaps(p), f"{width} px, before the run: {tool_overlaps(p)}"
+        before = p.evaluate(SWITCHES)
+        p.click("#look")
+        expect(p.locator(".trace__line[data-step='1']")).to_be_visible(timeout=T)
+        expect(p.locator("#pip")).to_be_visible()
+        assert not tool_overlaps(p), f"{width} px, after the first look: {tool_overlaps(p)}"
+        after = p.evaluate(SWITCHES)
+        assert all(abs(a - b) < 1 for a, b in zip(before, after)), f"{width} px: a switch moved in the row: {before} -> {after}"
+        s.check_clean()
+        s.context.close()
+    print("ok  phone tool row: no control or label over another at 320/360/375 px, before and after the crop shows; no shift")
 
 
 def test_keyboard(browser, base):
@@ -935,7 +1078,7 @@ def test_pending_states(browser, base):
     expect(p.locator("#fail")).to_contain_text("failure gallery pending")
     expect(p.locator("#t-bench-cool")).to_have_text("COOL on Graviton: not run")   # static: it does not wait for a file
     expect(p.locator("#bench-cool")).to_contain_text("The COOL Marketplace AMI could not be subscribed")
-    expect(p.locator("#cool-status")).to_contain_text("COOL on Graviton: not run.")
+    expect(p.locator("#cool-status")).to_contain_text("COOL on Graviton: not run, because its Marketplace AMI could not be subscribed")
     expect(p.locator("#video")).to_be_hidden()                    # no video shipped yet: no player, no link
     expect(p.locator("#video-link")).to_be_hidden()
     expect(p.locator("#gallery-empty")).to_be_visible()
@@ -1007,6 +1150,304 @@ def test_planner_status_shows_the_fallback_chip(browser, base):
     print("ok  planner_status rejected/fallback shows the planner-fallback chip")
 
 
+def test_kill_before_the_first_record(browser, base):
+    """KILL pressed while the photo is still on its way, before the server's first record (which carries the job id
+    and kill token): the page says, in the bar and the NOTE, that KILL is queued, and sends it the moment the job
+    record arrives. The server reads a KILL only after a step record, so look 1 runs and the halt comes at step 2.
+    Meanwhile the camera panel says a job is on its way, never "No look yet. Press Run.". The operator-wide switch,
+    set before the job began, halts it before any look: then nothing on the page says a state is kept or can be
+    resumed, and the done state counts no looks and no findings. In a recording, KILL before its first record says
+    nothing had started, and nothing is called preserved."""
+    reset_live([{"lines": JOB_LINES, "delay": 0.25, "killable": True, "lead": 2.5}])
+    s = Session(browser, "kill-early", viewport={"width": 1440, "height": 900})
+    p = s.page
+    p.goto(f"{base}/")
+    expect(p.locator("#look")).to_be_enabled(timeout=T)
+    p.click("#look")
+    until(lambda: LIVE["jobs"], "the upload to reach the server", page=p)       # its first record is 2.5 s away
+    expect(p.locator("#cam-cap")).to_have_text("Sending the photo: the first look follows the server’s preparation")
+    p.click("#kill")
+    expect(p.locator("#job-text")).to_contain_text("the page has no job id yet, so KILL is sent the moment it arrives")
+    expect(p.locator("#narrator")).to_have_text("KILL queued: it is sent as soon as the server answers.")   # a phone reads the NOTE
+    assert not LIVE["kills"], "nothing can be sent before the job id is known"
+    until(lambda: LIVE["kills"], "POST /api/kill once the job record arrives", page=p)
+    assert [{k: v for k, v in r.items() if k != "signed"} for r in LIVE["kills"]] == [{"job": JOB["job"], "kill_token": JOB["kill_token"]}]
+    expect(p.locator("#job-pill")).to_have_text("halted", timeout=T)
+    expect(p.locator(".trace__line .chip", has_text=re.compile("^kill-switch$"))).to_have_count(1)
+    expect(p.locator("#job-text")).to_contain_text("Halted by KILL at step 1: the trace shows kill-switch and the state is kept.")
+    expect(p.locator(".trace__line[data-step]")).to_have_count(2)            # look 1, then the halt
+    expect(p.locator("#resume")).to_be_visible()
+    expect(p.locator("#recap")).to_contain_text("2 decisions (1 look and the stop KILL asked for), every one with a recorded cause")
+    expect(p.locator("#recap")).to_contain_text("1 from the kill switch")
+    s.check_clean()
+    s.context.close()
+
+    reset_live([{"lines": JOB_LINES, "delay": 0, "switch_set": True}])
+    s = Session(browser, "kill-switch-set", viewport={"width": 1440, "height": 900})
+    p = s.page
+    p.goto(f"{base}/")
+    expect(p.locator("#look")).to_be_enabled(timeout=T)
+    p.click("#look")
+    expect(p.locator("#job-pill")).to_have_text("halted", timeout=T)
+    expect(p.locator("#job-text")).to_have_text(
+        "Halted before its first look: the kill switch was already set, so there is no look to resume. Run starts it again.")
+    expect(p.locator("#resume")).to_be_hidden()
+    halt = p.locator(".trace__line[data-step='1']")
+    expect(halt.locator(".trace__why")).to_have_text(
+        "because: The kill switch was already set before its first look, but nothing was looked at, so there is nothing to resume.")
+    expect(p.locator(".win--toast")).to_contain_text("it stopped before its first look, so there is nothing to resume")
+    halt.locator("button").click()
+    expect(p.locator("#step-detail .detail__why").first).to_have_text(
+        "The kill switch was already set, so it stopped before its first look. Nothing was looked at, so there is nothing to resume.")
+    expect(p.locator("#narrator")).to_contain_text("nothing to resume")
+    expect(p.locator("#cam-cap")).to_have_text("Stopped before any look")
+    expect(p.locator("#recap")).to_contain_text("1 decision (no looks and the stop the kill switch made), with its recorded cause: 1 from the kill switch.")
+    expect(p.locator("#recap")).to_contain_text("0 critical findings were sent to a person")
+    expect(p.locator("#done")).to_contain_text("stopped because the kill switch was already set (kill-switch)")
+    for k, v in (("looks", "0"), ("findings", "0"), ("critical, waiting for you", "0")):
+        expect(p.locator("#done .tile", has_text=k).locator(".tile__v")).to_have_text(v)
+    text = p.evaluate("""() => { const d = document.getElementById('demo').cloneNode(true);  // what the demo says, not How it works
+      d.querySelectorAll('details.detail__more').forEach((e) => e.remove());           // the raw record, folded away
+      return d.textContent; }""")
+    for claim in ("state is kept", "Resume carries on", "state preserved", "kept for Resume"):
+        assert claim not in text, f"a halt before any look claims a kept state: {claim!r}"
+    s.check_clean()
+    s.context.close()
+
+    LIVE["fixture_delay"] = 2.0
+    try:
+        s = Session(browser, "kill-early-mock", viewport={"width": 1440, "height": 900})
+        p = s.page
+        p.goto(f"{base}/?mock=1")
+        expect(p.locator("#look")).to_be_enabled(timeout=T)
+        p.click("#look")
+        expect(p.locator("#cam-cap")).to_contain_text("Sending the photo")
+        p.click("#kill")
+        expect(p.locator("#job-text")).to_contain_text("first look (the recording had not started). No look had arrived")
+        expect(p.locator("#job-pill")).to_have_text("ready")
+        expect(p.locator("#job-text")).not_to_contain_text("preserved")
+        expect(p.locator("#resume")).to_be_hidden()
+        expect(p.locator("#look")).to_be_enabled()
+        assert not s.api_calls, s.api_calls
+        s.check_clean()
+        s.context.close()
+    finally:
+        LIVE["fixture_delay"] = 0
+    print("ok  KILL before the first record: queued, sent once the job id arrives, halts after look 1; the operator switch "
+          "before any look keeps nothing; a recording says nothing had started")
+
+
+def test_kill_the_server_never_confirms(browser, base):
+    """KILL is never reported as a kill the server did not make. No job record within 8 s of a KILL pressed before it:
+    the page cancels the upload and says the server may run the job on. A KILL sent but never confirmed within 6 s:
+    the page stops showing the job (pill "stopped", not "killed"), says the server may still be running it, and
+    keeps what arrived for Resume."""
+    reset_live([{"lines": JOB_LINES, "delay": 0.25, "lead": 15}])
+    s = Session(browser, "kill-unanswered", viewport={"width": 1440, "height": 900})
+    p = s.page
+    p.goto(f"{base}/")
+    expect(p.locator("#look")).to_be_enabled(timeout=T)
+    p.click("#look")
+    until(lambda: LIVE["jobs"], "the upload to reach the server", page=p)
+    p.click("#kill")
+    expect(p.locator("#job-pill")).to_have_text("ready", timeout=12_000)
+    expect(p.locator("#job-text")).to_contain_text("the server had not answered 8 s after KILL, so the page cancelled the upload")
+    expect(p.locator("#job-text")).to_contain_text("it may run on, unseen, up to its time cap")
+    expect(p.locator("#look")).to_be_enabled()
+    assert not LIVE["kills"], "no job id ever arrived, so nothing could be sent"
+    s.check_clean()
+    s.context.close()
+
+    reset_live([{"lines": JOB_LINES, "delay": 1.0}])            # not killable: the server never confirms
+    s = Session(browser, "kill-unconfirmed", viewport={"width": 1440, "height": 900})
+    p = s.page
+    p.goto(f"{base}/")
+    expect(p.locator("#look")).to_be_enabled(timeout=T)
+    p.click("#look")
+    p.locator("#skip").click(timeout=T)
+    expect(p.locator(".trace__line[data-step='1']")).to_be_visible(timeout=T)
+    p.click("#kill")
+    until(lambda: LIVE["kills"], "POST /api/kill", page=p)
+    expect(p.locator("#job-pill")).to_have_text("stopped", timeout=10_000)
+    expect(p.locator("#job-text")).to_contain_text("The page stopped showing the job at step")
+    expect(p.locator("#job-text")).to_contain_text("the server did not confirm KILL within 6 s; the server may still be running it")
+    expect(p.locator("#job-text")).not_to_contain_text("Killed")
+    expect(p.locator("#resume")).to_be_visible()
+    s.check_clean()
+    s.context.close()
+    print("ok  KILL never confirmed: the upload is cancelled after 8 s, or the page stops showing the job after 6 s; neither is called a kill")
+
+
+def test_contract_fields_in_words(browser, base):
+    """The shared contract's new fields, said in plain words: a class-change review on critical f1 (trace and card),
+    an ambiguity on draft f4 (flagged, no sign-off), the other kinds as chips, step 4's class change and step 6's
+    agreement although the best class differs, the candidates a look seeded and the argmax severities that read
+    them in the agent's own format, a stop-rule halt bound by its floor, and a draft re-measured past the critical
+    rule getting a sign-off box. Then the text functions themselves, on records this fixture does not hold: a trace
+    recorded before `kind` (the chip is read from the reason) and a candidate no look has shown."""
+    reset_live([{"lines": [json.dumps(e) for e in contract_events()], "delay": 0}])
+    s = Session(browser, "contract", viewport={"width": 1440, "height": 900})
+    p = s.page
+    p.goto(f"{base}/")
+    expect(p.locator("#look")).to_be_enabled(timeout=T)
+    s.fast()
+    expect(p.locator("#job-pill")).to_have_text(DONE_LABEL, timeout=T)
+    expect(p.locator("#narrator-sub")).to_have_text("It stopped because the next look was worth less than its cost: step 9 says why.")
+    said = "the closer look saw exposed rebar where the coarser one saw crack: a person decides"
+    change = p.locator(".trace__line--review", has_text="class change")
+    expect(change).to_have_count(1)
+    expect(change.locator(".chip")).to_have_text("class change")
+    expect(change.locator(".trace__why")).to_contain_text(f"{said} (same place: the two looks' masks overlap 62 %)")
+    expect(card(p, "f1").locator(".review__why")).to_contain_text(said)
+    expect(p.locator(".trace__line--review .chip", has_text=re.compile("^disagree$"))).to_have_count(2)
+    ambiguous = p.locator(".trace__line--review", has_text="ambiguous")
+    expect(ambiguous.locator(".trace__why")).to_contain_text(
+        "it also looks like crack (5,232 px, mostly inside it), but only spalling was recorded, so it is flagged for a person to look at (a draft: no sign-off)")
+    ask = card(p, "f4").locator(".finding__ask")
+    expect(ask).to_have_text("Flagged for a person to look at: it also looks like crack (5,232 px, mostly inside it), but only spalling "
+                             "was recorded. No sign-off is needed for a draft, so the work order does not wait for it.")
+    expect(card(p, "f4").locator(".review")).to_have_count(0)                  # a draft has no sign-off
+    expect(card(p, "f2").locator(".review")).to_be_visible()                   # re-measured past the critical rule
+    expect(card(p, "f2").get_by_role("button", name="Approve")).to_be_enabled()
+    expect(p.locator(".trace__line--finding[data-finding='f2']")).to_have_count(2)   # drafted, then sent to a person
+    expect(p.locator(".trace__line--finding[data-finding='f2']").last).to_contain_text("human sign-off requested (re-measured: now critical)")
+    expect(p.locator("#done .tile", has_text="critical, waiting for you").locator(".tile__v")).to_have_text("4")  # the done record agrees
+    detail = p.locator("#step-detail")
+    p.locator(".trace__line[data-step='4'] button").click()
+    expect(detail).to_contain_text("exposed rebar 14,580 px")                 # the finer look's best class leads the saw line
+    expect(detail).to_contain_text("same place, different class: exposed rebar now, crack in the 1:2 look (62 % overlap)")
+    detail.locator("details summary").click()
+    expect(detail.locator(".kv")).to_contain_text("0.26: the crack mask vs L1")
+    expect(detail.locator(".kv")).not_to_contain_text("at both")
+    expect(detail.locator(".kv")).to_contain_text("crack at L1 → exposed rebar now")
+    expect(detail.locator(".kv")).to_contain_text("best masks overlap (any class)0.62")
+    six = p.locator(".trace__line[data-step='6'] .trace__saw")                # its spalling still agrees: no class change
+    expect(six).to_contain_text("exposed rebar 850 px")
+    expect(six).to_contain_text("its spalling mask: 66 % overlap with the 1:2 look")
+    expect(six).not_to_contain_text("different class")
+    first = p.locator(".trace__line[data-step='1']")
+    expect(first.locator(".trace__seeded")).to_have_text(
+        "set for later: r1: crack seen there, unsure 0.58; r2: no class seen there, unsure 0.31; r3: crack seen there, unsure 0.44")
+    first.locator("button").click()
+    expect(detail).to_contain_text("What it set for later")
+    expect(detail).to_contain_text("in 3 regions it has not visited: r1 (crack seen there, uncertainty 0.58), "
+                                   "r2 (no class seen there, uncertainty 0.31), r3 (crack seen there, uncertainty 0.44)")
+    seven = p.locator(".trace__line[data-step='7']")
+    expect(seven.locator(".trace__why")).to_contain_text(
+        "severity 1.5 (crack, seen at 1:4), unsure 0.58, 1 % not seen yet, a look costs about 26 ms")
+    expect(p.locator(".trace__line[data-step='5'] .trace__why")).to_contain_text(
+        "severity 1 (the default: no class seen there at 1:4), unsure 0.31")
+    seven.locator("button").click()
+    expect(p.locator("#narrator")).to_contain_text("it weighs severity 1.5 (crack, seen at 1:4), it is unsure there (uncertainty 0.58)")
+    halt = p.locator(".trace__line[data-step]").last
+    expect(halt.locator(".trace__why")).to_contain_text(
+        "its score 1.2e-04 is under the floor 2.0e-04 (the least any look must promise, ε × v0 ÷ t̂)")
+    halt.locator("button").click()
+    expect(detail).to_contain_text("Why it stopped")
+    expect(detail).to_contain_text("The bar it fell under was the floor, the least any look must promise: ε × v0 ÷ t̂, where v0 is "
+                                   "the value of a look that finds nothing. It was higher than the usual bar")
+    said = p.evaluate("""async () => { const m = await import('/js/panels.js');
+      const kinds = ['exposed_rebar is critical', 'iou 0.19 < 0.5 between L2 and L1', 'unconfirmed: iou 0.07 < 0.5 between L1 and L0',
+        'class change: spalling at L1, corrosion at L0 (same place, iou 0.62)', 'ambiguous: crack 5232 px (>= A_min 64) is mostly inside spalling f2; recorded as spalling only']
+        .map((reason) => m.reviewKind({ reason }));
+      const unseen = m.brief({ step: 2, cause: 'best-score', rationale: 'argmax score 4.1e-03: prior 0.81, severity 1 (not seen yet), uncertainty 0.00, unseen 1.00, t_hat 61 ms; lambda 3.0e-03' });
+      return { kinds, unseen }; }""")
+    assert said["kinds"] == ["critical", "disagree", "unconfirmed", "class-change", "ambiguous"], said["kinds"]  # a trace recorded before `kind`
+    assert "severity 1 (the default: no look has shown it yet)" in said["unseen"], said["unseen"]
+    s.to(".win--findings")
+    s.shot("desktop-contract-findings.png")
+    s.check_clean()
+    s.context.close()
+    print("ok  contract in words: class change (trace, card), ambiguity on a draft, review kinds (and from old reasons), verify "
+          "classes, seeded, severity sources, floor stop, new critical")
+
+
+# Text against the sheet it sits on: the first opaque background up the tree, with translucent layers composited over it,
+# and where that background carries the blueprint grid, its minor line (rgba(232,241,255,.055)) blended in, since body
+# text crosses it every 8 px. WCAG AA: 4.5:1, or 3:1 for large text (24 px, or 18.66 px bold), visible decorative lettering
+# (sheet zones, title blocks) included. Disabled controls and the drawings in svg or canvas are exempt.
+CONTRAST = """() => {
+  const rgba = (s) => { const m = String(s).match(/rgba?\\(([^)]+)\\)/); if (!m) return null; const v = m[1].split(/[ ,/]+/).filter(Boolean).map(Number); return [v[0], v[1], v[2], v.length > 3 ? v[3] : 1]; };
+  const over = (t, b) => [0, 1, 2].map((i) => t[i] * t[3] + b[i] * (1 - t[3])).concat(1);
+  const lum = (c) => { const f = (x) => { x /= 255; return x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]); };
+  const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+  const bgOf = (el) => {
+    const layers = [];
+    let base = [7, 34, 71, 1];
+    for (let e = el; e; e = e.parentElement) {
+      const s = getComputedStyle(e), c = rgba(s.backgroundColor);
+      if (c && c[3] >= 1) { base = /(^|[^-])linear-gradient/.test(s.backgroundImage) ? over([232, 241, 255, 0.055], c) : c; break; }
+      if (c && c[3] > 0) layers.push(c);
+    }
+    return layers.reverse().reduce((b, c) => over(c, b), base);
+  };
+  const out = [];
+  for (const el of document.querySelectorAll('body *')) {
+    if (![...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())) continue;
+    const r = el.getBoundingClientRect(), s = getComputedStyle(el);
+    if (!r.width || !r.height || s.visibility === 'hidden' || el.closest('svg, canvas, :disabled, .switch:has(:disabled), [hidden], .vh')) continue;
+    let o = 1;
+    for (let e = el; e; e = e.parentElement) o *= parseFloat(getComputedStyle(e).opacity);
+    if (o < 1) continue;  // fading in, or a disabled-looking control
+    const bg = bgOf(el), fg = over(rgba(s.color), bg), size = parseFloat(s.fontSize);
+    const need = size >= 24 || (Number(s.fontWeight) >= 700 && size >= 18.66) ? 3 : 4.5;
+    const k = ratio(fg, bg);
+    if (k < need) out.push(`${el.tagName.toLowerCase()}.${String(el.className).split(' ')[0]} "${el.textContent.trim().slice(0, 40)}" ${s.color} on rgb(${bg.slice(0, 3).map(Math.round)}): ${k.toFixed(2)} < ${need}`);
+  }
+  return out;
+}"""
+
+# The focused element: its focus ring (on it, or on the visible part a visually hidden input drives) and whether the
+# sticky nav or job bar covers it.
+FOCUS = """() => {
+  const a = document.activeElement;
+  if (!a || a === document.body) return null;
+  const ring = (e) => { const s = getComputedStyle(e); return s.outlineStyle !== 'none' && parseFloat(s.outlineWidth) >= 2; };
+  const shown = a.matches('.vh') ? (ring(a.nextElementSibling ?? a) ? a.nextElementSibling : a.closest('.drop') ?? a.parentElement) : a;
+  const r = shown.getBoundingClientRect();
+  const navBottom = document.getElementById('nav').getBoundingClientRect().bottom;
+  const bar = document.getElementById('taskbar'), b = bar.getBoundingClientRect();
+  const top = document.getElementById('nav').contains(a) ? 0 : bar.contains(a) || b.top > navBottom + 1 ? navBottom : Math.max(navBottom, b.bottom);
+  return { what: `${a.tagName.toLowerCase()}#${a.id}.${String(a.className).split(' ')[0]} ${(a.textContent || a.getAttribute('aria-label') || '').trim().slice(0, 30)}`,
+    ring: ring(shown) || ring(a), tabindex: a.tabIndex, covered: r.height < innerHeight / 2 && (r.top < top - 1 || r.bottom > innerHeight + 1) };
+}"""
+
+
+def test_accessibility(browser, base):
+    """At 1440x900 and 375x812 after a run: every Tab stop, from the top of the page to the footer, shows a focus ring,
+    sits outside the sticky bars and has no positive tabindex; text meets WCAG AA contrast on the blueprint sheet;
+    and the two explanations the page used to give twice (why COOL did not run, where the LLM path is) are given
+    once, while both disclosures stay."""
+    for size, phone in (({"width": 1440, "height": 900}, False), ({"width": 375, "height": 812}, True)):
+        s = Session(browser, f"a11y-{size['width']}", viewport=size, is_mobile=phone, has_touch=phone, reduced_motion="reduce")
+        p = s.page
+        p.goto(f"{base}/?mock=1")
+        expect(p.locator("#look")).to_be_enabled(timeout=T)
+        s.fast()
+        expect(p.locator("#job-pill")).to_have_text(DONE_LABEL, timeout=T)
+        s.scroll_through()
+        bad = p.evaluate(CONTRAST)
+        assert not bad, f"{size['width']} px: text under WCAG AA contrast: {bad[:10]}"
+        p.evaluate("window.scrollTo({top: 0, behavior: 'instant'}); document.querySelector('.skip').focus()")  # walk from the top
+        assert p.evaluate("document.querySelector('.skip').getBoundingClientRect().left") >= 0, "the skip link shows when focused"
+        stops = []
+        for _ in range(300):
+            p.keyboard.press("Tab")
+            f = p.evaluate(FOCUS)
+            if f is None or (stops and f["what"] == stops[0]["what"]):
+                break
+            stops.append(f)
+        assert len(stops) > 40, f"the Tab walk stopped early: {len(stops)} stops"
+        problems = [f for f in stops if not f["ring"] or f["covered"] or f["tabindex"] > 0]
+        assert not problems, f"{size['width']} px: Tab stops without a visible ring, under the sticky bars or out of order: {problems[:6]}"
+        text = p.evaluate("document.body.textContent.replace(/\\s+/g, ' ')")
+        assert text.count("a payment-method restriction") == 1 and text.count("COOL on Graviton: not run") == 2, "the COOL reason once, both notices"
+        assert text.count("in a recorded session Claude chose each call") == 1 and text.count("No LLM runs in this demo") == 2
+        s.check_clean()
+        s.context.close()
+    print("ok  accessibility: focus ring on every Tab stop, none under the bars, WCAG AA contrast, no explanation given twice")
+
+
 if __name__ == "__main__":
     test_static_csp_hygiene()
     srv, base = serve()
@@ -1017,6 +1458,7 @@ if __name__ == "__main__":
             test_live_api_contract(browser, base)
             test_guided(browser, base)
             test_fits_on_screen(browser, base)
+            test_phone_tools_never_overlap(browser, base)
             test_keyboard(browser, base)
             test_kill_after_finish(browser, base)
             test_mobile(browser, base)
@@ -1025,6 +1467,10 @@ if __name__ == "__main__":
             test_pending_states(browser, base)
             test_halt_governor_note_and_critical_trigger(browser, base)
             test_planner_status_shows_the_fallback_chip(browser, base)
+            test_kill_before_the_first_record(browser, base)
+            test_kill_the_server_never_confirms(browser, base)
+            test_contract_fields_in_words(browser, base)
+            test_accessibility(browser, base)
             browser.close()
     finally:
         srv.shutdown()

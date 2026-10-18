@@ -303,6 +303,7 @@
             <button class="btn btn--amber btn--look" id="look" type="button" disabled>Run the agent</button>
             <label class="switch"><input class="vh" type="checkbox" id="heat" checked><span class="switch__ui"></span>heatmap</label>
             <label class="switch"><input class="vh" type="checkbox" id="tiles" disabled><span class="switch__ui"></span>compare with tiling</label>
+            <img class="pip" id="pip" alt="" aria-hidden="true" hidden>
             <details class="key" id="key">
               <summary>What am I looking at?</summary>
               <dl class="key__list">
@@ -316,7 +317,7 @@
               </dl>
             </details>
           </div>
-          <div class="stage"><canvas id="stage" role="img" aria-label="Photo viewport. Load a photo and press Run."></canvas><img class="pip" id="pip" alt="" aria-hidden="true" hidden></div>
+          <div class="stage"><canvas id="stage" role="img" aria-label="Photo viewport. Load a photo and press Run."></canvas></div>
           <p class="note" id="tiles-note" hidden></p>
           <div class="narrator" aria-live="polite" aria-atomic="true">
             <span class="narrator__tag" aria-hidden="true">NOTE</span>
@@ -432,8 +433,8 @@
         <p class="formula" aria-label="score of r equals p times s times one plus u times a divided by t-hat">score(r) = <b data-n="1">p</b> &middot; <b data-n="2">s</b> &middot; (1 + <b data-n="3">u</b>) &middot; <b data-n="4">a</b> / <b data-n="5">t&#770;</b></p>
         <dl class="terms">
           <div><dt data-n="1">p</dt><dd>saliency prior from the overview, 0&ndash;1. How likely is something here?</dd></div>
-          <div><dt data-n="2">s</dt><dd>class severity weight. Exposed rebar 3.0, spalling 2.0, crack 1.5, corrosion 1.0, efflorescence 0.5.</dd></div>
-          <div><dt data-n="3">u</dt><dd>segmenter entropy at the last level that saw the region, 0 if unseen. How unsure are we?</dd></div>
+          <div><dt data-n="2">s</dt><dd>class severity weight of the most severe class a look has already seen in the region, 1 while no look has seen a class there. Exposed rebar 3.0, spalling 2.0, crack 1.5, corrosion 1.0, efflorescence 0.5.</dd></div>
+          <div><dt data-n="3">u</dt><dd>segmenter entropy over the region from the finest look that has shown it, 0 until one has. How unsure are we?</dd></div>
           <div><dt data-n="4">a</dt><dd>fraction of the region not yet seen at the target level. Don&rsquo;t look twice.</dd></div>
           <div><dt data-n="5">t&#770;</dt><dd>predicted milliseconds for the planned ops, from the live p95. What does looking cost?</dd></div>
         </dl>
@@ -446,8 +447,8 @@
         <ol class="rules">
           <li><b>Next gaze.</b> Take the highest score. Ties go to the larger unseen share, then top-left first. That is deterministic for the same timings; live latency changes t&#770;, so two runs can differ.</li>
           <li><b>Escalate (zoom in).</b> Zoom one pyramid level finer (2&times;) on the same centre when entropy &gt; &tau; (0.5), meaning the segmenter is unsure, or the mask is under 64 px, down to L0 (full resolution).</li>
-          <li><b>Verify (double-check).</b> When a mask appears at a new level, re-segment one level finer and record the IoU (how much the two masks overlap). Under 0.5 means one more look, or a human for a critical class.</li>
-          <li><b>Stop.</b> When the best remaining score falls below &lambda; = &epsilon; &times; (value so far &divide; cost so far), that is, when the next look is worth less than it costs, or any cap is hit.</li>
+          <li><b>Verify (double-check).</b> When a mask appears at a new level, re-segment one level finer and record the IoU of the same class&rsquo;s two masks (how much they overlap). Under 0.5 means one more look, or a human for a critical class. If that class is gone or under 0.5 but the finer look&rsquo;s main mask covers the same place (IoU 0.5 or more) as another class, it is a <i>class change</i>: the finer look&rsquo;s class is kept, and a human is asked when either finding is critical.</li>
+          <li><b>Stop.</b> When the best remaining score falls below &lambda; = max(&epsilon; &times; value so far &divide; cost so far, &epsilon; &times; v0 &divide; t&#770;), that is, when the next look is worth less than it costs, or any cap is hit. &epsilon; is 0.25. The second term is the floor, the least any look must promise: v0 (2.0) is the value of a look that finds nothing, so a photo with nothing to find can stop before its cap. It counts only once a look has shown the best candidate, so the agent never stops on the saliency prior alone.</li>
           <li><b>Governor.</b> The budget-and-speed watchdog runs before every step and may override the model, level or view size. Every override writes a cause into the trace.</li>
         </ol>
       </div>
@@ -573,7 +574,7 @@
           <li><b>Privacy blur.</b> Faces, people and vehicles are found with OpenCV DNN models and blurred before any look is taken. A photo in which one person fills more than a quarter of the frame is refused: this inspects structures, not people.</li>
           <li><b>Signed work orders.</b> The work order is signed with HMAC-SHA256 and every sign-off returns a new signature, so an edited order no longer verifies. The download includes the signature.</li>
         </ol>
-        <p class="note guards__llm">No LLM runs in this demo. The live agent is the rule policy (FIG. 3.2), and the drill planners are scripted to fail. The LLM path is the MCP server: in a recorded session Claude chose each call from the numbers the tools measured (its prompt states the decision rules). <a href="https://github.com/vj-io/drishyam/blob/main/docs/mcp-session/transcript.md" rel="noopener noreferrer">Read the recorded session</a>.</p>
+        <p class="note guards__llm">No LLM runs in this demo: the live agent is the rule policy (FIG. 3.2); FIG. 3.5 says what runs live and where the LLM path is. <a href="https://github.com/vj-io/drishyam/blob/main/docs/mcp-session/transcript.md" rel="noopener noreferrer">Read the recorded MCP session</a>.</p>
       </div>
     </section>
     <section class="win pop win--wide" aria-labelledby="t-auto">
@@ -641,7 +642,7 @@
     <div class="win__bar"><span class="win__fig" aria-hidden="true">END</span><h2 class="win__title" id="h-docs">Docs and links</h2></div>
     <div class="win__body stack">
       <figure class="video" id="video" hidden></figure>
-      <p class="banner banner--honest"><b id="live-where">Live demo: stock OpenCV 5 on AWS Lambda (arm64) &mdash; not COOL.</b> <span id="cool-status">COOL on Graviton: not run. The COOL Marketplace AMI could not be subscribed from our AWS account (a payment-method restriction); the three-arm scripts are in bench/.</span></p>
+      <p class="banner banner--honest"><b id="live-where">Live demo: stock OpenCV 5 on AWS Lambda (arm64) &mdash; not COOL.</b> <span id="cool-status">COOL on Graviton: not run, because its Marketplace AMI could not be subscribed from our AWS account (FIG. 4.3).</span></p>
       <nav aria-label="Project links">
         <ul class="links">
           <li><a href="https://github.com/vj-io/drishyam" rel="noopener noreferrer">GitHub repo</a></li>
@@ -656,6 +657,7 @@
         </ul>
       </nav>
       <p class="note" id="api-status" role="status">Checking the API&hellip;</p>
+      <p class="note" id="api-build" hidden></p>
       <p class="note">Pixels, not millimetres. AI-assisted, not an inspection. Synthetic samples are labelled synthetic.</p>
     </div>
   </div>

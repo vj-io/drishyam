@@ -43,6 +43,42 @@ def test_health_and_security_headers():
     assert h["segmenter"] == "classical-v1" and h["segmenter_licence"] == "MIT (no learned weights)"
     assert r.headers["cache-control"] == "no-store" and r.headers["x-content-type-options"] == "nosniff"
     assert client.get("/docs").status_code == 404 and client.get("/openapi.json").status_code == 404
+    b = h["cv2_build"]  # this process's own build, as cv2.getBuildInformation() prints it
+    info = cv2.getBuildInformation()
+    assert set(b) == {"hal", "cpu_baseline", "cpu_dispatch", "parallel", "onnx_runtime", "dnn_engines"}
+    for key, label in (("hal", "Custom HAL"), ("cpu_baseline", "Baseline"), ("parallel", "Parallel framework")):
+        assert b[key] and f"{label}:" in info and b[key] in info, key
+    assert "new" in b["dnn_engines"]  # OpenCV 5's cv2.dnn.ENGINE_NEW, the opt-in ONNX segmenter's engine
+    assert len(r.content) < 1000  # small: an uptime monitor polls it
+
+
+def test_build_facts_read_the_hal_line_of_an_arm_build(monkeypatch):
+    """The parser keeps each line as printed, so an aarch64 wheel's HALs show as they are; a missing line is None."""
+    from drishyam import web
+
+    arm = ("  CPU/HW features:\n    Baseline:                    NEON FP16\n      requested:                 DETECT\n"
+           "    Dispatched code generation:  NEON_DOTPROD NEON_FP16 NEON_BF16\n"
+           "  Parallel framework:            pthreads\n"
+           "    Custom HAL:                  YES (carotene (ver 0.0.1) KleidiCV (ver 0.6.0))\n")
+    monkeypatch.setattr(web.cv2, "getBuildInformation", lambda: arm)
+    b = web.build_facts()
+    assert b["hal"] == "YES (carotene (ver 0.0.1) KleidiCV (ver 0.6.0))" and b["parallel"] == "pthreads"
+    assert (b["cpu_baseline"], b["cpu_dispatch"]) == ("NEON FP16", "NEON_DOTPROD NEON_FP16 NEON_BF16")
+    monkeypatch.setattr(web.cv2, "getBuildInformation", lambda: "General configuration for OpenCV 5.0.0\n")
+    assert web.build_facts()["hal"] is None
+
+
+def test_build_facts_list_ort_only_when_onnx_runtime_is_built_in(monkeypatch):
+    """cv2.dnn.ENGINE_ORT exists whether or not the wheel was built with ONNX Runtime: the build line decides."""
+    from drishyam import web
+
+    monkeypatch.setattr(web.cv2.dnn, "ENGINE_ORT", 3, raising=False)
+    for printed, listed in (("NO", False), ("YES (ver 1.20.0)", True)):
+        monkeypatch.setattr(web.cv2, "getBuildInformation", lambda p=printed: f"  ONNX Runtime:                  {p}\n")
+        b = web.build_facts()
+        assert b["onnx_runtime"] == printed and ("ort" in b["dnn_engines"]) is listed, printed
+    monkeypatch.setattr(web.cv2, "getBuildInformation", lambda: "General configuration for OpenCV 5.0.0\n")
+    assert "ort" not in web.build_facts()["dnn_engines"]  # no line: not claimed
 
 
 def test_health_names_the_dacl10k_licence(monkeypatch):
@@ -98,18 +134,54 @@ def test_replay_header_validation(photo):
     assert ok.status_code == 200 and steps[0]["cause"] == "replay"
 
 
-def test_chaos_drills_over_http(scene, monkeypatch):
+def drill_records(ev):
+    """(the step after the injected spike or None, the step-6 planner event or None) of a drill job's events."""
+    steps = [e for e in ev if e["type"] == "step"]
+    spike = next((s for s in steps if s.get("injected") == "p95_spike"), None)
+    after = spike and next((s for s in steps if s["step"] == spike["step"] + 1), None)
+    planned = next((e for e in ev if e["type"] == "planner" and e["step"] == 6), None)
+    return after, planned
+
+
+def test_chaos_drills_over_http_on_fixed_costs(scene, monkeypatch):
+    """The drills through the HTTP path on the published fixed costs (a virtual clock, as the evaluations run them),
+    so the outcome cannot move with load: the spike on look 4 makes the next record carry p95>SLA, and the malformed
+    planner on step 6 is rejected while the rule planner's look stands."""
+    import functools
+
+    from drishyam import agent, segment, web
+    from evals.harness import FixedCostJob, cost_rows, op_costs
+
+    rows = cost_rows("linux-aarch64", segment.default_segmenter().name)
+    monkeypatch.setattr(web, "JobConfig", functools.partial(agent.JobConfig, eps=0.0))  # 6+ looks: no stop-rule halt
+    monkeypatch.setattr(web, "Job", lambda img, cfg, clock=None, **kw: FixedCostJob(
+        img, cfg, op_costs(rows, img.shape[1], img.shape[0]), **kw))
+    ev = lines(post(jpeg(scene), params="?pixel_cap=1&chaos=p95_spike,planner_malformed"))
+    after, planned = drill_records(ev)
+    assert after and (after.get("governor") or after)["cause"] == "p95>SLA"
+    assert planned and planned["status"] == "rejected" and planned["proposal"] is None
+    step6 = next(e for e in ev if e["type"] == "step" and e["step"] == 6)
+    assert step6["planner_status"]["status"] == "rejected" and step6["planner"] == "rule"
+
+
+def test_chaos_drills_over_http_on_the_real_clock(scene, monkeypatch):
+    """REAL CLOCK, so it depends on machine load: a busy machine trips p95>SLA on its own and can reach the 30 s cap
+    before look 6. It asserts behaviour every path guarantees, never a timing: the job ends with a done record,
+    every governor override carries its cause, and each drill that was reached was answered (the fixed-cost test
+    above pins the full sequence)."""
     import functools
 
     from drishyam import agent, web
 
-    # The drills need a job of 6+ looks: the scene (several defects) with eps = 0, so the stop rule cannot end it
-    # before the spike (injected on look 4) and the malformed planner (step 6).
     monkeypatch.setattr(web, "JobConfig", functools.partial(agent.JobConfig, eps=0.0))
-    ev = lines(post(jpeg(scene), params="?pixel_cap=1&chaos=p95_spike,planner_malformed"))
-    assert any(e.get("governor", {}).get("cause") == "p95>SLA" for e in ev)
-    assert any(e["type"] == "planner" and e["status"] == "rejected" for e in ev)
-    assert any(e.get("planner_status", {}).get("status") == "rejected" for e in ev)
+    ev = lines(post(jpeg(scene), params="?pixel_cap=1&seconds_cap=30&chaos=p95_spike,planner_malformed"))
+    assert ev[-1]["type"] == "done"
+    assert all(e["governor"]["cause"] for e in ev if e.get("governor"))
+    after, planned = drill_records(ev)
+    if after:
+        assert "p95>SLA" in {after["cause"], (after.get("governor") or {}).get("cause")}
+    if planned:
+        assert planned["status"] == "rejected"
 
 
 def test_jobs_consult_the_configured_planner(scene, monkeypatch):

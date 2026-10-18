@@ -3,7 +3,7 @@ import { $, $$, h, num, dataUrl } from './js/dom.js';
 import { MOCK, streamJob, postReview, postKill, getJSON, health } from './js/api.js';
 import { prepareImage } from './js/prep.js';
 import { Viewport, pointOf, tileBoxes } from './js/viewport.js';
-import { Budget, Trace, renderStepDetail, isGovernor, plannerFell, explain, haltText, kindOf, pad, px, label, words, reviewText } from './js/panels.js';
+import { Budget, Trace, renderStepDetail, isGovernor, plannerFell, explain, kindOf, pad, px, label, words, reviewText, reviewKind } from './js/panels.js';
 import { Findings, ruleOf } from './js/findings.js';
 import { countUp, popup, reduced, replay, sound } from './js/fx.js';
 import { initResults } from './js/results.js';
@@ -12,6 +12,7 @@ const PACE = 3500;  // ms each decision stays on screen, with what its look foun
 const HOLD = 5000;  // the decision that finds the first critical damage stays this long: the hand-off to a person
 const GUIDE = 'bridge_03.jpg';  // exposed rebar: the default run ends with critical findings for a human
 const GUIDE_PACE_MS = 1000;  // asks the server to wait this long between looks (pace_ms); its timings exclude the wait
+const KILL_WAIT_S = 8;  // a KILL pressed before the server's first record waits this long for it, then cancels the upload
 const NOTE = 'Press Run and the agent’s reasoning appears here, one decision at a time, in plain words.';
 
 const el = {
@@ -27,7 +28,7 @@ const el = {
 
 const S = {
   image: null, sample: null, ready: null, ctl: null, mode: 'idle', opts: {}, job: null, overview: null, steps: [], done: null,
-  token: null, order: null, ui: null, timer: 0, rev: 0, events: [], planners: new Map(), arrived: null, note: null, critSeen: false, killTimer: 0,
+  token: null, order: null, ui: null, timer: 0, rev: 0, events: [], planners: new Map(), arrived: null, note: null, critSeen: false, killTimer: 0, killPending: false,
   found: [], sent: [], crit: null, slow: false,  // what the step on screen found and sent to a person, its critical NOTE; replayed slowly?
 };
 // The presentation queue: stream events wait here and are shown one decision at a time. A step's findings and
@@ -46,13 +47,16 @@ const GOVERNOR_TEXT = {
   'warp-spike': () => 'Cutting out views got slow, so the governor shrank the view.',
   'usd≥80%': () => '80 % of the $ cap is spent, so it now double-checks critical damage only.',
   'cap-hit': () => 'A budget cap was hit, so it stopped and reported what it did not reach.',
-  'kill-switch': () => 'KILL: it halted before the next look; its state is kept.',
+  'kill-switch': (s) => (s.step > 1 ? 'KILL: it halted before the next look; its state is kept.'
+    : 'The kill switch was already set: it stopped before its first look, so there is nothing to resume.'),
   'planner-fallback': () => 'The planner failed, so the built-in rule planner took over.',
 };
 const STOPPED = {
   'stop-rule': 'the next look was worth less than its cost', exhausted: 'every candidate region was looked at',
   'cap-hit': 'budget spent', 'kill-switch': 'you pressed KILL', 'planner:stop': 'the planner proposed stopping',
 };
+// a kill-switch halt before any look can only be the operator-wide switch: the server reads a page's KILL after a look
+const stopWords = (cause, looks) => (cause === 'kill-switch' && !looks ? 'the kill switch was already set' : STOPPED[cause] ?? cause);
 
 // ---- the four steps: Waiting / Running / Done, each with a sentence in plain words -------------------
 const pendingCount = () => (S.order?.findings ?? []).filter((f) => f.critical && f.state === 'pending_review').length;
@@ -82,7 +86,7 @@ function doneKey() {
   return d?.status ?? 'completed';
 }
 const PILL = {
-  idle: 'ready', running: 'running', killed: 'killed', error: 'error',
+  idle: 'ready', running: 'running', killed: 'killed', stopped: 'stopped', error: 'error',
   awaiting_review: 'needs sign-off', signed: 'signed', completed: 'done', halted: 'halted', budget: 'budget spent',
 };
 
@@ -102,12 +106,14 @@ function setMode(mode, text) {
   el.kill.hidden = !running;
   el.skip.hidden = !running || Q.skip;
   el.runBar.hidden = running;
-  el.resume.hidden = !(mode === 'killed' || (mode === 'error' && S.steps.length > 0) || (mode === 'done' && S.done?.cause === 'kill-switch'));
+  el.resume.hidden = !(['killed', 'stopped'].includes(mode) || (mode === 'error' && S.steps.length > 0)
+    || (mode === 'done' && S.done?.cause === 'kill-switch' && S.done.summary?.steps > 0));  // a halt before any look has nothing to resume
   el.look.disabled = el.runBar.disabled = running || !S.image;
   el.guided.disabled = running;
   if (!running) el.count.textContent = '';
   if (['error', 'killed'].includes(mode) && !S.events.length) narrate(el.text.textContent);  // nothing arrived: the NOTE still says "Sending"
   if (onBar && !running) (el.resume.hidden ? el.look : el.resume).focus({ preventScroll: true });
+  showCam(viewport.cursor);  // its caption says whether a job is on its way
   syncSteps();
 }
 
@@ -143,7 +149,10 @@ function showCam(k) {
   el.camImg.hidden = el.pip.hidden = !url;
   el.stages.hidden = Boolean(url);
   if (!url) {
-    el.camCap.textContent = S.job ? 'Before the first look' : 'No look yet. Press Run.';
+    el.camCap.textContent = S.mode === 'running'
+      ? (S.job ? 'Before the first look: the stages above light up as the server prepares the photo'
+        : 'Sending the photo: the first look follows the server’s preparation')
+      : !S.job ? 'No look yet. Press Run.' : S.steps.some((s) => s.crop_jpeg_b64) ? 'Before the first look' : 'Stopped before any look';
     return;
   }
   el.camImg.src = el.pip.src = url;
@@ -305,11 +314,14 @@ function handle(ev) {
     case 'review_request': {
       const reason = String(ev.reason);
       const plain = reviewText(reason);
+      const kind = reviewKind(ev);
       findings.addReason(ev.finding_id, reason, plain);
-      if (!reason.endsWith(' is critical')) {  // that one is said by the finding's own line
+      if (kind !== 'critical') {  // that one is said by the finding's own line
         const f = findings.cards.get(ev.finding_id)?.finding;
+        const decides = / a person decides\b/.test(plain);
+        const ask = f && !f.critical ? 'so it is flagged for a person to look at (a draft: no sign-off)' : 'so a person must check it';
         trace.addNote('review', S.steps.at(-1)?.step ?? 0, ev.finding_id, `${f ? label(f.cls) : 'Finding'} ${ev.finding_id} → human`,
-          `${plain}, so a person must check it`, () => findings.focus(ev.finding_id), reason);
+          decides ? plain : `${plain}, ${ask}`, () => findings.focus(ev.finding_id), reason, kind.replace(/[-_]/g, ' '));
         S.sent.push(`${f ? label(f.cls) : 'Finding'} ${ev.finding_id} goes to a person: ${plain}.`);
         sayStep();
       }
@@ -362,10 +374,12 @@ function addStep(step) {
 }
 
 function addFinding(f) {
-  if (!findings.add(f)) return 0;  // a re-measure of a known finding updates its card only
+  const before = findings.cards.get(f.id)?.finding;
+  // A re-measure of a known finding updates its card only, unless a finer look measured it past the critical rule.
+  if (!findings.add(f) && !(f.critical && before && !before.critical)) return 0;
   const at = S.steps.at(-1)?.step ?? f.step;
   trace.addNote('finding', at, f.id,
-    `${label(f.cls)} · ${px(f.measure?.area_px)} px²${f.critical ? ' → human sign-off requested' : ' · draft, no sign-off needed'}`,
+    `${label(f.cls)} · ${px(f.measure?.area_px)} px²${f.critical ? ` → human sign-off requested${before ? ' (re-measured: now critical)' : ''}` : ' · draft, no sign-off needed'}`,
     f.critical ? ruleOf(f) : null, () => findings.focus(f.id));
   S.found.push(`${words(f.cls)} (${f.critical ? 'critical' : 'a draft'})`);
   const first = f.critical && !S.critSeen;
@@ -426,6 +440,10 @@ function arrive(ev) {
   Q.items.push(ev);
   if (ev.type === 'error') skip();  // say what went wrong now, after what had arrived
   else pump();
+  if (S.killPending && ev.type === 'job') {  // KILL was pressed before this record: send it now that the job is known
+    S.killPending = false;
+    sendKill(ev);
+  }
 }
 
 // ---- work order / done state ---------------------------------------------------------------------------
@@ -470,7 +488,7 @@ function buildDone() {
   log.addEventListener('click', () => save('trace.ndjson', `${S.events.map((e) => JSON.stringify(e)).join('\n')}\n`, 'application/x-ndjson'));
   const box = (id) => S.overview?.candidates?.find((c) => c.id === id)?.box;
   el.done.replaceChildren(h('div', { class: 'stack' },
-    h('div', { class: 'done__head' }, pill, h('span', { class: 'note' }, `stopped because ${STOPPED[cause] ?? cause} (${cause})`)),
+    h('div', { class: 'done__head' }, pill, h('span', { class: 'note' }, `stopped because ${stopWords(cause, sm.steps)} (${cause})`)),
     orderState,
     h('div', { class: 'tiles' }, specs.map((s) => s.pair[0])),
     h('div', { class: 'meter' },
@@ -512,11 +530,11 @@ function updateDone() {
 
 /** "What you just saw": the run in four honest numbers, and two ways to try it harder. */
 function recap() {
-  const kinds = { vision: 0, governor: 0, planner: 0, replay: 0 };
+  const kinds = { vision: 0, kill: 0, governor: 0, planner: 0, replay: 0 };
   for (const s of S.steps) kinds[kindOf(s.cause)] += 1;
   const sm = S.done.summary;
   const crit = S.order.findings.filter((f) => f.critical).length;
-  const why = [[kinds.vision, 'from what OpenCV measured in the photo'], [kinds.governor, 'from the governor’s timing and budget checks'],
+  const why = [[kinds.vision, 'from what OpenCV measured in the photo'], [kinds.kill, 'from the kill switch'], [kinds.governor, 'from the governor’s timing and budget checks'],
     [kinds.planner, 'from the planner drill (the rule planner’s choice stood)'], [kinds.replay, 'replayed from before KILL']]
     .filter(([n]) => n).map(([n, t]) => `${n} ${t}`);
   const breakIt = h('button', { class: 'btn btn--amber btn--sm', type: 'button' }, 'Now break it');
@@ -525,10 +543,16 @@ function recap() {
   tryKill.addEventListener('click', () => run({ pace: GUIDE_PACE_MS, chaos: 'planner_timeout', killHint: true }));
   const sign = h('button', { class: 'btn btn--amber btn--sm', type: 'button', id: 'sign-off' }, 'Sign them off');
   sign.addEventListener('click', () => findings.focus(S.order.findings.find((f) => f.critical && f.state === 'pending_review')?.id, true));
+  // A decision is a step record; a look is one that moved the camera (the work order's "looks"); the halt is the decision to stop.
+  const looks = S.steps.filter((s) => s.decision?.action !== 'halt').length;
+  const halt = S.steps.find((s) => s.decision?.action === 'halt');
+  const stopped = !halt ? '' : halt.cause !== 'kill-switch' ? ' and the decision to stop'
+    : looks ? ' and the stop KILL asked for' : ' and the stop the kill switch made';
   el.recap.replaceChildren(
     h('h4', { class: 'recap__t' }, 'What you just saw'),
     h('ul', { class: 'recap__list' },
-      h('li', {}, h('b', {}, String(S.steps.length)), ` decisions, every one with a recorded cause: ${why.join(', ')}.`),
+      h('li', {}, h('b', {}, String(S.steps.length)), ` decision${S.steps.length === 1 ? '' : 's'} (${looks ? looks : 'no'} look${looks === 1 ? '' : 's'}${stopped}), `
+        + `${S.steps.length === 1 ? 'with its' : 'every one with a'} recorded cause: ${why.join(', ')}.`),
       h('li', {}, h('b', {}, String(crit)), ` critical finding${crit === 1 ? ' was' : 's were'} sent to a person: the agent is not allowed to approve ${crit === 1 ? 'it' : 'them'}.`),
       h('li', {}, h('b', {}, `${Math.round(S.done.coverage * 100)} %`), ' of the salient area was seen at some level (the first survey look counts).'),
       h('li', {}, h('b', {}, `$${sm.usd.toFixed(6)}`), ` modelled for ${sm.seconds} s of agent time (wall time × $0.339/h, not billed).`)),
@@ -547,11 +571,13 @@ function finish(ev) {
   const sm = ev.summary;
   const n = sm.critical_pending;
   setMode('done', S.note ?? (ev.cause === 'kill-switch'
-    ? `Halted by KILL at step ${sm.steps}: the trace shows kill-switch and the state is kept. Resume carries on.`
+    ? (sm.steps ? `Halted by KILL at step ${sm.steps}: the trace shows kill-switch and the state is kept. Resume carries on.`
+      : 'Halted before its first look: the kill switch was already set, so there is no look to resume. Run starts it again.')
     : S.slow && !Q.skip ? `The agent took ${sm.seconds} s${paced()}; we replayed it slowly so you can read it${serverTotal(sm.seconds)}.`
       : `Done in ${sm.seconds} s of agent time: ${sm.steps} looks, ${(sm.pixels_frac * 100).toFixed(1)} % of the pixels${serverTotal(sm.seconds)}.`));
   narrate(n ? `${n} critical finding${n === 1 ? ' needs' : 's need'} you. Sign ${n === 1 ? 'it' : 'them'} off in step 4: the agent cannot.`
-    : 'Nothing critical was found, so nothing needs your sign-off.', haltText(ev.cause));
+    : 'Nothing critical was found, so nothing needs your sign-off.',
+  `It stopped because ${stopWords(ev.cause, sm.steps)}${S.steps.length ? `: step ${S.steps.at(-1).step} says why` : ''}.`);
   findings.setReady();
   findings.refresh();
   el.tiles.disabled = false;
@@ -591,7 +617,8 @@ async function run(opts = {}) {
   if (!S.image || S.mode === 'running') return;
   S.opts = opts;
   S.ctl = new AbortController();
-  Object.assign(S, { events: [], arrived: null, note: null, slow: false });
+  clearTimeout(S.killTimer);
+  Object.assign(S, { events: [], arrived: null, note: null, slow: false, killPending: false });
   clearTimeout(Q.timer);
   Object.assign(Q, { items: [], timer: 0, skip: Boolean(opts.killHint) });  // a KILL drill is shown live: never behind the job it asks to stop
   const active = document.activeElement;  // all hidden or disabled while running
@@ -624,12 +651,35 @@ async function run(opts = {}) {
   }
 }
 
-/** Abort the stream here, show what arrived, and say so. */
-function stop(why) {
+/** Abort the stream here, show what arrived, and say so. `unconfirmed`: the server never confirmed a KILL, so this is the
+    page stopping its view of the job, not a kill (behind a Lambda Function URL the job may run on to its cap). */
+function stop(why, unconfirmed = false) {
   S.ctl.abort();
   skip();
   const n = S.steps.length;
+  if (!n) {  // no look had been shown: there is no state to keep and nothing to resume
+    setMode('idle', `Stopped before the agent’s first look${why}. No look had arrived, so the page keeps nothing; Run starts it again.`);
+    narrate(el.text.textContent);
+    return;
+  }
+  if (unconfirmed) {
+    setMode('stopped', `The page stopped showing the job at step ${n}${why}; the server may still be running it, up to its time cap. `
+      + `What arrived is kept: Resume re-sends the photo and replays your ${n} moves.`);
+    narrate(el.text.textContent);
+    return;
+  }
   setMode('killed', `Killed at step ${n}${why} — state preserved. Resume re-sends the photo and replays your ${n} moves.`);
+}
+
+/** POST /api/kill for `job` (its first record): the server halts before its next look and sends the kill-switch record. */
+function sendKill(job) {
+  postKill(job.job, job.kill_token);
+  skip();
+  el.text.textContent = 'KILL sent: the agent halts before its next look…';
+  clearTimeout(S.killTimer);
+  S.killTimer = setTimeout(() => {
+    if (S.mode === 'running' && !S.arrived) stop(': the server did not confirm KILL within 6 s', true);
+  }, 6000);
 }
 
 function kill() {
@@ -637,14 +687,22 @@ function kill() {
     S.note = `The job had already finished on the server (the agent took ${S.arrived.summary.seconds} s) before KILL could reach it; here is its result.`;
     return skip();
   }
-  if (MOCK || !S.job || !S.events.length) return stop('');  // a recording, or a job (a Resume too) the server has not started yet
-  postKill(S.job.job, S.job.kill_token);  // the server halts before its next look and sends the kill-switch record
-  skip();
-  el.text.textContent = 'KILL sent: the agent halts before its next look…';
-  clearTimeout(S.killTimer);
-  S.killTimer = setTimeout(() => {
-    if (S.mode === 'running' && !S.arrived) stop(': the server did not confirm in time, so the page closed the stream');
-  }, 6000);
+  if (!S.events.length && !MOCK) {  // the job id and kill token come with the server's first record (a Resume's too)
+    if (S.killPending) return;
+    S.killPending = true;
+    el.text.textContent = 'KILL pressed before the server answered: the page has no job id yet, so KILL is sent the moment it arrives.';
+    narrate('KILL queued: it is sent as soon as the server answers.');
+    clearTimeout(S.killTimer);
+    S.killTimer = setTimeout(() => {  // no answer at all: cancel the upload rather than leave KILL doing nothing
+      if (S.mode === 'running' && S.killPending) {
+        stop(`: the server had not answered ${KILL_WAIT_S} s after KILL, so the page cancelled the upload (if the server had `
+          + 'already started the job, it may run on, unseen, up to its time cap)');
+      }
+    }, KILL_WAIT_S * 1000);
+    return;
+  }
+  if (MOCK) return stop(S.events.length ? '' : ' (the recording had not started)');  // no server to tell
+  sendKill(S.job);
 }
 
 function resume() {
@@ -817,5 +875,13 @@ health().then((hl) => {
     ? ['API online', `OpenCV ${hl.opencv}`, hl.build, `segmenter ${hl.segmenter}`, ...where].join(' · ')
     : 'The API is not reachable from this page. Watch a recorded run instead: it replays a saved job.';
   if (hl?.ok && hl.host) $('#live-where').textContent = `Live demo: OpenCV ${hl.opencv}, ${hl.build}, on ${hl.host}${arch ? ` (${arch})` : ''}.`;
+  const b = hl?.ok ? hl.cv2_build : null;  // read live from cv2.getBuildInformation() on the server
+  if (b) {
+    $('#api-build').textContent = [b.hal && `Custom HAL: ${b.hal}`, b.parallel && `parallel framework: ${b.parallel}`,
+      b.cpu_baseline && `CPU baseline: ${b.cpu_baseline}`, b.cpu_dispatch && `dispatched: ${b.cpu_dispatch}`,
+      Array.isArray(b.dnn_engines) && b.dnn_engines.length && `cv2.dnn engines built in: ${b.dnn_engines.join(', ')}`,
+      b.onnx_runtime && `ONNX Runtime: ${b.onnx_runtime}`].filter(Boolean).join(' · ');
+    $('#api-build').hidden = false;
+  }
   el.recorded.hidden = MOCK || Boolean(hl?.ok);
 });

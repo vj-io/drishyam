@@ -97,6 +97,23 @@ def _progress(ev: dict) -> None:
     print(line, file=sys.stderr)
 
 
+def fixed_cost_job(img, cfg, micro_arm: str, kw: dict):
+    """A Job on the published fixed costs, as the evaluations and evals/trace_sample.py run it: every timed op costs
+    its p50 from results/<micro_arm>/micro.json on a virtual clock, so the stop rule, the governor and the caps read
+    that table, not this machine's load. A repo checkout only: evals/ and results/ are not in the wheel."""
+    repo = Path(__file__).resolve().parent.parent
+    if not (repo / "evals" / "harness.py").exists():
+        raise ValueError("--cost-model fixed needs a repo checkout (evals/ and results/<arm>/micro.json)")
+    if str(repo) not in sys.path:
+        sys.path.insert(0, str(repo))
+    from evals.harness import FixedCostJob, cost_rows, op_costs
+
+    from .segment import default_segmenter
+
+    costs = op_costs(cost_rows(micro_arm, default_segmenter().name), img.shape[1], img.shape[0])
+    return FixedCostJob(img, cfg, costs, **kw)
+
+
 def cmd_run(a) -> int:
     img = imaging.decode_image(Path(a.image).read_bytes())
     priv = privacy.privacy_pass(img)
@@ -120,13 +137,13 @@ def cmd_run(a) -> int:
         interrupted.append(True)
         print("interrupt: halting after this step (Ctrl-C again to abort)", file=sys.stderr)
 
-    job = Job(
-        img,
-        JobConfig(pixel_cap=a.pixel_cap, usd_cap=a.usd_cap, seconds_cap=a.seconds_cap, chaos=a.chaos),
-        kill=lambda: stop.is_set() or kill_path().exists(),
-        replay=replay,
-        planner=planner.from_env(),  # None unless DRISHYAM_PLANNER_URL is set
-    )
+    cfg = JobConfig(pixel_cap=a.pixel_cap, usd_cap=a.usd_cap, seconds_cap=a.seconds_cap, chaos=a.chaos)
+    kw = {
+        "kill": lambda: stop.is_set() or kill_path().exists(),
+        "replay": replay,
+        "planner": planner.from_env(),  # None unless DRISHYAM_PLANNER_URL is set
+    }
+    job = Job(img, cfg, **kw) if a.cost_model == "live" else fixed_cost_job(img, cfg, a.micro_arm, kw)
     run_dir = Path(a.out) / job.id
     run_dir.mkdir(parents=True)
     old = (
@@ -140,6 +157,8 @@ def cmd_run(a) -> int:
             for ev in job.run():
                 if ev["type"] == "job":
                     ev["privacy"] = {k: v for k, v in priv.items() if k != "boxes"}
+                    if a.cost_model == "fixed":  # the trace says its times and $ are modelled
+                        ev["cost_model"] = {"kind": "fixed", "micro_arm": a.micro_arm}
                     if resumed:
                         ev["resumed_from"] = resumed
                 trace_file.write(json.dumps(ev, separators=(",", ":")) + "\n")
@@ -160,6 +179,8 @@ def cmd_run(a) -> int:
         f"steps {s['steps']}  pixels {s['pixels_frac']:.1%}  ${s['usd']}  {s['seconds']} s  "
         f"coverage {done['coverage']:.0%}"
     )
+    if a.cost_model == "fixed":
+        print(f"seconds and $ are modelled from results/{a.micro_arm}/micro.json (--cost-model fixed), not measured")
     print(f"findings {s['findings']}  critical pending review {s['critical_pending']}")
     print(f"work order {wo_path} ({done['work_order']['status']})")
     if s["critical_pending"]:
@@ -280,6 +301,15 @@ def _parser() -> argparse.ArgumentParser:
     r.add_argument("--out", default="runs", help="directory for run folders (default runs)")
     r.add_argument(
         "--resume", metavar="TRACE", help="re-execute the decisions of an earlier trace, then continue"
+    )
+    r.add_argument(
+        "--cost-model", choices=("live", "fixed"), default="live",
+        help="live: this machine's wall clock (default); fixed: the published per-op costs on a virtual clock, "
+        "so the run does not change with load (a repo checkout only)",
+    )
+    r.add_argument(
+        "--micro-arm", default="linux-aarch64", metavar="ARM",
+        help="the cost table for --cost-model fixed: results/ARM/micro.json (default linux-aarch64, the published one)",
     )
     r.set_defaults(func=cmd_run)
 
