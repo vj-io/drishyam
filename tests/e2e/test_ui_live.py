@@ -6,7 +6,9 @@ Without BASE_URL it starts the app locally (uvicorn, production headers from inf
 Waits use locators and polling, never wait_for_function (blocked under the strict CSP).
 """
 
+import json
 import os
+import re
 import socket
 import subprocess
 import sys
@@ -19,6 +21,8 @@ ROOT = Path(__file__).resolve().parents[2]
 SHOTS = Path(os.environ.get("DRISHYAM_SHOTS", "/tmp/drishyam-e2e"))
 DONE = ("needs sign-off", "signed", "done", "halted", "budget spent")
 OPTIONAL = ("/results/",)  # the page shows a pending state without these
+JARGON = re.compile(r"\b\d+(?:\.\d+)?e[-+]?\d+\b|\b[a-z]+_[a-z_]+\b")  # scientific notation, snake_case
+RATE_LIMITED = "Too many jobs from this address: 10 starts per 2 minutes. Wait a minute and retry."
 
 
 def start_local():
@@ -86,6 +90,14 @@ class Page:
           return document.getElementById('recap').getBoundingClientRect().top >= top - 1
             && [...document.querySelectorAll('#recap button')].every((b) => b.getBoundingClientRect().bottom <= innerHeight + 1); }""")
 
+    def plain(self):
+        """The visible trace, NOTE and finding cards carry no scientific notation and no snake_case: the raw
+        record sits in closed 'All numbers' folds, which innerText leaves out."""
+        text = self.page.evaluate("[...document.querySelectorAll('#trace, #narrator, #findings')].map((e) => e.innerText).join(' ')")
+        assert not JARGON.findall(text), f"jargon on screen: {sorted(set(JARGON.findall(text)))}"
+        raw = self.page.locator("#trace details").evaluate_all("(ds) => ds.map((d) => d.textContent).join(' ')")
+        assert "recorded: " in raw, "the raw record must stay in the DOM behind 'All numbers'"
+
     def viewer_in_view(self):
         return self.page.evaluate("""() => { const c = document.getElementById('stage').getBoundingClientRect();
           const bar = document.getElementById('taskbar').getBoundingClientRect();
@@ -107,14 +119,22 @@ def run(base, server_log=None):
         expect(page.locator("#gallery .thumb[data-file='bridge_03.jpg']")).to_have_attribute("aria-pressed", "true", timeout=15000)
         expect(page.locator("#look")).to_be_enabled(timeout=15000)
         page.locator("#guided").click()
+        t0 = time.time()
+        expect(page.locator("#narrator")).to_contain_text("Sending the photo", timeout=2000)  # the page answers the click at once
         expect(page.locator("#trace .trace__line[data-step='1']")).to_be_visible(timeout=30000)
         assert any("pace_ms=1000" in u for u in p.requests if "/api/jobs" in u), p.requests
         assert p.viewer_in_view(), "the viewer must stay on screen during the guided run"
         expect(page.locator("#narrator")).not_to_be_empty()
         expect(page.locator("#trace .trace__line[data-step='1'] .trace__why")).to_be_visible()
         page.screenshot(path=str(SHOTS / "live-desktop-guided.png"))
-        page.locator("#skip").click()
-        status = p.wait_done()
+        t1 = time.time()
+        expect(page.locator("#trace .trace__line[data-step='2']")).to_be_visible(timeout=15000)
+        assert time.time() - t1 < 5, f"step 1 stayed {time.time() - t1:.1f} s: the camera should move every 3-4 s"
+        status = p.wait_done(timeout=90)                  # the whole guided run at reading speed, no Skip
+        took = time.time() - t0
+        assert took < 40, f"the guided run took {took:.1f} s"
+        expect(page.locator("#job-text")).to_contain_text("we replayed it slowly so you can read it")
+        p.plain()
         expect(page.locator("#findings .finding").first).to_be_visible()
         assert page.locator("#trace .trace__line").count() >= 3
         critical = page.locator("#findings .finding--critical").first
@@ -130,7 +150,16 @@ def run(base, server_log=None):
         critical.locator("input").fill("E2E Engineer")
         critical.get_by_role("button", name="Approve").click()
         expect(critical.locator(".chip--state")).to_have_text("approved", timeout=10000)
-        print("ok  guided live run: paced, viewer on screen, findings, recap in view, critical card, human approval signed by the server")
+        with page.expect_download() as dl:
+            page.get_by_role("button", name="Download trace.ndjson").click()
+        job = json.loads(Path(dl.value.path()).read_text().splitlines()[0])
+        if "prep_ms" in job:  # the server's read, decode and privacy times: the status line adds them to the agent's
+            expect(page.locator("#job-text")).to_contain_text("server total")
+            expect(page.locator("#stages [data-stage='photo']")).to_contain_text("decoded in")
+        else:
+            expect(page.locator("#job-text")).not_to_contain_text("server total")
+        print(f"ok  guided live run ({took:.1f} s): paced, plain words, viewer on screen, findings, recap in view, critical card, "
+              f"human approval signed by the server; server total {'shown' if 'prep_ms' in job else 'not sent'}")
 
         # Try KILL from the recap: a run shown live whose planner stalls 2 s at step 3, so KILL lands mid-job.
         page.get_by_role("button", name="Try KILL").click()
@@ -164,10 +193,19 @@ def run(base, server_log=None):
             print("ok  KILL: /api/kill called, the server halted with kill-switch and the trace shows it")
         else:
             print("ok  KILL: the trace shows the server's kill-switch halt (server log not available for a remote base)")
+
+        # 3. The WAF's rate rule answers 429; the page says what that means. Stubbed: a test must not trip the real limit.
+        page.route("**/api/jobs*", lambda r: r.fulfill(status=429, content_type="application/json",
+                                                        body=json.dumps({"error": "rate limited: 10 job starts per 2 min per IP; wait and retry"})))
+        page.locator("#look").click()
+        expect(page.locator("#job-text")).to_have_text(RATE_LIMITED, timeout=15000)
+        expect(page.locator("#job-pill")).to_have_text("error")
+        page.unroute("**/api/jobs*")
+        print("ok  429: the rate-limit message")
         p.clean()
         print("ok  no CSP violations, no console errors")
 
-        # 3. Phone width: no horizontal scroll after a run.
+        # 4. Phone width: no horizontal scroll after a run.
         m = Page(browser, base, viewport={"width": 375, "height": 812}, is_mobile=True, has_touch=True)
         expect(m.page.locator("#gallery .thumb")).to_have_count(8, timeout=15000)
         cta = m.page.locator("#guided").bounding_box()
@@ -178,9 +216,10 @@ def run(base, server_log=None):
         m.wait_done()
         over = m.page.evaluate("document.documentElement.scrollWidth - document.documentElement.clientWidth")
         assert over <= 0, f"horizontal scroll of {over}px at 375 px"
+        m.plain()
         m.page.screenshot(path=str(SHOTS / "live-mobile-done.png"))
         m.clean()
-        print("ok  375 px: CTA above the fold, run completes, no horizontal scroll")
+        print("ok  375 px: CTA above the fold, run completes, plain words, no horizontal scroll")
         browser.close()
 
 
