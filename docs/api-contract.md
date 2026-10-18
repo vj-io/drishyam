@@ -26,11 +26,12 @@ app itself never sends 429.
 
 `cv2_build` is read from `cv2.getBuildInformation()` once per process: the `Custom HAL`, CPU `Baseline` and
 `Dispatched code generation`, `Parallel framework` and `ONNX Runtime` lines as printed (`null` when the build prints no such line), and the
-`cv2.dnn` engines the build can run: the `ENGINE_*` names `cv2.dnn` exposes, lower-cased, without `ort` unless the
-`ONNX Runtime` line says `YES` (the constant exists whether or not that backend is built in). The opt-in ONNX
-segmenter uses `new`. The example was measured on the macOS x86_64 wheel. The deployed
-Lambda's values (an aarch64 wheel, where ARM HALs such as carotene or KleidiCV are listed on the HAL line) are what
-its own `/api/health` returns; none are copied here.
+`dnn_engines`: the `ENGINE_*` names `cv2.dnn` exposes, lower-cased, without `ort` unless the `ONNX Runtime` line
+says `YES`. They are names, not a measurement: a constant exists whether or not its engine is built in, nothing here
+runs an engine to check it, and `auto` is a selector, not an engine (the page labels them "cv2.dnn engine names"). The
+opt-in ONNX segmenter uses `new`. The example was measured on the macOS x86_64 wheel. The deployed Lambda (an
+aarch64 wheel) reports its own values at its `/api/health`; none were read for this document, so none are copied or
+predicted here.
 
 `host` is `aws-lambda` or `local`; `arch` is `platform.machine()` (`x86_64`, `aarch64`,
 `arm64`); `commit` is `DRISHYAM_COMMIT` (`scripts/aws.sh deploy` sets it to the git SHA it deployed), else `null`.

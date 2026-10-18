@@ -183,10 +183,10 @@ async def _api_headers(request: Request, call_next):
 
 
 def build_facts() -> dict:
-    """The OpenCV build facts a reviewer asks about, read from cv2.getBuildInformation(): the custom HAL (the Lambda's
-    aarch64 wheel names carotene and KleidiCV there), the CPU baseline and dispatched SIMD sets, the parallel framework,
-    the `ONNX Runtime` line, and the cv2.dnn engines this build can run: the ENGINE_* names cv2.dnn exposes, without
-    `ort` unless the ONNX Runtime line says YES (the constant exists whether or not that backend is built in).
+    """The OpenCV build facts a reviewer asks about, read from cv2.getBuildInformation(): the custom HAL, the CPU
+    baseline and dispatched SIMD sets, the parallel framework, the `ONNX Runtime` line, and the cv2.dnn engine names:
+    the ENGINE_* names cv2.dnn exposes, without `ort` unless the ONNX Runtime line says YES. Names only, never a
+    measurement: a constant exists whether or not its engine is built in, and `auto` is a selector.
     A line the build does not print is None."""
     info = cv2.getBuildInformation()
 
