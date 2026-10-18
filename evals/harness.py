@@ -311,9 +311,9 @@ def run_drishyam(img: np.ndarray, cap: float, costs: dict | None = None, **switc
               "sharpness": r.get("observation", {}).get("sharpness"), "model": r.get("model"),
               "governor": r.get("governor", {}).get("cause")} for r in job.trace]
     net = net_px(rec_seg.log)
-    return {"preds": finding_components(job, rec_seg.log), "preds_union": preds,
-            "pixels_frac": done["summary"]["pixels_frac"], "net_pixels_frac": None if net is None else net / (img.shape[0] * img.shape[1]),
-            "wall_s": wall, "trace": trace, "status": done["status"], "halt_cause": done["cause"],
+    return {"preds": finding_components(job, rec_seg.log), "preds_union": preds, "pixels_frac": done["summary"]["pixels_frac"],
+            "net_pixels_frac": None if net is None else net / (img.shape[0] * img.shape[1]), "wall_s": wall,
+            "trace": trace, "status": done["status"], "halt_cause": done["cause"],
             "models": dict(collections.Counter(t["model"] for t in trace if t["action"] != "halt")),
             "switches": {k: getattr(job.cfg, k) for k in SWITCHES}}  # what the job read, not what was asked
 
