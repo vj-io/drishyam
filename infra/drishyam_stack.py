@@ -181,7 +181,7 @@ class DrishyamStack(Stack):
             log_group=logs.LogGroup(self, "SiteFilesLogs", retention=logs.RetentionDays.TWO_WEEKS,
                                     removal_policy=RemovalPolicy.DESTROY))
 
-        # Alerts go to a topic with no subscribers; the owner adds an email with the command in docs/aws.md.
+        # The stack adds no subscriber to the alerts topic; the owner subscribes an email (see docs/aws.md).
         topic = sns.Topic(self, "Alerts", display_name="Drishyam alerts")
         for service, source in (("cloudwatch", f"arn:aws:cloudwatch:{self.region}:{self.account}:alarm:*"),
                                 ("budgets", f"arn:aws:budgets::{self.account}:*")):

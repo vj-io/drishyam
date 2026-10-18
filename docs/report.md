@@ -99,8 +99,11 @@ limits and the cost table, is [aws.md](aws.md).
 - **Smoke test** (`scripts/aws.sh smoke`, `scripts/smoke.sh`): `smoke 2026-10-18T07:12:25Z result=pass`: a job ran
   to `awaiting_review`; KILL, sent after step 2 streamed, halted the second job after 3 steps (before step 4) with
   cause `kill-switch`; a `POST` without the body hash and a direct Function URL call both got 403; the WAF answered
-  429 at the 14th empty-bodied job start; and the step p95 was 67.7 ms on aarch64, over the 6 steps of one job.
-  That run was against the deployed build of commit ca69037, the commit `/api/health` reports.
+  429 at the 14th empty-bodied job start (WAF evaluates rates about every 10 s, so it blocks late); and the step
+  p95 was 67.7 ms on aarch64, over the 6 steps of one job.
+  That run was against the deployed build of commit ca69037, the commit `/api/health` reports. An earlier run against
+  the same build (`smoke 2026-10-18T07:09:20Z`, without the WAF check) also passed but measured more weakly: step p95
+  83.7 ms over 6 steps, and KILL halted the second job only after 6 steps (`runs/aws-smoke.log`).
 - **Cost.** Spent so far: not measured yet; the month-to-date figure from AWS Billing is still to be added. The
   list-price estimate is about 10 USD a month at 1,000 jobs a month, 8 of it the WAF ([aws.md](aws.md)). The $ shown
   in the UI and the evals is *modelled*: timed op milliseconds × 0.339 USD/h, the c8g.2xlarge rate plus the COOL
@@ -416,7 +419,7 @@ Failure drills, each runnable from the UI (`chaos` toggles) and covered by tests
 | --- | --- |
 | 20 planner timeouts + 20 malformed planner replies | 40 / 40 recovered by the rule planner (`test_20_timeouts_and_20_malformed_all_recover`) |
 | Forced p95 spike on the segmenter | the next step's cause is `p95>SLA` and its model is `fast` (`test_forced_p95_spike_changes_next_steps_model`) |
-| KILL during a live job | kill sent during step 3 → step 4 halted with cause `kill-switch` (`test_kill_endpoint_halts_a_running_job`, the live e2e run; on the deployed site, check 3 of `scripts/smoke.sh`) |
+| KILL during a live job | kill sent during step 3 → step 4 halted with cause `kill-switch` (`test_kill_endpoint_halts_a_running_job`, the live e2e run; on the deployed site, check 3 of `scripts/smoke.sh`, sent once step 2 has streamed: halted after 3 steps in the 07:12 smoke run and after 6 in the 07:09 one, section 5) |
 | $ and pixel caps | the job halts inside one step with coverage and unvisited regions reported (`test_pixel_cap_is_never_exceeded`, `test_seconds_and_usd_caps_halt`) |
 | Agent tries to approve its own critical finding | `ForbiddenTransition` (`test_agent_cannot_decide_or_downgrade`) |
 
@@ -450,8 +453,8 @@ notes the large spall it missed.
   on these sets, and that image-driven gaze order beats random order only on the larger photos (section 8).
 - COOL on Graviton was not run (section 6).
 - The arm64 timings come from GitHub's `ubuntu-24.04-arm` runner (`results/linux-aarch64/`, Neoverse-N2, one
-  thread), a GitHub Actions VM, not the deployed Lambda; on the Lambda itself the only number is the smoke test's step
-  p95 over one job (section 5). The evals ran on the x86 laptop with those arm64 costs.
+  thread), a GitHub Actions VM, not the deployed Lambda; on the Lambda itself the only numbers are the two smoke runs'
+  step p95s, 67.7 and 83.7 ms, each over one job (section 5). The evals ran on the x86 laptop with those arm64 costs.
 - The web demo is stateless; the signed `work_order.json` is its audit trail. There is no approval store, and
   human-approval latency is not measured.
 

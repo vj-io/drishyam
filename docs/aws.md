@@ -7,19 +7,23 @@ only through CloudFront and AWS WAF.
 **Status: deployed** on 2026-10-18 (India time) to `us-east-1` from commit ca69037 and smoke-tested. The latest
 smoke run (`scripts/aws.sh smoke` with `WAF_LOOP=1`: checks 1 to 5 and 7 under [Smoke](#smoke)) passed:
 `/api/health` answered from `aws-lambda` on `aarch64` with OpenCV 5.0.0 (`stock (not COOL)`) and commit ca69037, a
-job on `bridge_03.jpg` streamed to `done` (`awaiting_review`, 6 steps), KILL halted a second job at step 3, an
+job on `bridge_03.jpg` streamed to `done` (`awaiting_review`, 6 steps), KILL halted a second job after 3 steps, an
 unsigned `POST` through CloudFront got 403, the raw Function URL got 403, the WAF answered 429 at the 14th
-empty-bodied job start, and the step p95 was 67.7 ms over the first job's 6 steps. Its summary line, copied here
-because `runs/aws-smoke.log` is git-ignored (the timestamp is UTC):
+empty-bodied job start, and the step p95 was 67.7 ms over the first job's 6 steps. An earlier run against the same
+build, three minutes before and without the WAF check, also passed but measured more weakly: step p95 83.7 ms over
+6 steps, and KILL halted the second job only after 6 steps. Both summary lines, copied here because
+`runs/aws-smoke.log` is git-ignored (the timestamps are UTC):
 
 ```
+smoke 2026-10-18T07:09:20Z https://d1xg58guluup8c.cloudfront.net commit=ca690371bf3c21eb5efc61f58f9048322a41ec52 package=vSxCotfLF5Ja/atXtqO5ddXcvT9YHElpHTOQZ8woQvA= ttfb_first=1.307764s ttfb_warm=1.241300s step_p95_ms=83.7 result=pass
 smoke 2026-10-18T07:12:25Z https://d1xg58guluup8c.cloudfront.net commit=ca690371bf3c21eb5efc61f58f9048322a41ec52 package=vSxCotfLF5Ja/atXtqO5ddXcvT9YHElpHTOQZ8woQvA= ttfb_first=1.267549s ttfb_warm=1.335864s step_p95_ms=67.7 result=pass
 ```
 
 On the live site the WAF's 429 carries the JSON body `{"error": "rate limited: 10 job starts per 2 min per IP; wait
-and retry"}`, and a review reply carries `prev_token_sha256` (both checked on 2026-10-18). The live build's
-`public/results/` predates the arm64 re-run of the evaluations (commit 46f01b5), so until the next deploy the site's
-FIG. 4 and FIG. 5 show the earlier numbers. The costs below are list-price estimates until the first bill; the
+and retry"}`, and a review reply carries `prev_token_sha256` (both checked on 2026-10-18).
+**Until the next deploy:** the deployed build (commit ca69037, `/api/health` version 1.0.2) predates the numbers in
+the README and the report, so its FIG. 4 and FIG. 5 show the evaluation from before the arm64 re-run (commit 46f01b5)
+and its guided-run button still says "about 45 s". The costs below are list-price estimates until the first bill; the
 dashboard screenshot is not added yet.
 
 Three parts depend on app changes made outside `infra/` (all three are in):
@@ -224,7 +228,8 @@ classical engine. Making the CC BY-NC 4.0 dacl10k model the live segmenter is an
    the README). It starts about 3 jobs.
 7. With `WAF_LOOP=1`: empty-bodied job starts (the app answers 400 without running a job) until the WAF
    answers 429 with its `rate limited` JSON body (a Lambda throttle 429 does not count),
-   expected after about 10 in 120 s, fewer if the checks above started jobs. Job starts from
+   expected after about 10 in 120 s; WAF evaluates rates about every 10 s, so the block can come a few requests
+   later (the 14th, after the two jobs above, in the 2026-10-18T07:12:25Z run). Job starts from
    that IP stay blocked until its rate falls back under the limit, up to two minutes after the loop.
 
 The last line sums up the run: UTC timestamp, URL, the commit from `/api/health`, the package digest
