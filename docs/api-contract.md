@@ -7,7 +7,11 @@ top-left. All measurements are pixels; there are no millimetres anywhere.
 
 Behind CloudFront with Origin Access Control (the AWS deployment), every `POST` must also carry
 `x-amz-content-sha256`: the hex SHA-256 of the exact request body. Lambda refuses unsigned payloads
-through OAC with a 403. Locally the header is ignored.
+through OAC with a 403. Locally the header is ignored. When one of AWS WAF's per-IP rate rules blocks a
+request, CloudFront answers `429` with `Content-Type: application/json` and a body such as
+`{"error": "rate limited: 10 job starts per 2 min per IP; wait and retry"}`. Lambda also answers 429, with
+its own body and no `error` field, when every function environment is busy (docs/aws.md, "Limits"). The
+app itself never sends 429.
 
 ## `GET /api/health`
 
@@ -56,6 +60,7 @@ Event types, in order:
  "levels": [[3000, 2250], [1500, 1125], [750, 563], [375, 282], [188, 141]],
  "budget": {"pixel_cap_frac": 0.3, "pixels_cap": 2025000, "usd_cap": 0.05, "seconds_cap": 20},
  "privacy": {"faces_blurred": 0, "people_blurred": 0, "vehicles_blurred": 0, "boxes": [[x, y, w, h]]},
+ "prep_ms": {"read": 6, "decode": 84, "privacy": 60},
  "kill_token": "<24 url-safe chars; POST it to /api/kill to stop this job>"}
 
 {"type": "overview", "heatmap_png_b64": "<PNG, saliency 0-255, size of level 3>",
@@ -104,6 +109,14 @@ Event types, in order:
 
 {"type": "error", "message": "..."}
 ```
+
+`prep_ms` on the `job` event is the server's time before the job's clock starts, in whole milliseconds:
+`read` (receiving the upload), `decode` (`imaging.decode_image`) and `privacy` (the face, person and
+vehicle blur, `privacy.privacy_pass`). None of it is in a step's `latency_ms`, in `seconds_used`,
+`usd_used`, the summary's `seconds` and `usd`, or in any cap. The first job a fresh server process runs
+(on Lambda, the first after a cold start) also loads the two privacy models inside `privacy`. The job's
+log line repeats `prep_ms` (on Lambda as a field of its EMF record, not as a metric). The `prep_ms` in the
+example is from one local run of `public/samples/bridge_03.jpg` (3000x2250) on a warm process.
 
 Severity classes: `crack`, `spalling`, `efflorescence`, `exposed_rebar`,
 `corrosion`. Critical = `exposed_rebar` always, `spalling` above
@@ -190,7 +203,8 @@ A wrong token is accepted and kills nothing (no oracle). Returns `{"ok": true, "
                "verify_iou": 0.71, "verified": true}],
  "gaze_path": [[2210, 1480, 1], [2210, 1480, 0]],
  "not_assessed": [{"step": 4, "box": [0, 1024, 1024, 1024], "reason": "glare", "action": "re-shoot"}],
- "approvals": [{"finding_id": "f2", "decision": "approve", "reviewer": "A. Engineer", "at": "2026-10-24T17:05:00Z"}],
+ "approvals": [{"finding_id": "f2", "decision": "approve", "reviewer": "A. Engineer", "at": "2026-10-24T17:05:00Z",
+                "prev_mac": "<the MAC part of the token this decision was applied to>"}],
  "disclaimer": "AI-assisted, not an inspection. Measurements are image pixels, not millimetres."}
 ```
 
@@ -218,8 +232,18 @@ matches its token, and `/api/review` refuses an edited token with 403.
 {"token": "<signed work order>", "finding_id": "f2", "decision": "approve", "reviewer": "A. Engineer"}
 ```
 
-`decision` is `approve` or `reject`; `reviewer` is 1–64 printable characters.
-Returns `{"token": "<new signed work order>", "work_order": {...}}`.
+`decision` is `approve` or `reject`; `reviewer` is 1–64 printable characters, taken as given (it is not
+authenticated). Returns `{"token": "<new signed work order>", "work_order": {...}}`; the decision is appended
+to `approvals` with `prev_mac`, the part after the dot of the request's `token`. Nothing stops one token
+being signed into two conflicting decisions, but their orders then share one `prev_mac`, and a chained
+review's `prev_mac` is the MAC of the token the previous review returned. (`drishyam review` edits an
+unsigned `work_order.json` and writes no `prev_mac`.)
 Errors: 400 malformed, 403 bad or expired signature, 409 finding not pending.
+
+Each accepted review prints one log line; a refused one prints none. On AWS it is a CloudWatch EMF
+record, metric `Reviews` (namespace `Drishyam`, dimension `Decision`), with `wo`, `finding`, `Decision`
+and three SHA-256 hex digests: `reviewer_sha256` (of the reviewer name as stored), `token_in_sha256` (of
+the request's token) and `token_out_sha256` (of the returned token). Neither the name nor a token is
+logged; one review's `token_out_sha256` is the next review's `token_in_sha256`.
 The agent has no route to this transition: only this human endpoint (or the
 `drishyam review` CLI) can approve or reject a critical finding.
