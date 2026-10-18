@@ -49,7 +49,7 @@ account, 242441136319), asks before applying IAM changes, and prints the site UR
 Lambda concurrency quota is below 105 (the owner's account has 10), it stops and prints two ways forward;
 the shorter is to run it as `RESERVED=none scripts/aws.sh deploy` (see [Operate](#operate)). Left
 running, the stack costs about what the [Cost estimate](#cost-estimate) says, mostly the WAF; `destroy`
-removes it, except the `CDKToolkit` bootstrap stack.
+removes it, except the `CDKToolkit` bootstrap stack and one small log group (see [Operate](#operate)).
 
 ## Architecture
 
