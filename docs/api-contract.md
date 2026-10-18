@@ -209,7 +209,8 @@ A wrong token is accepted and kills nothing (no oracle). Returns `{"ok": true, "
 
 `status` is `blocked` while any critical finding is `pending_review`, else `ready`.
 `not_assessed` lists every window the quality gate refused (`reason` `blur`, `glare` or `dark`;
-`box` clipped to the image), so an area the agent could not read never passes for a clean one.
+`box` clipped to the image), and, with `step` 0, every blown-out or black area the overview found larger than 5 %
+of the image, which gets no look at all, so an area the agent could not read never passes for a clean one.
 
 ### Downloaded work-order file
 

@@ -273,6 +273,22 @@ async def test_a_straight_line_and_a_bug_hole_are_rejected_with_their_cause(d, t
     await d.refused("log_finding", PORE_CAUSE, job=job, gaze_id=g["gaze"], cls="crack")
 
 
+async def test_a_blown_out_band_is_not_assessed_once_the_overview_ran(d, tmp_path, monkeypatch):
+    """The overview gives a large blown-out area no candidates, so the work order lists it from the overview."""
+    root = tmp_path / "images"
+    root.mkdir()
+    img = concrete(600, 800, 5)
+    img[:180] = 252
+    cv2.imwrite(str(root / "sky.png"), img)
+    monkeypatch.setenv("DRISHYAM_IMAGE_ROOT", str(root))
+    job = await d.open(root / "sky.png")
+    assert (await d.ok("draft_work_order", job=job))[0]["work_order"]["not_assessed"] == []  # no overview yet
+    cands = (await d.ok("overview", job=job))[0]["candidates"]
+    assert all(c["center"][1] > 180 for c in cands)
+    (sky,) = (await d.ok("draft_work_order", job=job))[0]["work_order"]["not_assessed"]
+    assert sky["step"] == 0 and sky["reason"] == "glare" and sky["box"][:3] == [0, 0, 800] and 176 <= sky["box"][3] <= 184
+
+
 async def test_a_cap_can_be_lowered_never_raised(d, tmp_path):
     job = await d.open()
     first, _ = await d.ok("set_budget", job=job, pixel_cap=0.5, usd_cap=0.01, seconds_cap=15)

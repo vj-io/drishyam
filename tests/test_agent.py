@@ -474,6 +474,30 @@ def test_review_on_ambiguity_when_a_class_is_absorbed_by_another(scene):
     assert len({e["reason"].split(" px")[0] + e["finding_id"] for e in asked}) == len(asked)
 
 
+@pytest.mark.parametrize("band", [0.25, 0.35])
+def test_a_blown_out_band_is_not_assessed_and_takes_no_looks_from_a_crack(band):
+    """A blown-out band (sky) over a quarter or a third of the photo is marked not assessed from the overview, and
+    neither it nor its edge yields candidates: the crack below it is still found at the 30 % cap. A small glare patch
+    still gets a look, so the quality gate marks it (the 'Glare and blur' sample)."""
+    from pathlib import Path
+
+    from .conftest import add_crack, concrete
+
+    img = concrete(1536, 2048, 7)
+    img[: int(1536 * band)] = 252
+    add_crack(img, (500, 900), n=300, width=3)
+    job, events = run(img, pixel_cap=0.3)
+    assert any(f.cls == "crack" and f.box[1] > 900 for f in job.findings)
+    sky = events[-1]["work_order"]["not_assessed"][0]
+    assert sky == {"step": 0, "box": [0, 0, 2048, sky["box"][3]], "reason": "glare", "action": "re-shoot"}
+    assert abs(sky["box"][3] - 1536 * band) <= 8  # one overview px
+    assert all(c["box"][1] + c["box"][3] // 2 > 1536 * band for c in events[1]["candidates"])  # no centre in the band
+    img = cv2.imread(str(Path(__file__).resolve().parent.parent / "public" / "samples" / "bridge_07.jpg"))
+    _, events = run(img, pixel_cap=0.3)
+    (glare,) = events[-1]["work_order"]["not_assessed"]
+    assert glare["step"] > 0 and glare["reason"] == "glare"
+
+
 def test_quality_refused_windows_are_not_assessed(scene, monkeypatch):
     """A look the quality gate refuses is written to the work order with its reason and box, inside the image."""
     from drishyam import agent

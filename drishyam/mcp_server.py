@@ -683,6 +683,8 @@ def draft_work_order(job: JobId) -> str:
              "reason": g.quality["reason"], "action": "re-shoot"}
             for g in s.gazes.values() if not g.quality["ok"]
         ]
+        if s.sal is not None:  # the overview ran: so did its blown-out or black areas too large to look at
+            refused[:0] = imaging.unseen_areas(s.pyr[OVERVIEW_LEVEL], 2**OVERVIEW_LEVEL, (W, H))
         wo = make_work_order(s.id, s.findings, s.gaze_path, refused)
         path = s.dir / "work_order.json"
         if path.exists():

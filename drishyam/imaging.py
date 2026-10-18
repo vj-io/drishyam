@@ -28,7 +28,9 @@ DARK_MAX = 0.50
 EDGE_FLOOR = 250.0  # Sobel magnitude of the CLAHE'd 8-bit overview
 DARK_FLOOR = 70.0  # 9x9 blackhat, grey levels
 SAL_FLOOR = 0.55  # the weighted, blurred sum
-UNSEEN_W = 0.45  # blown-out or black pixels: worth a look, so the quality gate can mark the area not assessed
+UNSEEN_W = 0.45  # blown-out or black patches: worth a look, so the quality gate can mark the area not assessed
+UNSEEN_MAX_FRAC = 0.05  # a blown-out or black area larger than this share of the image gets no look (sky, a shadow):
+UNSEEN_RIM = 10  # it and this many overview px around it (its edge) score 0; the work order marks it not assessed
 
 _SOF = {0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7, 0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF}
 
@@ -131,10 +133,32 @@ def saliency(img: np.ndarray) -> np.ndarray:
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
     rust = cv2.inRange(hsv, (3, 70, 35), (25, 255, 235)).astype(np.float32) / 255
     white = cv2.inRange(hsv, (0, 0, 205), (180, 40, 255)).astype(np.float32) / 255
-    unseen = (255 - cv2.inRange(gray, 6, 249)).astype(np.float32) / 255  # blown out or black: the quality gate's case
-    s = 0.30 * edges + 0.40 * thin_dark + 0.10 * local_dark + 0.45 * rust + 0.15 * white + UNSEEN_W * unseen
+    small, large, _ = _unseen(gray)
+    s = 0.30 * edges + 0.40 * thin_dark + 0.10 * local_dark + 0.45 * rust + 0.15 * white + UNSEEN_W * small
     s = cv2.GaussianBlur(s, (0, 0), 2.0)
+    if large.any():  # its edge is no defect either: zeroed out to the 21-px adaptive block's reach
+        s[cv2.dilate(large.astype(np.uint8), cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * UNSEEN_RIM + 1,) * 2)) > 0] = 0
     return _norm(s, SAL_FLOOR).astype(np.float32)
+
+
+def _unseen(gray: np.ndarray) -> tuple[np.ndarray, np.ndarray, list]:
+    """Blown-out or black pixels (the quality gate's glare and dark), split by connected area: the patches small
+    enough to be worth a look (0/1 float), the areas over UNSEEN_MAX_FRAC of the image (bool), and those areas as
+    (x, y, w, h, reason)."""
+    m = 255 - cv2.inRange(gray, 6, 249)
+    n, lab, st, _ = cv2.connectedComponentsWithStats(m, connectivity=8)
+    big = [i for i in range(1, n) if st[i, cv2.CC_STAT_AREA] > UNSEEN_MAX_FRAC * gray.size]
+    large = np.isin(lab, big)
+    areas = [(*(int(v) for v in st[i, :4]), "glare" if gray[lab == i].mean() > 127 else "dark") for i in big]
+    return ((m > 0) & ~large).astype(np.float32), large, areas
+
+
+def unseen_areas(ov: np.ndarray, scale: int, l0_size: tuple[int, int]) -> list[dict]:
+    """Work-order `not_assessed` entries for the blown-out or black areas of the overview `ov` that are too large to
+    spend looks on (`saliency` scores them 0): step 0 (the overview), the L0 box, reason glare or dark."""
+    to_l0 = np.diag([float(scale), float(scale), 1.0])
+    return [{"step": 0, "box": l0_box((x, y, w, h), to_l0, l0_size), "reason": reason, "action": "re-shoot"}
+            for x, y, w, h, reason in _unseen(cv2.cvtColor(ov, cv2.COLOR_BGR2GRAY))[2]]
 
 
 @dataclass

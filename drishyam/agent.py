@@ -294,7 +294,7 @@ class Job:
         value, cost_ms, halt_cause, halt_why = 0.0, 0.0, None, ""
         govs: list = []  # governor overrides not yet written to the trace (PRD rule 5: every override writes a cause)
         rng = random.Random(cfg.seed)  # only the order="random" ablation draws from it
-        self.not_assessed: list[dict] = []
+        self.not_assessed = imaging.unseen_areas(pyr[ov], self.ov_scale, (W, H))  # too large to spend looks on
         asked: set = set()  # (finding id, class) pairs already sent to review as ambiguous
         self.followups = 0  # events that follow the step record just yielded (its findings and review requests)
         self.step = 0
