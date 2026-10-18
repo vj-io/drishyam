@@ -4,7 +4,7 @@ import { MOCK, streamJob, postReview, postKill, getJSON, health } from './js/api
 import { prepareImage } from './js/prep.js';
 import { Viewport, pointOf, tileBoxes } from './js/viewport.js';
 import { Budget, Trace, renderStepDetail, isGovernor, plannerFell, explain, kindOf, pad, px, label, words, reviewText, reviewKind } from './js/panels.js';
-import { Findings, ruleOf } from './js/findings.js';
+import { Findings, heldOf, ruleOf } from './js/findings.js';
 import { countUp, popup, reduced, replay, sound } from './js/fx.js';
 import { initResults } from './js/results.js';
 
@@ -386,14 +386,16 @@ function addFinding(f) {
   // A re-measure of a known finding updates its card only, unless a finer look measured it past the critical rule.
   if (!findings.add(f) && !(f.critical && before && !before.critical)) return 0;
   const at = S.steps.at(-1)?.step ?? f.step;
+  const held = heldOf(f);  // a class change put a critical class at its place: held for a person, not re-measured
   trace.addNote('finding', at, f.id,
-    `${label(f.cls)} · ${px(f.measure?.area_px)} px²${f.critical ? ` → human sign-off requested${before ? ' (re-measured: now critical)' : ''}` : ' · draft, no sign-off needed'}`,
+    `${label(f.cls)} · ${px(f.measure?.area_px)} px²${f.critical ? ` → human sign-off requested${!before ? '' : held ? ' (held: a class change)' : ' (re-measured: now critical)'}` : ' · draft, no sign-off needed'}`,
     f.critical ? ruleOf(f) : null, () => findings.focus(f.id));
-  S.found.push(`${words(f.cls)} (${f.critical ? 'critical' : 'a draft'})`);
+  S.found.push(`${words(f.cls)} (${!f.critical ? 'a draft' : held ? 'held for a person' : 'critical'})`);
   const first = f.critical && !S.critSeen;
   if (first) {
     S.critSeen = true;
-    S.crit = `Critical: ${words(f.cls)}, found at step ${at}. The agent cannot approve this; only you can, in step 4 once the run ends.`;
+    S.crit = `${held ? `Held for you: ${words(f.cls)} at step ${at}, because ${ruleOf(f)}` : `Critical: ${words(f.cls)}, found at step ${at}`}. `
+      + 'The agent cannot approve this; only you can, in step 4 once the run ends.';
   }
   sayStep();
   return first ? HOLD : 0;

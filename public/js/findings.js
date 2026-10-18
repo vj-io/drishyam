@@ -12,14 +12,20 @@ const px = (v, d = 0) => (num(v) ? `${v.toLocaleString('en-US', { maximumFractio
 // Until the server sends `critical_rule`, the two rules drishyam/findings.py enforces, in words.
 const RULE = { exposed_rebar: 'exposed rebar is always critical', spalling: 'spalling of 40,000 px² or more is critical' };
 /** The rule that made a finding critical, in words: the server's `critical_rule` ("exposed_rebar: always critical",
-    "spalling 52,000 px² >= 40,000 px²") rephrased, or the rule above. */
+    "spalling 52,000 px² >= 40,000 px²", or a hold: "class change: exposed_rebar at L1 here (exposed_rebar: always
+    critical)") rephrased, or the rule above. */
 export function ruleOf(f) {
   const r = f.critical_rule ?? '';
   let m;
+  if ((m = r.match(/^class change: (\w+) at L(\d+) here \((.+)\)$/))) {
+    return `a look at 1:${2 ** m[2]} saw ${words(m[1])} here, and ${ruleOf({ critical_rule: m[3] })}`;
+  }
   if ((m = r.match(/^(\w+): always critical$/))) return `${words(m[1])} is always critical`;
   if ((m = r.match(/^(\w+) ([\d,]+) px² >= ([\d,]+) px²$/))) return `${words(m[1])} of ${m[2]} px² is critical (${m[3]} px² or more)`;
   return r || (RULE[f.cls] ?? null);
 }
+/** Held for a person by a class change (`Finding.hold`): critical because of another look's class, not its own measure. */
+export const heldOf = (f) => /^class change: /.test(f.critical_rule ?? '');
 const regionName = (r) => (r === 's0' ? 'Whole photo (survey look)' : `Region ${r}`);
 
 export class Findings {
@@ -148,8 +154,9 @@ export class Findings {
     const state = h('span', { class: 'chip chip--state' }, STATE[f.state] ?? f.state);
     const refined = Array.isArray(f.steps) && f.steps.length > 1 ? `, refined at ${f.steps.slice(1).join(', ')}` : '';
     // Criticality may come from a coarser look than the one `measure` shows: say which, and with what area.
-    const trigger = f.critical && num(f.critical_step)
-      ? h('div', { class: 'finding__trigger' }, h('dt', {}, 'critical at'), h('dd', {}, `step ${f.critical_step}, ${px(f.critical_area_px)} px²`))
+    const trigger = f.critical && num(f.critical_step)  // a hold's area is the other class's, so it names the step only
+      ? h('div', { class: 'finding__trigger' }, h('dt', {}, heldOf(f) ? 'held at' : 'critical at'),
+        h('dd', {}, heldOf(f) ? `step ${f.critical_step}` : `step ${f.critical_step}, ${px(f.critical_area_px)} px²`))
       : null;
     const show = h('button', { class: 'btn btn--sm finding__show', type: 'button' }, 'Show on photo');
     show.addEventListener('click', () => this.onShow(f));

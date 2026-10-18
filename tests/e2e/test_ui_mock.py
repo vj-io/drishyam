@@ -170,10 +170,11 @@ def contract_events():
     its L1 look drafted is exposed rebar at L0, same place) whose review names critical f1 in place of the old
     disagreement; an ambiguity on draft f4; step 6's verify an agreement although the finer look's best class differs;
     `seeded` candidates on the survey look (crack is all it saw) and argmax rationales in the agent's format that read
-    them; a stop-rule halt bound by its floor; draft f2 re-measured past the critical area rule (52,000 px²), with the
-    done record to match; and a class change that names draft f5, as the agent sends when the coarser look saw a
-    critical class but drafted nothing. Once the fixture is regenerated from the agent that sends them, these patches
-    can go."""
+    them; a stop-rule halt bound by its floor; draft f2 re-measured past the critical area rule (52,000 px²); and a
+    class change that holds draft f5 for a person (no finding it names is critical, but the class the coarser look saw
+    is), sent as the agent sends it: the held finding (`Finding.hold`), then the request. It is patched in at step 8,
+    whose region is not f5's: the page does not check that. The done record matches. Once the fixture is regenerated
+    from the agent that sends them, these patches can go."""
     events = [json.loads(ln) for ln in JOB_LINES]
     for e in events:
         if e["type"] == "review_request":
@@ -205,14 +206,20 @@ def contract_events():
     assert not f2["critical"] and f2["cls"] == "spalling"
     f2.update(critical=True, state="pending_review", critical_step=f2["steps"][-1], critical_area_px=52000,
               critical_rule="spalling 52,000 px² >= 40,000 px²", measure={**f2["measure"], "area_px": 52000})
-    f5 = next(i for i, e in enumerate(events) if e["type"] == "finding" and e["finding"]["id"] == "f5")
-    assert not events[f5]["finding"]["critical"] and events[f5]["finding"]["cls"] == "crack"
-    events.insert(f5 + 1, {"type": "review_request", "kind": "class-change", "finding_id": "f5", "iou": 0.71, "level_a": 1,
-                           "level_b": 0, "classes": ["exposed_rebar", "crack"],
-                           "reason": "class change: exposed_rebar at L1, crack at L0 (same place, iou 0.71)"})
+    (f5,) = [e["finding"] for e in events if e["type"] == "finding" and e["finding"]["id"] == "f5"]
+    assert not f5["critical"] and f5["cls"] == "crack"
+    f5 = {**f5, "critical": True, "state": "pending_review", "critical_step": 8, "critical_area_px": 2544,
+          "critical_rule": "class change: exposed_rebar at L1 here (exposed_rebar: always critical)"}
+    at = next(i for i, e in enumerate(events) if e["type"] == "step" and e["step"] == 9)
+    events[at:at] = [{"type": "finding", "finding": f5},
+                     {"type": "review_request", "kind": "class-change", "finding_id": "f5", "iou": 0.71, "level_a": 1,
+                      "level_b": 0, "classes": ["exposed_rebar", "crack"],
+                      "reason": "class change: exposed_rebar at L1, crack at L0 (same place, iou 0.71)"}]
     done = events[-1]
-    done["work_order"]["findings"] = [{**f, **({k: f2[k] for k in ("critical", "state", "critical_step", "critical_area_px", "measure")}
-                                             if f["id"] == "f2" else {})} for f in done["work_order"]["findings"]]
+    keys = ("critical", "state", "critical_step", "critical_area_px", "critical_rule", "measure")
+    patched = {"f2": f2, "f5": f5}
+    done["work_order"]["findings"] = [{**f, **{k: patched[f["id"]][k] for k in keys if k in patched[f["id"]]}} if f["id"] in patched else f
+                                      for f in done["work_order"]["findings"]]
     done["summary"]["critical_pending"] = sum(f["critical"] and f["state"] == "pending_review" for f in done["work_order"]["findings"])
     return events
 
@@ -1384,8 +1391,9 @@ def test_contract_fields_in_words(browser, base):
     """The shared contract's new fields, said in plain words: a class-change review on critical f1 (trace and card),
     an ambiguity on draft f4 (flagged, no sign-off), the other kinds as chips, step 4's class change and step 6's
     agreement although the best class differs, the candidates a look seeded and the argmax severities that read
-    them in the agent's own format, a stop-rule halt bound by its floor, and a draft re-measured past the critical
-    rule getting a sign-off box. Then the text functions themselves, on records this fixture does not hold: a trace
+    them in the agent's own format, a stop-rule halt bound by its floor, a draft re-measured past the critical
+    rule getting a sign-off box, and a draft held by a class change (a sign-off box, its rule in words, never
+    "re-measured"). Then the text functions themselves, on records this fixture does not hold: a trace
     recorded before `kind` (the chip is read from the reason) and a candidate no look has shown."""
     reset_live([{"lines": [json.dumps(e) for e in contract_events()], "delay": 0}])
     s = Session(browser, "contract", viewport={"width": 1440, "height": 900})
@@ -1404,15 +1412,19 @@ def test_contract_fields_in_words(browser, base):
     expect(change.locator(".chip")).to_have_text("class change")
     expect(change.locator(".trace__why")).to_contain_text(f"{said} (same place: the two looks' masks overlap 62 %), so a person must check it")
     expect(card(p, "f1").locator(".review__why")).to_contain_text(said)
-    # a class change that names a draft: flagged for a person, never "a person decides", and the work order does not wait
-    draft = p.locator(".trace__line--review", has_text="class change").filter(has_text="f5")
-    expect(draft.locator(".trace__why")).to_have_text(
+    # a class change that holds draft f5: the held finding, then the request; it waits for a sign-off, never "re-measured"
+    held = p.locator(".trace__line--finding[data-finding='f5']").last
+    expect(held).to_contain_text("Crack · 10,400 px² → human sign-off requested (held: a class change)")
+    expect(held.locator(".trace__why")).to_have_text("because: a look at 1:2 saw exposed rebar here, and exposed rebar is always critical")
+    asked = p.locator(".trace__line--review", has_text="class change").filter(has_text="f5")
+    expect(asked.locator(".trace__why")).to_have_text(
         "because: the closer look saw crack where the coarser one saw exposed rebar (same place: the two looks' masks overlap 71 %), "
-        "so it is flagged for a person to look at (a draft: no sign-off)")
-    expect(card(p, "f5").locator(".finding__ask")).to_have_text(
-        "Flagged for a person to look at: the closer look saw crack where the coarser one saw exposed rebar (same place: the two "
-        "looks' masks overlap 71 %). No sign-off is needed for a draft, so the work order does not wait for it.")
-    expect(card(p, "f5").locator(".review")).to_have_count(0)
+        "so a person must check it")
+    expect(card(p, "f5").locator(".review")).to_be_visible()
+    expect(card(p, "f5").locator(".review__why")).to_contain_text("a look at 1:2 saw exposed rebar here, and exposed rebar is always critical; "
+                                                                  "the closer look saw crack where the coarser one saw exposed rebar")
+    expect(card(p, "f5").locator(".finding__trigger")).to_have_text("held atstep 8")       # not the other class's area
+    expect(card(p, "f5").locator(".finding__ask")).to_have_count(0)
     assert "a person decides" not in p.locator("#demo").inner_text()
     expect(p.locator(".trace__line--review .chip", has_text=re.compile("^disagree$"))).to_have_count(2)
     ambiguous = p.locator(".trace__line--review", has_text="ambiguous")
@@ -1427,7 +1439,7 @@ def test_contract_fields_in_words(browser, base):
     expect(p.locator(".trace__line--finding[data-finding='f2']")).to_have_count(2)   # drafted, then sent to a person
     expect(p.locator(".trace__line--finding[data-finding='f2']").last).to_contain_text(
         "Spalling · 52,000 px² → human sign-off requested (re-measured: now critical)")    # the measure and the rule agree
-    expect(p.locator("#done .tile", has_text="critical, waiting for you").locator(".tile__v")).to_have_text("4")  # the done record agrees
+    expect(p.locator("#done .tile", has_text="critical, waiting for you").locator(".tile__v")).to_have_text("5")  # the done record agrees
     detail = p.locator("#step-detail")
     p.locator(".trace__line[data-step='4'] button").click()
     expect(detail).to_contain_text("exposed rebar 14,580 px")                 # the finer look's best class leads the saw line
