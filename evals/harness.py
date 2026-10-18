@@ -50,7 +50,7 @@ import numpy as np
 
 from bench.micro import check_load, provenance, set_threads
 from drishyam import imaging
-from drishyam.agent import PLANNER_MALFORMED_STEP, PLANNER_TIMEOUT_STEP, Job, JobConfig
+from drishyam.agent import PLANNER_MALFORMED_STEP, PLANNER_TIMEOUT_STEP, Job, JobConfig, profile_for
 from drishyam.findings import SPALL_CRITICAL_AREA_PX, is_critical
 from drishyam.governor import USD_PER_HOUR
 from drishyam.segment import DEFECTS, ClassicalSegmenter, default_segmenter, drop_straight_lines, restrict
@@ -258,6 +258,7 @@ class RecordingSegmenter:
 
     def __init__(self) -> None:
         self.inner, self.log = default_segmenter(), []
+        self.name = self.inner.name  # the Job picks its profile by this name (agent.PROFILES)
 
     def predict(self, crop, model="accurate"):
         self.log.append(self.inner.predict(crop, model))
@@ -325,7 +326,8 @@ def run_drishyam(img: np.ndarray, cap: float, costs: dict | None = None, **switc
             "net_pixels_frac": None if net is None else net / (img.shape[0] * img.shape[1]), "wall_s": wall,
             "trace": trace, "status": done["status"], "halt_cause": done["cause"],
             "models": dict(collections.Counter(t["model"] for t in trace if t["action"] != "halt")),
-            "switches": {k: getattr(job.cfg, k) for k in SWITCHES}}  # what the job read, not what was asked
+            "switches": {k: getattr(job.cfg, k) for k in SWITCHES},  # what the job read, not what was asked
+            "profile": job.cfg.profile}
 
 
 def eval_image(rec: dict, budgets=BUDGETS, cost_rows: list | None = None, governor: bool = False) -> dict:
@@ -838,7 +840,7 @@ def run(data_dir="data/synth200", n=200, out_dir="public/results", results_dir="
         "dataset": label,
         "n_images": len(records),
         "segmenter": seg_name,
-        "agent_config": {"governor": governor, "use": GOVERNOR_USE[governor]},
+        "agent_config": {"governor": governor, "use": GOVERNOR_USE[governor], "profile": profile_for(seg)},
         "cost_model": {"kind": cost_model, **({"source": f"results/{micro_arm}/micro.json job_ops (p50 ms per call)",
                                                "ms_per_call": {k: round(v, 2) for k, v in op_costs(
                                                    rows, records[0]["width"], records[0]["height"]).items()}}
@@ -986,7 +988,8 @@ def run_ablations(data_dir="data/synth200", n=200, out_dir="public/results", res
         by_cap[str(cap)] = out
     threads = sorted({r["cv2_threads"] for r in results})
     prov = run_provenance(load_start)
-    entry = {"dataset": label, "n_images": n_img, "segmenter": seg.name, "box_convention": primary_boxes,
+    entry = {"dataset": label, "n_images": n_img, "segmenter": seg.name, "profile": profile_for(seg),
+             "box_convention": primary_boxes,
              "cost_model": {"kind": "fixed", "source": f"results/{micro_arm}/micro.json job_ops (p50 ms per call)"},
              "variants": {v: switches(v) for v in ABLATIONS}, "by_cap": by_cap,
              "coupling": ("no-uncertainty and no-seed lower every score, so the stop floor (eps x v0) also ends their "

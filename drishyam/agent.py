@@ -12,7 +12,7 @@ import random
 import secrets
 import time
 from collections import deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import cv2
 import numpy as np
@@ -47,6 +47,19 @@ MAX_REPLAY = 200
 # instead of 0.48-0.50) and saves false alarms on the clean dev split (15.8 boxes per photo instead of 20.3);
 # results/dev/v0_sweep.json.
 V0 = 2.0
+# Where each segmenter is reliable, by its name: the level of a first look and the finest level an escalation or a
+# verify look may go to. A JobConfig knob left None takes its segmenter's value; a value set explicitly always wins.
+# classical-v1 (and any segmenter not listed) keeps the agent's original defaults: on synthetic photos zooming in
+# pays. ONNX_PROFILE_TBD
+PROFILES = {
+    "classical-v1": {"first_level": 1, "min_level": 0},
+}
+
+
+def profile_for(segmenter) -> str:
+    """The PROFILES key of a segmenter (its `name`), or classical-v1 for one not calibrated."""
+    name = getattr(segmenter, "name", None)
+    return name if name in PROFILES else "classical-v1"
 
 
 @dataclass
@@ -55,8 +68,9 @@ class JobConfig:
     usd_cap: float = 0.05
     seconds_cap: float = 20.0
     size: int = 512
-    first_level: int = 1
-    min_level: int = 0  # the finest level an escalation or a verify look may go to
+    first_level: int | None = None  # None: the profile's (PROFILES)
+    min_level: int | None = None  # the finest level an escalation or a verify look may go to; None: the profile's
+    profile: str | None = None  # a PROFILES key; None: the segmenter's own (`profile_for`)
     tau: float = 0.5  # entropy above this escalates
     a_min: int = 64  # crop px; a smaller mask escalates
     eps: float = 0.25  # stop-rule slope factor
@@ -76,6 +90,7 @@ class JobConfig:
     v0: float = V0
     survey: bool = True  # one coarse look that covers every candidate before zooming
     verify: bool = True  # verify looks: a new mask, or a finer look that disagrees with the coarser one
+    absorb: bool = True  # a crack or rust mostly inside a spall's or bar's finding joins it (DOMINATED_BY)
     order: str = "score"  # "random": a seeded random pick among unseen candidates instead of the argmax
     seed: int = 0
     governor: bool = True  # False: kill switch and caps only; no model, level, gaze-size or critical-only override
@@ -127,9 +142,11 @@ class Job:
                  segmenter=None, planner=None, kill=lambda: False, clock=time.perf_counter,
                  replay: list | None = None) -> None:
         self.image = image
-        self.cfg = config or JobConfig()
-        self.id = job_id or "j_" + secrets.token_hex(3)
         self.segmenter = segmenter or default_segmenter()
+        cfg = config or JobConfig()
+        name = cfg.profile or profile_for(self.segmenter)
+        self.cfg = replace(cfg, profile=name, **{k: v for k, v in PROFILES[name].items() if getattr(cfg, k) is None})
+        self.id = job_id or "j_" + secrets.token_hex(3)
         self.planner = planner
         self.kill = kill
         self.clock = clock
@@ -294,8 +311,8 @@ class Job:
         conf = seg.confidence[cls]
         # One physical defect, one finding: rust on exposed bars is the bar, a spall's rim is the spall. A check of the
         # absorbed class is not a check of the dominating finding's class, so it leaves that finding's verify alone.
-        if dom := next((f for f in self.findings if f.cls in DOMINATED_BY.get(cls, ()) and _inside(box, f.box) >= 0.5),
-                       None):
+        if self.cfg.absorb and (dom := next((f for f in self.findings if f.cls in DOMINATED_BY.get(cls, ())
+                                             and _inside(box, f.box) >= 0.5), None)):
             return dom, "absorbed"
         same = [f for f in self.findings if f.cls == cls and (f.region == r.id or imaging.box_iou(f.box, box) > 0.3)]
         if same:
@@ -604,7 +621,7 @@ class Job:
                 "cause": cause,
                 "planner": "llm" if cause.startswith("planner:") or (planner_status or {}).get("strategy") in (
                     "switch_model", "batch_remaining") else "rule",
-                "model": model, "latency_ms": round(warp_ms + seg_ms, 1),
+                "model": model, "profile": cfg.profile, "latency_ms": round(warp_ms + seg_ms, 1),
                 "cost_usd": round(self.budget.usd_used - usd_before, 8),
                 "pixels_used": self.budget.pixels_used,
                 "pixels_frac": round(self.budget.pixels_used / (W * H), 4),
@@ -636,7 +653,8 @@ class Job:
         halted = halt_cause in ("cap-hit", "kill-switch")
         rec = {"type": "step", "job": self.id, "step": self.step, "t": now_iso(), "region": None,
                "decision": {"action": "halt", "args": {}}, "rationale": halt_why, "cause": halt_cause,
-               "planner": "rule", "model": self.settings.model, "pixels_used": self.budget.pixels_used,
+               "planner": "rule", "model": self.settings.model, "profile": cfg.profile,
+               "pixels_used": self.budget.pixels_used,
                "pixels_frac": round(self.budget.pixels_used / (W * H), 4),
                "usd_used": round(self.budget.usd_used, 6), "seconds_used": round(self.budget.seconds_used, 3),
                "runtime": self.stats.snapshot(self.budget.usd_used)}
@@ -650,6 +668,7 @@ class Job:
         seen_any = np.logical_or.reduce(self.seen)
         coverage = float((sal * seen_any).sum() / max(sal.sum(), 1e-6))
         self.work_order = work_order(self.id, self.findings, self.gaze_path, self.not_assessed)
+        self.work_order["profile"] = cfg.profile  # the levels it looked at were this segmenter's (PROFILES)
         yield {"type": "done", "status": status, "cause": halt_cause,
                "summary": {"steps": len(self.gaze_path), "pixels_used": self.budget.pixels_used,
                            "pixels_frac": round(self.budget.pixels_used / (W * H), 4),
