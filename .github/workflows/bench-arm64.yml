@@ -1,0 +1,33 @@
+name: bench-arm64
+# Manual only: bench/run_all.sh on GitHub's hosted Arm runner. This is a GitHub Actions VM, not the deployed Lambda,
+# and the JSON says so (provenance.label). The segmenter rows time the classical engine: the dacl10k ONNX files are
+# not in the repository, so no trained-model DNN row runs here.
+on:
+  workflow_dispatch:
+    inputs:
+      n:
+        description: images for the macro run (data/synth200 is built here)
+        default: "200"
+
+permissions:
+  contents: read
+
+jobs:
+  bench:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --all-extras --locked
+      - run: bash bench/run_all.sh linux-aarch64
+        env:
+          N: ${{ inputs.n }}
+          BENCH_LABEL: GitHub arm64 runner (ubuntu-24.04-arm), not Lambda
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bench-linux-aarch64
+          path: |
+            results/linux-aarch64/micro.json
+            results/linux-aarch64/macro.json
+          if-no-files-found: error
