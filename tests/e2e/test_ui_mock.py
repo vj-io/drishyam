@@ -21,7 +21,7 @@ Scenarios (a real Chromium, the document served with the production CSP header):
      the recap in view, hand-off to the reviewer, and Try KILL (planner_timeout, shown live) halted by KILL.
   4. photo, NOTE and newest trace line on one screen (1440x900; 375x812 with the crop and the replay label),
   5. keyboard only, 6. KILL after the job had finished, 7. mobile 375 px, 8. prefers-reduced-motion,
-  9. heading names, 10. pending states, 11. halt governor note.
+  9. heading names, 10. pending states (no video, no results), 11. halt governor note.
 Any CSP violation, console error or page error fails the run. wait_for_function is avoided on purpose
 (it is blocked by a strict CSP): every wait uses locators or polls page.evaluate.
 """
@@ -131,6 +131,7 @@ DATA = {
     "/results/codebrim/summary.json": ("application/json", json.dumps(REAL).encode()),
     "/results/failures.json": ("application/json", json.dumps(FAILURES).encode()),
     "/results/failures/f01.jpg": ("image/jpeg", MOCK_JPG),
+    "/video/drishyam.mp4": ("video/mp4", b"\x00\x00\x00\x18ftypmp42"),  # only its HEAD is asked for (preload="none")
 }
 
 
@@ -382,6 +383,7 @@ def test_static_csp_hygiene():
     assert not re.findall(r"url\(\s*['\"]?(?:https?:)?//", css), "external url() in CSS"
     assert 'id="stat-real"' in html, "WS3 fills the #stat-real hero slot"
     assert html.count("og:image") == 1 and '<meta name="twitter:card" content="summary_large_image">' in html, "one share card"
+    assert ".mp4" not in html, "no video link in the page itself: js/results.js adds the player once video/drishyam.mp4 is deployed"
     print("ok  static CSP hygiene")
 
 
@@ -426,6 +428,10 @@ def test_desktop_mock(browser, base):
     expect(p.locator("#fail .fail")).to_have_count(1)
     expect(p.locator("#bench-cool")).to_contain_text("COOL on Graviton: not run.")  # FIG. 4.3 and the banner say why, nothing pending
     expect(p.locator("#cool-status")).to_contain_text("COOL on Graviton: not run.")
+    expect(p.locator("#video video")).to_have_attribute("src", "video/drishyam.mp4")  # same-origin player, once the file is there
+    expect(p.locator("#video video")).to_have_attribute("poster", "og.png")
+    expect(p.locator("#video track[kind=captions]")).to_have_count(1)
+    expect(p.locator("#video-link")).to_be_visible()
     p.keyboard.press("Tab")
     outline = p.evaluate("(() => { const s = getComputedStyle(document.activeElement); return s.outlineStyle + ' ' + s.outlineWidth; })()")
     assert outline.startswith("solid"), f"no visible keyboard focus: {outline}"
@@ -923,6 +929,9 @@ def test_pending_states(browser, base):
     expect(p.locator("#fail")).to_contain_text("failure gallery pending")
     expect(p.locator("#bench-cool")).to_contain_text("COOL on Graviton: not run.")   # static: it does not wait for a file
     expect(p.locator("#cool-status")).to_contain_text("COOL on Graviton: not run.")
+    expect(p.locator("#video")).to_be_hidden()                    # no video/drishyam.mp4 deployed: no player, no link
+    expect(p.locator("#video video")).to_have_count(0)
+    expect(p.locator("#video-link")).to_be_hidden()
     expect(p.locator("#gallery-empty")).to_be_visible()
     expect(p.locator("#say-1")).to_contain_text("Drop your own JPEG or PNG")
     expect(p.locator("#state-1")).to_have_text("Waiting")

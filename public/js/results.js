@@ -1,4 +1,4 @@
-// Benchmarks (a hand-drawn blueprint line chart + tables) and the failure plates. Both degrade to a "pending" state.
+// Benchmarks (a hand-drawn blueprint line chart + tables), the failure plates and the video slot. Each degrades to a "pending" or empty state.
 import { $, h, svg, num } from './dom.js';
 import { getJSON } from './api.js';
 import { countUp } from './fx.js';
@@ -360,7 +360,19 @@ function realFailures(real, n) {
         byRule.map(([category, cases]) => [category, String(cases[0].rule_that_would_catch_it ?? '')]))));
 }
 
+/** The narrated video, played from this origin. It is drawn only once public/video/drishyam.mp4 is deployed;
+ * until then the HEAD check fails and the page shows nothing for it. */
+async function initVideo() {
+  const r = await fetch('video/drishyam.mp4', { method: 'HEAD' }).catch(() => null);
+  if (!r?.ok) return;
+  $('#video').replaceChildren(h('video', { controls: true, preload: 'none', poster: 'og.png', src: 'video/drishyam.mp4' },
+    h('track', { kind: 'captions', src: 'video/drishyam.vtt', srclang: 'en', label: 'English' })));
+  $('#video').hidden = false;
+  $('#video-link').hidden = false;
+}
+
 export async function initResults() {
+  initVideo();
   // The trained segmenter's summaries (results/synth_dacl10k, results/codebrim_dacl10k) are not published yet; pass
   // them as renderBench's `model` once they are. COOL was not run, so FIG. 4.3 is static text.
   const [sum, real, fails, realFails, large, live] = await Promise.all(

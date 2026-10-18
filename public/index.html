@@ -68,7 +68,7 @@
       <div class="cta">
         <button class="btn btn--amber btn--xl" id="guided" type="button"><span>Watch it inspect a bridge <span class="cta__time">(about 45 s)</span></span></button>
         <a class="btn" id="own" href="#step-photo">Try your own photo</a>
-        <a class="cta__link" href="https://github.com/vj-io/drishyam/releases/latest/download/drishyam-demo.mp4" rel="noopener noreferrer">Download the video (MP4)</a>
+        <a class="cta__link" id="video-link" href="#video" hidden>Watch the video</a>
       </div>
       <p class="stakes">The US has 624,939 bridges (FHWA, 2026), and the rule is a routine inspection at intervals of up to 24 months (23 CFR 650.311). One drone inspection of a single bridge produced 2,536 photos. Someone has to look at every one. <a href="https://github.com/vj-io/drishyam/blob/main/docs/impact-sources.md" rel="noopener noreferrer">Sources</a></p>
       <ol class="claims" aria-label="How to use it">
@@ -635,6 +635,7 @@
   <div class="win">
     <div class="win__bar"><span class="win__fig" aria-hidden="true">END</span><h2 class="win__title" id="h-docs">Docs and links</h2></div>
     <div class="win__body stack">
+      <figure class="video" id="video" hidden></figure>
       <p class="banner banner--honest"><b id="live-where">Live demo: stock OpenCV 5 on AWS Lambda (arm64) &mdash; not COOL.</b> <span id="cool-status">COOL on Graviton: not run. The COOL Marketplace AMI could not be subscribed from our AWS account (a payment-method restriction); the three-arm scripts are in bench/.</span></p>
       <nav aria-label="Project links">
         <ul class="links">
@@ -643,7 +644,9 @@
           <li><a href="https://github.com/vj-io/drishyam/blob/main/docs/PRD.md" rel="noopener noreferrer">PRD</a></li>
           <li><a href="https://github.com/vj-io/drishyam/blob/main/docs/api-contract.md" rel="noopener noreferrer">API contract</a></li>
           <li><a href="https://github.com/vj-io/drishyam/blob/main/docs/mcp.md" rel="noopener noreferrer">MCP usage</a></li>
-          <li><a href="https://github.com/vj-io/drishyam/releases/latest/download/drishyam-demo.mp4" rel="noopener noreferrer">Demo video (MP4 download)</a></li>
+          <li><a href="https://github.com/vj-io/drishyam/blob/main/docs/mcp-session/transcript.md" rel="noopener noreferrer">Claude drives it over MCP (recorded)</a></li>
+          <li><a href="https://github.com/vj-io/drishyam/blob/main/docs/architecture.png" rel="noopener noreferrer">Architecture diagram</a></li>
+          <li><a href="https://github.com/vj-io/drishyam/blob/main/docs/impact-sources.md" rel="noopener noreferrer">Impact sources</a></li>
           <li><a href="?mock=1#demo">Recorded run</a></li>
         </ul>
       </nav>

@@ -18,7 +18,7 @@ from playwright.sync_api import expect, sync_playwright
 ROOT = Path(__file__).resolve().parents[2]
 SHOTS = Path(os.environ.get("DRISHYAM_SHOTS", "/tmp/drishyam-e2e"))
 DONE = ("needs sign-off", "signed", "done", "halted", "budget spent")
-OPTIONAL = ("/results/",)  # the page shows a pending state without these
+OPTIONAL = ("/results/", "/video/")  # the page shows a pending state, or no video player, without these
 
 
 def start_local():
