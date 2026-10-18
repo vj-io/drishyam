@@ -162,6 +162,24 @@ def test_drishyam_components_reproduce_finding_boxes(scene):
         assert c["box"][0] + c["box"][2] <= fx + fw + 2 and c["box"][1] + c["box"][3] <= fy + fh + 2
 
 
+def test_drishyam_components_leave_out_what_the_job_dropped_as_a_straight_line(monkeypatch):
+    """bridge_08's formwork groove is dropped as a straight line on every look that sees it. With the pore rule off,
+    two bug holes become crack findings, one on a look that also saw the groove: the rebuilt per-component boxes
+    hold the bug holes and never the groove the trace lists as rejected."""
+    from drishyam import imaging, segment
+
+    monkeypatch.setattr(segment, "PORE_ASPECT", 0.0)
+    img = cv2.imread(str(harness.REPO / "public" / "samples" / "bridge_08.jpg"))
+    costs = harness.op_costs(harness.cost_rows("local-macos-x86", "classical-v1"), img.shape[1], img.shape[0])
+    rec = harness.RecordingSegmenter()
+    job = harness.FixedCostJob(img, harness.JobConfig(pixel_cap=0.3, thumbs=False), costs, segmenter=rec)
+    list(job.run())
+    comps = harness.finding_components(job, rec.log)
+    rejected = {r["step"]: [x["box"] for x in r["rejected"]] for r in job.trace if r.get("rejected")}
+    assert comps and any(s in rejected for f in job.findings for s in f.steps)  # a finding's look also saw the groove
+    assert all(imaging.box_iou(c["box"], b) < 0.3 for c in comps for bs in rejected.values() for b in bs)
+
+
 def test_chaos_drills_recover(scene):
     # Real clock, real stop rule: the job may halt on the step right after the p95 spike; the governor's
     # model switch is then recorded on that halt record (`governor`), which the drill accepts.
