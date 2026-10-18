@@ -126,8 +126,10 @@ def test_two_decisions_forked_from_one_token_are_visible_siblings():
 def test_tampering_expiry_and_reviewer_validation():
     token = F.sign(F.work_order("j_x", [make()], []), KEY)
     body, mac = token.split(".")
+    m = len(mac) // 2  # flip one middle character: overwriting the tail with "AA" was a no-op when the MAC ended in AA
+    flipped = mac[:m] + ("B" if mac[m] == "A" else "A") + mac[m + 1:]
     forged = F.sign({"findings": [{"id": "f1", "state": "approved"}]}, b"other-key")
-    for bad in (forged, body + "." + mac[:-2] + "AA", "garbage", body[:-4] + "." + mac, ""):
+    for bad in (forged, body + "." + flipped, "garbage", body[:-4] + "." + mac, ""):
         with pytest.raises(F.SignatureError):
             F.verify(bad, KEY)
     with pytest.raises(F.SignatureError, match="expired"):
