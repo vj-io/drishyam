@@ -109,9 +109,14 @@ if mp.exists():
     b = max(hist, key=lambda r: r["val_miou5"])  # the epoch train_dacl10k.py saved as best.pt
     merged = ", ".join(f"{n} {v:.3f}" for n, v in zip(("crack", "spalling", "efflorescence", "exposed_rebar", "corrosion"), b["iou5"]))
     score = (f"Epoch {b['epoch']} of {len(hist)}, chosen on the mean validation IoU of Drishyam's five defect classes: "
-             f"**{b['val_miou5']:.3f}** ({merged}). Validation mIoU over the 19 dacl10k classes at that epoch: "
-             f"{b['val_miou19']:.3f} (the paper's MobileNetV3 baseline: 0.320). Per-epoch numbers: "
-             "`drishyam_dacl10k.metrics.json`.")
+             f"**{b['val_miou5']:.3f}** ({merged}). That is the split that chose the epoch, so the number is "
+             "optimistic, and no held-out number exists (dacl10k's test labels are withheld). The merged classes are "
+             "unions (`training/class_map.json`): crack is dacl10k Crack or ACrack (alligator crack), whose own IoUs at "
+             f"that epoch are {b['iou19']['Crack']:.3f} and {b['iou19']['ACrack']:.3f}. Validation mIoU over the 19 "
+             f"dacl10k classes at that epoch: {b['val_miou19']:.3f}. For reference, not as a like-for-like comparison: "
+             "the dacl10k paper's DeepLabv3+ with a MobileNetV3-Large encoder and no auxiliary loss scores 0.320 on "
+             "the validation split ([arXiv:2309.00460](https://arxiv.org/abs/2309.00460), Table 3). Per-epoch "
+             "numbers: `drishyam_dacl10k.metrics.json`.")
 rp = Path("models/drishyam_dacl10k.run_info.json")
 run = "No `run_info.json` came with the weights (notebooks built before it was added do not write one)."
 if rp.exists():
@@ -139,8 +144,8 @@ select it (`training/README.md`).
 **Licence: [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/), non-commercial; not the permissive licences
 above and not the repo's MIT.** The weights are adapted from (trained on) [dacl10k](https://github.com/phiyodr/dacl10k-toolkit)
 (Flotzinger et al., WACV 2024, [arXiv:2309.00460](https://arxiv.org/abs/2309.00460); CC BY-NC 4.0), so they carry its
-non-commercial terms and its attribution. No dacl10k images or labels are included. The ImageNet starting point (timm
-`mobilenetv3_large_100`) is Apache 2.0.
+non-commercial terms and its attribution (`LICENSE.drishyam_dacl10k`). No dacl10k images or labels are included. The
+ImageNet starting point (timm `mobilenetv3_large_100`) is Apache 2.0.
 """
 text = readme.read_text().split("\n" + head)[0].rstrip("\n")
 text = text.replace("# Bundled models (third-party, permissive licences)",
