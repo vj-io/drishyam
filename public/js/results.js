@@ -188,13 +188,14 @@ function heroChips(sum, real) {
     const others = [...points(real.policies.downscale), ...points(real.policies.tiling)].map((p) => p.recall);
     const [lo, hi] = [Math.min(rd.recall, ...others), Math.max(rd.recall, ...others)];
     const mid = (lo + hi) / 2;
-    const chance = num(rd.chance_recall) ? ` Its boxes at random places score ${dec(rd.chance_recall)}.` : '';
+    const plain = hi - lo <= 0.05 && mid > 0;  // every policy within 0.05 of the others: one plain number for all of them
+    const u = (v) => (plain && v > 0 ? `about 1 in ${Math.round(1 / v)}` : dec(v));  // and the card keeps that one unit
+    const chance = num(rd.chance_recall) ? ` Its boxes at random places ${plain ? 'find' : 'score'} ${u(rd.chance_recall)}.` : '';
     const strict = num(rd.recall_iou_only) && num(rd.chance_recall_iou_only)
-      ? ` With strict IoU matching it is ${dec(rd.recall_iou_only)} against ${dec(rd.chance_recall_iou_only)} by chance.` : '';
+      ? ` With strict IoU matching it ${plain ? 'finds' : 'is'} ${u(rd.recall_iou_only)} against ${u(rd.chance_recall_iou_only)} by chance.` : '';
     const why = ' The classical segmenter is the bottleneck, not where it looks.';
     const key = `Real bridge photos (CODEBRIM${num(real.n_images) ? `, ${real.n_images}` : ''})`;
-    // every policy within 0.05 of the others: one plain number for all of them
-    if (hi - lo <= 0.05 && mid > 0) fill('stat-real', key, Math.round(1 / mid), { prefix: 'about 1 in ' }, `defects found by every method, ours included.${chance}${strict}${why}`);
+    if (plain) fill('stat-real', key, Math.round(1 / mid), { prefix: 'about 1 in ' }, `defects found by every method, ours included.${chance}${strict}${why}`);
     else fill('stat-real', key, rd.recall, { decimals: 2, prefix: 'recall ' }, `ours; the other methods ${dec(Math.min(...others))}–${dec(Math.max(...others))}.${chance}${strict}${why}`);
   }
   // The uncapped run: where the stop rule (value per ms) ended the job by itself, and how often the headline cap binds first.

@@ -419,7 +419,8 @@ def test_desktop_mock(browser, base):
     expect(p.locator("#stat-ops .stat__v")).to_have_text("49 / 50 recovered")
     expect(p.locator("#stat-real .stat__k")).to_have_text("Real bridge photos (CODEBRIM, 200)")
     expect(p.locator("#stat-real .stat__v")).to_have_text("about 1 in 5")           # every policy within 0.05: recall about 0.21
-    expect(p.locator("#stat-real .stat__s")).to_contain_text("Its boxes at random places score 0.14. With strict IoU matching it is 0.09 against 0.02 by chance.")
+    expect(p.locator("#stat-real .stat__s")).to_contain_text(            # the same unit throughout the card
+        "Its boxes at random places find about 1 in 7. With strict IoU matching it finds about 1 in 11 against about 1 in 50 by chance.")
     expect(p.locator("#bench svg.chart")).to_be_visible()
     expect(p.locator("#bench .legend li")).to_have_count(3)                       # three policies; no trained-model summary is fetched
     n_iou = sum(len(v) for v in REAL["policies"].values())
