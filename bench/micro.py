@@ -79,8 +79,9 @@ def build_lines() -> dict:
 
 
 def set_threads(n: int) -> int:
-    """cv2.setNumThreads(n), read back with getNumThreads(); exits if OpenCV did not take it. One thread falls back to
-    setNumThreads(0) (sequential): macOS's GCD framework ignores setNumThreads(1) and keeps every core."""
+    """cv2.setNumThreads(n), read back with getNumThreads(); exits if OpenCV did not take it. On macOS's GCD framework
+    getNumThreads() reports the CPU count for any n > 0, though setNumThreads(1) does run on one OS thread; one thread
+    then uses setNumThreads(0) (also sequential), so the recorded value is the 1 that ran."""
     cv2.setNumThreads(n)
     if n == 1 and cv2.getNumThreads() != 1:
         cv2.setNumThreads(0)
