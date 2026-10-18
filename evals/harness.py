@@ -301,10 +301,13 @@ def run_drishyam(img: np.ndarray, cap: float, costs: dict | None = None, **switc
     rec_seg = RecordingSegmenter()
     cfg = JobConfig(pixel_cap=cap, thumbs=False, **{"governor": False, **switches})
     job = Job(img, cfg, segmenter=rec_seg) if costs is None else FixedCostJob(img, cfg, costs, segmenter=rec_seg)
-    done = list(job.run())[-1]
+    events = list(job.run())
+    done = events[-1]
     wall = time.perf_counter() - t0 if costs is None else job.now
     preds = [{"cls": f.cls, "box": list(f.box), "area": int(f.measure["area_px"]), "conf": round(f.confidence, 3),
-              "step": f.step, "level": f.level, "region": f.region} for f in job.findings]
+              "step": f.step, "level": f.level, "region": f.region, "id": f.id} for f in job.findings]
+    # who was sent to a person, and why: the failure gallery says when a review named a case's finding
+    reviews = [{"finding": e["finding_id"], "reason": e["reason"]} for e in events if e["type"] == "review_request"]
     trace = [{"step": r["step"], "action": r["decision"]["action"], "cause": r["cause"],
               "x": r["decision"]["args"].get("x"), "y": r["decision"]["args"].get("y"),
               "level": r["decision"]["args"].get("level"), "window": r.get("window"),
@@ -314,7 +317,7 @@ def run_drishyam(img: np.ndarray, cap: float, costs: dict | None = None, **switc
     net = net_px(rec_seg.log)
     return {"preds": finding_components(job, rec_seg.log), "preds_union": preds, "pixels_frac": done["summary"]["pixels_frac"],
             "net_pixels_frac": None if net is None else net / (img.shape[0] * img.shape[1]), "wall_s": wall,
-            "trace": trace, "status": done["status"], "halt_cause": done["cause"],
+            "trace": trace, "reviews": reviews, "status": done["status"], "halt_cause": done["cause"],
             "models": dict(collections.Counter(t["model"] for t in trace if t["action"] != "halt")),
             "switches": {k: getattr(job.cfg, k) for k in SWITCHES}}  # what the job read, not what was asked
 

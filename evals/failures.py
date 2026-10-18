@@ -52,18 +52,20 @@ def _straight_line_miss(trace, p) -> str:
     """Why a crack finding on a formwork line got past the straight-line test, from the run's own record. The test
     judges a centreline's residual in L0 px (drishyam/segment.py), so a look at L removes the line only if its
     residual is under 1.5 / 2**L view px, and keeps it otherwise; a later look never withdraws a finding an
-    earlier look drafted. Only looks after the drafting one (p's step) count as later."""
+    earlier look drafted. `p` is one connected component, from one look in its finding's evidence trail (p's step:
+    the look that saw this component, not necessarily the one that drafted the finding); only looks after it count
+    as later."""
     if p["level"] == 0:
-        return (f" The straight-line test ran at full resolution on the look that drafted it (step {p['step']}, L0) and kept it: "
-                "its centreline was not within 1.5 px (RMS) of one straight line over at least 20x its width.")
+        return (f" The straight-line test ran at full resolution on the look that saw this component (step {p['step']}, L0) and "
+                "kept it: its centreline was not within 1.5 px (RMS) of one straight line over at least 20x its width.")
     later = [t["level"] for t in _visits(trace, p["box"])
              if t["step"] > p["step"] and t.get("q_ok", True) and t["level"] is not None]
-    drafted = (f" The straight-line test kept it at the look that drafted it (step {p['step']}, L{p['level']}, where a residual "
-               f"counts {2 ** p['level']}x in L0 px)")
+    kept = (f" The straight-line test kept it at the look that saw this component (step {p['step']}, L{p['level']}, where a "
+            f"residual counts {2 ** p['level']}x in L0 px)")
     if 0 in later:
-        return drafted + "; a later full-resolution look covered it, but a later look never withdraws a drafted finding."
-    return drafted + (f", and no later look was at full resolution (finest later look: L{min(later)})." if later
-                      else ", and no later look covered it.")
+        return kept + "; a later full-resolution look covered it, but a later look never withdraws a drafted finding."
+    return kept + (f", and no later look was at full resolution (finest later look: L{min(later)})." if later
+                   else ", and no later look covered it.")
 
 
 # ---------------------------------------------------------------- finders: each yields cases for one image
@@ -159,6 +161,15 @@ def _budget_miss(rec, res):
                         f"but found by {' and '.join(by)}; {how}")}
 
 
+def _class_change(c, g) -> dict | None:
+    """The first class-change review (the job's own review_request record) that named a finding on ground-truth box g."""
+    from evals.harness import hits
+
+    named = {f["id"]: f for f in c.get("preds_union", []) if "id" in f}
+    return next((r for r in c.get("reviews", []) if r["reason"].startswith("class change:")
+                 and r["finding"] in named and hits(named[r["finding"]]["box"], g["box"])), None)
+
+
 def _confusion(rec, res):
     from evals.harness import found, hits
 
@@ -175,6 +186,10 @@ def _confusion(rec, res):
                           if p["cls"] not in DOMINATED_BY.get(g["cls"], ()) else
                           f" If its {g['cls']} mask cleared A_min mostly inside that {p['cls']} finding, the agent sent the finding to "
                           "a person as ambiguous; the evaluation scores only the class it kept.")
+                changed = _class_change(res["configs"][cfg], g)
+                review += (f" A class-change review sent finding {changed['finding']} there to a person ({changed['reason']}); "
+                           "the evaluation scores only the class the job kept." if changed else
+                           " No class-change review named a finding there.")
                 yield {"id": rec["id"], "cls": g["cls"], "cfg": cfg, "score": 10 * (g["cls"] == "exposed_rebar") + p["conf"],
                        "marks": [_mark("gt", f"GT {g['cls']}", g["box"]), _mark("pred", f"{p['cls']} {p['conf']:.2f}", p["box"])],
                        "what": (f"{rec['id']}, {cfg}: ground truth is {g['cls']}, the job reported {p['cls']} there "
@@ -211,9 +226,12 @@ CATEGORIES = [
      ("Implemented: rust near a spall is exposed rebar and rust with no spall near it is corrosion (the classical segmenter), "
      "and review on ambiguity (drishyam/agent.py): when a second class clears A_min mostly inside a finding that dominates it "
      "(corrosion inside exposed rebar; crack or efflorescence inside spalling or exposed rebar), the agent keeps one finding and "
-     "sends it to a person. It cannot catch a spall reported as exposed rebar, because spalling is never absorbed: each case "
-     "says whether the rule could apply. Not implemented: the shape test (exposed bars as thin strips, minAreaRect aspect above 3) "
-     "that would keep a rust-stained spall floor as spalling.")),
+     "sends it to a person. That review cannot catch a spall reported as exposed rebar, because spalling is never absorbed. "
+     "The class-change review (drishyam/agent.py) can: when a finer look sees the same place as another class than a coarser "
+     "look did, and either class is critical there, it sends the finding to a person. It cannot when only one look saw the "
+     "place. Each case says whether the ambiguity rule could apply and whether a class-change review named its finding. Not "
+     "implemented: the shape test (exposed bars as thin strips, minAreaRect aspect above 3) that would keep a rust-stained "
+     "spall floor as spalling.")),
 ]
 
 
