@@ -252,7 +252,7 @@ def test_ablations_assert_each_variant_ran_its_switches(tmp_path):
     doc = json.loads((tmp_path / "pub" / "ablations.json").read_text())
     assert doc["datasets"] == {"abl": json.loads(json.dumps(entry))} and "NaN" not in json.dumps(doc)
     rows = entry["by_cap"]["1.0"]
-    assert set(rows) == set(harness.ABLATIONS) == set(entry["variants"]) and len(harness.ABLATIONS) == 8  # full + 7
+    assert set(rows) == set(harness.ABLATIONS) == set(entry["variants"]) and len(harness.ABLATIONS) == 10  # full + 9
     assert rows["full"]["ratio_vs_full"] == 1.0 and rows["full"]["vs_full"] == "no measurable difference"
     assert rows["no-verify"]["verify_looks"] == rows["no-survey"]["survey_looks"] == 0
     assert set(rows["no-survey"]["model_usage"]) == {"accurate"} and len(rows["full"]["ratio_vs_full_ci"]) == 2
@@ -270,6 +270,30 @@ def test_ablations_assert_each_variant_ran_its_switches(tmp_path):
     cfg["trace"].insert(0, {"action": "gaze", "cause": "survey"})  # right switches, but the trace has a survey look
     with pytest.raises(SystemExit, match="trace shows a look"):
         harness.check_variants(saved, (1.0,))
+    cfg["trace"].pop(0)
+    harness.check_variants(saved, (1.0,))
+    saved[0]["configs"]["no-seed@1.0"]["trace"][0]["seeded"] = 2  # labelled no-seed, but a look seeded candidates
+    with pytest.raises(SystemExit, match="trace shows a look"):
+        harness.check_variants(saved, (1.0,))
+
+
+def test_no_seed_and_no_floor_ablations_switch_one_term_off_and_change_the_run(scene):
+    """'no-seed' (no look seeds an unvisited candidate) and 'no-floor' (v0 = 0: lambda is 0 until something is found)
+    each flip one switch, and each changes what the agent does: without seeds the argmax order changes; without the
+    floor a photo with nothing to find runs on to its cap or until every candidate is looked at."""
+    from drishyam.agent import JobConfig
+
+    full = harness.switches("full")
+    assert harness.switches("no-seed") == {**full, "seed_from_looks": False} and full["seed_from_looks"] is True
+    assert harness.switches("no-floor") == {**full, "v0": 0.0} and full["v0"] == JobConfig().v0 > 0
+    looks = lambda out: [(t["action"], t["x"], t["y"], t["level"]) for t in out["trace"]]
+    full_run, no_seed = (harness.run_drishyam(scene, 1.0, **harness.ABLATIONS[v]) for v in ("full", "no-seed"))
+    assert no_seed["switches"] == harness.switches("no-seed") and looks(no_seed) != looks(full_run)
+    clean = synth.render(2, 1600, 1200, {"distractors": ["water_stain"]})[0]  # nothing to find
+    for cap in (0.3, 1.0):
+        full_run, no_floor = (harness.run_drishyam(clean, cap, **harness.ABLATIONS[v]) for v in ("full", "no-floor"))
+        assert no_floor["switches"] == harness.switches("no-floor") and full_run["halt_cause"] == "stop-rule"
+        assert len(looks(no_floor)) > len(looks(full_run)) and no_floor["halt_cause"] != "stop-rule"
 
 
 def test_random_order_matches_only_inside_the_margin():

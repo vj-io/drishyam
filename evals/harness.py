@@ -67,12 +67,15 @@ BOOT_N, BOOT_SEED, CHANCE_SEED = 1000, 0, 1
 SMALL_PX = 96 * 96  # GT boxes below this area form the small-box stratum
 PER_IMAGE_OPS = ("pyrDown", "saliency", "downscale")  # their cost grows with the image; per-look ops read 512x512
 REPO = Path(__file__).resolve().parents[1]
-SWITCHES = ("order", "seed", "use_uncertainty", "survey", "verify", "governor")  # JobConfig fields a variant may flip
+SWITCHES = ("order", "seed", "use_uncertainty", "seed_from_looks", "v0", "survey", "verify",
+            "governor")  # JobConfig fields a variant may flip
 ABLATION_CAPS = (0.3, 1.0)
 ABLATIONS = {  # FR-21: each variant flips one switch of the compared agent (governor off, as in every comparison)
     "full": {},
     **{f"random-order-s{s}": {"order": "random", "seed": s} for s in (0, 1, 2)},
     "no-uncertainty": {"use_uncertainty": False},
+    "no-seed": {"seed_from_looks": False},  # no look sets an unvisited candidate's entropy or class: score = prior x unseen
+    "no-floor": {"v0": 0.0},  # the stop rule's lambda is 0 until something is found
     "no-survey": {"survey": False},
     "no-verify": {"verify": False},
     "governor-on": {"governor": True},  # deployment behaviour: may switch to the fast net, so not like for like
@@ -310,7 +313,7 @@ def run_drishyam(img: np.ndarray, cap: float, costs: dict | None = None, **switc
               "level": r["decision"]["args"].get("level"), "window": r.get("window"),
               "q_ok": r.get("quality", {}).get("ok", True), "q_reason": r.get("quality", {}).get("reason"),
               "sharpness": r.get("observation", {}).get("sharpness"), "model": r.get("model"),
-              "governor": r.get("governor", {}).get("cause")} for r in job.trace]
+              "governor": r.get("governor", {}).get("cause"), "seeded": len(r.get("seeded", ()))} for r in job.trace]
     net = net_px(rec_seg.log)
     return {"preds": finding_components(job, rec_seg.log), "preds_union": preds, "pixels_frac": done["summary"]["pixels_frac"],
             "net_pixels_frac": None if net is None else net / (img.shape[0] * img.shape[1]), "wall_s": wall,
@@ -889,7 +892,7 @@ def ablation_image(rec: dict, caps=ABLATION_CAPS, cost_rows: list | None = None)
 
 def check_variants(results: list[dict], caps) -> None:
     """Refuse to compare unless every output ran its label's switches (read from the job's own config) and shows it:
-    no verify look with verify off, no survey look with the survey off."""
+    no verify look with verify off, no survey look with the survey off, no seeded candidate with seeding off."""
     for res in results:
         for v in ABLATIONS:
             want = switches(v)
@@ -898,7 +901,8 @@ def check_variants(results: list[dict], caps) -> None:
                 if c["switches"] != want:
                     raise SystemExit(f"{res['id']} {v}@{cap} ran {c['switches']}, not its label's {want}")
                 if (not want["verify"] and any(t["action"] == "verify" for t in c["trace"])) or (
-                        not want["survey"] and any(t["cause"] == "survey" for t in c["trace"])):
+                        not want["survey"] and any(t["cause"] == "survey" for t in c["trace"])) or (
+                        not want["seed_from_looks"] and any(t.get("seeded") for t in c["trace"])):
                     raise SystemExit(f"{res['id']} {v}@{cap}: the trace shows a look its switches turn off")
 
 
