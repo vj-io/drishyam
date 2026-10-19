@@ -112,22 +112,6 @@ def test_finish_drops_specks_and_scores_entropy():
     assert seg.entropy == pytest.approx(1.0, abs=0.01)
 
 
-@pytest.fixture(scope="module")
-def tiny_onnx(tmp_path_factory):
-    onnx = pytest.importorskip("onnx")
-    from onnx import TensorProto, helper, numpy_helper
-
-    rng = np.random.default_rng(0)
-    w = numpy_helper.from_array(rng.normal(0, 0.5, (6, 3, 1, 1)).astype(np.float32), "w")
-    node = helper.make_node("Conv", ["x", "w"], ["y"])
-    graph = helper.make_graph([node], "seg", [helper.make_tensor_value_info("x", TensorProto.FLOAT, [1, 3, "h", "w"])],
-                              [helper.make_tensor_value_info("y", TensorProto.FLOAT, [1, 6, "h", "w"])], [w])
-    model = helper.make_model(graph, opset_imports=[helper.make_opsetid("", 17)])
-    path = tmp_path_factory.mktemp("m") / "tiny.onnx"
-    onnx.save(model, path)
-    return str(path)
-
-
 def test_micro_times_nanodet_and_the_onnx_named_by_the_env(tiny_onnx, monkeypatch):
     from bench import micro
 

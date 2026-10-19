@@ -18,6 +18,7 @@ import cv2
 import numpy as np
 
 from . import imaging
+from .cascade import confirm_look, ms_hat  # cascade
 from .findings import IOU_AGREE, SEVERITY, Finding, critical_rule, is_critical, now_iso, work_order
 from .governor import MIN_GAZE, USD_PER_HOUR, Budget, RuntimeStats, Settings, check
 from .measure import measure
@@ -139,6 +140,10 @@ class JobConfig:
     # A fixed predicted cost per look, {"warp": ms, "segment": ms, "segment:<model>": ms}, instead of live p95s:
     # scores and the stop rule then do not move with machine load. The caps still run on the real clock.
     t_hat_ms: dict | None = None
+    # cascade: with a confirm net (Job(confirm=...), drishyam.cascade; none by default), the scout entropy band, both
+    # cascade: ends included, in which the confirm net segments a look again. Not tuned: it straddles tau.
+    tau_confirm_lo: float = 0.35  # cascade
+    tau_confirm_hi: float = 0.65  # cascade
 
 
 @dataclass
@@ -182,9 +187,11 @@ def _rect_on(shape, window, level_scale):
 class Job:
     def __init__(self, image: np.ndarray, config: JobConfig | None = None, *, job_id: str | None = None,
                  segmenter=None, planner=None, kill=lambda: False, clock=time.perf_counter,
+                 confirm=None,  # cascade: the confirm net (drishyam.cascade); None, the default: no cascade
                  replay: list | None = None) -> None:
         self.image = image
         self.segmenter = segmenter or default_segmenter()
+        self.confirm = confirm  # cascade
         cfg = config or JobConfig()
         name = cfg.profile or profile_for(self.segmenter)
         self.cfg = replace(cfg, profile=name, **{k: v for k, v in PROFILES[name].items() if getattr(cfg, k) is None})
@@ -585,6 +592,10 @@ class Job:
             valid = imaging.footprint(to_l0, (W, H), size)
             seg, seg_ms = self._timed(f"segment:{model}", segment_view, self.segmenter, crop, model, valid, 2**level)
             self.stats.record("segment", seg_ms)
+            # cascade: the confirm net looks again at an unsure or critical look, if the caps leave room for it
+            seg, confirmed = (confirm_look(self, seg, crop, level, valid, clock() - t_start)  # cascade
+                              if self.confirm is not None and q["ok"] else (seg, None))  # cascade
+            ran = confirmed is not None and "skipped" not in confirmed  # cascade
             # Crack components segment_view dropped as straight lines (formwork, joints): logged, never drafted.
             rejected = rejected_lines(seg, to_l0, (W, H))
             injected = None
@@ -683,8 +694,10 @@ class Job:
             step_s = clock() - step_t0
             if cause != "survey" or cfg.survey_value:
                 cost_ms += self._t_hat() if cfg.t_hat_ms else step_s * 1000
+                cost_ms += ms_hat(self) if ran and cfg.t_hat_ms else 0.0  # cascade: step_s holds it otherwise
             usd_before = self.budget.usd_used
             self.budget.pixels_used += size * size
+            self.budget.pixels_used += size * size if ran else 0  # cascade: the confirm read the crop again
             self.budget.seconds_used = clock() - t_start
             self.gaze_path.append([cx, cy, level])
             rec = {
@@ -708,6 +721,9 @@ class Job:
                 "usd_used": round(self.budget.usd_used, 6), "seconds_used": round(self.budget.seconds_used, 3),
                 "injected": injected,
             }
+            if confirmed:  # cascade
+                rec |= {"confirm": confirmed,  # cascade
+                        "latency_ms": round(warp_ms + seg_ms + confirmed.get("latency_ms", 0.0), 1)}  # cascade
             if chk:
                 rec["verify"] = {k: chk[k] for k in ("iou", "class", "against_level", "class_now", "iou_any")}
             if seeded:
@@ -750,6 +766,8 @@ class Job:
         self.work_order = work_order(self.id, self.findings, self.gaze_path, self.not_assessed)
         self.work_order["profile"] = cfg.profile  # the levels it looked at were this segmenter's (PROFILES)
         self.work_order["weights_sha256"] = getattr(self.segmenter, "sha256", None)  # the model that looked (WEIGHTS)
+        if self.confirm is not None:  # cascade
+            self.work_order["confirm_sha256"] = getattr(self.confirm, "sha256", None)  # cascade
         yield {"type": "done", "status": status, "cause": halt_cause,
                "summary": {"steps": len(self.gaze_path), "pixels_used": self.budget.pixels_used,
                            "pixels_frac": round(self.budget.pixels_used / (W * H), 4),

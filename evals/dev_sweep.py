@@ -17,6 +17,13 @@ per-image counts (for paired comparisons across runs), as JSON.
 results/dev/v0_sweep.json holds the rows that chose JobConfig.v0, results/dev/onnx_profile_sweep.json those that chose
 the dacl10k ONNX profile (agent.PROFILES), results/dev/tune_sweep.json those of the tuning knobs (tau_scout, fill,
 survey_value; none adopted).
+
+A cascade (drishyam.cascade): --confirm names the confirm net (or DRISHYAM_ONNX_CONFIRM; DRISHYAM_ONNX the scout), and
+a variant's `net` picks the arm: scout (the default: the scout alone), confirm (the confirm net alone, every look
+charged its segment:confirm p50, under the scout's profile so only the net differs) or cascade, e.g.
+"scout=;confirm=net:confirm;cascade=net:cascade" (make eval-cascade runs exactly that). The table must have timed the
+pair. Every row also carries modelled ms per job and recall per modelled second, and against the first variant the
+paired CIs of their ratios and of the chance ratio.
 """
 
 import argparse
@@ -24,13 +31,18 @@ import collections
 import functools
 import gzip
 import json
+import os
 from pathlib import Path
 
 import cv2
 import numpy as np
 
+from drishyam import cascade
+from drishyam.agent import profile_for
 from drishyam.segment import default_segmenter
-from evals import harness
+from evals import harness, synth
+
+NETS = ("scout", "confirm", "cascade")
 
 SPLITS = {"synth_dev": ("data/synth_dev", 60, 4242), "clean": ("data/synth_clean_dev", 30, 4243)}
 
@@ -56,6 +68,18 @@ def parse(spec: str) -> dict:
     return out
 
 
+def arm(net: str, seg, confirm, costs: dict, sw: dict) -> dict:
+    """run_drishyam's arguments for a variant's `net` (NETS): the job's segmenter, the confirm net, costs, switches."""
+    if net not in NETS:
+        raise SystemExit(f"net:{net} is not one of {', '.join(NETS)}")
+    if net != "scout" and confirm is None:
+        raise SystemExit(f"net:{net} needs a confirm net: --confirm or DRISHYAM_ONNX_CONFIRM")
+    if net == "confirm":
+        return {"segmenter": confirm, "costs": {**costs, "segment:accurate": costs["segment:confirm"]},
+                "profile": profile_for(seg), **sw}
+    return {"segmenter": seg, "confirm": confirm if net == "cascade" else None, "costs": costs, **sw}
+
+
 def task(rec, variants, rows, caps, baselines=False):
     img = cv2.imread(rec["path"], cv2.IMREAD_COLOR)
     costs, seg = harness.op_costs(rows, img.shape[1], img.shape[0]), default_segmenter()
@@ -63,8 +87,9 @@ def task(rec, variants, rows, caps, baselines=False):
     for lv in harness.TILE_LEVELS if baselines else ():
         cfg[f"tiling@L{lv}"] = harness.run_tiling(img, seg, lv, costs)
     for k, sw in variants.items():
+        kw = arm(sw.get("net", "scout"), seg, cascade.default_confirm(), costs, {x: v for x, v in sw.items() if x != "net"})
         for cap in caps:
-            cfg[f"{k}@{cap}"] = harness.run_drishyam(img, cap, costs, **sw)
+            cfg[f"{k}@{cap}"] = harness.run_drishyam(img, cap, **kw)
     return {"id": rec["id"], "width": img.shape[1], "height": img.shape[0], "configs": cfg}
 
 
@@ -82,6 +107,9 @@ def row(key: str, records, results, scored: dict, ref: str | None = None) -> dic
            "critical_per_image": m["critical_predictions"] / n,
            "findings_per_image": sum(len(c["preds_union"]) for c in cs) / n,  # one box per class per view
            "per_class": {c: None if v is None else round(v, 4) for c, v in m["per_class"].items()}}
+    wall = np.array([c["wall_s"] for c in cs])  # modelled seconds per job (fixed costs)
+    out |= {"ms_per_job": 1000 * float(wall.mean()),
+            "recall_per_s": None if m["recall"] is None else m["recall"] / float(wall.mean())}
     for name, k in (("downscale", "downscale"), ("tiling_L0", "tiling@L0"), ("ref", ref)):
         if k in scored and k != key and scored[k]["recall"]:
             b = scored[k]
@@ -93,12 +121,28 @@ def row(key: str, records, results, scored: dict, ref: str | None = None) -> dic
         # Boxes: on the clean split every box is a false alarm. Paired, like the recall ratios.
         a, b = (np.array([len(r["configs"][k]["preds"]) for r in results]) for k in (key, ref))
         out |= {"ref": ref, "boxes_vs_ref_ci": harness.boot_ci(lambda i: a[i].sum() / b[i].sum() if b[i].sum() else np.nan, n),
+                "boxes_diff_vs_ref_ci": harness.boot_ci(lambda i: a[i].mean() - b[i].mean(), n),  # per photo: no 0 / 0
                 "images_with_any_vs_ref_ci": harness.boot_ci(lambda i: (a[i] > 0).mean() - (b[i] > 0).mean(), n)}
+        wa, wb = (np.array([r["configs"][k]["wall_s"] for r in results]) for k in (key, ref))
+        out |= {"ms_vs_ref": wa.mean() / wb.mean(), "ms_vs_ref_ci": harness.boot_ci(lambda i: wa[i].mean() / wb[i].mean(), n)}
+        if m["recall"] and scored[ref]["recall"]:  # recall per modelled second, and the chance recall, paired likewise
+            ra, rb = harness.recall_of(m), harness.recall_of(scored[ref])
+            out |= {"recall_per_s_vs_ref": m["recall"] * wb.mean() / (scored[ref]["recall"] * wa.mean()),
+                    "recall_per_s_vs_ref_ci": harness.boot_ci(
+                        lambda i: ra(i) * wb[i].mean() / (rb(i) * wa[i].mean()) if rb(i) else np.nan, n),
+                    "chance_vs_ref_ci": harness.ratio_ci(m, scored[ref], n, col=2)}
     if "trace" in cs[0]:
         looks = [t for c in cs for t in c["trace"] if t["action"] != "halt"]
         out |= {"halt": dict(collections.Counter(c["halt_cause"] for c in cs)), "looks_mean": len(looks) / len(cs),
                 "looks_by_level": dict(sorted(collections.Counter(f"L{t['level']}" for t in looks).items())),
                 "looks_by_action": dict(collections.Counter(t["action"] for t in looks))}
+        # the nets each job ran (run_drishyam records them; caches from before the cascade lack them)
+        out |= {k: cs[0].get(k) for k in ("segmenter", "confirm", "profile")}
+        if conf := [t["confirm"] for t in looks if t.get("confirm")]:
+            done = [c for c in conf if "latency_ms" in c]
+            out |= {"confirms_per_job": len(done) / len(cs),
+                    "confirm_reasons": dict(collections.Counter(c["reason"] for c in done)),
+                    "confirms_skipped": dict(collections.Counter(c["skipped"].split(":")[0] for c in conf if c not in done))}
     out["per_image"] = m["per_image"]  # [found, found IoU-only, chance, chance IoU-only, GT] per image: paired comparisons
     return {x: (round(y, 4) if isinstance(y, float) else y) for x, y in out.items()}
 
@@ -114,15 +158,25 @@ def main(argv=None) -> None:
     ap.add_argument("--baselines", action="store_true", help="also tiling at L2, L1 and L0 (the downscale always runs)")
     ap.add_argument("--out", help="also write the rows here, as JSON")
     ap.add_argument("--dump", help="also write every image's predictions and traces here (gzipped JSON)")
+    ap.add_argument("--confirm", help="a cascade's confirm net, an ONNX path (default: DRISHYAM_ONNX_CONFIRM)")
     a = ap.parse_args(argv)
     variants, caps = parse(a.variants), [float(c) for c in a.cap.split(",")]
     if a.split == "real":
         records, _ = harness.load_records(a.codebrim, 100, list_file=harness.REPO / "evals" / "codebrim_dev100.txt")
     else:
         d, n, seed = SPLITS[a.split]
+        if a.split == "clean" and not (harness.REPO / d / "annotations.json").exists():  # load_records would add damage
+            synth.build_dataset(harness.REPO / d, n, seed, clean=True)
         records, _ = harness.load_records(harness.REPO / d, n, seed=seed)
-    seg = default_segmenter()
-    rows = harness.cost_rows(a.micro_arm, seg.name)
+    if a.confirm:
+        os.environ["DRISHYAM_ONNX_CONFIRM"] = a.confirm  # the spawned workers start with this environment
+        cascade.default_confirm.cache_clear()
+    seg, confirm = default_segmenter(), cascade.default_confirm()
+    if all(v.get("net", "scout") == "scout" for v in variants.values()):
+        confirm = None  # no arm reads a confirm net, so the table need not have timed one
+    elif confirm is None:
+        raise SystemExit("net:confirm and net:cascade need a confirm net: --confirm or DRISHYAM_ONNX_CONFIRM")
+    rows = harness.cost_rows(a.micro_arm, seg.name, confirm and confirm.name)
     results = harness.pool_map(functools.partial(task, variants=variants, rows=rows, caps=caps, baselines=a.baselines),
                                records, a.workers, lambda m: print(m, flush=True), a.split)
     scored = {k: harness.score_config(k, records, results, "preds") for k in results[0]["configs"]}
@@ -137,6 +191,7 @@ def main(argv=None) -> None:
     if a.out:
         Path(a.out).write_text(json.dumps({"split": a.split, "n": len(records), **harness.dataset_sha256(records),
                                            "caps": caps, "segmenter": harness.segmenter_id(seg),
+                                           **({"confirm": harness.segmenter_id(confirm)} if confirm else {}),
                                            "micro_arm": a.micro_arm, "variants": variants, "rows": out}, indent=1) + "\n")
 
 

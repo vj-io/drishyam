@@ -11,7 +11,7 @@ MAX_LOAD ?=
 MICRO_ARM ?= linux-aarch64
 EVAL = $(PY) -m evals.harness --cost-model fixed --micro-arm $(MICRO_ARM) $(if $(MAX_LOAD),--max-load $(MAX_LOAD))
 
-.PHONY: test e2e eval eval-real eval-large eval-dev eval-dev-clean eval-dev-real eval-live eval-model eval-ablations eval-ablations-real eval-clean bench data serve lint
+.PHONY: test e2e eval eval-real eval-large eval-dev eval-dev-clean eval-dev-real eval-live eval-model eval-cascade eval-ablations eval-ablations-real eval-clean bench data serve lint
 
 test:  ## unit, API, MCP, CLI and eval tests (same as CI)
 	$(PY) -m pytest -q --ignore=tests/e2e
@@ -47,6 +47,9 @@ eval-live:  ## deployment behaviour: measured wall time and the governor on (loa
 
 eval-model:  ## after scripts/install_model.sh: leakage check, then the ONNX on CODEBRIM and synth200 vs the classical runs
 	$(PY) -m evals.model_eval --publish --onnx $(or $(ONNX),models/drishyam_dacl10k.onnx) --codebrim $(CODEBRIM) $(if $(DACL10K),--dacl10k $(DACL10K)) $(if $(MAX_LOAD),--max-load $(MAX_LOAD))
+
+eval-cascade:  ## dev splits only: SCOUT alone, CONFIRM alone and the two-model cascade at caps 0.3 and 1.0 -> results/dev/cascade_<pair>.json
+	$(PY) -m evals.model_eval --onnx $(SCOUT) --confirm $(CONFIRM) --codebrim $(CODEBRIM) $(if $(LABEL),--label "$(LABEL)") $(if $(WORKERS),--workers $(WORKERS)) $(if $(MAX_LOAD),--max-load $(MAX_LOAD))
 
 eval-ablations:  ## FR-21 ablations (evals.harness.ABLATIONS vs the full agent, caps 0.3 and 1.0, fixed costs) on synth200 and the 4608 set -> public/results/ablations.json
 	$(EVAL) --ablation --data $(DATA) --n $(N) --seed 7 --out $(OUT) --results-dir runs/ablations/synth

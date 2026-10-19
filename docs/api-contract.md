@@ -109,6 +109,10 @@ Event types, in order:
  "latency_ms": 52, "cost_usd": 0.000005,
  "pixels_used": 870000, "pixels_frac": 0.129, "usd_used": 0.00021, "seconds_used": 2.2,
  "injected": null,                                      // or "p95_spike"
+ "confirm": {"reason": "ambiguous", "net": "onnx:drishyam_dacl10k.onnx", "scout": {"entropy": 0.52,
+             "classes": {"crack": 310}}, "latency_ms": 783.1},
+                                                        // only with a two-model cascade, which no app path runs
+                                                        // (off by default; see "Two-model cascade" below)
  "crop_jpeg_b64": "<160 px JPEG thumbnail of the gaze crop>"}
 
 {"type": "finding", "finding": {"id": "f1", "cls": "crack", "critical": false, "state": "draft",
@@ -302,6 +306,61 @@ look that no longer fits under the pixel cap shrinks to what is left (a multiple
 the job halting, with that size in `decision.args.size` and a rationale ending `"; gaze 320 px: what the pixel cap
 leaves (108134 px)"` (synth_dev recall x1.03, clean boxes x1.40); and `survey_value`, which when False keeps the
 survey's finds out of the stop rule's value found per ms (no measurable effect).
+
+### Two-model cascade (off by default)
+
+`drishyam.cascade` lets a fast scout segment every look and a stronger net segment again only the looks that need it.
+It is off everywhere by default: a `Job` runs it only when given a confirm net (`Job(confirm=...)`), and no app path
+passes one, so this API (locally and on Lambda), `drishyam run` and the MCP server never run it, whatever the
+environment holds, and the Lambda stack sets no `DRISHYAM_ONNX_CONFIRM`. `DRISHYAM_ONNX` names the scout as before;
+`DRISHYAM_ONNX_CONFIRM` names the confirm net (its accurate net only) for `bench.micro` and the dev evaluation.
+
+After the scout segments a look that passed the quality gate, the confirm net segments the same crop when the scout
+drafted a critical class (`reason` `critical`: a mask of at least `A_min` whose largest component is critical by the
+findings rule, so exposed rebar at any area or spalling from 40,000 L0 px²), else when the scout's entropy lies in
+[`tau_confirm_lo`, `tau_confirm_hi`] (`ambiguous`; `JobConfig`, 0.35 and 0.65, both ends included: not tuned, they
+straddle `tau`). The look then keeps the confirm's segmentation for everything after it: escalation, drafting,
+seeding and the step's `observation`. The step's `confirm` record names the reason, the net, what the scout saw
+(`scout.entropy`, `scout.classes`) and the confirm's own `latency_ms`.
+
+There is no second budget. The confirm reads the crop a second time, so a confirmed step's `pixels_used` grows by two
+crops against the one pixel cap; its time runs on the job's clock, so it counts in `seconds_used`, `usd_used`, the
+stop rule's spend and the step's `latency_ms`. It runs only if the job would still be inside the pixel, seconds and $
+caps after it, its cost predicted as its p95 so far (before the first one, the scout's median segment); otherwise the
+record has `skipped`, naming the cap (`"pixel cap: 120000 px left after this look, 262144 needed"`), no `latency_ms`,
+and the look keeps the scout's segmentation. It is timed as its own op, `segment:confirm` (in `runtime`), so under the
+fixed cost model each net is charged its own p50, and it always runs the confirm's accurate net: the governor's
+`p95>SLA` ladder reads and moves the scout only. A work order made with a confirm net also carries `confirm_sha256`.
+
+`bench.micro --job-ops-only` with `DRISHYAM_ONNX_CONFIRM` set adds a `segment:confirm` row per size to `job_ops` and
+names the net under `job_ops.confirm`; a fixed-cost cascade refuses a table that did not time the same confirm net.
+`make eval-cascade SCOUT=<onnx> CONFIRM=<onnx> [LABEL=...] [WORKERS=4]` times the pair into
+`results/<arm>-<pair>/micro.json` (the pair named like the single models: `dacl10k_v2a+v2b`), then runs (at most
+WORKERS processes, default 4; the numbers do not depend on it) the scout alone, the confirm net alone (each
+look charged its `segment:confirm` p50, under the scout's profile, so only the net differs) and the cascade, at caps
+0.3 and 1.0 on the three dev splits (synth_dev, the clean split, CODEBRIM dev100; never a held-out set), checks that
+each arm ran the nets it is named for, and writes `results/dev/cascade_<pair>.json`: recall, IoU-only recall, chance
+recall, boxes per photo (on the clean split, false alarms), the share of photos with any box, modelled ms per job and
+recall per modelled second, each with a paired 95 % bootstrap CI against the scout alone at the same cap. Its
+`readings` read every one of those CIs by the same standard, for a gain and a harm alike: a change only when the CI
+excludes no change (a ratio of 1; for boxes per photo and the share with any box, a per-photo difference of 0), then
+`gain` or `harm` where the direction says which (fewer false alarms on the clean split is a gain), `higher` or `lower`
+where it does not (chance recall, boxes on a labelled split), else `no clear change`.
+
+`results/dev/cascade_dacl10k_v2a.fp16+v2a.json` is a plumbing check, not a result: the v2a weights as the FP16 file
+scout and the same weights in FP32 confirm, so the two nets give nearly the same masks. It shows the mechanism and its
+accounting at work (confirms for both reasons, confirms skipped at the pixel and seconds caps, each net charged its own
+p50), and that on this x86 Mac the FP16 file is no faster than the FP32 one (segment:accurate p50 672-805 ms against
+segment:confirm 624-661 ms in the same timing run), so here the FP32 net alone is the cheaper arm.
+
+`results/dev/cascade_dacl10k_v2a+v2b.json` is the first real comparison: v2a (FP32) scouts, v2b confirms, both under
+the classical-v1 profile (`PROFILES` has none of their own yet), charged this x86 Mac's costs (v2a 665-739 ms and v2b
+813-880 ms per look, timed in one run). Read by the rule above it shows no gain on any split, in recall, IoU-only
+recall, false alarms, ms per job or recall per modelled second. On CODEBRIM dev100 the cascade loses recall (x0.83 at
+cap 0.3, x0.85 at 1.0; CIs 0.73-0.93 and 0.76-0.94) and costs more per job (x1.12, x1.08): its confirms spend the pixel
+and seconds caps, so a job takes about a third fewer looks (10.0 against 14.9 at 0.3, 16.0 against 24.2 at 1.0). v2b
+alone also loses recall there (x0.89, x0.90) and is no better on synth_dev (x0.91, x0.97: no clear change); on the
+clean split no arm changes the false alarms. On these splits v2b is not the stronger net, so the cascade stays off.
 
 ## `POST /api/kill`
 

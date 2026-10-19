@@ -254,10 +254,10 @@ def run_tiling(img: np.ndarray, seg, level: int, costs: dict | None = None) -> d
 
 
 class RecordingSegmenter:
-    """The default segmenter, keeping every Segmentation so per-component boxes can be rebuilt after a job."""
+    """The default segmenter (or `inner`), keeping every Segmentation so per-component boxes can be rebuilt after a job."""
 
-    def __init__(self) -> None:
-        self.inner, self.log = default_segmenter(), []
+    def __init__(self, inner=None) -> None:
+        self.inner, self.log = inner or default_segmenter(), []
         self.name = self.inner.name  # the Job picks its profile by this name and these weights (agent.PROFILES)
         self.sha256 = getattr(self.inner, "sha256", None)
 
@@ -272,12 +272,16 @@ def gaze_to_l0(x: int, y: int, level: int, size: int) -> np.ndarray:
     return np.array([[s, 0, s * (x / s - size / 2)], [0, s, s * (y / s - size / 2)], [0, 0, 1.0]])
 
 
-def finding_components(job: Job, segs: list) -> list[dict]:
+def finding_components(job: Job, segs: list, confirms: list = ()) -> list[dict]:
     """Drishyam's evidence in the baselines' box semantics: per-component boxes of the classes behind each
-    finding, from every look in its evidence trail. Lets the harness score both box conventions (see `run`)."""
+    finding, from every look in its evidence trail. Lets the harness score both box conventions (see `run`).
+    `segs`: the scout's raw output per look; `confirms`: the confirm net's, in order, for the looks it segmented
+    again (a cascade, drishyam.cascade), which then kept the confirm's."""
     looks = [r for r in job.trace if r["decision"]["action"] != "halt"]
-    out, wh = [], job.image.shape[1::-1]
+    out, wh, again = [], job.image.shape[1::-1], iter(confirms)
     for rec, seg in zip(looks, segs, strict=True):
+        if "latency_ms" in rec.get("confirm", {}):
+            seg = next(again)
         classes = {f.cls for f in job.findings if rec["step"] in f.steps}
         if classes:
             a = rec["decision"]["args"]
@@ -305,13 +309,16 @@ class FixedCostJob(Job):
         return out, ms
 
 
-def run_drishyam(img: np.ndarray, cap: float, costs: dict | None = None, **switches) -> dict:
+def run_drishyam(img: np.ndarray, cap: float, costs: dict | None = None, segmenter=None, confirm=None,
+                 **switches) -> dict:
     """One Job at pixel cap `cap`. `switches` are JobConfig ablation fields; the governor's overrides are off unless
-    governor=True, so a policy comparison runs the accurate net on every look, as the baselines do."""
+    governor=True, so a policy comparison runs the accurate net on every look, as the baselines do. `segmenter`: the
+    job's (default `default_segmenter()`); `confirm`: a confirm net, for a cascade (drishyam.cascade; default none)."""
     t0 = time.perf_counter()
-    rec_seg = RecordingSegmenter()
+    rec_seg, rec_confirm = RecordingSegmenter(segmenter), None if confirm is None else RecordingSegmenter(confirm)
     cfg = JobConfig(pixel_cap=cap, thumbs=False, **{"governor": False, **switches})
-    job = Job(img, cfg, segmenter=rec_seg) if costs is None else FixedCostJob(img, cfg, costs, segmenter=rec_seg)
+    kw = {"segmenter": rec_seg, "confirm": rec_confirm}
+    job = Job(img, cfg, **kw) if costs is None else FixedCostJob(img, cfg, costs, **kw)
     done = list(job.run())[-1]
     wall = time.perf_counter() - t0 if costs is None else job.now
     preds = [{"cls": f.cls, "box": list(f.box), "area": int(f.measure["area_px"]), "conf": round(f.confidence, 3),
@@ -321,14 +328,17 @@ def run_drishyam(img: np.ndarray, cap: float, costs: dict | None = None, **switc
               "level": r["decision"]["args"].get("level"), "window": r.get("window"),
               "q_ok": r.get("quality", {}).get("ok", True), "q_reason": r.get("quality", {}).get("reason"),
               "sharpness": r.get("observation", {}).get("sharpness"), "model": r.get("model"),
-              "governor": r.get("governor", {}).get("cause"), "seeded": len(r.get("seeded", ()))} for r in job.trace]
-    net = net_px(rec_seg.log)
-    return {"preds": finding_components(job, rec_seg.log), "preds_union": preds, "pixels_frac": done["summary"]["pixels_frac"],
+              "governor": r.get("governor", {}).get("cause"), "seeded": len(r.get("seeded", ())),
+              **({"confirm": r["confirm"]} if "confirm" in r else {})} for r in job.trace]
+    confirms = rec_confirm.log if rec_confirm else []
+    net = net_px(rec_seg.log + confirms)
+    return {"preds": finding_components(job, rec_seg.log, confirms), "preds_union": preds,
+            "pixels_frac": done["summary"]["pixels_frac"],
             "net_pixels_frac": None if net is None else net / (img.shape[0] * img.shape[1]), "wall_s": wall,
             "trace": trace, "status": done["status"], "halt_cause": done["cause"],
             "models": dict(collections.Counter(t["model"] for t in trace if t["action"] != "halt")),
             "switches": {k: getattr(job.cfg, k) for k in SWITCHES},  # what the job read, not what was asked
-            "profile": job.cfg.profile}
+            "profile": job.cfg.profile, "segmenter": rec_seg.name, "confirm": rec_confirm and rec_confirm.name}
 
 
 def eval_image(rec: dict, budgets=BUDGETS, cost_rows: list | None = None, governor: bool = False) -> dict:
@@ -345,8 +355,9 @@ def eval_image(rec: dict, budgets=BUDGETS, cost_rows: list | None = None, govern
 
 
 # ---------------------------------------------------------------- fixed cost model
-def cost_rows(micro_arm: str, seg_name: str) -> list[dict]:
-    """The job_ops rows of results/<micro_arm>/micro.json, which must have timed this segmenter."""
+def cost_rows(micro_arm: str, seg_name: str, confirm_name: str | None = None) -> list[dict]:
+    """The job_ops rows of results/<micro_arm>/micro.json, which must have timed this segmenter (and, for a cascade,
+    this confirm net: its segment:confirm row)."""
     p = REPO / "results" / micro_arm / "micro.json"
     jobs = json.loads(p.read_text()).get("job_ops") if p.exists() else None
     if not jobs:
@@ -354,6 +365,9 @@ def cost_rows(micro_arm: str, seg_name: str) -> list[dict]:
     if jobs["segmenter"] != seg_name:
         raise SystemExit(f"{p} timed {jobs['segmenter']}, but this process segments with {seg_name}: time it with "
                          f"`python -m bench.micro --arm <new arm> --job-ops-only` (same DRISHYAM_ONNX) and pass --micro-arm")
+    if confirm_name and jobs.get("confirm") != confirm_name:
+        raise SystemExit(f"{p} timed confirm net {jobs.get('confirm')}, not {confirm_name}: time the pair with "
+                         "`python -m bench.micro --arm <new arm> --job-ops-only` (same DRISHYAM_ONNX_CONFIRM)")
     return jobs["results"]
 
 
