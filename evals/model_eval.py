@@ -18,6 +18,16 @@ Those paths are models/drishyam_dacl10k.onnx's (v1). Another model there (models
 gets its own: results/<micro-arm>-dacl10k_v2a/, runs/model-eval/onnx-v2a-*, public/results/*_dacl10k_v2a/, so
 installing it beside v1 overwrites none of v1's cost table or runs.
 The classical side is the published summary when it is comparable on the same data; otherwise it is run too.
+
+A two-model cascade (drishyam.cascade), on the dev splits only, never a held-out set and never published:
+
+    make eval-cascade SCOUT=models/drishyam_dacl10k_v2a.onnx CONFIRM=models/drishyam_dacl10k_v2b.onnx [LABEL=...]
+    python -m evals.model_eval --onnx SCOUT --confirm CONFIRM [--label L] [--codebrim C] [--workers 4]
+
+times the pair's job ops (segment:confirm too) into results/<micro-arm>-<pair>/micro.json, the pair named as the
+single models are (dacl10k_v2a+v2b; an FP16 file keeps its .fp16), runs evals.dev_sweep on synth_dev, the clean split
+and CODEBRIM dev100 (if present) with the scout alone, the confirm net alone and the cascade at caps 0.3 and 1.0,
+checks that each arm ran the nets it is named for, and writes results/dev/cascade_<pair>.json with --label.
 """
 from __future__ import annotations
 
@@ -92,6 +102,75 @@ def table(name: str, before: dict, after: dict) -> None:
     print(f"recall 95% CI at {key}: {b[key]['recall_ci']} > {a[key]['recall_ci']}")
 
 
+# ---------------------------------------------------------------- a two-model cascade, dev splits only
+CASCADE_ARMS = "scout=;confirm=net:confirm;cascade=net:cascade"  # evals.dev_sweep variants: scout-only is the reference
+CASCADE_CAPS = "0.3,1.0"
+DEV_SPLITS = ("synth_dev", "clean", "real")  # evals.dev_sweep.SPLITS and CODEBRIM dev100: no held-out set
+
+
+def pair_tag(scout: Path, confirm: Path) -> str:
+    """dacl10k_v2a+v2b: each file's name without drishyam_ and .onnx (an FP16 file keeps its .fp16), the confirm's
+    without the dacl10k_ both share."""
+    a, b = (p.name.removesuffix(".onnx").removeprefix("drishyam_") for p in (scout, confirm))
+    return f"{a}+{b.removeprefix('dacl10k_')}"
+
+
+def check_arms(split: str, doc: dict, scout: str, confirm: str) -> None:
+    """Each arm ran the nets it is named for, all under one profile (an env-var A/B once scored one engine twice)."""
+    want = {"scout": (scout, None), "confirm": (confirm, None), "cascade": (scout, confirm)}
+    agents = {k: r for k, r in doc["rows"].items() if "@" in k}
+    for k, r in agents.items():
+        if (r["segmenter"], r["confirm"]) != want[k.partition("@")[0]]:
+            raise SystemExit(f"{split}: {k} ran {r['segmenter']} + {r['confirm']}, not {want[k.partition('@')[0]]}")
+    if len({r["profile"] for r in agents.values()}) != 1:
+        raise SystemExit(f"{split}: the arms ran different profiles: {sorted({r['profile'] for r in agents.values()})}")
+
+
+def cascade_table(split: str, doc: dict) -> None:
+    f = lambda v: "-" if v is None else f"{v:.3f}"
+    ci = lambda r, k: f"{f(r.get(k))} {r.get(k + '_ci', '')}"
+    print(f"\n{split} ({doc['n']} images): ratios are paired against scout-only at the same cap, 95 % bootstrap CIs")
+    for k, r in doc["rows"].items():
+        if "@" in k:
+            print(f"{k:<13} recall {f(r['recall'])} (IoU-only {f(r['recall_iou_only'])}, chance {f(r['chance_recall'])})"
+                  f" x{ci(r, 'vs_ref')}  ms/job {r['ms_per_job']:.0f} x{ci(r, 'ms_vs_ref')}  recall/s"
+                  f" {f(r['recall_per_s'])} x{ci(r, 'recall_per_s_vs_ref')}  boxes/photo {r['boxes_per_image']:.2f}"
+                  f" {r.get('boxes_vs_ref_ci', '')}  any box {r['images_with_any']:.2f}"
+                  f" {r.get('images_with_any_vs_ref_ci', '')}  confirms/job {r.get('confirms_per_job', 0):.2f}")
+
+
+def cascade_eval(a, scout: Path, fp16: Path) -> None:
+    if a.publish:
+        raise SystemExit("--confirm compares on the dev splits only: nothing is published")
+    confirm = (REPO / a.confirm).resolve()
+    if not confirm.exists():
+        raise SystemExit(f"{confirm} not found")
+    tag = pair_tag(scout, confirm)
+    arm, runs = f"{a.micro_arm}-{tag}", REPO / "runs" / "model-eval" / f"cascade-{tag}"
+    plain = {k: v for k, v in os.environ.items() if k not in ("DRISHYAM_ONNX", "DRISHYAM_ONNX_FP16", "DRISHYAM_ONNX_CONFIRM")}
+    env = {**plain, "DRISHYAM_ONNX": str(scout), **({"DRISHYAM_ONNX_FP16": str(fp16)} if fp16.exists() else {}),
+           "DRISHYAM_ONNX_CONFIRM": str(confirm)}
+    subprocess.run([sys.executable, "-m", "bench.micro", "--arm", arm, "--job-ops-only",
+                    *(["--max-load", str(a.max_load)] if a.max_load is not None else [])], env=env, cwd=REPO, check=True)
+    runs.mkdir(parents=True, exist_ok=True)
+    splits = {}
+    for split in DEV_SPLITS:
+        if split == "real" and not (Path(a.codebrim) / "annotations").is_dir():
+            print(f"no CODEBRIM under {a.codebrim}: the real dev split is skipped (run `make data`)")
+            continue
+        out = runs / f"{split}.json"
+        subprocess.run([sys.executable, "-m", "evals.dev_sweep", split, CASCADE_CAPS, CASCADE_ARMS, "--micro-arm", arm,
+                        "--workers", str(a.workers or 4), "--codebrim", str(Path(a.codebrim).resolve()), "--out", str(out)],
+                       env=env, cwd=REPO, check=True)
+        splits[split] = json.loads(out.read_text())
+        check_arms(split, splits[split], f"onnx:{scout.name}", f"onnx:{confirm.name}")
+        cascade_table(split, splits[split])
+    dst = REPO / "results" / "dev" / f"cascade_{tag}.json"
+    dst.write_text(json.dumps({"label": a.label, "micro_arm": arm, "arms": CASCADE_ARMS, "caps": CASCADE_CAPS,
+                               "splits": splits}, indent=1) + "\n")
+    print(f"wrote {dst.relative_to(REPO)}")
+
+
 def main(argv=None) -> None:
     ap = argparse.ArgumentParser(prog="python -m evals.model_eval", description=__doc__.split("\n\n")[0])
     ap.add_argument("--onnx", default="models/drishyam_dacl10k.onnx")
@@ -104,15 +183,19 @@ def main(argv=None) -> None:
     ap.add_argument("--micro-arm", default="local-macos-x86")
     ap.add_argument("--publish", action="store_true", help="copy the ONNX summaries to public/results/*_dacl10k/")
     ap.add_argument("--skip-codebrim", action="store_true", help="synthetic set only (scripts/install_model.sh's quick check)")
+    ap.add_argument("--confirm", help="a cascade's confirm net: --onnx alone, it alone and the cascade on the dev splits")
+    ap.add_argument("--label", default="", help="with --confirm: what this run is, written into its results file")
     a = ap.parse_args(argv)
     onnx = (REPO / a.onnx).resolve()
     fp16 = (REPO / a.fp16).resolve() if a.fp16 else onnx.with_name(onnx.name.replace(".onnx", ".fp16.onnx"))
     if not onnx.exists():
         raise SystemExit(f"{onnx} not found: run scripts/install_model.sh first")
+    if a.confirm:
+        return cascade_eval(a, onnx, fp16)
     tag = onnx.name.split(".")[0].removeprefix("drishyam_")  # dacl10k (v1), dacl10k_v2a, ...: see the docstring
     sub = "" if tag == "dacl10k" else "-" + tag.removeprefix("dacl10k_")
     label, runs, arm = f"onnx:{onnx.name}", REPO / "runs" / "model-eval", f"{a.micro_arm}-{tag}"
-    plain = {k: v for k, v in os.environ.items() if k not in ("DRISHYAM_ONNX", "DRISHYAM_ONNX_FP16")}
+    plain = {k: v for k, v in os.environ.items() if k not in ("DRISHYAM_ONNX", "DRISHYAM_ONNX_FP16", "DRISHYAM_ONNX_CONFIRM")}
     env = {**plain, "DRISHYAM_ONNX": str(onnx), **({"DRISHYAM_ONNX_FP16": str(fp16)} if fp16.exists() else {})}
     sets = [("synth", REPO / "data" / "synth200", REPO / "public" / "results")]
     if not a.skip_codebrim and (Path(a.codebrim) / "eval200.txt").exists():

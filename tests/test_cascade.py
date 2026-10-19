@@ -33,8 +33,8 @@ class Painted:
     """A stand-in confirm net: background everywhere but, with `cls`, one 40 x 40 block of that class at the crop's
     centre. It records the model each call asked for."""
 
-    def __init__(self, cls=None):
-        self.cls, self.name, self.sha256, self.models = cls, f"stub:{cls or 'blank'}", "c" * 64, []
+    def __init__(self, cls=None, name=None, sha256="c" * 64):
+        self.cls, self.name, self.sha256, self.models = cls, name or f"stub:{cls or 'blank'}", sha256, []
 
     def predict(self, crop, model="accurate"):
         self.models.append(model)
@@ -127,6 +127,7 @@ def test_a_confirm_that_would_break_a_cap_is_skipped_and_the_step_says_which(sce
     steps = looks(ev)
     assert sum(map(ran, steps)) == 1 and skipped(steps, "seconds cap")
     assert max(s["seconds_used"] for s in steps) <= job.cfg.seconds_cap
+    assert all(s["latency_ms"] == 1.0 + 10.0 for s in steps if not ran(s))  # a skipped confirm costs nothing
 
 
 # ---------------------------------------------------------------- what a confirm is charged
@@ -232,16 +233,17 @@ def test_each_dev_sweep_arm_runs_the_nets_it_is_named_for(tmp_path, monkeypatch)
     cv2.imwrite(str(tmp_path / "a.png"), img)
     rows = [{"op": op, "size": "1024x768", "p50_ms": ms} for op, ms in COSTS.items()]
     monkeypatch.setattr(dev_sweep, "default_segmenter", ClassicalSegmenter)
-    net = Painted("corrosion")
+    net = Painted("corrosion", ONNX, agent.WEIGHTS[ONNX])  # a confirm net whose own profile is not the scout's
+    assert agent.profile_for(net) == ONNX != agent.profile_for(ClassicalSegmenter())
     monkeypatch.setattr(cascade, "default_confirm", lambda: net)
     variants = dev_sweep.parse("scout=;confirm=net:confirm;cascade=net:cascade")
     res = dev_sweep.task({"id": "a", "path": str(tmp_path / "a.png")}, variants, rows, [1.0])["configs"]
     scout, alone, both = res["scout@1.0"], res["confirm@1.0"], res["cascade@1.0"]
     assert (scout["segmenter"], scout["confirm"]) == ("classical-v1", None) and not any("confirm" in t for t in scout["trace"])
     # the confirm net alone: every look charged its p50, under the scout's profile so only the net differs
-    assert (alone["segmenter"], alone["confirm"], alone["profile"]) == ("stub:corrosion", None, "classical-v1")
+    assert (alone["segmenter"], alone["confirm"], alone["profile"]) == (ONNX, None, "classical-v1")
     assert alone["wall_s"] == pytest.approx((2 + 2 + 702 * len(looks_of(alone))) / 1000)
-    assert (both["segmenter"], both["confirm"]) == ("classical-v1", "stub:corrosion")
+    assert (both["segmenter"], both["confirm"], both["profile"]) == ("classical-v1", ONNX, "classical-v1")
     confirmed = {t["step"] for t in both["trace"] if "latency_ms" in t.get("confirm", {})}
     assert confirmed and both["wall_s"] == pytest.approx((4 + 12 * len(looks_of(both)) + 700 * len(confirmed)) / 1000)
     # Findings from a confirmed look are rebuilt from the confirm's segmentation (its corrosion block), not the scout's
@@ -277,3 +279,44 @@ def test_a_cost_table_must_have_timed_the_same_confirm_net(tmp_path, monkeypatch
     net = Painted("corrosion")
     out = micro.job_ops(1024, 768, ClassicalSegmenter(), net)["segment:confirm"]()
     assert out.areas["corrosion"] == 1600 and net.models == ["accurate"]
+
+
+def test_the_cascade_eval_times_the_pair_and_sweeps_the_dev_splits_only(tmp_path, monkeypatch):
+    from evals import model_eval
+
+    assert model_eval.pair_tag(Path("drishyam_dacl10k_v2a.onnx"), Path("drishyam_dacl10k_v2b.onnx")) == "dacl10k_v2a+v2b"
+    assert model_eval.pair_tag(Path("drishyam_dacl10k.fp16.onnx"), Path("drishyam_dacl10k.onnx")) == "dacl10k.fp16+dacl10k"
+    scout, confirm = tmp_path / "drishyam_dacl10k_v2a.onnx", tmp_path / "drishyam_dacl10k_v2b.onnx"
+    scout.write_bytes(b"")
+    confirm.write_bytes(b"")
+    (tmp_path / "results" / "dev").mkdir(parents=True)
+    nets = {"scout": ("onnx:drishyam_dacl10k_v2a.onnx", None), "confirm": ("onnx:drishyam_dacl10k_v2b.onnx", None),
+            "cascade": ("onnx:drishyam_dacl10k_v2a.onnx", "onnx:drishyam_dacl10k_v2b.onnx")}
+    calls, wrong = [], []
+
+    def run(cmd, env, cwd, check):
+        calls.append((cmd, env))
+        if "evals.dev_sweep" in cmd:
+            row = {"recall": 0.5, "recall_iou_only": 0.4, "chance_recall": 0.1, "ms_per_job": 900.0, "recall_per_s": 0.6,
+                   "boxes_per_image": 3.0, "images_with_any": 1.0, "profile": "classical-v1"}
+            rows = {f"{k}@{cap}": {**row, "segmenter": s, "confirm": None if wrong and k == "cascade" else c}
+                    for k, (s, c) in nets.items() for cap in (0.3, 1.0)}
+            Path(cmd[cmd.index("--out") + 1]).write_text(json.dumps({"n": 1, "rows": rows}))
+
+    monkeypatch.setattr(model_eval, "REPO", tmp_path)
+    monkeypatch.setattr(model_eval.subprocess, "run", run)
+    argv = ["--onnx", str(scout), "--confirm", str(confirm), "--codebrim", str(tmp_path / "no-codebrim"), "--label", "x"]
+    model_eval.main(argv)
+    (micro, env), *sweeps = calls
+    assert micro[1:5] == ["-m", "bench.micro", "--arm", "local-macos-x86-dacl10k_v2a+v2b"]
+    assert (env["DRISHYAM_ONNX"], env["DRISHYAM_ONNX_CONFIRM"]) == (str(scout), str(confirm))
+    assert [c[3] for c, _ in sweeps] == ["synth_dev", "clean"]  # no CODEBRIM here, and never a held-out set
+    assert all(c[4:6] == ["0.3,1.0", model_eval.CASCADE_ARMS] and c[c.index("--workers") + 1] == "4" for c, _ in sweeps)
+    assert all(e["DRISHYAM_ONNX_CONFIRM"] == str(confirm) for _, e in sweeps)
+    out = json.loads((tmp_path / "results" / "dev" / "cascade_dacl10k_v2a+v2b.json").read_text())
+    assert out["label"] == "x" and set(out["splits"]) == {"synth_dev", "clean"}
+    wrong.append(True)  # a cascade arm that ran no confirm net is refused, not written up
+    with pytest.raises(SystemExit, match="cascade@0.3 ran"):
+        model_eval.main(argv)
+    with pytest.raises(SystemExit, match="nothing is published"):
+        model_eval.main([*argv, "--publish"])

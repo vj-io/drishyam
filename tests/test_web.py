@@ -108,8 +108,14 @@ def test_job_streams_contract_events(photo):
 def test_a_web_job_runs_no_cascade_even_with_a_confirm_net_named(photo, monkeypatch, tmp_path):
     """The cascade (drishyam.cascade) is off everywhere in the app: DRISHYAM_ONNX_CONFIRM names a confirm net for
     bench.micro and the dev evals only, and a job over HTTP (the local server, and Lambda) runs the scout alone."""
+    from drishyam import cascade
+
     monkeypatch.setenv("DRISHYAM_ONNX_CONFIRM", str(tmp_path / "missing.onnx"))  # reading it would fail the job
-    ev = lines(post(photo, params="?pixel_cap=0.5"))
+    cascade.default_confirm.cache_clear()  # (a None cached by an earlier job would hide a read)
+    try:
+        ev = lines(post(photo, params="?pixel_cap=0.5"))
+    finally:
+        cascade.default_confirm.cache_clear()
     assert ev[-1]["type"] == "done" and "confirm_sha256" not in ev[-1]["work_order"]
     assert not any("confirm" in e for e in ev if e["type"] == "step")
 
