@@ -1,253 +1,249 @@
 WEBVTT
 
 1
-00:00:01.900 --> 00:00:06.390
+00:00:01.700 --> 00:00:06.190
 It read a quarter of this photo's pixels, and found 3 critical findings.
 
 2
-00:00:06.490 --> 00:00:09.043
+00:00:06.240 --> 00:00:08.793
 It will not sign them off. A person must.
 
 3
-00:00:09.793 --> 00:00:16.700
+00:00:09.543 --> 00:00:16.450
 Drishyam, an Agentic Vision entry to the OpenCV AI Competition, powered by AWS.
 
 4
-00:00:16.800 --> 00:00:22.375
+00:00:17.500 --> 00:00:23.075
 Built by Vaibhav Jangid, lead engineer, and Bhavya Dhoot, design and presentation.
 
 5
-00:00:23.225 --> 00:00:26.003
+00:00:23.825 --> 00:00:26.434
 America has about 625,000 bridges,
 
 6
-00:00:26.013 --> 00:00:30.773
-each due a routine inspection at least every 24 months.
+00:00:26.444 --> 00:00:30.931
+each due a routine inspection at least every two years.
 
 7
-00:00:30.873 --> 00:00:33.866
-In an Oregon study of 6 drone inspections,
+00:00:30.981 --> 00:00:32.247
+In an Oregon study,
 
 8
-00:00:33.876 --> 00:00:38.274
-the largest produced more than 2,500 photos of one bridge.
+00:00:32.257 --> 00:00:37.544
+the largest drone inspection produced more than 2,500 photos of one bridge.
 
 9
-00:00:38.374 --> 00:00:41.010
+00:00:37.594 --> 00:00:40.230
 Drishyam is for the engineer reviewing them:
 
 10
-00:00:41.020 --> 00:00:45.239
+00:00:40.240 --> 00:00:44.459
 it zooms in where needed, and hands critical findings to a person.
 
 11
-00:00:46.089 --> 00:00:51.316
+00:00:45.159 --> 00:00:50.386
 The live site runs on AWS: OpenCV 5, on an arm Lambda.
 
 12
-00:00:51.416 --> 00:00:56.329
+00:00:50.436 --> 00:00:55.349
 Watch it inspect a bridge. A privacy pass runs first; nothing to blur here.
 
 13
-00:00:56.429 --> 00:00:59.872
+00:00:55.399 --> 00:00:58.842
 One survey look at the whole photo, at one eighth size.
 
 14
-00:00:59.972 --> 00:01:04.877
+00:00:58.892 --> 00:01:03.797
 Entropy 0.69 is above 0.5. Unsure, so it zooms in.
 
 15
-00:01:04.977 --> 00:01:08.891
+00:01:03.847 --> 00:01:07.761
 Then it moves to the best region, and double-checks at full resolution.
 
 16
-00:01:08.991 --> 00:01:12.571
+00:01:07.811 --> 00:01:11.391
 At full resolution the masks disagree: unconfirmed.
 
 17
-00:01:12.581 --> 00:01:15.506
+00:01:11.401 --> 00:01:14.326
 Exposed rebar always goes to a person.
 
 18
-00:01:15.606 --> 00:01:19.904
+00:01:14.376 --> 00:01:18.674
 Then a second spall. It stops when the next look costs more than it is worth,
 
 19
-00:01:19.914 --> 00:01:23.186
+00:01:18.684 --> 00:01:21.956
 and so it misses a crack in a region it never visited.
 
 20
-00:01:23.286 --> 00:01:26.851
+00:01:22.006 --> 00:01:25.571
 The agent took under a second; the page replays it slowly.
 
 21
-00:01:26.951 --> 00:01:31.949
+00:01:25.621 --> 00:01:30.619
 Only a person can approve. A name, Approve, and the server signs the work order.
 
 22
-00:01:32.049 --> 00:01:36.006
+00:01:30.669 --> 00:01:34.626
 Change one character of that signature, and the server refuses it.
 
 23
-00:01:36.656 --> 00:01:37.818
+00:01:35.276 --> 00:01:36.438
 Now, break it.
 
 24
-00:01:37.918 --> 00:01:41.836
+00:01:36.538 --> 00:01:40.456
 Slow the segmenter down, and the governor switches to the fast model.
 
 25
-00:01:41.936 --> 00:01:44.201
+00:01:40.556 --> 00:01:42.821
 The planner drill sends a shell command.
 
 26
-00:01:44.211 --> 00:01:47.645
+00:01:42.831 --> 00:01:46.265
 The allow-list rejects it, and the rule planner decides.
 
 27
-00:01:47.745 --> 00:01:53.255
+00:01:46.365 --> 00:01:51.875
 KILL halts the job before its next look; Resume replays the moves so far and carries on.
 
 28
-00:01:53.355 --> 00:01:57.949
+00:01:51.975 --> 00:01:56.569
 No language model runs live. These drill planners are scripted to fail.
 
 29
-00:01:58.799 --> 00:02:03.919
+00:01:57.319 --> 00:02:02.439
 Over MCP, Claude drove the same OpenCV tools on the same photo.
 
 30
-00:02:04.019 --> 00:02:09.120
+00:02:02.489 --> 00:02:07.590
 At call 6, the full-resolution mask disagreed, and exposed rebar is critical:
 
 31
-00:02:09.130 --> 00:02:11.239
+00:02:07.600 --> 00:02:09.709
 Claude handed it to a human.
 
 32
-00:02:11.339 --> 00:02:14.772
+00:02:09.759 --> 00:02:13.192
 At call 18, the masks agreed: a spall, confirmed.
 
 33
-00:02:14.782 --> 00:02:17.843
+00:02:13.202 --> 00:02:16.263
 At call 20, the budget ended the search.
 
 34
-00:02:17.943 --> 00:02:22.790
+00:02:16.313 --> 00:02:21.160
 It still missed the large spall. The rules are in the prompt; the values were measured.
 
 35
-00:02:23.740 --> 00:02:28.370
+00:02:21.910 --> 00:02:26.540
 Every step is perception, decision and action, with a human gate at the end.
 
 36
-00:02:28.470 --> 00:02:34.309
+00:02:26.590 --> 00:02:32.429
 CloudFront and a rate-limiting firewall front a signed Function URL and the arm Lambda.
 
 37
-00:02:34.409 --> 00:02:38.781
+00:02:32.479 --> 00:02:36.851
 DynamoDB holds the kill flags, Secrets Manager the signing key,
 
 38
-00:02:38.791 --> 00:02:40.850
+00:02:36.861 --> 00:02:38.920
 and CloudWatch the alarms.
 
 39
-00:02:40.950 --> 00:02:44.009
+00:02:38.970 --> 00:02:42.029
 OpenCV does the looking: a pyramid, saliency,
 
 40
-00:02:44.019 --> 00:02:49.862
+00:02:42.039 --> 00:02:47.882
 warpPerspective as a virtual pan-tilt-zoom camera, a blur gate, and face blurring.
 
 41
-00:02:49.962 --> 00:02:52.873
+00:02:47.932 --> 00:02:50.843
 Live, it uses the classical segmenter;
 
 42
-00:02:52.883 --> 00:02:57.360
+00:02:50.853 --> 00:02:55.330
 OpenCV 5's new DNN engine is on the optional ONNX path.
 
 43
-00:02:57.460 --> 00:03:05.457
-On Lambda, a step took 68 to 88 ms at p95, over 3 smoke runs. COOL was not run.
+00:02:55.380 --> 00:03:02.521
+On Lambda, a step took under 90 ms at p95, over 3 smoke runs. COOL was not run.
 
 44
-00:03:06.307 --> 00:03:11.963
-On 200 synthetic photos, it finds 85 % of exhaustive tiling's recall,
+00:03:03.221 --> 00:03:08.934
+On 200 synthetic photos, it finds 87 % of exhaustive tiling's recall,
 
 45
-00:03:11.973 --> 00:03:18.300
-at 23 % of the pixels: short of the 90 % target, though not significantly.
+00:03:08.944 --> 00:03:15.331
+at 26 % of the pixels: short of the 90 % target, though not significantly.
 
 46
-00:03:18.400 --> 00:03:21.854
-Drishyam scores 0.94× one downscaled pass:
+00:03:15.381 --> 00:03:21.891
+Against one downscaled pass it scores 0.96×: slightly behind, within the noise.
 
 47
-00:03:21.864 --> 00:03:25.991
-the downscale does as well, or slightly better.
-
-48
-00:03:26.091 --> 00:03:31.000
+00:03:21.941 --> 00:03:26.850
 On larger photos it beats one downscale, which reads a sixth as many pixels;
 
-49
-00:03:31.010 --> 00:03:34.108
+48
+00:03:26.860 --> 00:03:29.958
 quarter-size tiling does as well with fewer.
 
+49
+00:03:30.008 --> 00:03:33.598
+Ablations: only dropping the survey look loses recall;
+
 50
-00:03:34.208 --> 00:03:39.140
-Ablations: dropping the survey look hurts everywhere. Dropping uncertainty,
+00:03:33.608 --> 00:03:38.858
+the others lose none, and a random gaze order matches it on smaller photos.
 
 51
-00:03:39.150 --> 00:03:44.478
-or turning the governor on, changes nothing, and dropping verify costs no recall.
-
-52
-00:03:44.488 --> 00:03:47.967
-A random gaze order matches it on smaller photos.
-
-53
-00:03:48.067 --> 00:03:53.267
+00:03:38.908 --> 00:03:44.445
 On 200 real CODEBRIM photos, every method finds about 1 defect in 5;
 
+52
+00:03:44.455 --> 00:03:47.479
+its boxes at random, about 1 in 8.
+
+53
+00:03:47.529 --> 00:03:53.374
+On 51 synthetic photos with no damage, it still reports something 2 times in 3.
+
 54
-00:03:53.277 --> 00:03:57.435
-our boxes placed at random would find about 1 in 8.
-
-55
-00:03:57.535 --> 00:04:04.124
-On 51 synthetic photos with no damage, it still reports something 67 % of the time.
-
-56
-00:04:04.224 --> 00:04:06.621
+00:03:53.424 --> 00:03:55.821
 Results for a trained segmenter are pending.
 
+55
+00:03:56.521 --> 00:04:01.419
+Failures, in the open: graffiti read as spalling, a formwork line as a crack,
+
+56
+00:04:01.429 --> 00:04:03.973
+glare left for a re-shoot, and blur.
+
 57
-00:04:07.471 --> 00:04:12.831
-The failures stay in the open: graffiti read as spalling, a formwork line as a crack,
+00:04:04.023 --> 00:04:05.939
+2 of these rules are not built yet.
 
 58
-00:04:12.841 --> 00:04:16.376
-glare refused but never marked unassessed, and blur.
+00:04:05.949 --> 00:04:10.545
+The straight-line test is built, but it let this line through at a coarse look.
 
 59
-00:04:16.476 --> 00:04:20.578
-Each names the rule that would catch it. None of those rules is built yet.
-
-60
-00:04:20.678 --> 00:04:24.791
+00:04:10.595 --> 00:04:14.708
 On a real photo, exposed rebar was reported as corrosion.
 
-61
-00:04:25.641 --> 00:04:31.509
+60
+00:04:15.408 --> 00:04:21.276
 Pixels, not millimetres. AI-assisted, not an inspection. Only a person can approve.
 
-62
-00:04:33.359 --> 00:04:39.061
+61
+00:04:23.026 --> 00:04:28.728
 make test, make eval, and one script to deploy, test and destroy the AWS stack.
 
-63
-00:04:39.911 --> 00:04:43.575
+62
+00:04:29.378 --> 00:04:33.042
 Drishyam. It looks where it matters, and asks a human first.

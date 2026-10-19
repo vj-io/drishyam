@@ -12,6 +12,7 @@ complete it.
 from __future__ import annotations
 
 import json
+import mmap
 import re
 from pathlib import Path
 
@@ -49,6 +50,17 @@ RATE_LIMITS = {"job-starts": f"{JOBS_LIMIT} job starts per {JOBS_WINDOW_S // 60}
                "kill-and-review": f"{KILL_REVIEW_PER_MINUTE} kill and review calls per min",
                "all-requests": f"{REQUESTS_PER_MINUTE} requests per min"}
 BUDGET_USD = 20
+# video/build.py --standin renders the film with stand-in data (a relabelled trained-segmenter result) and writes this
+# into the MP4's metadata and file name; such a film must never reach the site.
+STANDIN_MARK = b"STAND-IN DATA, NOT FOR PUBLICATION"
+
+
+def refuse_standin(public: Path) -> None:
+    """Stop the deployment if any MP4 under public/ was rendered with stand-in data, whatever it is called now."""
+    for f in public.rglob("*.mp4"):
+        with f.open("rb") as fh, mmap.mmap(fh.fileno(), 0, access=mmap.ACCESS_READ) as m:
+            if "standin" in f.name or m.find(STANDIN_MARK) >= 0:
+                raise SystemExit(f"{f} is a stand-in film (video/build.py --standin), not for publication")
 
 
 def _path_is(path: str) -> waf.CfnWebACL.StatementProperty:
@@ -176,6 +188,7 @@ class DrishyamStack(Stack):
                 origin_request_policy=cf.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER, compress=False)})
         # Uploads public/ on each deploy that changes it, deletes files no longer there and invalidates /*.
         # 1 GiB of memory and 2 GiB of /tmp: the asset holds the video (public/video/drishyam.mp4, git-ignored).
+        refuse_standin(ROOT / "public")
         s3deploy.BucketDeployment(
             self, "SiteFiles", sources=[s3deploy.Source.asset(str(ROOT / "public"))], destination_bucket=site,
             distribution=dist, distribution_paths=["/*"], memory_limit=1024,

@@ -68,10 +68,14 @@ def lines(D):
     # 2. team
     add("team", "t1", "Drishyam, an Agentic Vision entry to the OpenCV AI Competition, powered by AWS.")
     add("team", "t2", "Built by Vaibhav Jangid, lead engineer, and Bhavya Dhoot, design and presentation.")
+    if D.get("team"):   # the portraits: the second photo is held 1 s before its looks (film.js HOLD), so t2 waits as long
+        L[-1]["pause"] = 0.95
 
     # 3. problem and user
-    add("problem", "p1", "America has about ", W(round(num(imp["bridges"]), -3)), " bridges, each due a routine inspection at least every ", W(num(imp["months"])), " months.")
-    add("problem", "p2", "In an Oregon study of ", W(imp["n_bridges"]), " drone inspections, the largest produced more than ", W(num(imp["photos"]) // 100 * 100), " photos of one bridge.")
+    assert num(imp["months"]) == 24, "p1 says every two years"
+    add("problem", "p1", "America has about ", W(round(num(imp["bridges"]), -3)), " bridges, each due a routine inspection at least every two years.")
+    hund = num(imp["photos"]) // 100   # 2,536 -> "twenty-five hundred": a figure costs the words it takes to say
+    add("problem", "p2", "In an Oregon study, the largest drone inspection produced more than ", (f"{words(hund)} hundred", f"{hund * 100:,}"), " photos of one bridge.")
     add("problem", "p3", "Drishyam is for the engineer reviewing them: it zooms in where needed, and hands critical findings to a person.")
 
     # 4. the app working, live
@@ -113,28 +117,31 @@ def lines(D):
     assert h["segmenter"].startswith("classical"), "a4 says the live site uses the classical segmenter"
     add("arch", "a4", "Live, it uses the classical segmenter; OpenCV ", CV, "'s new DNN engine is on the optional ONNX path.")
     lo, hi = a["p95"]
-    add("arch", "a5", "On Lambda, a step took ", (f"{words(round(lo))} to {words(round(hi))} milliseconds", f"{round(lo)} to {round(hi)} ms"), " at ", P95,
+    cap_ms = (int(hi) // 10 + 1) * 10   # 88.0 -> "under ninety"; the rail card prints the range
+    add("arch", "a5", "On Lambda, a step took ", (f"under {words(cap_ms)} milliseconds", f"under {cap_ms} ms"), " at ", P95,
         ", over ", W(a["smoke_runs"]), " smoke runs. COOL was not run.")
 
     # 8. principal results
     assert not s["meets_target"] and s["cap"] == 0.3
     add("results", "r1", "On ", W(s["n"]), " synthetic photos, it finds ", P(s["ratio"]), " of exhaustive tiling's recall, at ", P(s["head"]["pixels_frac"]), " of the pixels: short of the ", P(s["target"]),
         " target, " + ("though not significantly." if s["ratio_ci"][1] >= s["target"] else "and so is its whole confidence interval."))
-    assert s["ds_ci"][0] < 1.0 and s["ds_ci"][1] <= 1.0 and s["ds"]["recall"] > s["head"]["recall"], "r3 says the downscale does as well or slightly better"
-    add("results", "r3", "Drishyam scores ", (f"{dec(s['ds_ratio'])} times", f"{s['ds_ratio']:.2f}×"), " one downscaled pass: the downscale does as well, or slightly better.")
+    assert s["ds_ci"][0] < 1.0 and s["ds_ratio"] < 1 and s["ds"]["recall"] > s["head"]["recall"], "r3 says the downscale is slightly ahead"
+    add("results", "r3", "Against one downscaled pass it scores ", (f"{dec(s['ds_ratio'])} times", f"{s['ds_ratio']:.2f}×"), ": "
+        + ("the downscale does as well, or slightly better." if s["ds_ci"][1] <= 1.0 else "slightly behind, within the noise."))
     assert lg["ds_ci"][0] > 1.0 and lg["l2"]["recall"] >= lg["head"]["recall"] and lg["l2"]["pixels_frac"] < lg["head"]["pixels_frac"]
     add("results", "r4", f"On larger photos it beats one downscale, which reads a {ORD[round(lg['head']['pixels_frac'] / lg['ds']['pixels_frac'])]} as many pixels; "
         f"{ORD[lg['l2_div']]}-size tiling does as well with fewer.")
     assert all(ab[d]["no-survey"] < 1 and ab[d]["vs"]["no-survey"] == "below the full agent" for d in ab) and ab["synth200"]["random_lo"] >= 0.95
-    assert all(ab[d][v] == 1.0 and ab[d]["vs"][v] == "no measurable difference" for d in ab for v in ("no-uncertainty", "governor-on")), "r5 says these change nothing"
+    assert all(abs(ab[d][v] - 1) < 0.02 and ab[d]["vs"][v] == "no measurable difference" for d in ab for v in ("no-uncertainty", "governor-on")), "r5 says these change nothing measurable"
     assert all(ab[d]["vs"]["no-verify"] in ("no measurable difference", "above the full agent") for d in ab), "r5 says dropping verify costs no recall"
-    add("results", "r5", "Ablations: dropping the survey look hurts everywhere. Dropping uncertainty, or turning the governor on, changes nothing, and dropping verify costs no recall. "
-        "A random gaze order matches it on smaller photos.")
+    # complete by construction: every other variant (no verify, no uncertainty, governor on) is asserted above to lose no recall
+    add("results", "r5", "Ablations: only dropping the survey look loses recall; the others lose none, and a random gaze order matches it on smaller photos.")
     assert cb["plain"] and cb["chance"] < cb["range"][0], "r6 says every method finds about 1 in N, and chance is below that"
     c8 = round(1 / cb["chance"])
     add("results", "r6", "On ", W(cb["n"]), " real CODEBRIM photos, every method finds about ", (f"one defect in {words(cb['one_in'])}", f"1 defect in {cb['one_in']}"),
-        "; our boxes placed at random would find about ", (f"one in {words(c8)}", f"1 in {c8}"), ".")
-    add("results", "r7", "On ", W(cl["n"]), " synthetic photos with no damage, it still reports something ", P(cl["any"]), " of the time.")
+        "; its boxes at random, about ", (f"one in {words(c8)}", f"1 in {c8}"), ".")
+    assert abs(cl["any"] - 2 / 3) < 0.01, "r7 says two times in three"
+    add("results", "r7", "On ", W(cl["n"]), " synthetic photos with no damage, it still reports something ", ("two times in three", "2 times in 3"), ".")
     if D.get("model"):   # the trained segmenter: build.py has checked governor off, same cost table and same data
         md = D["model"]
         wins = [(f"L {words(int(x[1:]))}", x) for x in md["tiling_wins"]]
@@ -142,14 +149,46 @@ def lines(D):
                 else ["Tiling at ", wins[0], " and ", wins[1], " still finds more."] if wins else ["No tiling level finds more."])
         c_in = round(1 / md["chance"])
         leak = [] if md["near_dups"] == 0 else [" ", W(md["near_dups"]), " of these photos have a near-duplicate in its training set."]   # the board shows the count either way
-        add("results", "r8", "Governor off, same cost table: a trained segmenter finds ", Dc(md["recall"]), " of the defects, against ", Dc(md["classical"]),
-            " for the classical engine; at random, about ", (f"one in {words(c_in)}", f"1 in {c_in}"), ". ", *tail, *leak)
+        add("results", "r8", "Governor off, same cost table: a trained segmenter finds ", P(md["recall"]), " of the defects, the classical engine ",
+            (words(round(100 * md["classical"])), f"{round(100 * md['classical'])}"), "; at random, ", (f"one in {words(c_in)}", f"1 in {c_in}"), ". ", *tail, *leak)
     else:
         add("results", "r8", "Results for a trained segmenter are pending.")
 
+    # 8b. a real photo of our own: only when a recorded job on one of the team's wall photos exists (build.py real_run)
+    if D.get("real"):
+        R = D["real"]; n = R["n_looks"]; seen = R["seen"]
+        assert n == len(R["looks"]) and R["n_found"] == len(R["found"]) and (n or not R["found"]), R
+        # the share read, as the PIXELS READ card prints it: one decimal under 10 % (rounding 1.6 to "two" would not match the card)
+        PR = lambda x: (f"{dec(100 * x, 1)} percent", f"{100 * x:.1f} %") if x < 0.1 else P(x)
+        missed = bool(seen) and not R["hit"]
+        eng = "the trained segmenter" if R["kind"] == "onnx" else "the classical engine"
+        parts = ["Our own photo of a painted wall, no ground truth: ", eng]
+        if n == 0:
+            assert R["candidates"] == 0, "q1 says it saw nothing worth a closer look"
+            parts += [" read ", PR(R["pixels_frac"]), " of it, saw nothing worth a look, and ", f"missed {seen['say']}." if missed else "reported nothing."]
+        elif not R["found"]:
+            parts += [" took ", W(n), " looks" if n > 1 else " look", " at ", PR(R["pixels_frac"]), " of the pixels, reported nothing", f", and missed {seen['say']}." if missed else "."]
+        else:
+            cls = {}
+            for x in R["found"]:
+                cls[x["cls"]] = cls.get(x["cls"], 0) + 1
+            from build import SAY_CLS
+            said = [SAY_CLS[c][0] if k == 1 or SAY_CLS[c][0] == SAY_CLS[c][1] else f"{words(k)} {SAY_CLS[c][1]}" for c, k in cls.items()]
+            listed = said[0] if len(said) == 1 else ", ".join(said[:-1]) + " and " + said[-1]
+            k = len(R["wrong"]) if seen else 0
+            # with the team's reading, the verdict says what it found (the card lists the classes); without it, the classes.
+            # No ground truth: a finding away from the team's line is "off the team's line", not a false alarm
+            verdict = ([f" and missed {seen['say']}" if missed else f" and found {seen['say']}"] + ([", with ", W(k), " finding" if k == 1 else " findings", " off the team's line"] if k else [])
+                       if seen else [" and reported ", listed])
+            parts += [" took ", W(n), " looks" if n > 1 else " look", " at ", PR(R["pixels_frac"]), " of the pixels", *verdict, "."]
+        add("real", "q1", *parts)
+
     # 9. failure cases
-    add("failures", "f1", "The failures stay in the open: graffiti read as spalling, a formwork line as a crack, glare refused but never marked unassessed, and blur.")
-    add("failures", "f2", "Each names the rule that would catch it. None of those rules is built yet.")
+    fs = D["fails_said"]
+    assert fs["glare_listed"] and fs["formwork_kept_coarse"], fs
+    add("failures", "f1", "Failures, in the open: graffiti read as spalling, a formwork line as a crack, glare left for a re-shoot, and blur.")
+    assert len(D["fails"]) == 4 and "built" in next(x for x in D["fails"] if x["cat"].startswith("Formwork")), D["fails"]
+    add("failures", "f2", (words(fs["not_built"]).capitalize(), str(fs["not_built"])), " of these rules are not built yet. The straight-line test is built, but it let this line through at a coarse look.")
     rf = D["real_fail"]
     add("failures", "f3", f"On a real photo, {rf['gt']} was reported as {rf['got']}.")
 

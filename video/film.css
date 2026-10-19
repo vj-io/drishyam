@@ -26,8 +26,10 @@ body.short, body.short html { width: 1080px; height: 1920px; }
 #strip { position: absolute; left: 40px; right: 40px; top: 30px; height: 50px; display: flex; align-items: center; gap: 22px; padding: 0 18px;
   border: 2.5px solid var(--line); background: rgba(7,34,71,.85); font: 500 21px/1 var(--fm); letter-spacing: .12em; text-transform: uppercase; color: var(--line-2); }
 #strip .a { color: var(--line); font-weight: 700; white-space: nowrap; }
-#strip .b { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; }
+#strip .b { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #strip .b::before { content: '|'; margin-right: 22px; color: var(--line-3); }
+#strip .b:empty::before { content: none; }
+#strip .b code { font: inherit; text-transform: none; letter-spacing: .04em; color: var(--line); }
 #strip .no { color: var(--amber); font-weight: 700; white-space: nowrap; }
 #strip .no b { display: inline-block; min-width: 1.9em; margin: 0 .3em; padding: 2px .25em; border: 2.5px solid var(--amber); text-align: center; }
 
@@ -40,7 +42,7 @@ body.short, body.short html { width: 1080px; height: 1920px; }
 .ch.on { color: var(--amber); } .ch.on i { border-color: var(--amber); color: var(--amber); background: transparent; }
 #railnote { margin-top: 26px; padding-top: 16px; border-top: 2px solid rgba(232,241,255,.25); font: 400 19px/1.45 var(--fm); color: var(--line-2); }
 #railnote b { color: var(--amber); font-weight: 700; }
-#railcall { position: absolute; left: 0; top: 600px; width: 272px; padding: 14px 16px 16px; border: 3px solid var(--amber); background: rgba(7,34,71,.96); opacity: 0; transform-origin: 0 0; }
+#railcall { position: absolute; left: 0; top: 600px; /* film.js puts it under the last index row */ width: 272px; padding: 14px 16px 16px; border: 3px solid var(--amber); background: rgba(7,34,71,.96); opacity: 0; transform-origin: 0 0; }
 #railcall .n { display: grid; place-items: center; width: 36px; height: 36px; border: 3px solid var(--amber); border-radius: 50%; color: var(--amber); font: 700 17px/1 var(--fm); }
 #railcall .big { margin-top: 10px; font: 700 44px/1.02 var(--ft); color: var(--amber); letter-spacing: .02em; word-break: break-word; }
 #railcall .lb { margin-top: 8px; font: 500 19px/1.35 var(--fm); color: var(--line); }
@@ -99,3 +101,4 @@ table.t .good { color: var(--amber); font-weight: 700; }
 .term .no { color: var(--red); font-weight: 700; }
 .caret { display: inline-block; width: 14px; height: 1.1em; vertical-align: -.2em; background: var(--line); }
 .title { position: absolute; left: 0; right: 0; text-align: center; }
+#standin { position: absolute; left: 0; right: 0; top: 0; height: 34px; z-index: 99; background: var(--red); color: var(--red-ink); font: 700 22px/34px var(--fm); letter-spacing: .16em; text-align: center; }

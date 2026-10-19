@@ -17,7 +17,7 @@ from aws_cdk import assertions
 from aws_cdk import aws_lambda as lambda_
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "infra"))
-from drishyam_stack import DrishyamStack
+from drishyam_stack import DrishyamStack, refuse_standin
 
 ACCOUNT = "123456789012"
 ROOT = Path(__file__).resolve().parents[1]
@@ -219,3 +219,16 @@ def test_onnx_context_sets_the_segmenter_env(tmp_path):
     assert fp32["DRISHYAM_ONNX"] == "/var/task/models/drishyam_dacl10k.onnx" and "DRISHYAM_ONNX_FP16" not in fp32
     both = env("b", onnx="models/m.onnx", onnx_fp16="models/m.fp16.onnx")
     assert (both["DRISHYAM_ONNX"], both["DRISHYAM_ONNX_FP16"]) == ("/var/task/models/m.onnx", "/var/task/models/m.fp16.onnx")
+
+
+def test_a_standin_film_is_refused(tmp_path):
+    (tmp_path / "video").mkdir()
+    (tmp_path / "video" / "drishyam.mp4").write_bytes(b"\0\0\0\x18ftypisom" + b"moov" * 4)
+    refuse_standin(tmp_path)  # a plain film passes
+    (tmp_path / "video" / "drishyam.mp4").write_bytes(b"\0\0\0\x18ftypisom" + b"\xa9cmt" + b"STAND-IN DATA, NOT FOR PUBLICATION")
+    with pytest.raises(SystemExit):  # renamed to the public name, the metadata still gives it away
+        refuse_standin(tmp_path)
+    (tmp_path / "video" / "drishyam.mp4").unlink()
+    (tmp_path / "video" / "drishyam-standin.mp4").write_bytes(b"\0\0\0\x18ftypisom")
+    with pytest.raises(SystemExit):
+        refuse_standin(tmp_path)
