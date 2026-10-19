@@ -341,14 +341,15 @@ def test_the_cascade_eval_times_the_pair_and_sweeps_the_dev_splits_only(tmp_path
     (tmp_path / "results" / "dev").mkdir(parents=True)
     nets = {"scout": ("onnx:drishyam_dacl10k_v2a.onnx", None), "confirm": ("onnx:drishyam_dacl10k_v2b.onnx", None),
             "cascade": ("onnx:drishyam_dacl10k_v2a.onnx", "onnx:drishyam_dacl10k_v2b.onnx")}
-    calls, wrong = [], []
+    calls, wrong = [], set()
 
     def run(cmd, env, cwd, check):
         calls.append((cmd, env))
         if "evals.dev_sweep" in cmd:
             row = {"recall": 0.5, "recall_iou_only": 0.4, "chance_recall": 0.1, "ms_per_job": 900.0, "recall_per_s": 0.6,
                    "boxes_per_image": 3.0, "images_with_any": 1.0, "profile": "classical-v1"}
-            rows = {f"{k}@{cap}": {**row, "segmenter": s, "confirm": None if wrong and k == "cascade" else c,
+            rows = {f"{k}@{cap}": {**row, "segmenter": s, "confirm": None if "net" in wrong and k == "cascade" else c,
+                                   **({"profile": ONNX} if "profile" in wrong and k == "confirm" else {}),
                                    **({"ref": f"scout@{cap}", "vs_ref_ci": [0.9, 0.99]} if k != "scout" else {})}
                     for k, (s, c) in nets.items() for cap in (0.3, 1.0)}
             Path(cmd[cmd.index("--out") + 1]).write_text(json.dumps({"n": 1, "rows": rows}))
@@ -366,7 +367,10 @@ def test_the_cascade_eval_times_the_pair_and_sweeps_the_dev_splits_only(tmp_path
     out = json.loads((tmp_path / "results" / "dev" / "cascade_dacl10k_v2a+v2b.json").read_text())
     assert out["label"] == "x" and set(out["splits"]) == {"synth_dev", "clean"}
     assert out["readings"]["clean"] == {k: {"recall": "harm"} for k in ("confirm@0.3", "confirm@1.0", "cascade@0.3", "cascade@1.0")}
-    wrong.append(True)  # a cascade arm that ran no confirm net is refused, not written up
+    wrong.add("profile")  # an arm under another profile is refused: the nets would not be all that differs
+    with pytest.raises(SystemExit, match="different profiles"):
+        model_eval.main(argv)
+    wrong.add("net")  # a cascade arm that ran no confirm net is refused, not written up
     with pytest.raises(SystemExit, match="cascade@0.3 ran"):
         model_eval.main(argv)
     with pytest.raises(SystemExit, match="nothing is published"):
