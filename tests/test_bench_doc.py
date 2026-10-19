@@ -120,6 +120,25 @@ def test_macro_split_quotes_are_the_json():
         assert [w for w in want if w not in text] == [], path
 
 
+def test_arm_x86_summary_is_the_json():
+    """The few Arm-against-x86 figures README.md and docs/report.md repeat from the tables."""
+    la, lx = loop(ARM), loop(X86)
+    jobs = sorted(la[t, "off"]["jobs_per_s"] / lx[t, "off"]["jobs_per_s"] for t in (1, 2, 4))
+    sa, sx = (load(arm, "macro.json")["summary"] for arm in (ARM, X86))
+    ka, kx = ({(r["kernel"], r["size"], r["threads"]): r["p50_ms"] for r in load(arm, "kernels.json")["results"]}
+              for arm in (ARM, X86))
+    wins = {t: sum(kx[k] > ka[k] for k in ka if k[2] == t) for t in (1, 4)}
+    da, dx = ({r["threads"]: r["p50_ms"] for r in load(arm, "kernels.json")["dnn"]} for arm in (ARM, X86))
+    want = [f"{jobs[0]:.2f} to {jobs[-1]:.2f} times", f"{sa['images_per_s'] / sx['images_per_s']:.2f} times",
+            f"{sa['per_image_ms']['p50']} against {sx['per_image_ms']['p50']}", f"{wins[1]} of the 24",
+            f"{wins[4]} of 24", f"{dx[1] / da[1]:.2f} of Arm's time"]
+    assert wins == {1: 12, 4: 23}
+    assert [w for w in want[3:] if w not in " ".join(SECTION.split())] == []
+    for path in ("README.md", "docs/report.md"):
+        text = " ".join((REPO / path).read_text().split())
+        assert [w for w in want if w not in text] == [], path
+
+
 if __name__ == "__main__":
     for f in ROWS:
         print(f.__name__, *f(), sep="\n")
