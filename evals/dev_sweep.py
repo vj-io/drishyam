@@ -6,7 +6,9 @@
 Splits: synth_dev (60, seed 4242), clean (data/synth_clean_dev, 30 with no damage, seed 4243) and real (CODEBRIM
 evals/codebrim_dev100.txt). It never reads a held-out set. `cap`: one pixel cap or several, comma-separated. Every
 run also scores one 1024-px downscale with the same segmenter (one look per image), so each variant gets a paired
-bootstrap recall ratio against it; --baselines adds L2/L1/L0 tiling (with an ONNX, the costly part). Costs: the
+bootstrap recall ratio against it; --baselines adds L2/L1/L0 tiling (with an ONNX, the costly part), and then every
+row also gets its paired ratio to L0 tiling (vs_tiling_L0, with pixels_vs_tiling_L0). Each variant after the first is
+also compared with the first at the same cap (vs_ref: list the reference first). Costs: the
 job_ops table of results/<--micro-arm>/micro.json (default linux-aarch64, which timed the classical engine; an ONNX
 needs its own table). Prints one JSON row per variant and cap (recall, IoU-only recall, chance, precision, boxes,
 pixels, halt causes, looks per level, the ratio to the downscale with its CI); `--out` also writes them, with the
@@ -24,6 +26,7 @@ import json
 from pathlib import Path
 
 import cv2
+import numpy as np
 
 from drishyam.segment import default_segmenter
 from evals import harness
@@ -64,9 +67,10 @@ def task(rec, variants, rows, caps, baselines=False):
     return {"id": rec["id"], "width": img.shape[1], "height": img.shape[0], "configs": cfg}
 
 
-def row(key: str, records, results, base) -> dict:
-    """One config's dev numbers; `base`: the downscale's scored metrics, for the paired ratio."""
-    m, n = harness.score_config(key, records, results, "preds"), len(records)
+def row(key: str, records, results, scored: dict, ref: str | None = None) -> dict:
+    """One config's dev numbers; `scored`: every config's scored metrics, for the paired ratios against the downscale,
+    L0 tiling (when --baselines ran it) and `ref` (the first variant at the same cap)."""
+    m, n = scored[key], len(records)
     cs = [r["configs"][key] for r in results]
     out = {"recall": m["recall"], "recall_ci": harness.boot_ci(harness.recall_of(m), n),
            "recall_iou_only": m["recall_iou_only"], "chance_recall": m["chance_recall"],
@@ -74,10 +78,21 @@ def row(key: str, records, results, base) -> dict:
            "fp_per_image": m["fp_per_image"], "boxes_per_image": m["predictions_per_image"],
            "pixels_frac": m["pixels_frac"], "net_pixels_frac": m["net_pixels_frac"],
            "images_with_any": sum(bool(c["preds"]) for c in cs) / len(cs),
+           "critical_per_image": m["critical_predictions"] / n,
+           "findings_per_image": sum(len(c["preds_union"]) for c in cs) / n,  # one box per class per view
            "per_class": {c: None if v is None else round(v, 4) for c, v in m["per_class"].items()}}
-    if key != "downscale" and base["recall"]:
-        out |= {"vs_downscale": m["recall"] / base["recall"], "vs_downscale_ci": harness.ratio_ci(m, base, n),
-                "vs_downscale_iou_only_ci": harness.ratio_ci(m, base, n, col=1)}
+    for name, k in (("downscale", "downscale"), ("tiling_L0", "tiling@L0"), ("ref", ref)):
+        if k in scored and k != key and scored[k]["recall"]:
+            b = scored[k]
+            out |= {f"vs_{name}": m["recall"] / b["recall"], f"vs_{name}_ci": harness.ratio_ci(m, b, n),
+                    f"vs_{name}_iou_only_ci": harness.ratio_ci(m, b, n, col=1)}
+            if name != "downscale":
+                out[f"pixels_vs_{name}"] = m["pixels_frac"] / b["pixels_frac"]
+    if ref in scored and ref != key:
+        # Boxes: on the clean split every box is a false alarm. Paired, like the recall ratios.
+        a, b = (np.array([len(r["configs"][k]["preds"]) for r in results]) for k in (key, ref))
+        out |= {"ref": ref, "boxes_vs_ref_ci": harness.boot_ci(lambda i: a[i].sum() / b[i].sum() if b[i].sum() else np.nan, n),
+                "images_with_any_vs_ref_ci": harness.boot_ci(lambda i: (a[i] > 0).mean() - (b[i] > 0).mean(), n)}
     if "trace" in cs[0]:
         looks = [t for c in cs for t in c["trace"] if t["action"] != "halt"]
         out |= {"halt": dict(collections.Counter(c["halt_cause"] for c in cs)), "looks_mean": len(looks) / len(cs),
@@ -109,10 +124,11 @@ def main(argv=None) -> None:
     rows = harness.cost_rows(a.micro_arm, seg.name)
     results = harness.pool_map(functools.partial(task, variants=variants, rows=rows, caps=caps, baselines=a.baselines),
                                records, a.workers, lambda m: print(m, flush=True), a.split)
-    base = harness.score_config("downscale", records, results, "preds")
-    out = {}
-    for k in results[0]["configs"]:
-        out[k] = row(k, records, results, base)
+    scored = {k: harness.score_config(k, records, results, "preds") for k in results[0]["configs"]}
+    first, out = next(iter(variants)), {}
+    for k in scored:
+        out[k] = row(k, records, results, scored, f"{first}@{k.rpartition('@')[2]}" if k.partition("@")[0] in variants
+                     else None)
         print(k, json.dumps({x: y for x, y in out[k].items() if x != "per_image"}), flush=True)
     if a.dump:
         Path(a.dump).write_bytes(gzip.compress(json.dumps({"ids": [r["id"] for r in records], "results": results},

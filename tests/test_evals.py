@@ -665,3 +665,5 @@ def test_dev_sweep_runs_end_to_end_and_writes_its_rows(tmp_path, monkeypatch):
     agents = [r for k, r in rows["rows"].items() if "@" in k]
     assert all(0 < r["pixels_frac"] <= 1 and sum(r["halt"].values()) == 2 for r in agents)
     assert all(len(r["per_image"]) == 2 and "vs_downscale_ci" in r for r in agents)
+    # every variant after the first is compared, paired, with the first at its own cap
+    assert [rows["rows"][k].get("ref") for k in ("a@1.0", "a@0.3", "b@1.0", "b@0.3")] == [None, None, "a@1.0", "a@0.3"]

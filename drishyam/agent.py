@@ -96,7 +96,8 @@ class JobConfig:
     min_level: int = 0  # the finest level an escalation or a verify look may go to (min_view may raise it)
     min_view: float | None = None  # a look spans at least this share of the photo's long side (0: any); None: profile's
     profile: str | None = None  # a PROFILES key; None: the segmenter's own (`profile_for`)
-    tau: float = 0.5  # entropy above this escalates
+    tau: float = 0.5  # entropy above this escalates (tau_confirm: every look finer than L2)
+    tau_scout: float | None = None  # the same for a coarse look (L2 or coarser); None: tau
     a_min: int = 64  # crop px; a smaller mask escalates
     eps: float = 0.25  # stop-rule slope factor
     sla_ms: float = 500.0
@@ -119,6 +120,12 @@ class JobConfig:
     order: str = "score"  # "random": a seeded random pick among unseen candidates instead of the argmax
     seed: int = 0
     governor: bool = True  # False: kill switch and caps only; no model, level, gaze-size or critical-only override
+    # When the next look no longer fits under the pixel cap, it shrinks to the largest gaze (a multiple of 32 px, at
+    # least MIN_GAZE) that does, instead of the job halting on cap-hit; the stop rule still decides whether it is taken.
+    fill: bool = False
+    # Whether the survey's finds (and its cost) count toward the stop rule's value found per ms. It sees the whole photo,
+    # so its value is not what a look at one candidate yields; False: only looks at candidates set that term.
+    survey_value: bool = True
     # A fixed predicted cost per look, {"warp": ms, "segment": ms, "segment:<model>": ms}, instead of live p95s:
     # scores and the stop rule then do not move with machine load. The caps still run on the real clock.
     t_hat_ms: dict | None = None
@@ -484,6 +491,10 @@ class Job:
             self.step += 1
             step_t0 = clock()
             replaying = n_replay > 0
+            left, fill = self.budget.pixels_cap - self.budget.pixels_used, ""
+            if cfg.fill and not replaying and self.settings.size ** 2 > left >= MIN_GAZE ** 2:
+                self.settings.size = math.isqrt(left) // 32 * 32
+                fill = f"; gaze {self.settings.size} px: what the pixel cap leaves ({left} px)"
             # 1. governor first: it may halt, or change the model, level or gaze size, before a look is chosen
             verdict = check(self.budget, self.stats, self.settings, self.settings.size ** 2, cfg.sla_ms, self.kill(),
                             overrides=cfg.governor)
@@ -534,6 +545,7 @@ class Job:
                        f"unseen {a:.2f}, t_hat {self._t_hat():.0f} ms; lambda {lam:.2e}")
             if not replaying:
                 level = min(level + self.settings.level_bias, self.max_level)
+            why += fill
             if self.settings.critical_only and action == "verify" and not any(
                     f.critical and f.region == r.id for f in self.findings):
                 r.done = True
@@ -576,6 +588,7 @@ class Job:
             # 5. what the measurements say to do next
             best = seg.best if q["ok"] else None
             area = seg.areas[best] if best else 0
+            tau = cfg.tau if level < 2 or cfg.tau_scout is None else cfg.tau_scout
             r.entropy = seg.entropy
             # The finer look against the last coarser look that saw a class here, class by class (PRD rule 3).
             prev = next((lk for lk in reversed(r.looks) if lk.cls), None) if q["ok"] else None
@@ -589,15 +602,15 @@ class Job:
                 r.done = True
                 self.not_assessed.append({"step": self.step, "box": imaging.l0_box((0, 0, size, size), to_l0, (W, H)),
                                           "reason": q["reason"], "action": "re-shoot"})
-            elif level > self.min_level and not batch and seg.entropy > cfg.tau:
-                follow = ("escalate", r, level - 1, "entropy>tau", f"entropy {seg.entropy:.2f} > {cfg.tau} at L{level}")
+            elif level > self.min_level and not batch and seg.entropy > tau:
+                follow = ("escalate", r, level - 1, "entropy>tau", f"entropy {seg.entropy:.2f} > {tau} at L{level}")
             elif level > self.min_level and not batch and best and area < cfg.a_min:
                 follow = ("escalate", r, level - 1, "area<A_min", f"{best} area {area} px < {cfg.a_min} at L{level}")
             else:
                 present = self._present(seg, to_l0, level, rejected) if best else []
-                if 0 < level == self.min_level and not batch and (seg.entropy > cfg.tau or (best and area < cfg.a_min)):
+                if 0 < level == self.min_level and not batch and (seg.entropy > tau or (best and area < cfg.a_min)):
                     # the escalation the rules call for, held: what this look saw, and what it drafted of it
-                    saw = (f"entropy {seg.entropy:.2f} > {cfg.tau}" if seg.entropy > cfg.tau
+                    saw = (f"entropy {seg.entropy:.2f} > {tau}" if seg.entropy > tau
                            else f"{best} area {area} px < A_min {cfg.a_min}")
                     kept = f"{', '.join(present)} drafted here" if present else f"{best} not drafted" if best else "no class"
                     why += (f"; L{level} is the finest level for {cfg.profile} (min_view {cfg.min_view:g}): {saw}, "
@@ -607,7 +620,8 @@ class Job:
                     r.cls = present[0]
                     # Realised value of the look, in the same units as a region's expected value
                     # (one class's severity), so the stop rule compares like with like.
-                    value += max(SEVERITY[c] * seg.confidence[c] for c in present)
+                    if cause != "survey" or cfg.survey_value:
+                        value += max(SEVERITY[c] * seg.confidence[c] for c in present)
                     for c in present:
                         # The check compared class chk["class"] across the two looks: evidence about that class's finding.
                         f, kind = self._log_finding(r, c, seg, crop, to_l0, level,
@@ -655,7 +669,8 @@ class Job:
 
             # 6. account and log
             step_s = clock() - step_t0
-            cost_ms += self._t_hat() if cfg.t_hat_ms else step_s * 1000
+            if cause != "survey" or cfg.survey_value:
+                cost_ms += self._t_hat() if cfg.t_hat_ms else step_s * 1000
             usd_before = self.budget.usd_used
             self.budget.pixels_used += size * size
             self.budget.seconds_used = clock() - t_start
