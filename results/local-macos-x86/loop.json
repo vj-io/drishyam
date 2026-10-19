@@ -1,0 +1,209 @@
+{
+ "arm": "local-macos-x86",
+ "segmenter": "classical-v1",
+ "config": {
+  "pixel_cap": 0.3,
+  "thumbs": false,
+  "governor": false,
+  "t_hat_ms": {
+   "warp": 2.0,
+   "segment": 60.0
+  },
+  "seconds_cap": 120.0,
+  "prefetch_k": 2,
+  "threads": [
+   1,
+   16
+  ],
+  "all_threads": 16,
+  "rounds": 2,
+  "photos": [
+   "bridge_01",
+   "bridge_02",
+   "bridge_03",
+   "bridge_04",
+   "bridge_05",
+   "bridge_06",
+   "bridge_07",
+   "bridge_08",
+   "synth_9100",
+   "synth_9101",
+   "synth_9102",
+   "synth_9103",
+   "synth_9104",
+   "synth_9105",
+   "synth_9106",
+   "synth_9107"
+  ]
+ },
+ "provenance": {
+  "cv2": "5.0.0",
+  "build_info_sha256": "fe5f9337dbc8663639ee7bcb2deb09359893fc8d2aa5b6a447cee2a0117d2ec7",
+  "cv2_baseline": "SSE SSE2 SSE3 SSSE3 SSE4_1",
+  "cv2_dispatch": "SSE4_2 AVX FP16 AVX2 AVX512_SKX",
+  "cv2_parallel_framework": "GCD",
+  "cv2_custom_hal": "YES (ipp (ver 0.0.1))",
+  "cv2_file": "/Users/mac/Documents/Projects/opencv/.claude/worktrees/wf_63705f18-04c-2/.venv/lib/python3.13/site-packages/cv2/__init__.py",
+  "under_opt_cool": false,
+  "build": "stock (not COOL)",
+  "machine": "Darwin 25.6.0 x86_64",
+  "platform": "macOS-26.7.1-x86_64-i386-64bit-Mach-O",
+  "cpu": "Intel(R) Core(TM) i9-9880H CPU @ 2.30GHz",
+  "logical_cpus": 16,
+  "cv2_threads": 16,
+  "python": "3.13.16",
+  "numpy": "2.5.4",
+  "timestamp": "2026-10-19T06:37:22Z",
+  "load_avg": [
+   9.43,
+   8.59,
+   11.12
+  ]
+ },
+ "load_avg_end": [
+  10.59,
+  10.97,
+  11.72
+ ],
+ "decisions_identical_across_threads": true,
+ "results": [
+  {
+   "threads": 1,
+   "variant": "off",
+   "jobs": 32,
+   "steps": 142,
+   "jobs_per_s": 0.7554,
+   "job_ms": {
+    "p50": 1085.8,
+    "p95": 2548.4
+   },
+   "step_ms": {
+    "p50": 281.4,
+    "p95": 454.6
+   },
+   "cpu_s_per_job": 1.26,
+   "prefetch": {
+    "warp_hit_rate": null
+   },
+   "decisions_identical": true
+  },
+  {
+   "threads": 1,
+   "variant": "warp",
+   "jobs": 32,
+   "steps": 142,
+   "jobs_per_s": 0.7601,
+   "job_ms": {
+    "p50": 1074.7,
+    "p95": 2547.0
+   },
+   "step_ms": {
+    "p50": 282.5,
+    "p95": 452.9
+   },
+   "cpu_s_per_job": 1.26,
+   "prefetch": {
+    "warp_miss": 104,
+    "submitted": 116,
+    "warp_hit": 38,
+    "dropped": 28,
+    "warp_hit_rate": 0.268
+   },
+   "decisions_identical": true
+  },
+  {
+   "threads": 1,
+   "variant": "warp+segment",
+   "jobs": 32,
+   "steps": 142,
+   "jobs_per_s": 0.8676,
+   "job_ms": {
+    "p50": 1061.4,
+    "p95": 2061.7
+   },
+   "step_ms": {
+    "p50": 249.6,
+    "p95": 462.9
+   },
+   "cpu_s_per_job": 1.752,
+   "prefetch": {
+    "warp_miss": 104,
+    "submitted": 116,
+    "warp_hit": 38,
+    "seg_hit": 38,
+    "dropped": 28,
+    "warp_hit_rate": 0.268
+   },
+   "decisions_identical": true
+  },
+  {
+   "threads": 16,
+   "variant": "off",
+   "jobs": 32,
+   "steps": 142,
+   "jobs_per_s": 1.3331,
+   "job_ms": {
+    "p50": 599.0,
+    "p95": 1317.2
+   },
+   "step_ms": {
+    "p50": 154.7,
+    "p95": 231.9
+   },
+   "cpu_s_per_job": 0.94,
+   "prefetch": {
+    "warp_hit_rate": null
+   },
+   "decisions_identical": true
+  },
+  {
+   "threads": 16,
+   "variant": "warp",
+   "jobs": 32,
+   "steps": 142,
+   "jobs_per_s": 1.2955,
+   "job_ms": {
+    "p50": 574.1,
+    "p95": 1357.6
+   },
+   "step_ms": {
+    "p50": 155.6,
+    "p95": 237.7
+   },
+   "cpu_s_per_job": 0.969,
+   "prefetch": {
+    "warp_miss": 104,
+    "submitted": 116,
+    "warp_hit": 38,
+    "dropped": 28,
+    "warp_hit_rate": 0.268
+   },
+   "decisions_identical": true
+  },
+  {
+   "threads": 16,
+   "variant": "warp+segment",
+   "jobs": 32,
+   "steps": 142,
+   "jobs_per_s": 1.4147,
+   "job_ms": {
+    "p50": 608.1,
+    "p95": 1079.4
+   },
+   "step_ms": {
+    "p50": 169.7,
+    "p95": 268.2
+   },
+   "cpu_s_per_job": 1.379,
+   "prefetch": {
+    "warp_miss": 104,
+    "submitted": 116,
+    "warp_hit": 38,
+    "seg_hit": 38,
+    "dropped": 28,
+    "warp_hit_rate": 0.268
+   },
+   "decisions_identical": true
+  }
+ ]
+}

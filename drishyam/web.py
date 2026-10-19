@@ -46,6 +46,9 @@ CHAOS = {"p95_spike", "planner_timeout", "planner_malformed"}
 ROOT = Path(__file__).resolve().parent.parent
 MAX_PACED_S = 25.0  # viewing pauses per job (pace_ms): with the 30 s seconds cap, still inside a 60 s function limit
 HOST = "aws-lambda" if os.environ.get("AWS_LAMBDA_FUNCTION_NAME") else "local"
+if CV_THREADS := os.environ.get("DRISHYAM_CV_THREADS"):  # OpenCV's thread count; the stack sets 2 (docs/bench.md)
+    cv2.setNumThreads(int(CV_THREADS))
+    log.info("DRISHYAM_CV_THREADS=%s: cv2.getNumThreads() = %d", CV_THREADS, cv2.getNumThreads())
 
 
 def _signing_key() -> bytes:

@@ -109,6 +109,8 @@ class DrishyamStack(Stack):
             "AWS_LWA_READINESS_CHECK_PATH": "/api/health",
             "DRISHYAM_KILL_TABLE": kills.table_name,
             "DRISHYAM_SIGNING_KEY_SECRET_ARN": key.secret_arn,
+            # cv2.setNumThreads at startup (web.py): 3008 MB is 1.7 vCPU of time (1,769 MB = 1 vCPU), so 2 threads
+            "DRISHYAM_CV_THREADS": "2",
         }
         if commit:
             env["DRISHYAM_COMMIT"] = commit
