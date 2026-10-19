@@ -147,6 +147,20 @@ def test_a_confirm_is_charged_as_its_own_op_and_spends_the_jobs_own_budget(scene
     assert (p50["segment:accurate"], p50["segment:confirm"]) == (10.0, 700.0)
 
 
+def test_on_a_fixed_predicted_cost_table_the_stop_rules_spend_counts_each_confirm_at_its_own_cost(scene):
+    """With JobConfig.t_hat_ms the stop rule's spend is t_hat per look (35 ms here) plus segment:confirm's cost per
+    confirm, so its lambda (eps x value found / spend; the floor is off) falls as the confirm net costs more."""
+    def run(ms):
+        cfg = JobConfig(pixel_cap=1.0, thumbs=False, v0=1e-12, t_hat_ms={"warp": 5.0, "segment": 30.0, "segment:confirm": ms})
+        steps = looks(list(Job(scene, cfg, clock=FakeClock(), job_id="j_test", confirm=Painted()).run()))
+        i, lam = next((i, float(m[1])) for i, s in enumerate(steps) if (m := re.search(r"lambda ([-+.e\d]+)", s["rationale"]))
+                      and float(m[1]) > 0)
+        return [s["decision"] for s in steps], lam, 35.0 * i + ms * sum(map(ran, steps[:i]))
+    (cheap, lam1, spend1), (dear, lam700, spend700) = run(1.0), run(700.0)
+    assert cheap == dear and spend700 > spend1  # the same looks, and some confirmed before lambda was read
+    assert lam700 / lam1 == pytest.approx(spend1 / spend700, rel=0.01)
+
+
 def test_a_confirmed_look_keeps_the_confirm_nets_segmentation_and_the_ladder_moves_the_scout_only(scene):
     net = Painted("corrosion")
     job = Job(scene, JobConfig(pixel_cap=1.0, thumbs=False, chaos=("p95_spike",)), clock=FakeClock(), job_id="j_test",

@@ -334,8 +334,9 @@ fixed cost model each net is charged its own p50, and it always runs the confirm
 
 `bench.micro --job-ops-only` with `DRISHYAM_ONNX_CONFIRM` set adds a `segment:confirm` row per size to `job_ops` and
 names the net under `job_ops.confirm`; a fixed-cost cascade refuses a table that did not time the same confirm net.
-`make eval-cascade SCOUT=<onnx> CONFIRM=<onnx> [LABEL=...]` times the pair into `results/<arm>-<pair>/micro.json`
-(the pair named like the single models: `dacl10k_v2a+v2b`), then runs the scout alone, the confirm net alone (each
+`make eval-cascade SCOUT=<onnx> CONFIRM=<onnx> [LABEL=...] [WORKERS=4]` times the pair into
+`results/<arm>-<pair>/micro.json` (the pair named like the single models: `dacl10k_v2a+v2b`), then runs (at most
+WORKERS processes, default 4; the numbers do not depend on it) the scout alone, the confirm net alone (each
 look charged its `segment:confirm` p50, under the scout's profile, so only the net differs) and the cascade, at caps
 0.3 and 1.0 on the three dev splits (synth_dev, the clean split, CODEBRIM dev100; never a held-out set), checks that
 each arm ran the nets it is named for, and writes `results/dev/cascade_<pair>.json`: recall, IoU-only recall, chance

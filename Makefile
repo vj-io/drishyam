@@ -49,7 +49,7 @@ eval-model:  ## after scripts/install_model.sh: leakage check, then the ONNX on 
 	$(PY) -m evals.model_eval --publish --onnx $(or $(ONNX),models/drishyam_dacl10k.onnx) --codebrim $(CODEBRIM) $(if $(DACL10K),--dacl10k $(DACL10K)) $(if $(MAX_LOAD),--max-load $(MAX_LOAD))
 
 eval-cascade:  ## dev splits only: SCOUT alone, CONFIRM alone and the two-model cascade at caps 0.3 and 1.0 -> results/dev/cascade_<pair>.json
-	$(PY) -m evals.model_eval --onnx $(SCOUT) --confirm $(CONFIRM) --codebrim $(CODEBRIM) $(if $(LABEL),--label "$(LABEL)") $(if $(MAX_LOAD),--max-load $(MAX_LOAD))
+	$(PY) -m evals.model_eval --onnx $(SCOUT) --confirm $(CONFIRM) --codebrim $(CODEBRIM) $(if $(LABEL),--label "$(LABEL)") $(if $(WORKERS),--workers $(WORKERS)) $(if $(MAX_LOAD),--max-load $(MAX_LOAD))
 
 eval-ablations:  ## FR-21 ablations (evals.harness.ABLATIONS vs the full agent, caps 0.3 and 1.0, fixed costs) on synth200 and the 4608 set -> public/results/ablations.json
 	$(EVAL) --ablation --data $(DATA) --n $(N) --seed 7 --out $(OUT) --results-dir runs/ablations/synth

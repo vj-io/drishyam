@@ -21,7 +21,7 @@ The classical side is the published summary when it is comparable on the same da
 
 A two-model cascade (drishyam.cascade), on the dev splits only, never a held-out set and never published:
 
-    make eval-cascade SCOUT=models/drishyam_dacl10k_v2a.onnx CONFIRM=models/drishyam_dacl10k_v2b.onnx [LABEL=...]
+    make eval-cascade SCOUT=models/drishyam_dacl10k_v2a.onnx CONFIRM=models/drishyam_dacl10k_v2b.onnx [LABEL=...] [WORKERS=4]
     python -m evals.model_eval --onnx SCOUT --confirm CONFIRM [--label L] [--codebrim C] [--workers 4]
 
 times the pair's job ops (segment:confirm too) into results/<micro-arm>-<pair>/micro.json, the pair named as the
