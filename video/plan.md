@@ -14,7 +14,7 @@ stamping in at each chapter.
 | `public/video/drishyam.vtt` | captions, the same cues as the burned-in ones (written by the same build as the MP4) | yes |
 | `public/video/poster.jpg` | the end card, settled | yes |
 | `brag-output/drishyam-short.mp4` | 15-20 s 9:16 cut: the cold open, ending on the settled APPROVED stamp | no (brag-output/ is ignored) |
-| `brag-output/standin/film/` | `build.py --standin`: the film with every pending piece on (stand-ins), with its captions, poster and chapter tables | no |
+| `brag-output/standin/film/` | `build.py --standin`: the film with every pending piece on (stand-ins): `drishyam-standin.mp4`, `drishyam-standin.vtt`, `poster-standin.jpg`, `plan-tables.md` | no |
 
 The site expects the player at `video/drishyam.mp4` with captions at `video/drishyam.vtt` (the paths the removed
 `initVideo()` in `public/js/results.js` used, commit 939f973; commit 5c2fb04 removed it until the MP4 ships). Adding
@@ -43,7 +43,10 @@ stops after the voice, the layout and this file. The build stops if the film wou
 
 `--standin` renders the film with the trained-segmenter stand-in (below) and the stand-in real-photo run, into
 `brag-output/standin/film/` (MP4, captions, poster, `plan-tables.md`); it never touches `public/video/` or this file,
-so the committed poster and captions are never from a stand-in build.
+so the committed poster and captions are never from a stand-in build. A stand-in film is marked so it cannot pass for
+the real one: a red strip "STAND-IN DATA, NOT FOR PUBLICATION" across the top of every frame, `-standin` in every file
+name, and the same words in the MP4's metadata (`comment`). `infra/drishyam_stack.py` refuses to deploy while any MP4
+under `public/` carries the mark or the name, so a renamed copy is refused too. Do not share a stand-in MP4.
 
 ## Private inputs, and the build without them
 
@@ -61,19 +64,24 @@ and portraits appear in the public film.
 
 Anyone else gets a complete film: name cards, no real-photo chapter (`DRISHYAM_PRIVATE_DIR=/nonexistent` shows it).
 
-**Team chapter (photo to drawing).** Each person in turn: the real photo, framed on its plate; the Drishyam gaze
-window (white frame, amber corners, `LOOK n · L k · 1:2^k`, dimensions in the photo's own pixels) takes six looks,
-coarse to fine (outline, face and hair, eyes, nose and mouth, collar, shading), and inside each look the photo
-dissolves while that look's lines draw on behind an amber nib, until the settle look has replaced the whole photo
-with the drawing; the name and the role type into the title block; the window glides to the second plate and does
-the same. As `t2` starts both plates are framed, and each title block lights as the voice says the name; the parts
-key and the tagline "Drawn by OpenCV 5, coarse to fine" close it. `t1` carries both transformations (about 2.3 s of
-looks each, `pace` 0.75), `t2` the names; `film.js` throws if both plates are not framed before the first name is said.
-The strip says how the drawings were made: "our photos, drawn by OpenCV 5: Canny, findContours, approxPolyDP"; the
-build checks that `portraits.py` makes those three calls and says OpenCV 5. The photo layer, the per-look dissolve,
-`pace` and the voice timing (`said1At`, `said2At`) are opt-in options of `portraits-chapter.js` (its header lists them;
-`portraits.html` uses none, so it renders as before; the file before these options is kept beside it as
-`portraits-chapter.before-photo.js`).
+**Team chapter (photo to drawing).** Each person in turn: the real photo, framed on its plate and held with the
+camera settled on it for about a second; then the Drishyam gaze window (white frame, amber corners,
+`LOOK n · L k · 1:2^k` in the corner away from that person's callouts, dimensions in the photo's own pixels) flies in
+and takes five looks, coarse to fine (outline, face and hair, eyes, nose and mouth, collar), then a shading pass
+(tagged `SHADING · L k`: it is traced at a coarser level than the looks before it); inside each the photo dissolves
+while its lines draw on behind an amber nib, until the shading pass has replaced the whole photo with the drawing; the
+name and the role type into the title block. The camera glides to the second plate (the first plate's text dims to
+40 % while it is at the edge of the view), holds the second photo the same way (`hold`, 1 s; `t2` waits 0.95 s more
+for it) and does the same. As `t2` starts both plates are framed, and each title block lights as the voice says the
+name; the parts key and the tagline "Drawn by OpenCV 5, coarse to fine" close it. `t1` carries both transformations
+(about 2.3 s of looks each, `pace` 0.75), `t2` the names; `film.js` throws if both plates are not framed before the
+first name is said. The strip says how the drawings were made: "our photos, drawn by OpenCV 5: Canny, findContours,
+approxPolyDP", and the rail note says what was not automatic: the feature regions (the crop and the boxes for eyes,
+brows, nose, mouth and collar in `portraits.py`) were placed by hand; every line is traced by OpenCV at the level the
+tag names. The build checks that `portraits.py` makes those three calls and says OpenCV 5. The photo layer, the
+per-look dissolve, `pace`, `hold` and the voice timing (`said1At`, `said2At`) are opt-in options of
+`portraits-chapter.js` (its header lists them; `portraits.html` uses none, so it renders as before; the file before
+these options is kept beside it as `portraits-chapter.before-photo.js`).
 
 **Real-photo chapter.** It appears when `video/live/real.ndjson` (the NDJSON stream of one Drishyam job on one of the
 team's wall photos, embedded images removed) and `video/live/real.json` exist, and the photo is in the private folder:
@@ -90,16 +98,19 @@ team's wall photos, embedded images removed) and `video/live/real.json` exist, a
 in full-resolution pixels; the ones above are IMG_2332's). The photo is labelled "REAL PHOTO (ours): painted plaster
 wall, no ground truth"; the chapter shows the overview (the photo as its pyramid level, a scan line, the candidate
 regions), each look as the gaze window, each finding's box and class, why it stopped, and the cards ENGINE, LOOKS,
-PIXELS READ, REPORTED and BY EYE; the team's line draws on and a FOUND or MISSED stamp lands. A finding counts as on
-what the team sees when its box touches the traced line; every other finding is called a false alarm, by eye.
+PIXELS READ, REPORTED and BY EYE; the team's line draws on (thin, over a light dimming, so the crack stays visible
+beside it) and a FOUND or MISSED stamp lands. A finding counts as on what the team sees when its box touches the
+traced line; every other finding is "off the team's line" (never a false alarm: there is no ground truth).
 The line `q1` is built from the trace in `video/narration.py` and asserted against it (looks, findings and pixels
-against `done.summary`, "saw nothing worth a look" only with no candidate region), in one of three forms:
+against `done.summary`, "saw nothing worth a look" only with no candidate region), in one of three forms. The share of
+pixels is said as the PIXELS READ card prints it: one decimal under 10 % ("one point six percent", "1.6 %"), whole
+percent above.
 
-- no look: "Our own photo of a painted wall, no ground truth: the classical engine read two percent of it, saw nothing
-  worth a look, and missed the hairline crack."
+- no look: "Our own photo of a painted wall, no ground truth: the classical engine read one point six percent of it,
+  saw nothing worth a look, and missed the hairline crack."
 - looks, nothing reported: "... took N looks at P of the pixels, reported nothing, and missed ..."
-- findings: "... took N looks at P of the pixels and found (or missed) the hairline crack, with K false alarms." (without
-  `seen`: "... and reported a crack and spalling.")
+- findings: "... took N looks at P of the pixels and found (or missed) the hairline crack, with K findings off the team's
+  line." (without `seen`: "... and reported a crack and spalling.")
 
 To record the final trace (the owner, with the final engine): `uv run drishyam run
 $DRISHYAM_PRIVATE_DIR/real-photos/clean/IMG_2332.jpg --cost-model fixed --out runs/real` (for the trained segmenter add
@@ -109,7 +120,7 @@ run `--check-template`, then the build.
 
 The stand-ins (`build.py --make-standin`, git-ignored under `brag-output/standin/`): the classical engine on IMG_2332
 (the render's real photo: one L3 overview, no candidate region, nothing found, the crack missed) and on IMG_2330 (two
-looks, a crack on the team's line and a spalling false alarm; used only by `--check-template`, as the longer line).
+looks, a crack on the team's line and a spalling finding off it; used only by `--check-template`, as the longer line).
 
 The trained segmenter is "results pending" until `public/results/codebrim_dacl10k/summary.json` exists. Then the
 same build quotes it, and only like for like: its summary must say `onnx:`, governor off and not confounded, and
@@ -121,7 +132,7 @@ tiling still finds more; a near-duplicate count above zero is spoken, and the bo
 Any failed check stops the build. `--check-template` tries all of this on a stand-in summary (the classical
 numbers relabelled), with the real-photo chapter on each stand-in trace (or the owner's `video/live/real.*`), checks
 the longest film still fits 300 s, and checks that a summary charged another machine's costs is refused. Last run:
-293.9 s with the IMG_2332 stand-in, 295.7 s with the longer IMG_2330 line (cap 300). Claims whose truth depends on the data are asserted in `video/narration.py`
+296.3 s with the IMG_2332 stand-in, 298.5 s with the longer IMG_2330 line (cap 300). Claims whose truth depends on the data are asserted in `video/narration.py`
 and `video/build.py`, so a re-run that changes them stops the build instead of shipping a sentence that is no
 longer true; words and figures typed into the scene text (citations, the competition name, the limits, the
 team) are checked against their files and listed below.
@@ -145,29 +156,30 @@ again (4 job starts, about 3 minutes):
 
 The committed tables below come from the plain build (portraits on, no real-photo trace yet, trained segmenter
 pending). With every pending piece on (`--standin`: the trained-segmenter stand-in line, the IMG_2332 stand-in run)
-the film runs 293.9 s:
+the film runs 296.3 s:
 
 | Chapter | Starts | Ends | Lines |
 | --- | --- | --- | --- |
 | Cold open | 0:00.0 | 0:09.0 | o1, o2 |
-| Team (photo to drawing) | 0:09.0 | 0:22.4 | t1, t2 |
-| Problem and user | 0:22.4 | 0:43.7 | p1, p2, p3 |
-| Live demo | 0:43.7 | 1:33.9 | l1-l9, l11 |
-| Failure drills | 1:33.9 | 1:55.9 | b0-b4 |
-| An LLM over MCP | 1:55.9 | 2:20.5 | m1-m4 |
-| Architecture | 2:20.5 | 3:01.8 | a0-a5 |
-| Results (with the trained-segmenter line) | 3:01.8 | 4:04.4 | r1, r3-r8 |
-| Real photo (ours) | 4:04.4 | 4:14.4 | q1 |
-| Failure cases | 4:14.4 | 4:32.9 | f1-f3 |
-| Limits | 4:32.9 | 4:40.5 | x1 |
-| Reproduce | 4:40.5 | 4:46.9 | y1 |
-| End | 4:46.9 | 4:53.9 | e1 |
+| Team (photo to drawing) | 0:09.0 | 0:23.3 | t1, t2 |
+| Problem and user | 0:23.3 | 0:44.7 | p1, p2, p3 |
+| Live demo | 0:44.7 | 1:34.9 | l1-l9, l11 |
+| Failure drills | 1:34.9 | 1:56.8 | b0-b4 |
+| An LLM over MCP | 1:56.8 | 2:21.4 | m1-m4 |
+| Architecture | 2:21.4 | 3:02.7 | a0-a5 |
+| Results (with the trained-segmenter line) | 3:02.7 | 4:05.3 | r1, r3-r8 |
+| Real photo (ours) | 4:05.3 | 4:16.3 | q1 |
+| Failure cases | 4:16.3 | 4:35.2 | f1-f3 |
+| Limits | 4:35.2 | 4:42.8 | x1 |
+| Reproduce | 4:42.8 | 4:49.3 | y1 |
+| End | 4:49.3 | 4:56.3 | e1 |
 
 To fit the real-photo chapter and the trained-segmenter line under 300 s, figures are said the short way ("every two
 years" for 24 months, "twenty-five hundred", "under ninety milliseconds", "two times in three", the trained segmenter's
 recall in whole percent; the exact figures stay on the boards), the ablation line says only what the table supports
 ("only dropping the survey look loses recall; the others lose none"), and the gaps between lines are 0.3 s (0.35 in
-the team chapter and the drills, where the footage warp needs it). The held-out re-run (c36e375) changed three
+the team chapter and the drills, where the footage warp needs it; with the portraits `t2` also waits 0.95 s for the
+second photo's hold). The held-out re-run (c36e375) changed three
 claims, and the narration with them: the downscale is now slightly ahead within the noise (0.96x, CI 0.91-1.02), and
 two of the four failure rules are built (the straight-line test, which still let the shown formwork line through at
 a coarse look, and the glare gate's re-shoot listing); the plates say "built" and "not yet" from `failures.json`.
@@ -219,47 +231,47 @@ a coarse look, and the glare gate's re-shoot listing); the plates say "built" an
 
 | Requirement | Covered by | From | To |
 | --- | --- | --- | --- |
-| At most 5 minutes, 1920x1080 | open, end | 0:00.0 | 4:34.6 |
-| Narrated (offline Kokoro voice af_heart) with burned-in captions; the same cues in public/video/drishyam.vtt | open, end | 0:00.0 | 4:34.6 |
-| The team: Vaibhav Jangid, Bhavya Dhoot. Each real photo, then the window's looks turn it into OpenCV line art (Canny, findContours, approxPolyDP); name cards without the private inputs | team | 0:09.0 | 0:22.4 |
-| Problem and user, with sources on screen | problem | 0:22.4 | 0:43.7 |
-| /api/health on the live site: opencv 5.0.0, aarch64, aws-lambda | l1 | 0:44.2 | 0:49.2 |
-| The application working: the guided run on bridge_03 ('Watch it inspect a bridge'), recorded live, with what it missed | l2, l3, l4, l5, l6, l7, l8 | 0:49.5 | 1:24.4 |
-| Plain-words trace (the NOTE and 'What it decided and why' panels) | l3, l4, l5, l6, l7 | 0:54.4 | 1:20.8 |
-| Human sign-off: reviewer name, Approve, APPROVED stamp, work order signed | l9 | 1:24.7 | 1:29.4 |
-| Human control: a tampered work-order token refused (403) | l11 | 1:29.7 | 1:33.4 |
-| Failure handling: 'Now break it' (slowed segmenter -> governor; malformed planner reply -> allow-list) | b0, b1, b2 | 1:34.3 | 1:45.1 |
-| Human control: 'Try KILL' (KILL halts with kill-switch, Resume replays) | b3 | 1:45.4 | 1:50.7 |
-| Honesty: no LLM runs in the live demo; the drill planners are scripted | b4 | 1:51.0 | 1:55.4 |
-| An LLM driving the OpenCV tools over MCP: IoU 0.00 at call 6 -> human; IoU 0.72 at call 18 -> confirmed; call 20 budget | mcp | 1:55.9 | 2:20.5 |
-| Architecture: docs/agent-loop.svg, public/docs/aws-simple.svg, docs/architecture.png (AWS path and OpenCV layer) | arch | 2:20.5 | 3:01.8 |
-| Principal results: recall vs pixels, with one downscale, the tiling family and chance | r1, r3 | 3:02.3 | 3:20.7 |
-| Larger photos (4608 px): beats one downscale (which reads far fewer pixels), L2 tiling matches it with fewer pixels | r4 | 3:21.0 | 3:28.8 |
-| Ablations (public/results/ablations.json) | r5 | 3:29.1 | 3:37.7 |
-| Real photos (CODEBRIM), said plainly weak; no CODEBRIM image shown | r6 | 3:38.0 | 3:46.3 |
-| False alarms on synthetic photos with no damage (public/results/clean/summary.json) | r7 | 3:46.6 | 3:52.2 |
-| Trained segmenter: 'results pending' until public/results/codebrim_dacl10k/summary.json exists | r8 | 3:52.5 | 3:54.6 |
-| Failure cases: failures.json plates and their rules; one CODEBRIM case in words only | failures | 3:55.1 | 4:13.5 |
-| Limits and responsible use | limits | 4:13.5 | 4:21.1 |
-| Reproduce: make test, make eval, scripts/aws.sh | repro | 4:21.1 | 4:27.6 |
-| End card: live URL, repository, team | end | 4:27.6 | 4:34.6 |
+| At most 5 minutes, 1920x1080 | open, end | 0:00.0 | 4:36.0 |
+| Narrated (offline Kokoro voice af_heart) with burned-in captions; the same cues in public/video/drishyam.vtt | open, end | 0:00.0 | 4:36.0 |
+| The team: Vaibhav Jangid, Bhavya Dhoot. Each real photo, then the window's looks turn it into OpenCV line art (Canny, findContours, approxPolyDP); name cards without the private inputs | team | 0:09.0 | 0:23.3 |
+| Problem and user, with sources on screen | problem | 0:23.3 | 0:44.7 |
+| /api/health on the live site: opencv 5.0.0, aarch64, aws-lambda | l1 | 0:45.2 | 0:50.1 |
+| The application working: the guided run on bridge_03 ('Watch it inspect a bridge'), recorded live, with what it missed | l2, l3, l4, l5, l6, l7, l8 | 0:50.4 | 1:25.3 |
+| Plain-words trace (the NOTE and 'What it decided and why' panels) | l3, l4, l5, l6, l7 | 0:55.4 | 1:21.7 |
+| Human sign-off: reviewer name, Approve, APPROVED stamp, work order signed | l9 | 1:25.6 | 1:30.4 |
+| Human control: a tampered work-order token refused (403) | l11 | 1:30.7 | 1:34.4 |
+| Failure handling: 'Now break it' (slowed segmenter -> governor; malformed planner reply -> allow-list) | b0, b1, b2 | 1:35.3 | 1:46.0 |
+| Human control: 'Try KILL' (KILL halts with kill-switch, Resume replays) | b3 | 1:46.4 | 1:51.6 |
+| Honesty: no LLM runs in the live demo; the drill planners are scripted | b4 | 1:52.0 | 1:56.3 |
+| An LLM driving the OpenCV tools over MCP: IoU 0.00 at call 6 -> human; IoU 0.72 at call 18 -> confirmed; call 20 budget | mcp | 1:56.8 | 2:21.4 |
+| Architecture: docs/agent-loop.svg, public/docs/aws-simple.svg, docs/architecture.png (AWS path and OpenCV layer) | arch | 2:21.4 | 3:02.7 |
+| Principal results: recall vs pixels, with one downscale, the tiling family and chance | r1, r3 | 3:03.2 | 3:21.6 |
+| Larger photos (4608 px): beats one downscale (which reads far fewer pixels), L2 tiling matches it with fewer pixels | r4 | 3:21.9 | 3:29.7 |
+| Ablations (public/results/ablations.json) | r5 | 3:30.0 | 3:38.6 |
+| Real photos (CODEBRIM), said plainly weak; no CODEBRIM image shown | r6 | 3:38.9 | 3:47.2 |
+| False alarms on synthetic photos with no damage (public/results/clean/summary.json) | r7 | 3:47.5 | 3:53.1 |
+| Trained segmenter: 'results pending' until public/results/codebrim_dacl10k/summary.json exists | r8 | 3:53.4 | 3:55.6 |
+| Failure cases: failures.json plates and their rules; one CODEBRIM case in words only | failures | 3:56.0 | 4:14.9 |
+| Limits and responsible use | limits | 4:14.9 | 4:22.5 |
+| Reproduce: make test, make eval, scripts/aws.sh | repro | 4:22.5 | 4:29.0 |
+| End card: live URL, repository, team | end | 4:29.0 | 4:36.0 |
 
 ### Chapters (from this build)
 
 | Chapter | Starts | Ends | Lines |
 | --- | --- | --- | --- |
 | Cold open | 0:00.0 | 0:09.0 | o1, o2 |
-| Team | 0:09.0 | 0:22.4 | t1, t2 |
-| Problem and user | 0:22.4 | 0:43.7 | p1, p2, p3 |
-| Live demo | 0:43.7 | 1:33.9 | l1, l2, l3, l4, l5, l6, l7, l8, l9, l11 |
-| Failure drills | 1:33.9 | 1:55.9 | b0, b1, b2, b3, b4 |
-| An LLM over MCP | 1:55.9 | 2:20.5 | m1, m2, m3, m4 |
-| Architecture | 2:20.5 | 3:01.8 | a0, a1, a2, a3, a4, a5 |
-| Results | 3:01.8 | 3:55.1 | r1, r3, r4, r5, r6, r7, r8 |
-| Failure cases | 3:55.1 | 4:13.5 | f1, f2, f3 |
-| Limits | 4:13.5 | 4:21.1 | x1 |
-| Reproduce | 4:21.1 | 4:27.6 | y1 |
-| End | 4:27.6 | 4:34.6 | e1 |
+| Team | 0:09.0 | 0:23.3 | t1, t2 |
+| Problem and user | 0:23.3 | 0:44.7 | p1, p2, p3 |
+| Live demo | 0:44.7 | 1:34.9 | l1, l2, l3, l4, l5, l6, l7, l8, l9, l11 |
+| Failure drills | 1:34.9 | 1:56.8 | b0, b1, b2, b3, b4 |
+| An LLM over MCP | 1:56.8 | 2:21.4 | m1, m2, m3, m4 |
+| Architecture | 2:21.4 | 3:02.7 | a0, a1, a2, a3, a4, a5 |
+| Results | 3:02.7 | 3:56.0 | r1, r3, r4, r5, r6, r7, r8 |
+| Failure cases | 3:56.0 | 4:14.9 | f1, f2, f3 |
+| Limits | 4:14.9 | 4:22.5 | x1 |
+| Reproduce | 4:22.5 | 4:29.0 | y1 |
+| End | 4:29.0 | 4:36.0 | e1 |
 
 ### Every number and URL, with its source
 
@@ -415,46 +427,46 @@ a coarse look, and the glare gate's re-shoot listing); the plates say "built" an
 | o1 | 0:01.7 | It read a quarter of this photo's pixels, and found three critical findings. | It read a quarter of this photo's pixels, and found 3 critical findings. |
 | o2 | 0:06.2 | It will not sign them off. A person must. | It will not sign them off. A person must. |
 | t1 | 0:09.5 | Drishyam, an Agentic Vision entry to the OpenCV AI Competition, powered by AWS. | Drishyam, an Agentic Vision entry to the OpenCV AI Competition, powered by AWS. |
-| t2 | 0:16.6 | Built by Vaibhav Jangid, lead engineer, and Bhavya Dhoot, design and presentation. | Built by Vaibhav Jangid, lead engineer, and Bhavya Dhoot, design and presentation. |
-| p1 | 0:22.9 | America has about six hundred twenty-five thousand bridges, each due a routine inspection at least every two years. | America has about 625,000 bridges, each due a routine inspection at least every two years. |
-| p2 | 0:30.0 | In an Oregon study, the largest drone inspection produced more than twenty-five hundred photos of one bridge. | In an Oregon study, the largest drone inspection produced more than 2,500 photos of one bridge. |
-| p3 | 0:36.6 | Drishyam is for the engineer reviewing them: it zooms in where needed, and hands critical findings to a person. | Drishyam is for the engineer reviewing them: it zooms in where needed, and hands critical findings to a person. |
-| l1 | 0:44.2 | The live site runs on AWS: OpenCV five, on an arm Lambda. | The live site runs on AWS: OpenCV 5, on an arm Lambda. |
-| l2 | 0:49.5 | Watch it inspect a bridge. A privacy pass runs first; nothing to blur here. | Watch it inspect a bridge. A privacy pass runs first; nothing to blur here. |
-| l3 | 0:54.4 | One survey look at the whole photo, at one eighth size. | One survey look at the whole photo, at one eighth size. |
-| l4 | 0:57.9 | Entropy zero point six nine is above one half. Unsure, so it zooms in. | Entropy 0.69 is above 0.5. Unsure, so it zooms in. |
-| l5 | 1:02.9 | Then it moves to the best region, and double-checks at full resolution. | Then it moves to the best region, and double-checks at full resolution. |
-| l6 | 1:06.9 | At full resolution the masks disagree: unconfirmed. Exposed rebar always goes to a person. | At full resolution the masks disagree: unconfirmed. Exposed rebar always goes to a person. |
-| l7 | 1:13.4 | Then a second spall. It stops when the next look costs more than it is worth, and so it misses a crack in a region it never visited. | Then a second spall. It stops when the next look costs more than it is worth, and so it misses a crack in a region it never visited. |
-| l8 | 1:21.1 | The agent took under a second; the page replays it slowly. | The agent took under a second; the page replays it slowly. |
-| l9 | 1:24.7 | Only a person can approve. A name, Approve, and the server signs the work order. | Only a person can approve. A name, Approve, and the server signs the work order. |
-| l11 | 1:29.7 | Change one character of that signature, and the server refuses it. | Change one character of that signature, and the server refuses it. |
-| b0 | 1:34.3 | Now, break it. | Now, break it. |
-| b1 | 1:35.6 | Slow the segmenter down, and the governor switches to the fast model. | Slow the segmenter down, and the governor switches to the fast model. |
-| b2 | 1:39.6 | The planner drill sends a shell command. The allow-list rejects it, and the rule planner decides. | The planner drill sends a shell command. The allow-list rejects it, and the rule planner decides. |
-| b3 | 1:45.4 | KILL halts the job before its next look; Resume replays the moves so far and carries on. | KILL halts the job before its next look; Resume replays the moves so far and carries on. |
-| b4 | 1:51.0 | No language model runs live. These drill planners are scripted to fail. | No language model runs live. These drill planners are scripted to fail. |
-| m1 | 1:56.4 | Over MCP, Claude drove the same OpenCV tools on the same photo. | Over MCP, Claude drove the same OpenCV tools on the same photo. |
-| m2 | 2:01.5 | At call six, the full-resolution mask disagreed, and exposed rebar is critical: Claude handed it to a human. | At call 6, the full-resolution mask disagreed, and exposed rebar is critical: Claude handed it to a human. |
-| m3 | 2:08.8 | At call eighteen, the masks agreed: a spall, confirmed. At call twenty, the budget ended the search. | At call 18, the masks agreed: a spall, confirmed. At call 20, the budget ended the search. |
-| m4 | 2:15.4 | It still missed the large spall. The rules are in the prompt; the values were measured. | It still missed the large spall. The rules are in the prompt; the values were measured. |
-| a0 | 2:21.0 | Every step is perception, decision and action, with a human gate at the end. | Every step is perception, decision and action, with a human gate at the end. |
-| a1 | 2:25.6 | CloudFront and a rate-limiting firewall front a signed Function URL and the arm Lambda. | CloudFront and a rate-limiting firewall front a signed Function URL and the arm Lambda. |
-| a2 | 2:31.5 | DynamoDB holds the kill flags, Secrets Manager the signing key, and CloudWatch the alarms. | DynamoDB holds the kill flags, Secrets Manager the signing key, and CloudWatch the alarms. |
-| a3 | 2:38.0 | OpenCV does the looking: a pyramid, saliency, warp perspective as a virtual pan-tilt-zoom camera, a blur gate, and face blurring. | OpenCV does the looking: a pyramid, saliency, warpPerspective as a virtual pan-tilt-zoom camera, a blur gate, and face blurring. |
-| a4 | 2:47.0 | Live, it uses the classical segmenter; OpenCV five's new DNN engine is on the optional ONNX path. | Live, it uses the classical segmenter; OpenCV 5's new DNN engine is on the optional ONNX path. |
-| a5 | 2:54.4 | On Lambda, a step took under ninety milliseconds at p ninety-five, over three smoke runs. COOL was not run. | On Lambda, a step took under 90 ms at p95, over 3 smoke runs. COOL was not run. |
-| r1 | 3:02.3 | On two hundred synthetic photos, it finds eighty-seven percent of exhaustive tiling's recall, at twenty-six percent of the pixels: short of the ninety percent target, though not significantly. | On 200 synthetic photos, it finds 87 % of exhaustive tiling's recall, at 26 % of the pixels: short of the 90 % target, though not significantly. |
-| r3 | 3:14.4 | Against one downscaled pass it scores zero point nine six times: slightly behind, within the noise. | Against one downscaled pass it scores 0.96×: slightly behind, within the noise. |
-| r4 | 3:21.0 | On larger photos it beats one downscale, which reads a sixth as many pixels; quarter-size tiling does as well with fewer. | On larger photos it beats one downscale, which reads a sixth as many pixels; quarter-size tiling does as well with fewer. |
-| r5 | 3:29.1 | Ablations: only dropping the survey look loses recall; the others lose none, and a random gaze order matches it on smaller photos. | Ablations: only dropping the survey look loses recall; the others lose none, and a random gaze order matches it on smaller photos. |
-| r6 | 3:38.0 | On two hundred real CODEBRIM photos, every method finds about one defect in five; its boxes at random, about one in eight. | On 200 real CODEBRIM photos, every method finds about 1 defect in 5; its boxes at random, about 1 in 8. |
-| r7 | 3:46.6 | On fifty-one synthetic photos with no damage, it still reports something two times in three. | On 51 synthetic photos with no damage, it still reports something 2 times in 3. |
-| r8 | 3:52.5 | Results for a trained segmenter are pending. | Results for a trained segmenter are pending. |
-| f1 | 3:55.6 | Failures, in the open: graffiti read as spalling, a formwork line as a crack, glare left for a re-shoot, and blur. | Failures, in the open: graffiti read as spalling, a formwork line as a crack, glare left for a re-shoot, and blur. |
-| f2 | 4:03.1 | Two of these rules are not built yet; the straight-line test is, but let this one through at a coarse look. | 2 of these rules are not built yet; the straight-line test is, but let this one through at a coarse look. |
-| f3 | 4:09.2 | On a real photo, exposed rebar was reported as corrosion. | On a real photo, exposed rebar was reported as corrosion. |
-| x1 | 4:14.0 | Pixels, not millimetres. AI-assisted, not an inspection. Only a person can approve. | Pixels, not millimetres. AI-assisted, not an inspection. Only a person can approve. |
-| y1 | 4:21.6 | Make test, make eval, and one script to deploy, test and destroy the AWS stack. | make test, make eval, and one script to deploy, test and destroy the AWS stack. |
-| e1 | 4:28.0 | Drishyam. It looks where it matters, and asks a human first. | Drishyam. It looks where it matters, and asks a human first. |
+| t2 | 0:17.5 | Built by Vaibhav Jangid, lead engineer, and Bhavya Dhoot, design and presentation. | Built by Vaibhav Jangid, lead engineer, and Bhavya Dhoot, design and presentation. |
+| p1 | 0:23.8 | America has about six hundred twenty-five thousand bridges, each due a routine inspection at least every two years. | America has about 625,000 bridges, each due a routine inspection at least every two years. |
+| p2 | 0:31.0 | In an Oregon study, the largest drone inspection produced more than twenty-five hundred photos of one bridge. | In an Oregon study, the largest drone inspection produced more than 2,500 photos of one bridge. |
+| p3 | 0:37.6 | Drishyam is for the engineer reviewing them: it zooms in where needed, and hands critical findings to a person. | Drishyam is for the engineer reviewing them: it zooms in where needed, and hands critical findings to a person. |
+| l1 | 0:45.2 | The live site runs on AWS: OpenCV five, on an arm Lambda. | The live site runs on AWS: OpenCV 5, on an arm Lambda. |
+| l2 | 0:50.4 | Watch it inspect a bridge. A privacy pass runs first; nothing to blur here. | Watch it inspect a bridge. A privacy pass runs first; nothing to blur here. |
+| l3 | 0:55.4 | One survey look at the whole photo, at one eighth size. | One survey look at the whole photo, at one eighth size. |
+| l4 | 0:58.9 | Entropy zero point six nine is above one half. Unsure, so it zooms in. | Entropy 0.69 is above 0.5. Unsure, so it zooms in. |
+| l5 | 1:03.8 | Then it moves to the best region, and double-checks at full resolution. | Then it moves to the best region, and double-checks at full resolution. |
+| l6 | 1:07.8 | At full resolution the masks disagree: unconfirmed. Exposed rebar always goes to a person. | At full resolution the masks disagree: unconfirmed. Exposed rebar always goes to a person. |
+| l7 | 1:14.4 | Then a second spall. It stops when the next look costs more than it is worth, and so it misses a crack in a region it never visited. | Then a second spall. It stops when the next look costs more than it is worth, and so it misses a crack in a region it never visited. |
+| l8 | 1:22.0 | The agent took under a second; the page replays it slowly. | The agent took under a second; the page replays it slowly. |
+| l9 | 1:25.6 | Only a person can approve. A name, Approve, and the server signs the work order. | Only a person can approve. A name, Approve, and the server signs the work order. |
+| l11 | 1:30.7 | Change one character of that signature, and the server refuses it. | Change one character of that signature, and the server refuses it. |
+| b0 | 1:35.3 | Now, break it. | Now, break it. |
+| b1 | 1:36.5 | Slow the segmenter down, and the governor switches to the fast model. | Slow the segmenter down, and the governor switches to the fast model. |
+| b2 | 1:40.6 | The planner drill sends a shell command. The allow-list rejects it, and the rule planner decides. | The planner drill sends a shell command. The allow-list rejects it, and the rule planner decides. |
+| b3 | 1:46.4 | KILL halts the job before its next look; Resume replays the moves so far and carries on. | KILL halts the job before its next look; Resume replays the moves so far and carries on. |
+| b4 | 1:52.0 | No language model runs live. These drill planners are scripted to fail. | No language model runs live. These drill planners are scripted to fail. |
+| m1 | 1:57.3 | Over MCP, Claude drove the same OpenCV tools on the same photo. | Over MCP, Claude drove the same OpenCV tools on the same photo. |
+| m2 | 2:02.5 | At call six, the full-resolution mask disagreed, and exposed rebar is critical: Claude handed it to a human. | At call 6, the full-resolution mask disagreed, and exposed rebar is critical: Claude handed it to a human. |
+| m3 | 2:09.8 | At call eighteen, the masks agreed: a spall, confirmed. At call twenty, the budget ended the search. | At call 18, the masks agreed: a spall, confirmed. At call 20, the budget ended the search. |
+| m4 | 2:16.3 | It still missed the large spall. The rules are in the prompt; the values were measured. | It still missed the large spall. The rules are in the prompt; the values were measured. |
+| a0 | 2:21.9 | Every step is perception, decision and action, with a human gate at the end. | Every step is perception, decision and action, with a human gate at the end. |
+| a1 | 2:26.6 | CloudFront and a rate-limiting firewall front a signed Function URL and the arm Lambda. | CloudFront and a rate-limiting firewall front a signed Function URL and the arm Lambda. |
+| a2 | 2:32.5 | DynamoDB holds the kill flags, Secrets Manager the signing key, and CloudWatch the alarms. | DynamoDB holds the kill flags, Secrets Manager the signing key, and CloudWatch the alarms. |
+| a3 | 2:39.0 | OpenCV does the looking: a pyramid, saliency, warp perspective as a virtual pan-tilt-zoom camera, a blur gate, and face blurring. | OpenCV does the looking: a pyramid, saliency, warpPerspective as a virtual pan-tilt-zoom camera, a blur gate, and face blurring. |
+| a4 | 2:47.9 | Live, it uses the classical segmenter; OpenCV five's new DNN engine is on the optional ONNX path. | Live, it uses the classical segmenter; OpenCV 5's new DNN engine is on the optional ONNX path. |
+| a5 | 2:55.4 | On Lambda, a step took under ninety milliseconds at p ninety-five, over three smoke runs. COOL was not run. | On Lambda, a step took under 90 ms at p95, over 3 smoke runs. COOL was not run. |
+| r1 | 3:03.2 | On two hundred synthetic photos, it finds eighty-seven percent of exhaustive tiling's recall, at twenty-six percent of the pixels: short of the ninety percent target, though not significantly. | On 200 synthetic photos, it finds 87 % of exhaustive tiling's recall, at 26 % of the pixels: short of the 90 % target, though not significantly. |
+| r3 | 3:15.4 | Against one downscaled pass it scores zero point nine six times: slightly behind, within the noise. | Against one downscaled pass it scores 0.96×: slightly behind, within the noise. |
+| r4 | 3:21.9 | On larger photos it beats one downscale, which reads a sixth as many pixels; quarter-size tiling does as well with fewer. | On larger photos it beats one downscale, which reads a sixth as many pixels; quarter-size tiling does as well with fewer. |
+| r5 | 3:30.0 | Ablations: only dropping the survey look loses recall; the others lose none, and a random gaze order matches it on smaller photos. | Ablations: only dropping the survey look loses recall; the others lose none, and a random gaze order matches it on smaller photos. |
+| r6 | 3:38.9 | On two hundred real CODEBRIM photos, every method finds about one defect in five; its boxes at random, about one in eight. | On 200 real CODEBRIM photos, every method finds about 1 defect in 5; its boxes at random, about 1 in 8. |
+| r7 | 3:47.5 | On fifty-one synthetic photos with no damage, it still reports something two times in three. | On 51 synthetic photos with no damage, it still reports something 2 times in 3. |
+| r8 | 3:53.4 | Results for a trained segmenter are pending. | Results for a trained segmenter are pending. |
+| f1 | 3:56.5 | Failures, in the open: graffiti read as spalling, a formwork line as a crack, glare left for a re-shoot, and blur. | Failures, in the open: graffiti read as spalling, a formwork line as a crack, glare left for a re-shoot, and blur. |
+| f2 | 4:04.0 | Two of these rules are not built yet. The straight-line test is built, but it let this line through at a coarse look. | 2 of these rules are not built yet. The straight-line test is built, but it let this line through at a coarse look. |
+| f3 | 4:10.6 | On a real photo, exposed rebar was reported as corrosion. | On a real photo, exposed rebar was reported as corrosion. |
+| x1 | 4:15.4 | Pixels, not millimetres. AI-assisted, not an inspection. Only a person can approve. | Pixels, not millimetres. AI-assisted, not an inspection. Only a person can approve. |
+| y1 | 4:23.0 | Make test, make eval, and one script to deploy, test and destroy the AWS stack. | make test, make eval, and one script to deploy, test and destroy the AWS stack. |
+| e1 | 4:29.4 | Drishyam. It looks where it matters, and asks a human first. | Drishyam. It looks where it matters, and asks a human first. |
 <!-- generated:end -->
