@@ -68,6 +68,7 @@ def test_function_is_arm64_streaming_behind_iam(template):
     assert env["DRISHYAM_COMMIT"] == "abc123" and "DRISHYAM_SERVE_STATIC" not in env  # static files come from S3
     assert set(env) >= {"DRISHYAM_KILL_TABLE", "DRISHYAM_SIGNING_KEY_SECRET_ARN"}
     assert "DRISHYAM_ONNX" not in env and "DRISHYAM_ONNX_FP16" not in env  # classical-v1 unless asked
+    assert "DRISHYAM_ONNX_CONFIRM" not in env  # and no cascade (drishyam.cascade): the web API never runs one
     assert env["DRISHYAM_CV_THREADS"] == "2" and fn["MemorySize"] == 3008  # 3008 / 1769 = 1.7 vCPU (docs/bench.md)
     url = one(template, "AWS::Lambda::Url")
     assert url["AuthType"] == "AWS_IAM" and url["InvokeMode"] == "RESPONSE_STREAM"

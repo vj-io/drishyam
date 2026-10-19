@@ -940,7 +940,7 @@ def test_the_classical_profile_is_the_agent_every_classical_number_ran_with(scen
         "usd_per_hour": USD_PER_HOUR, "thumbs": True, "max_steps": 200, "use_uncertainty": True,
         "seed_from_looks": True, "v0": 2.0, "survey": True, "verify": True, "absorb": True, "order": "score", "seed": 0,
         "governor": True, "fill": False, "survey_value": True,
-        "t_hat_ms": None}
+        "t_hat_ms": None, "tau_confirm_lo": 0.35, "tau_confirm_hi": 0.65}
 
 
 def test_a_job_takes_its_segmenters_profile_by_name_and_a_knob_set_explicitly_wins(scene, monkeypatch):

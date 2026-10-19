@@ -53,7 +53,8 @@ class Prefetcher:
             return out
         if op.startswith("segment:") and self.seg is not None and args[1] is self.crop:
             self.counts["seg_hit"] += 1
-            return self.seg.result()
+            sf, self.seg = self.seg, None  # one call per look: a cascade's confirm on the same crop is computed
+            return sf.result()
         return fn(*args, **kw)
 
     def _ahead(self, job, pyr, now: tuple) -> None:
