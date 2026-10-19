@@ -120,15 +120,30 @@ def _clahe():
     return cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
 
 
-def saliency(img: np.ndarray) -> np.ndarray:
-    """0-1 prior of 'something worth a closer look', built from imgproc ops only."""
+def _max_pool(x: np.ndarray, shape: tuple[int, int]) -> np.ndarray:
+    """x shrunk to `shape` (h, w) by the max over each block: a 1-px line survives (INTER_AREA would average it out)."""
+    k = max(1, round(x.shape[0] / shape[0]))
+    return cv2.resize(cv2.dilate(x, np.ones((k, k), np.uint8)), shape[::-1], interpolation=cv2.INTER_NEAREST)
+
+
+def saliency(img: np.ndarray, fine: np.ndarray | None = None) -> np.ndarray:
+    """0-1 prior of 'something worth a closer look', built from imgproc ops only. `fine`: a finer pyramid level of the
+    same image; the edge and thin-dark maps are then computed there (Scharr at Sobel's gain, black-hat) and
+    max-pooled to `img`'s size, so thin linear evidence is not averaged away by the downsample."""
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     eq = cv2.GaussianBlur(_clahe().apply(gray), (3, 3), 0)
-    gx = cv2.Sobel(eq, cv2.CV_32F, 1, 0, ksize=3)
-    gy = cv2.Sobel(eq, cv2.CV_32F, 0, 1, ksize=3)
-    edges = _norm(cv2.magnitude(gx, gy), EDGE_FLOOR)
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9))
-    thin_dark = _norm(cv2.morphologyEx(eq, cv2.MORPH_BLACKHAT, kernel).astype(np.float32), DARK_FLOOR)
+    if fine is None:
+        gx = cv2.Sobel(eq, cv2.CV_32F, 1, 0, ksize=3)
+        gy = cv2.Sobel(eq, cv2.CV_32F, 0, 1, ksize=3)
+        mag, bh = cv2.magnitude(gx, gy), cv2.morphologyEx(eq, cv2.MORPH_BLACKHAT, kernel).astype(np.float32)
+    else:
+        feq = cv2.GaussianBlur(_clahe().apply(cv2.cvtColor(fine, cv2.COLOR_BGR2GRAY)), (3, 3), 0)
+        mag = cv2.magnitude(cv2.Scharr(feq, cv2.CV_32F, 1, 0, scale=0.25), cv2.Scharr(feq, cv2.CV_32F, 0, 1, scale=0.25))
+        mag = _max_pool(mag, gray.shape)
+        bh = _max_pool(cv2.morphologyEx(feq, cv2.MORPH_BLACKHAT, kernel).astype(np.float32), gray.shape)
+    edges = _norm(mag, EDGE_FLOOR)
+    thin_dark = _norm(bh, DARK_FLOOR)
     local_dark = cv2.adaptiveThreshold(eq, 1, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, 21, 12)
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
     rust = cv2.inRange(hsv, (3, 70, 35), (25, 255, 235)).astype(np.float32) / 255

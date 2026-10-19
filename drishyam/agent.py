@@ -120,6 +120,10 @@ class JobConfig:
     order: str = "score"  # "random": a seeded random pick among unseen candidates instead of the argmax
     seed: int = 0
     governor: bool = True  # False: kill switch and caps only; no model, level, gaze-size or critical-only override
+    # The overview's edge and thin-dark maps are computed this many pyramid levels finer than the overview and max-pooled
+    # down to it (0: at the overview level), so a hairline still makes a candidate; the overview is charged that finer
+    # level's pixels.
+    sal_fine: int = 0
     # When the next look no longer fits under the pixel cap, it shrinks to the largest gaze (a multiple of 32 px, at
     # least MIN_GAZE) that does, instead of the job halting on cap-hit; the stop rule still decides whether it is taken.
     fill: bool = False
@@ -449,9 +453,10 @@ class Job:
 
         ov = imaging.OVERVIEW_LEVEL
         self.ov_scale = 2**ov
-        sal, _ = self._timed("saliency", imaging.saliency, pyr[ov])
+        fine = pyr[max(0, ov - cfg.sal_fine)] if cfg.sal_fine else None
+        sal, _ = self._timed("saliency", imaging.saliency, pyr[ov], fine)
         cands = imaging.find_candidates(sal, ov, cfg.size * 2**first, (W, H), cfg.max_candidates)
-        self.budget.spend(int(sal.size), 0)
+        self.budget.spend(int(sal.size if fine is None else fine.shape[0] * fine.shape[1]), 0)
         self.budget.seconds_used = clock() - t_start
         yield {"type": "overview", "heatmap_png_b64": imaging.png_b64((sal * 255).astype(np.uint8)),
                "candidates": [{"id": c.id, "box": list(c.box), "prior": c.prior} for c in cands],

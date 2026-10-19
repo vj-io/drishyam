@@ -105,6 +105,21 @@ def test_overview_finds_the_salient_spot(scene):
     assert any(abs(c.cx - 1500) < 400 and abs(c.cy - 450) < 400 for c in cands[:3])
 
 
+def test_a_finer_overview_keeps_a_one_pixel_line_through_the_downsample():
+    """saliency(img, fine): edges and black-hat from one level finer, max-pooled, keep a 1-px line that pyrDown blurs;
+    sound concrete stays below the candidate threshold either way (the floors are in the same units)."""
+    img = concrete(1536, 2048, 0)
+    pyr = imaging.build_pyramid(img)
+    assert (imaging.saliency(pyr[3], pyr[2]) >= 0.5).mean() < 0.01
+    fine = pyr[2].copy()
+    cv2.line(fine, (100, 100), (400, 300), (110, 110, 112), 1)
+    line = imaging._max_pool(np.all(fine == (110, 110, 112), 2).astype(np.float32), pyr[3].shape[:2]) > 0
+    assert line.sum() >= 150  # every 2x2 block the 301-px line crosses keeps it
+    smooth = cv2.pyrDown(fine)
+    # the share of the line's overview pixels at the candidate threshold: 0.16 against 0.04 from the overview alone
+    assert (imaging.saliency(smooth, fine)[line] >= 0.5).mean() > 2 * (imaging.saliency(smooth)[line] >= 0.5).mean()
+
+
 def test_sound_concrete_is_not_salient_but_glare_still_gets_a_look():
     """The absolute null: a sound surface's texture is not stretched to full scale (with plain p99.5 scaling about
     a quarter of this overview scored >= 0.5, the candidate threshold). A blown-out patch stays salient, so the
