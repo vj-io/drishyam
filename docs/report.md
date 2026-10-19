@@ -143,8 +143,9 @@ segmenter adds `connectedComponentsWithStats` and a NumPy softmax, and measureme
 
 ### COOL on Graviton (not run)
 
-COOL on Graviton was not run: the Marketplace AMI could not be subscribed from our AWS account (a payment-method
-restriction); the three-arm scripts are in [bench/](../bench/README.md). `bench/run_all.sh <arm>` runs the micro and
+COOL on Graviton was not run: the Marketplace AMI could not be subscribed from our AWS account. It is an AWS India
+(AISPL) account, whose card restriction terminated the Marketplace agreement seconds after subscribing (a support case
+is open). The three-arm scripts are in [bench/](../bench/README.md). `bench/run_all.sh <arm>` runs the micro and
 macro benchmarks and a parity save with a provenance block (OpenCV version, build-info hash, whether `cv2` loads
 from `/opt/cool`), `bench/parity.py` checks that two arms produce identical masks, and the same code passes CI on
 GitHub's arm64 runners. [bench/aws_runbook.md](../bench/aws_runbook.md) is the copy-paste sequence for the three

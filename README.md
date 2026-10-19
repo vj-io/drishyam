@@ -93,7 +93,7 @@ Full numbers: [public/results/summary.json](public/results/summary.json), [publi
 
 ## COOL on Graviton (not run)
 
-COOL on Graviton was not run: the Marketplace AMI could not be subscribed from our AWS account (a payment-method restriction); the three-arm scripts are in [bench/](bench/README.md).
+COOL on Graviton was not run: the Marketplace AMI could not be subscribed from our AWS account. It is an AWS India (AISPL) account, whose card restriction terminated the Marketplace agreement seconds after subscribing (a support case is open). The three-arm scripts are in [bench/](bench/README.md).
 
 **What COOL could buy end to end, from GitHub's arm64 runner.** A 50-image macro run with the stock aarch64 wheel on GitHub's `ubuntu-24.04-arm` runner (Neoverse-N2, one thread; a GitHub Actions VM, not the Lambda; [results/linux-aarch64/macro.json](results/linux-aarch64/macro.json)) puts 8 % of a job in KleidiCV-covered imgproc, 75 % in the classical segmenter (imgproc plus NumPy), 4 % in crack thinning, 8 % in decode and 6 % in Python. So if COOL made the covered ops 1.8× faster, a whole job would get about 1.04× faster (the x86 laptop's 8-image run, [results/local-macos-x86/macro.json](results/local-macos-x86/macro.json), gives the same 1.04×). The gaze path itself is cheap; most of the time is in segmentation, which is where a COOL or DNN speed-up would have to land. The stock aarch64 wheel the live demo runs already links KleidiCV 26.03, so any COOL gain would come on top of that.
 
