@@ -180,6 +180,7 @@ class DrishyamStack(Stack):
         dist = cf.Distribution(
             self, "Cdn", comment="Drishyam web app", web_acl_id=acl.attr_arn, price_class=cf.PriceClass.PRICE_CLASS_100,
             http_version=cf.HttpVersion.HTTP2_AND_3, default_root_object="index.html",
+            enable_ipv6=False,  # WAF rate rules count per address; an IPv6 /64 would give a client millions of them
             default_behavior=cf.BehaviorOptions(  # the static site: cached; the deployment below invalidates it
                 origin=origins.S3BucketOrigin.with_origin_access_control(site),
                 viewer_protocol_policy=cf.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,

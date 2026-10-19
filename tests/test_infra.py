@@ -137,6 +137,7 @@ def test_waf_rate_limits_per_ip(template):
     assert "30 kill and review" in bodies["kill-and-review"]["Content"]
     assert "300 requests" in bodies["all-requests"]["Content"]
     assert one(template, "AWS::CloudFront::Distribution")["DistributionConfig"]["WebACLId"]["Fn::GetAtt"][0] == "Waf"
+    assert one(template, "AWS::CloudFront::Distribution")["DistributionConfig"]["IPV6Enabled"] is False  # per-IP limits hold
 
 
 def test_api_behaviour_is_uncached_and_forwards_the_body_hash(template):
