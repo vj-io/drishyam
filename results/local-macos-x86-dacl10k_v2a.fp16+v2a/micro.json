@@ -1,0 +1,376 @@
+{
+ "arm": "local-macos-x86-dacl10k_v2a.fp16+v2a",
+ "config": {
+  "repeats": 50,
+  "warmup": 5,
+  "cv2_threads": 1,
+  "requested_threads": 1,
+  "sizes": [
+   "1024x768",
+   "2048x1536",
+   "4000x3000"
+  ],
+  "gaze_view_px": 512
+ },
+ "provenance": {
+  "cv2": "5.0.0",
+  "build_info_sha256": "fe5f9337dbc8663639ee7bcb2deb09359893fc8d2aa5b6a447cee2a0117d2ec7",
+  "cv2_baseline": "SSE SSE2 SSE3 SSSE3 SSE4_1",
+  "cv2_dispatch": "SSE4_2 AVX FP16 AVX2 AVX512_SKX",
+  "cv2_parallel_framework": "GCD",
+  "cv2_custom_hal": "YES (ipp (ver 0.0.1))",
+  "cv2_file": "/Users/mac/Documents/Projects/opencv/.claude/worktrees/wf_1449fcdf-61b-1/.venv/lib/python3.13/site-packages/cv2/__init__.py",
+  "under_opt_cool": false,
+  "build": "stock (not COOL)",
+  "machine": "Darwin 25.6.0 x86_64",
+  "platform": "macOS-26.7.1-x86_64-i386-64bit-Mach-O",
+  "cpu": "Intel(R) Core(TM) i9-9880H CPU @ 2.30GHz",
+  "logical_cpus": 16,
+  "cv2_threads": 1,
+  "python": "3.13.16",
+  "numpy": "2.5.4",
+  "timestamp": "2026-10-19T16:37:46Z",
+  "load_avg": [
+   9.72,
+   7.97,
+   6.3
+  ]
+ },
+ "results": [],
+ "job_ops": {
+  "segmenter": "onnx:drishyam_dacl10k_v2a.fp16.onnx",
+  "confirm": "onnx:drishyam_dacl10k_v2a.onnx",
+  "cv2_threads": 1,
+  "provenance": {
+   "cv2": "5.0.0",
+   "build_info_sha256": "fe5f9337dbc8663639ee7bcb2deb09359893fc8d2aa5b6a447cee2a0117d2ec7",
+   "cv2_baseline": "SSE SSE2 SSE3 SSSE3 SSE4_1",
+   "cv2_dispatch": "SSE4_2 AVX FP16 AVX2 AVX512_SKX",
+   "cv2_parallel_framework": "GCD",
+   "cv2_custom_hal": "YES (ipp (ver 0.0.1))",
+   "cv2_file": "/Users/mac/Documents/Projects/opencv/.claude/worktrees/wf_1449fcdf-61b-1/.venv/lib/python3.13/site-packages/cv2/__init__.py",
+   "under_opt_cool": false,
+   "build": "stock (not COOL)",
+   "machine": "Darwin 25.6.0 x86_64",
+   "platform": "macOS-26.7.1-x86_64-i386-64bit-Mach-O",
+   "cpu": "Intel(R) Core(TM) i9-9880H CPU @ 2.30GHz",
+   "logical_cpus": 16,
+   "cv2_threads": 1,
+   "python": "3.13.16",
+   "numpy": "2.5.4",
+   "timestamp": "2026-10-19T16:33:07Z",
+   "load_avg": [
+    6.89,
+    7.08,
+    5.54
+   ]
+  },
+  "results": [
+   {
+    "op": "pyrDown",
+    "size": "1024x768",
+    "n": 50,
+    "min_ms": 2.529,
+    "p50_ms": 3.42,
+    "p95_ms": 4.247,
+    "p99_ms": 4.845,
+    "mean_ms": 3.407
+   },
+   {
+    "op": "saliency",
+    "size": "1024x768",
+    "n": 50,
+    "min_ms": 1.7,
+    "p50_ms": 2.172,
+    "p95_ms": 4.026,
+    "p99_ms": 4.608,
+    "mean_ms": 2.539
+   },
+   {
+    "op": "warp",
+    "size": "1024x768",
+    "n": 50,
+    "min_ms": 1.686,
+    "p50_ms": 2.41,
+    "p95_ms": 3.437,
+    "p99_ms": 9.186,
+    "mean_ms": 2.708
+   },
+   {
+    "op": "quality",
+    "size": "1024x768",
+    "n": 50,
+    "min_ms": 1.549,
+    "p50_ms": 2.275,
+    "p95_ms": 3.871,
+    "p99_ms": 12.036,
+    "mean_ms": 2.752
+   },
+   {
+    "op": "segment:accurate",
+    "size": "1024x768",
+    "n": 50,
+    "min_ms": 632.556,
+    "p50_ms": 672.328,
+    "p95_ms": 770.05,
+    "p99_ms": 782.286,
+    "mean_ms": 684.574
+   },
+   {
+    "op": "segment:fast",
+    "size": "1024x768",
+    "n": 50,
+    "min_ms": 177.187,
+    "p50_ms": 190.824,
+    "p95_ms": 252.922,
+    "p99_ms": 316.737,
+    "mean_ms": 203.709
+   },
+   {
+    "op": "segment:confirm",
+    "size": "1024x768",
+    "n": 50,
+    "min_ms": 551.251,
+    "p50_ms": 641.833,
+    "p95_ms": 898.71,
+    "p99_ms": 955.95,
+    "mean_ms": 680.304
+   },
+   {
+    "op": "downscale",
+    "size": "1024x768",
+    "n": 50,
+    "min_ms": 0.137,
+    "p50_ms": 0.145,
+    "p95_ms": 0.231,
+    "p99_ms": 0.331,
+    "mean_ms": 0.155
+   },
+   {
+    "op": "pyrDown",
+    "size": "2048x1536",
+    "n": 50,
+    "min_ms": 10.15,
+    "p50_ms": 10.899,
+    "p95_ms": 11.963,
+    "p99_ms": 13.266,
+    "mean_ms": 10.905
+   },
+   {
+    "op": "saliency",
+    "size": "2048x1536",
+    "n": 50,
+    "min_ms": 3.935,
+    "p50_ms": 4.776,
+    "p95_ms": 6.602,
+    "p99_ms": 8.298,
+    "mean_ms": 5.035
+   },
+   {
+    "op": "warp",
+    "size": "2048x1536",
+    "n": 50,
+    "min_ms": 1.87,
+    "p50_ms": 2.038,
+    "p95_ms": 2.386,
+    "p99_ms": 2.779,
+    "mean_ms": 2.09
+   },
+   {
+    "op": "quality",
+    "size": "2048x1536",
+    "n": 50,
+    "min_ms": 1.141,
+    "p50_ms": 1.497,
+    "p95_ms": 2.195,
+    "p99_ms": 2.295,
+    "mean_ms": 1.571
+   },
+   {
+    "op": "segment:accurate",
+    "size": "2048x1536",
+    "n": 50,
+    "min_ms": 671.495,
+    "p50_ms": 780.713,
+    "p95_ms": 962.411,
+    "p99_ms": 1094.883,
+    "mean_ms": 793.578
+   },
+   {
+    "op": "segment:fast",
+    "size": "2048x1536",
+    "n": 50,
+    "min_ms": 175.688,
+    "p50_ms": 187.22,
+    "p95_ms": 226.812,
+    "p99_ms": 235.422,
+    "mean_ms": 193.716
+   },
+   {
+    "op": "segment:confirm",
+    "size": "2048x1536",
+    "n": 50,
+    "min_ms": 564.201,
+    "p50_ms": 660.714,
+    "p95_ms": 839.788,
+    "p99_ms": 942.373,
+    "mean_ms": 669.25
+   },
+   {
+    "op": "downscale",
+    "size": "2048x1536",
+    "n": 50,
+    "min_ms": 1.436,
+    "p50_ms": 1.914,
+    "p95_ms": 3.113,
+    "p99_ms": 3.859,
+    "mean_ms": 2.05
+   },
+   {
+    "op": "pyrDown",
+    "size": "4000x3000",
+    "n": 50,
+    "min_ms": 33.58,
+    "p50_ms": 35.635,
+    "p95_ms": 44.682,
+    "p99_ms": 45.605,
+    "mean_ms": 37.306
+   },
+   {
+    "op": "saliency",
+    "size": "4000x3000",
+    "n": 50,
+    "min_ms": 14.428,
+    "p50_ms": 19.156,
+    "p95_ms": 22.767,
+    "p99_ms": 25.527,
+    "mean_ms": 19.426
+   },
+   {
+    "op": "warp",
+    "size": "4000x3000",
+    "n": 50,
+    "min_ms": 1.637,
+    "p50_ms": 1.839,
+    "p95_ms": 2.165,
+    "p99_ms": 2.431,
+    "mean_ms": 1.895
+   },
+   {
+    "op": "quality",
+    "size": "4000x3000",
+    "n": 50,
+    "min_ms": 1.224,
+    "p50_ms": 1.575,
+    "p95_ms": 3.441,
+    "p99_ms": 4.086,
+    "mean_ms": 1.964
+   },
+   {
+    "op": "segment:accurate",
+    "size": "4000x3000",
+    "n": 50,
+    "min_ms": 717.76,
+    "p50_ms": 804.706,
+    "p95_ms": 984.474,
+    "p99_ms": 1266.655,
+    "mean_ms": 843.991
+   },
+   {
+    "op": "segment:fast",
+    "size": "4000x3000",
+    "n": 50,
+    "min_ms": 211.605,
+    "p50_ms": 224.335,
+    "p95_ms": 276.776,
+    "p99_ms": 332.872,
+    "mean_ms": 231.906
+   },
+   {
+    "op": "segment:confirm",
+    "size": "4000x3000",
+    "n": 50,
+    "min_ms": 584.405,
+    "p50_ms": 624.006,
+    "p95_ms": 723.818,
+    "p99_ms": 777.745,
+    "mean_ms": 631.717
+   },
+   {
+    "op": "downscale",
+    "size": "4000x3000",
+    "n": 50,
+    "min_ms": 39.892,
+    "p50_ms": 41.469,
+    "p95_ms": 44.828,
+    "p99_ms": 47.713,
+    "mean_ms": 42.041
+   }
+  ]
+ },
+ "dnn": {
+  "onnx": "/Users/mac/Documents/Projects/opencv/models/drishyam_dacl10k_v2a.fp16.onnx",
+  "onnx_fp16": null,
+  "provenance": {
+   "cv2": "5.0.0",
+   "build_info_sha256": "fe5f9337dbc8663639ee7bcb2deb09359893fc8d2aa5b6a447cee2a0117d2ec7",
+   "cv2_baseline": "SSE SSE2 SSE3 SSSE3 SSE4_1",
+   "cv2_dispatch": "SSE4_2 AVX FP16 AVX2 AVX512_SKX",
+   "cv2_parallel_framework": "GCD",
+   "cv2_custom_hal": "YES (ipp (ver 0.0.1))",
+   "cv2_file": "/Users/mac/Documents/Projects/opencv/.claude/worktrees/wf_1449fcdf-61b-1/.venv/lib/python3.13/site-packages/cv2/__init__.py",
+   "under_opt_cool": false,
+   "build": "stock (not COOL)",
+   "machine": "Darwin 25.6.0 x86_64",
+   "platform": "macOS-26.7.1-x86_64-i386-64bit-Mach-O",
+   "cpu": "Intel(R) Core(TM) i9-9880H CPU @ 2.30GHz",
+   "logical_cpus": 16,
+   "cv2_threads": 1,
+   "python": "3.13.16",
+   "numpy": "2.5.4",
+   "timestamp": "2026-10-19T16:38:43Z",
+   "load_avg": [
+    9.03,
+    8.15,
+    6.49
+   ]
+  },
+  "results": [
+   {
+    "op": "nanodet",
+    "size": "416x416",
+    "n": 50,
+    "min_ms": 33.777,
+    "p50_ms": 36.725,
+    "p95_ms": 42.453,
+    "p99_ms": 47.355,
+    "mean_ms": 37.9
+   },
+   {
+    "op": "onnx:fp32@256",
+    "size": "256x256",
+    "n": 50,
+    "min_ms": 176.023,
+    "p50_ms": 189.32,
+    "p95_ms": 212.747,
+    "p99_ms": 228.811,
+    "mean_ms": 191.664
+   },
+   {
+    "op": "onnx:fp32@512",
+    "size": "512x512",
+    "n": 50,
+    "min_ms": 700.554,
+    "p50_ms": 755.869,
+    "p95_ms": 1000.507,
+    "p99_ms": 1085.209,
+    "mean_ms": 806.627
+   }
+  ]
+ },
+ "load_avg_end": [
+  9.03,
+  8.15,
+  6.49
+ ]
+}

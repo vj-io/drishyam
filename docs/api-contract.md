@@ -347,6 +347,12 @@ excludes no change (a ratio of 1; for boxes per photo and the share with any box
 `gain` or `harm` where the direction says which (fewer false alarms on the clean split is a gain), `higher` or `lower`
 where it does not (chance recall, boxes on a labelled split), else `no clear change`.
 
+`results/dev/cascade_dacl10k_v2a.fp16+v2a.json` is a plumbing check, not a result: the v2a weights as the FP16 file
+scout and the same weights in FP32 confirm, so the two nets give nearly the same masks. It shows the mechanism and its
+accounting at work (confirms for both reasons, confirms skipped at the pixel and seconds caps, each net charged its own
+p50), and that on this x86 Mac the FP16 file is no faster than the FP32 one (segment:accurate p50 672-805 ms against
+segment:confirm 624-661 ms in the same timing run), so here the FP32 net alone is the cheaper arm.
+
 ## `POST /api/kill`
 
 ```json
