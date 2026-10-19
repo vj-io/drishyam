@@ -646,6 +646,7 @@ def test_dev_sweep_reads_variants_and_only_dev_splits():
     from evals import dev_sweep
 
     assert dev_sweep.parse("a=v0:2,seed_from_looks:False;b=") == {"a": {"v0": 2.0, "seed_from_looks": False}, "b": {}}
+    assert type(dev_sweep.parse("a=first_level:2,tau:0.5")["a"]["first_level"]) is int  # a level indexes lists
     assert {d for d, _, _ in dev_sweep.SPLITS.values()} == {"data/synth_dev", "data/synth_clean_dev"}  # never held out
 
 
@@ -655,7 +656,12 @@ def test_dev_sweep_runs_end_to_end_and_writes_its_rows(tmp_path, monkeypatch):
     synth.build_dataset(tmp_path / "tiny", n=2, seed=3, width=640, height=480)
     monkeypatch.setitem(dev_sweep.SPLITS, "tiny", (tmp_path / "tiny", 2, 3))
     out = tmp_path / "rows.json"
-    dev_sweep.main(["tiny", "1.0", "a=v0:0;b=v0:2", "--workers", "1", "--out", str(out)])
+    dev_sweep.main(["tiny", "1.0,0.3", "a=v0:0;b=v0:2", "--workers", "1", "--out", str(out)])
     rows = json.loads(out.read_text())
-    assert rows["split"] == "tiny" and rows["n"] == 2 and set(rows["rows"]) == {"a", "b"}
-    assert all(0 < r["pixels_frac"] <= 1 and sum(r["halt"].values()) == 2 for r in rows["rows"].values())
+    assert rows["split"] == "tiny" and rows["n"] == 2
+    records, _ = harness.load_records(tmp_path / "tiny", 2, seed=3)  # the rows say which data they scored
+    assert {k: rows[k] for k in ("dataset_gt_sha256", "dataset_images_sha256")} == harness.dataset_sha256(records)
+    assert set(rows["rows"]) == {"downscale", "a@1.0", "a@0.3", "b@1.0", "b@0.3"}
+    agents = [r for k, r in rows["rows"].items() if "@" in k]
+    assert all(0 < r["pixels_frac"] <= 1 and sum(r["halt"].values()) == 2 for r in agents)
+    assert all(len(r["per_image"]) == 2 and "vs_downscale_ci" in r for r in agents)
