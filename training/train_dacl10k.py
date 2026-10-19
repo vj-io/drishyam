@@ -656,7 +656,7 @@ def tool(script: str, *args) -> int:
 VARIANT = "v2a"
 VARIANTS = {
     "v2a": "",  # recipe v2 on v1's UNet + MobileNetV3-Large: the one Drishyam can deploy today
-    "v2b": "--encoder tu-efficientnet_b2",  # recipe v2 on a UNet + EfficientNet-B2 (README: CPU time per look)
+    "v2b": "--encoder tu-efficientnet_b2",  # recipe v2 on a UNet + EfficientNet-B2: about 1.25x v2a's CPU per look (README 5b)
 }
 NOTEBOOK_FLAGS = f"--data /kaggle/input --out /kaggle/working/run --resume auto --hours 11 --variant {VARIANT} " \
                  + VARIANTS[VARIANT]

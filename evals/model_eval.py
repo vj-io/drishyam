@@ -14,6 +14,9 @@
 5. prints classical vs ONNX and, with --publish (make eval-model passes it), writes the ONNX summaries (aggregate
    numbers only) to public/results/codebrim_dacl10k/ (with the leakage count and its calibration) and
    public/results/synth_dacl10k/, whatever they show.
+Those paths are models/drishyam_dacl10k.onnx's (v1). Another model there (models/drishyam_dacl10k_v2a.onnx, ...)
+gets its own: results/<micro-arm>-dacl10k_v2a/, runs/model-eval/onnx-v2a-*, public/results/*_dacl10k_v2a/, so
+installing it beside v1 overwrites none of v1's cost table or runs.
 The classical side is the published summary when it is comparable on the same data; otherwise it is run too.
 """
 from __future__ import annotations
@@ -106,7 +109,9 @@ def main(argv=None) -> None:
     fp16 = (REPO / a.fp16).resolve() if a.fp16 else onnx.with_name(onnx.name.replace(".onnx", ".fp16.onnx"))
     if not onnx.exists():
         raise SystemExit(f"{onnx} not found: run scripts/install_model.sh first")
-    label, runs, arm = f"onnx:{onnx.name}", REPO / "runs" / "model-eval", f"{a.micro_arm}-dacl10k"
+    tag = onnx.name.split(".")[0].removeprefix("drishyam_")  # dacl10k (v1), dacl10k_v2a, ...: see the docstring
+    sub = "" if tag == "dacl10k" else "-" + tag.removeprefix("dacl10k_")
+    label, runs, arm = f"onnx:{onnx.name}", REPO / "runs" / "model-eval", f"{a.micro_arm}-{tag}"
     plain = {k: v for k, v in os.environ.items() if k not in ("DRISHYAM_ONNX", "DRISHYAM_ONNX_FP16")}
     env = {**plain, "DRISHYAM_ONNX": str(onnx), **({"DRISHYAM_ONNX_FP16": str(fp16)} if fp16.exists() else {})}
     sets = [("synth", REPO / "data" / "synth200", REPO / "public" / "results")]
@@ -123,7 +128,7 @@ def main(argv=None) -> None:
     subprocess.run([sys.executable, "-m", "bench.micro", "--arm", arm, "--job-ops-only",
                     *(["--max-load", str(a.max_load)] if a.max_load is not None else [])], env=env, cwd=REPO, check=True)
     for name, data, published in sets:
-        after = check(harness(data, runs / f"onnx-{name}", a.n, env, arm, a.workers), label, runs / f"onnx-{name}")
+        after = check(harness(data, runs / f"onnx{sub}-{name}", a.n, env, arm, a.workers), label, runs / f"onnx{sub}-{name}")
         pub = json.loads((published / "summary.json").read_text()) if (published / "summary.json").exists() else None
         if (pub and pub["n_images"] == a.n and pub.get("cost_model", {}).get("kind") == "fixed"
                 and same_costs(pub, a.micro_arm) and not confounded(pub) and same_data(pub, after)):
@@ -135,7 +140,7 @@ def main(argv=None) -> None:
             raise SystemExit(f"{name}: the classical and ONNX runs scored different data (dataset hashes differ): refusing to compare")
         table(name, before, after)
         if a.publish:
-            dst = REPO / "public" / "results" / f"{name}_dacl10k"
+            dst = REPO / "public" / "results" / f"{name}_{tag}"
             dst.mkdir(parents=True, exist_ok=True)
             extra = {"leakage": leak} if name == "codebrim" else {}  # the count beside the number it qualifies
             (dst / "summary.json").write_text(json.dumps({**after, **extra}, indent=1, ensure_ascii=False))
