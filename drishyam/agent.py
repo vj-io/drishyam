@@ -47,12 +47,23 @@ MAX_REPLAY = 200
 # instead of 0.48-0.50) and saves false alarms on the clean dev split (15.8 boxes per photo instead of 20.3);
 # results/dev/v0_sweep.json.
 V0 = 2.0
-# Where each segmenter is reliable, by its name: the level of a first look and the finest level an escalation or a
-# verify look may go to. A JobConfig knob left None takes its segmenter's value; a value set explicitly always wins.
-# classical-v1 (and any segmenter not listed) keeps the agent's original defaults: on synthetic photos zooming in
-# pays. ONNX_PROFILE_TBD
+# Where each segmenter is reliable, by its name (JobConfig knobs left None take its values; a value set explicitly
+# always wins): min_view, the smallest share of the photo's long side a look may span, which bounds the first look and
+# every escalation and verify look; absorb, whether a crack or rust inside a spall's or bar's finding joins it.
+# classical-v1, and any segmenter not listed, keeps the agent as published: any level, absorption on.
+# The dacl10k ONNX values were chosen on the dev splits only (results/dev/onnx_profile_sweep.json, 30 % cap, paired
+# 95 % CIs). On CODEBRIM dev100 photos (mostly 4608 px) L1 looks (0.22 of the side) add boxes, not recall: L2 as
+# first and finest level found 0.397 at 33 boxes per photo against 0.403 at 85 for L1; with absorption off, 0.473
+# against 0.415 for the original levels (L1 first, L0 finest; x1.14, CI 1.07-1.22). Absorption had dropped real
+# cracks the model segmented beside a spall (x1.19 with it off, CI 1.11-1.31). On synth_dev (2048 px) L1 looks (0.5
+# of the side) do add recall: L2 alone found x0.88 of the old agent's (CI 0.82-0.93). A share in (0.22, 0.34] keeps
+# L2 on the 4608- and 6000-px photos and L1 on the 2048-px ones; 0.3 found x1.18 a 1024-px downscale on CODEBRIM (CI
+# 1.07-1.31) and x1.03 the old agent on synth_dev (CI 0.98-1.07), at no more false alarms on the clean split. 0.25,
+# which also allows L0 on a 2048-px photo, showed no measurable difference on either at the 30 % cap; uncapped, its L0 looks found a
+# little more on synth_dev (0.3 against it: x0.98, CI 0.95-1.00).
 PROFILES = {
-    "classical-v1": {"first_level": 1, "min_level": 0},
+    "classical-v1": {"min_view": 0.0, "absorb": True},
+    "onnx:drishyam_dacl10k.onnx": {"min_view": 0.3, "absorb": False},
 }
 
 
@@ -68,8 +79,9 @@ class JobConfig:
     usd_cap: float = 0.05
     seconds_cap: float = 20.0
     size: int = 512
-    first_level: int | None = None  # None: the profile's (PROFILES)
-    min_level: int | None = None  # the finest level an escalation or a verify look may go to; None: the profile's
+    first_level: int = 1
+    min_level: int = 0  # the finest level an escalation or a verify look may go to (min_view may raise it)
+    min_view: float | None = None  # a look spans at least this share of the photo's long side (0: any); None: profile's
     profile: str | None = None  # a PROFILES key; None: the segmenter's own (`profile_for`)
     tau: float = 0.5  # entropy above this escalates
     a_min: int = 64  # crop px; a smaller mask escalates
@@ -90,7 +102,7 @@ class JobConfig:
     v0: float = V0
     survey: bool = True  # one coarse look that covers every candidate before zooming
     verify: bool = True  # verify looks: a new mask, or a finer look that disagrees with the coarser one
-    absorb: bool = True  # a crack or rust mostly inside a spall's or bar's finding joins it (DOMINATED_BY)
+    absorb: bool | None = None  # a crack or rust mostly inside a spall's or bar's finding joins it (DOMINATED_BY)
     order: str = "score"  # "random": a seeded random pick among unseen candidates instead of the argmax
     seed: int = 0
     governor: bool = True  # False: kill switch and caps only; no model, level, gaze-size or critical-only override
@@ -389,8 +401,14 @@ class Job:
         self.max_level = min(3, len(pyr) - 1)
         self.budget = Budget(int(cfg.pixel_cap * W * H), cfg.usd_cap, cfg.seconds_cap, usd_per_hour=cfg.usd_per_hour)
         self.settings = Settings(size=cfg.size)
-        first = max(0, min(cfg.first_level, int(math.log2(max(W, H) / cfg.size)) if max(W, H) > cfg.size else 0))
-        self.min_level = min(cfg.min_level, first)
+        fits = int(math.log2(max(W, H) / cfg.size)) if max(W, H) > cfg.size else 0  # coarsest level a look fits in
+        first = max(0, min(cfg.first_level, fits))
+        # min_view: no look, first or follow-up, is finer than the finest level whose window spans that share of the
+        # long side (0: any level), capped where a look still fits in the photo.
+        wide = min(fits, self.max_level, max(0, math.ceil(math.log2(cfg.min_view * max(W, H) / cfg.size)))) \
+            if cfg.min_view else 0
+        first = max(first, wide)
+        self.min_level = max(wide, min(cfg.min_level, first))
         yield {"type": "job", "job": self.id, "width": W, "height": H,
                "levels": [[p.shape[1], p.shape[0]] for p in pyr],
                "budget": {"pixel_cap_frac": cfg.pixel_cap, "pixels_cap": self.budget.pixels_cap,

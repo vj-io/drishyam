@@ -770,6 +770,10 @@ def test_review_on_ambiguity_when_a_class_is_absorbed_by_another(scene):
         f = ids[e["finding_id"]]
         assert f.cls in e["reason"] and f"is mostly inside {f.cls} {f.id}" in e["reason"]
     assert len({e["reason"].split(" px")[0] + e["finding_id"] for e in asked}) == len(asked)
+    # absorb off (the dacl10k profile): the class that was absorbed is a finding of its own, and nobody is asked
+    job, events = run(scene, pixel_cap=1.0, absorb=False)
+    assert not any(e["type"] == "review_request" and e["kind"] == "ambiguous" for e in events)
+    assert {e["reason"].split(":")[1].split()[0] for e in asked} <= {f.cls for f in job.findings}
 
 
 @pytest.mark.parametrize("band", [0.25, 0.35])
@@ -878,3 +882,93 @@ def test_a_fixed_cost_table_makes_decisions_independent_of_load(scene):
     assert job._t_hat() == 35.0
     assert all("t_hat 35 ms" in s["rationale"] for s in job.trace if s["cause"] == "best-score")
     assert decisions(LoadedClock(), t_hat_ms=table)[1] == calm
+
+
+
+# ---- per-segmenter profiles (agent.PROFILES) ---------------------------------------------------------------
+ONNX = "onnx:drishyam_dacl10k.onnx"
+
+
+def named(name):
+    """The classical engine under another segmenter's name: profiles are looked up by name alone."""
+    from drishyam.segment import ClassicalSegmenter
+
+    return type("Named", (ClassicalSegmenter,), {"name": name})()
+
+
+def test_the_classical_profile_is_the_agent_every_classical_number_ran_with(scene):
+    """classical-v1 resolves to exactly the JobConfig defaults from before profiles existed (first look L1, any level,
+    absorption on), so no classical result moves (results/dev/onnx_profile_sweep.json: the byte-for-byte rerun)."""
+    from dataclasses import asdict
+
+    from drishyam.agent import PROFILES
+    from drishyam.governor import USD_PER_HOUR
+    from drishyam.planner import TIMEOUT_S
+
+    assert PROFILES["classical-v1"] == {"min_view": 0.0, "absorb": True}
+    job = Job(scene, JobConfig(), clock=FakeClock())  # the default segmenter here: the classical engine
+    assert asdict(job.cfg) == {
+        "pixel_cap": 0.3, "usd_cap": 0.05, "seconds_cap": 20.0, "size": 512, "first_level": 1, "min_level": 0,
+        "min_view": 0.0, "profile": "classical-v1", "tau": 0.5, "a_min": 64, "eps": 0.25, "sla_ms": 500.0,
+        "max_candidates": 20, "chaos": (), "planner_every": 5, "planner_timeout_s": TIMEOUT_S,
+        "usd_per_hour": USD_PER_HOUR, "thumbs": True, "max_steps": 200, "use_uncertainty": True,
+        "seed_from_looks": True, "v0": 2.0, "survey": True, "verify": True, "absorb": True, "order": "score", "seed": 0,
+        "governor": True, "t_hat_ms": None}
+
+
+def test_a_job_takes_its_segmenters_profile_by_name_and_a_knob_set_explicitly_wins(scene, monkeypatch):
+    from drishyam.agent import PROFILES, profile_for
+    from drishyam.segment import ClassicalSegmenter
+    from evals import harness
+
+    assert profile_for(ClassicalSegmenter()) == profile_for(object()) == profile_for(named("onnx:other.onnx")) \
+        == "classical-v1"  # a segmenter nobody calibrated keeps the original defaults
+    assert profile_for(named(ONNX)) == ONNX
+    cfg = Job(scene, JobConfig(), segmenter=named(ONNX)).cfg
+    assert cfg.profile == ONNX and {k: getattr(cfg, k) for k in PROFILES[ONNX]} == PROFILES[ONNX]
+    cfg = Job(scene, JobConfig(min_view=0.0), segmenter=named(ONNX)).cfg  # a dev sweep's variant
+    assert (cfg.min_view, cfg.absorb) == (0.0, PROFILES[ONNX]["absorb"])
+    cfg = Job(scene, JobConfig(profile="classical-v1"), segmenter=named(ONNX)).cfg
+    assert (cfg.profile, cfg.min_view, cfg.absorb) == ("classical-v1", 0.0, True)
+    # The eval harness wraps the segmenter to record its looks: the wrapper must carry the name, or every ONNX eval
+    # would silently run the classical profile.
+    monkeypatch.setattr(harness, "default_segmenter", lambda: named(ONNX))
+    assert harness.RecordingSegmenter().name == ONNX
+
+
+class Unsure:
+    """Dark pixels are spalling at p 0.55: a mask that clears A_min, at an entropy near 1 (> tau) at every level."""
+
+    def __init__(self, name):
+        self.name = name
+
+    def predict(self, crop, model="accurate"):
+        dark = (cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY) < 105).astype(np.float32)
+        probs = np.zeros((len(CLASSES), *dark.shape), np.float32)
+        probs[0], probs[CLASSES.index("spalling")] = 1 - 0.55 * dark, 0.55 * dark
+        return finish(probs, time.perf_counter(), model)
+
+
+@pytest.mark.parametrize("w, h, finest", [(4608, 3456, 2), (2048, 1536, 1)])
+def test_the_onnx_profile_never_looks_finer_than_a_share_of_the_photo(w, h, finest):
+    """The trained model is reliable on views that span a good share of the photo: under its profile no look, first
+    or follow-up, spans less than min_view (0.3) of the long side, though the measurements ask for finer looks
+    (entropy > tau at every level): L2 on a CODEBRIM-sized 4608-px photo, L1 on a 2048-px one."""
+    from .conftest import concrete
+
+    img = concrete(h, w, 9)
+    for fx, fy in ((0.15, 0.2), (0.6, 0.25), (0.4, 0.65), (0.75, 0.75)):
+        cv2.circle(img, (int(fx * w), int(fy * h)), w // 50, (45, 45, 45), -1)
+
+    def looks(**cfg):
+        job = Job(img, JobConfig(thumbs=False, pixel_cap=1.0, **cfg), clock=FakeClock(), segmenter=Unsure(ONNX))
+        ev = list(job.run())
+        return job, [s for s in steps(ev) if s["decision"]["action"] != "halt"]
+
+    job, st = looks()
+    assert 512 * 2**finest >= job.cfg.min_view * w > 512 * 2 ** (finest - 1)
+    assert st and min(s["decision"]["args"]["level"] for s in st) == finest
+    assert any(s["observation"]["entropy"] > job.cfg.tau and s["decision"]["args"]["level"] == finest for s in st)
+    assert {s["profile"] for s in job.trace} == {ONNX} and job.work_order["profile"] == ONNX
+    _, st = looks(profile="classical-v1")  # the same measurements under the original defaults zoom further
+    assert min(s["decision"]["args"]["level"] for s in st) < finest
