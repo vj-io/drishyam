@@ -179,7 +179,12 @@ def test_one_pixel_crack_survives_a_whole_photo_view(mods, tmp_path):
     diag = [crack[round(y * 512 / 3000) - 1 : round(y * 512 / 3000) + 2, round(x * 512 / 4000) - 1 :
                   round(x * 512 / 4000) + 2].any() for x, y in zip(range(100, 2900, 25), range(100, 2900, 25))]
     assert all(diag)
-    assert train.rasterise(shapes, {"Crack": 0}, (0, 0, 4000, 3000), 512, 1)[0].sum() > 0  # v1 keeps a line too
+    # What v2 changes: the footprint, against the max-pool of a source-resolution raster (k = 8 covers 7.8x).
+    # v1 (k = 1) keeps a line too, so presence alone would pass on it; recall separates them.
+    truth = train.rasterise(shapes, {"Crack": 0}, (0, 0, 4000, 3000), 512, 8)[0] > 0
+    v1 = train.rasterise(shapes, {"Crack": 0}, (0, 0, 4000, 3000), 512, 1)[0] > 0
+    recall = lambda m: (m & truth).sum() / truth.sum()
+    assert v1.sum() > 0 and recall(v1) < 0.8 and recall(crack > 0) > 0.9
 
 
 @needs_torch

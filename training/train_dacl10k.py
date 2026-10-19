@@ -647,7 +647,8 @@ def tool(script: str, *args) -> int:
 
 
 # %% Settings
-# The notebook runs with these flags (or DACL_FLAGS, if set); a headless run takes them from its command line.
+# The notebook runs with these flags, then DACL_FLAGS if set (a flag given there wins: Colab sets --data and --out
+# there, a smoke run --synthetic); a headless run takes them from its command line alone.
 # Every flag is in parse() above. --hours 11 leaves time to export inside Kaggle's 12 h; --resume auto picks up
 # a run that stopped (this session's /kaggle/working/run, or an earlier version's output added as input).
 # make_notebook.py writes one notebook per VARIANTS key (Kaggle kernel vaibhav2105/drishyam-dacl10k-train-<key>,
@@ -660,7 +661,7 @@ VARIANTS = {
 NOTEBOOK_FLAGS = f"--data /kaggle/input --out /kaggle/working/run --resume auto --hours 11 --variant {VARIANT} " \
                  + VARIANTS[VARIANT]
 if __name__ == "__main__":  # true in a notebook too: importing this module (tests) skips every cell from here
-    FLAGS = shlex.split(os.environ.get("DACL_FLAGS", NOTEBOOK_FLAGS)) if NOTEBOOK else sys.argv[1:]
+    FLAGS = shlex.split(NOTEBOOK_FLAGS) + shlex.split(os.environ.get("DACL_FLAGS", "")) if NOTEBOOK else sys.argv[1:]
     A = parse(FLAGS)
     OUT, ONNX = Path(A.out), Path(A.out) / "onnx"
 
