@@ -62,6 +62,29 @@ def test_deterministic_for_a_fixed_clock(scene, cap):
     assert a == once()
 
 
+def test_fill_shrinks_only_the_look_that_no_longer_fits(scene):
+    """fill: three 512-px looks leave 0.022 of this photo under a 30 % cap; the next look takes it at 256 px (a
+    multiple of 32, at least MIN_GAZE) instead of the job halting, and says so; the cap still holds."""
+    plain, filled = (steps(run(scene, fill=f)[1]) for f in (False, True))
+    looks = [s for s in filled if s["decision"]["action"] != "halt"]
+    assert [s["decision"] for s in looks[:-1]] == [s["decision"] for s in plain if s["decision"]["action"] != "halt"]
+    assert looks[-1]["decision"]["args"]["size"] == 256 and "what the pixel cap leaves" in looks[-1]["rationale"]
+    assert plain[-1]["pixels_frac"] < filled[-1]["pixels_frac"] <= 0.3 and filled[-1]["cause"] == "cap-hit"
+
+
+def test_tau_scout_sets_escalation_at_coarse_looks_only(scene):
+    """tau_scout is the entropy threshold of a look at L2 or coarser; finer looks keep tau."""
+    def acts(**kw):
+        return [(s["decision"]["action"], s["decision"]["args"].get("level"), s["cause"]) for s in steps(run(scene, **kw)[1])]
+
+    base = acts(tau_scout=0.5)  # tau at every level: the agent before tau_scout
+    assert acts() == base and base[1][2] == "verify-new-mask"  # the L2 survey's entropy is 0.44, under 0.5 and 0.7
+    assert acts(tau_scout=0.4)[1] == ("escalate", 1, "entropy>tau")  # ... so a lower scout threshold zooms on it
+    # finer looks keep tau: the L1 look's entropy 0.80 is under a 0.9 scout threshold and still escalates to L0
+    assert acts(tau_scout=0.9, pixel_cap=1.0) == acts(tau_scout=0.5, pixel_cap=1.0)
+    assert ("escalate", 0, "entropy>tau") in acts(pixel_cap=1.0)
+
+
 @pytest.mark.parametrize("cap", [0.05, 0.1, 0.3])
 def test_pixel_cap_is_never_exceeded(scene, cap):
     _job, events = run(scene, pixel_cap=cap)
@@ -900,7 +923,8 @@ def named(name, sha256=None):
 
 def test_the_classical_profile_is_the_agent_every_classical_number_ran_with(scene):
     """classical-v1 resolves to exactly the JobConfig defaults from before profiles existed (first look L1, any level,
-    absorption on), so no classical result moves (results/dev/onnx_profile_sweep.json: the byte-for-byte rerun)."""
+    absorption on), so no classical result moves (results/dev/onnx_profile_sweep.json: the byte-for-byte rerun).
+    tau_scout, fill and survey_value stay off: measured, not adopted (results/dev/tune_sweep.json)."""
     from dataclasses import asdict
 
     from drishyam.agent import PROFILES
@@ -911,11 +935,12 @@ def test_the_classical_profile_is_the_agent_every_classical_number_ran_with(scen
     job = Job(scene, JobConfig(), clock=FakeClock())  # the default segmenter here: the classical engine
     assert asdict(job.cfg) == {
         "pixel_cap": 0.3, "usd_cap": 0.05, "seconds_cap": 20.0, "size": 512, "first_level": 1, "min_level": 0,
-        "min_view": 0.0, "profile": "classical-v1", "tau": 0.5, "a_min": 64, "eps": 0.25, "sla_ms": 500.0,
-        "max_candidates": 20, "chaos": (), "planner_every": 5, "planner_timeout_s": TIMEOUT_S,
+        "min_view": 0.0, "profile": "classical-v1", "tau": 0.5, "tau_scout": None, "a_min": 64, "eps": 0.25,
+        "sla_ms": 500.0, "max_candidates": 20, "chaos": (), "planner_every": 5, "planner_timeout_s": TIMEOUT_S,
         "usd_per_hour": USD_PER_HOUR, "thumbs": True, "max_steps": 200, "use_uncertainty": True,
         "seed_from_looks": True, "v0": 2.0, "survey": True, "verify": True, "absorb": True, "order": "score", "seed": 0,
-        "governor": True, "t_hat_ms": None}
+        "governor": True, "fill": False, "survey_value": True,
+        "t_hat_ms": None}
 
 
 def test_a_job_takes_its_segmenters_profile_by_name_and_a_knob_set_explicitly_wins(scene, monkeypatch):
@@ -931,6 +956,8 @@ def test_a_job_takes_its_segmenters_profile_by_name_and_a_knob_set_explicitly_wi
     assert profile_for(type("NoSha", (ClassicalSegmenter,), {"name": ONNX})()) == "classical-v1"
     cfg = Job(scene, JobConfig(), segmenter=named(ONNX)).cfg
     assert cfg.profile == ONNX and {k: getattr(cfg, k) for k in PROFILES[ONNX]} == PROFILES[ONNX]
+    # pinned: the ONNX profile as it was measured (results/dev/onnx_profile_sweep.json), tau at every level
+    assert PROFILES[ONNX] == {"min_view": 0.3, "absorb": False} and (cfg.tau, cfg.tau_scout) == (0.5, None)
     cfg = Job(scene, JobConfig(min_view=0.0), segmenter=named(ONNX)).cfg  # a dev sweep's variant
     assert (cfg.min_view, cfg.absorb) == (0.0, PROFILES[ONNX]["absorb"])
     cfg = Job(scene, JobConfig(profile="classical-v1"), segmenter=named(ONNX)).cfg

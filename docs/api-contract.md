@@ -286,6 +286,23 @@ governor's `warp-spike` override shrank (512, 384, 288, then 256 px) does not mo
 3000-px photo an L1 look at 384 px spans 0.256 of the side. The dev runs had neither (no replay, governor off).
 The ONNX values were chosen on the dev splits only (`results/dev/onnx_profile_sweep.json`).
 
+Three `JobConfig` knobs from the tuning dev sweep (`results/dev/tune_sweep.json`) are off by default: measured, not
+adopted. `tau_scout`, when set, is the entropy threshold of a look at L2 or coarser; `tau` (0.5) stays that of every
+finer look, and an `entropy>tau` rationale names the threshold that applied (`"entropy 0.74 > 0.7 at L2"`). Unset
+(every profile), `tau` applies at every level. With 0.7 a survey whose entropy is above 0.5 and at most 0.7 drafts
+its classes and is checked one level finer (`verify-new-mask`) instead of escalating (`entropy>tau`) with nothing
+drafted. At the 30 % cap that found x1.03 the recall on synth_dev (95 % CI 0.98-1.09, not a measurable gain) and
+x1.22 on CODEBRIM dev100 (1.09-1.43): 0.153 to 0.186, where the same boxes at random positions find 0.088 and 0.099
+(mean of 30 draws), IoU-only 0.066 to 0.086 against 0.019 and 0.023. It also sent 242 critical boxes to the human
+gate on CODEBRIM dev100 instead of 178 (239 and 176 matching no ground-truth box), put 12.40 boxes on a clean photo
+instead of 12.13 (8 more boxes, on 2 photos of 30) and sat within 0.003 of a clean dev survey's entropy (any value
+in [0.692, 0.703) gives the same dev rows). The sweep's rule asked for a recall gain on synth_dev without more clean
+false alarms: the gain is inside its CI and the clean count rose. The other two: `fill`, under which a
+look that no longer fits under the pixel cap shrinks to what is left (a multiple of 32 px, at least 256) instead of
+the job halting, with that size in `decision.args.size` and a rationale ending `"; gaze 320 px: what the pixel cap
+leaves (108134 px)"` (synth_dev recall x1.03, clean boxes x1.40); and `survey_value`, which when False keeps the
+survey's finds out of the stop rule's value found per ms (no measurable effect).
+
 ## `POST /api/kill`
 
 ```json
