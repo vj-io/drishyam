@@ -61,3 +61,26 @@ above and not the repo's MIT.** The weights are adapted from (trained on) [dacl1
 (Flotzinger et al., WACV 2024, [arXiv:2309.00460](https://arxiv.org/abs/2309.00460); CC BY-NC 4.0), so they carry its
 non-commercial terms and its attribution (`LICENSE.drishyam_dacl10k`). No dacl10k images or labels are included. The
 ImageNet starting point (timm `mobilenetv3_large_100`) is Apache 2.0.
+
+## Trained segmenter: `drishyam_dacl10k_v2b`
+
+Fine-tuned on dacl10k with `training/drishyam_dacl10k_kaggle_v2b.ipynb` (recipe v2, variant v2b: unet, timm `efficientnet_b2` encoder) and installed
+2026-10-19 by `scripts/install_model.sh`. Input `(1, 3, H, W)` ImageNet-normalised RGB, output `(1, 6, H, W)`
+logits in `drishyam.segment.CLASSES` order (the 19 -> 6 merge is in the graph); `DRISHYAM_ONNX` / `DRISHYAM_ONNX_FP16`
+select it (`training/README.md`).
+
+| File | Size | sha256 |
+| --- | --- | --- |
+| `drishyam_dacl10k_v2b.onnx` | 38.3 MB | `47e4b687d179efc9d221ef05eca441d24b0f025f9ab252c0a60c64455ff99207` |
+| `drishyam_dacl10k_v2b.fp16.onnx` | 19.3 MB | `3f8b8648ccfd465e8bd668cf0b2e8d7c6085252426ff048c256dee69d3922838` |
+| `eval/drishyam_dacl10k_v2b_19.onnx` | 38.3 MB | `4b679ffafbc1b76cfe95057740be6e0a78ea397eb63ac761dd12a0b493151dbb` |
+
+Epoch 58 of 60, chosen on the mean validation IoU of Drishyam's five defect classes over 4 views (square crops of 512, 1024, 2048 source px, and the whole photo): **0.390** (512 px 0.381, 1024 px 0.407, 2048 px 0.401, whole 0.370); on whole photos alone 0.370 (crack 0.420, spalling 0.390, efflorescence 0.308, exposed_rebar 0.352, corrosion 0.378). That is the split that chose the epoch, so the number is optimistic, and no held-out number exists (dacl10k's test labels are withheld). The merged classes are unions (`training/class_map.json`): crack is dacl10k Crack or ACrack (alligator crack), whose own IoUs at that epoch are 0.243 and 0.441. Validation mIoU over the 19 dacl10k classes at that epoch: 0.352. For reference, not as a like-for-like comparison: the dacl10k paper's DeepLabv3+ with a MobileNetV3-Large encoder and no auxiliary loss scores 0.320 on the validation split ([arXiv:2309.00460](https://arxiv.org/abs/2309.00460), Table 3). Per-epoch numbers: `drishyam_dacl10k_v2b.metrics.json`.
+
+Trained with Python 3.13.15, torch 2.11.0+cu128, torchvision 0.26.0+cu128, timm 1.0.29, segmentation-models-pytorch 0.5.0, onnx 1.23.2, onnxslim 0.1.98, onnxconverter-common 1.16.0, numpy 2.1.3, cv2 4.14.0, cv2_export 5.0.0.93 (1 session(s); every one is in `drishyam_dacl10k_v2b.run_info.json`). Source: no git checkout (Kaggle); notebook sources sha256 `15fa5c66887d08ed6582dbe51dbd0e6ba42a427a7c043632555e678aa28b7468` (`training/make_notebook.py`'s `source_sha256()` at the commit the notebook was built from). Training flags: that file's `flags`; best.pt: the epoch with the highest scale_mean, the mean over 4 views (square crops of 512, 1024, 2048 source px, each clamped to the photo's short side, 60 % centred on a labelled pixel, seeded and the same every epoch, and the whole photo) of the validation mean IoU of Drishyam's 5 defects.
+
+**Licence: [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/), non-commercial; not the permissive licences
+above and not the repo's MIT.** The weights are adapted from (trained on) [dacl10k](https://github.com/phiyodr/dacl10k-toolkit)
+(Flotzinger et al., WACV 2024, [arXiv:2309.00460](https://arxiv.org/abs/2309.00460); CC BY-NC 4.0), so they carry its
+non-commercial terms and its attribution (`LICENSE.drishyam_dacl10k`). No dacl10k images or labels are included. The
+ImageNet starting point (timm `efficientnet_b2`) is Apache 2.0.
