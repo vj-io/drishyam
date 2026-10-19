@@ -50,8 +50,8 @@ V0 = 2.0
 # Where each segmenter is reliable, by its name (JobConfig knobs left None take its values; a value set explicitly
 # always wins): min_view, the smallest share of the photo's long side a look may span, which bounds the first look and
 # every escalation and verify look; absorb, whether a crack or rust inside a spall's or bar's finding joins it;
-# tau_scout, the entropy threshold of a look at L2 or coarser (tau keeps every finer look).
-# classical-v1, and any segmenter not listed, keeps the agent as published (any level, absorption on) except tau_scout.
+# tau_scout, the entropy threshold of a look at L2 or coarser (tau keeps every finer look; unset, tau everywhere).
+# classical-v1, and any segmenter not listed, keeps the agent as published: any level, absorption on.
 # The dacl10k ONNX values were chosen on the dev splits only (results/dev/onnx_profile_sweep.json, 30 % cap, paired
 # 95 % CIs). On CODEBRIM dev100 photos (mostly 4608 px) L1 looks (0.22 of the side) add boxes, not recall: L2 as
 # first and finest level found 0.397 at 33 boxes per photo against 0.403 at 85 for L1; with absorption off, 0.473
@@ -68,20 +68,17 @@ V0 = 2.0
 # A mask first drafted at the finest level gets no verify look (no finer level to confirm it at; its verify_iou stays
 # null, and the step's rationale says so): the dev numbers above ran that way, and a verify at the same level (a
 # shifted window) was not built or measured.
-# classical-v1 tau_scout 0.7 was chosen on the dev splits only (results/dev/tune_sweep.json, fixed costs, paired 95 %
-# CIs, against tau 0.5 at every level). A coarse look that escalates drafts nothing of what it saw, and the classical
-# engine's whole-photo looks (the survey, and on 4608-px photos the L2 look after an L3 survey) are where it is most
-# reliable. At the 30 % cap 0.7 found x1.22 the recall on CODEBRIM dev100 (CI 1.09-1.43; IoU-only x1.31, 1.06-1.73)
-# and x1.03 on synth_dev (0.98-1.09), at the same pixels, as many boxes on CODEBRIM (x1.00, 0.95-1.04) and x1.09 on
-# synth_dev (1.03-1.17). On the clean split it reported 12.40 boxes per photo instead of 12.13 (CI x1.00-1.07: 8 more
-# boxes on 2 photos of 30) and some box on 22 photos instead of 21 (+0.03, CI 0.00-0.10), no more critical ones.
-# Lower values lost recall (0.3: x0.94 on synth_dev, CI 0.88-0.99); above 0.7 no dev recall moved, while each clean
-# survey whose entropy was passed drafted a false alarm (1.0: 25 photos of 30, +0.13, CI 0.03-0.27). Any value in
-# [0.692, 0.703) gives the same dev results: 0.692 is the highest survey entropy that moved recall (synth_dev), 0.703
-# the next clean survey's. It was measured with the classical engine only; a segmenter that falls back to classical-v1
-# (not listed, or other weights) gets it too. The ONNX profile keeps tau at every level (tau_scout None): not re-measured.
+# tau_scout was measured for classical-v1 on the dev splits and not adopted (results/dev/tune_sweep.json, fixed costs,
+# paired 95 % CIs, against tau 0.5 at every level). A coarse look that escalates drafts nothing of what it saw; with
+# 0.7 a survey whose entropy is in (0.5, 0.7] drafts and is verified one level finer instead. At the 30 % cap that
+# found x1.03 on synth_dev (CI 0.98-1.09, not a measurable gain) and x1.22 on CODEBRIM dev100 (1.09-1.43): 0.153 to
+# 0.186, where the same boxes at random positions find 0.088 and 0.099 (mean of 30 draws; IoU-only 0.066 to 0.086
+# against 0.019 and 0.023). It sent 242 critical boxes to the human gate on CODEBRIM dev100 instead of 178 (239 and 176
+# matching no ground truth), put 8 more boxes on 2 clean photos of 30 (12.40 per photo against 12.13), and any value in
+# [0.692, 0.703) gives the same dev rows, the upper edge a clean dev survey's entropy. Lower values lost recall (0.3:
+# x0.94 on synth_dev, CI 0.88-0.99); above 0.7 no dev recall moved and more clean photos held a box.
 PROFILES = {
-    "classical-v1": {"min_view": 0.0, "absorb": True, "tau_scout": 0.7},
+    "classical-v1": {"min_view": 0.0, "absorb": True},
     "onnx:drishyam_dacl10k.onnx": {"min_view": 0.3, "absorb": False},
 }
 
@@ -109,7 +106,7 @@ class JobConfig:
     min_level: int = 0  # the finest level an escalation or a verify look may go to (min_view may raise it)
     min_view: float | None = None  # a look spans at least this share of the photo's long side (0: any); None: profile's
     profile: str | None = None  # a PROFILES key; None: the segmenter's own (`profile_for`)
-    tau: float = 0.5  # entropy above this escalates (tau_confirm: every look finer than L2)
+    tau: float = 0.5  # entropy above this escalates (at L2 or coarser too, unless tau_scout is set)
     tau_scout: float | None = None  # the same for a look at L2 or coarser; None: the profile's (PROFILES), else tau
     a_min: int = 64  # crop px; a smaller mask escalates
     eps: float = 0.25  # stop-rule slope factor

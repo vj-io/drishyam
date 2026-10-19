@@ -921,21 +921,21 @@ def named(name, sha256=None):
     return type("Named", (ClassicalSegmenter,), {"name": name, "sha256": sha256 or WEIGHTS.get(name)})()
 
 
-def test_the_classical_profile_pins_its_defaults(scene):
-    """classical-v1 resolves to the JobConfig defaults from before profiles existed (first look L1, any level,
-    absorption on; results/dev/onnx_profile_sweep.json: the byte-for-byte rerun) with one change, tau_scout 0.7 (coarse
-    looks; results/dev/tune_sweep.json). fill and survey_value stay off: measured, not adopted."""
+def test_the_classical_profile_is_the_agent_every_classical_number_ran_with(scene):
+    """classical-v1 resolves to exactly the JobConfig defaults from before profiles existed (first look L1, any level,
+    absorption on), so no classical result moves (results/dev/onnx_profile_sweep.json: the byte-for-byte rerun).
+    tau_scout, fill and survey_value stay off: measured, not adopted (results/dev/tune_sweep.json)."""
     from dataclasses import asdict
 
     from drishyam.agent import PROFILES
     from drishyam.governor import USD_PER_HOUR
     from drishyam.planner import TIMEOUT_S
 
-    assert PROFILES["classical-v1"] == {"min_view": 0.0, "absorb": True, "tau_scout": 0.7}
+    assert PROFILES["classical-v1"] == {"min_view": 0.0, "absorb": True}
     job = Job(scene, JobConfig(), clock=FakeClock())  # the default segmenter here: the classical engine
     assert asdict(job.cfg) == {
         "pixel_cap": 0.3, "usd_cap": 0.05, "seconds_cap": 20.0, "size": 512, "first_level": 1, "min_level": 0,
-        "min_view": 0.0, "profile": "classical-v1", "tau": 0.5, "tau_scout": 0.7, "a_min": 64, "eps": 0.25,
+        "min_view": 0.0, "profile": "classical-v1", "tau": 0.5, "tau_scout": None, "a_min": 64, "eps": 0.25,
         "sla_ms": 500.0, "max_candidates": 20, "chaos": (), "planner_every": 5, "planner_timeout_s": TIMEOUT_S,
         "usd_per_hour": USD_PER_HOUR, "thumbs": True, "max_steps": 200, "use_uncertainty": True,
         "seed_from_looks": True, "v0": 2.0, "survey": True, "verify": True, "absorb": True, "order": "score", "seed": 0,
@@ -956,8 +956,7 @@ def test_a_job_takes_its_segmenters_profile_by_name_and_a_knob_set_explicitly_wi
     assert profile_for(type("NoSha", (ClassicalSegmenter,), {"name": ONNX})()) == "classical-v1"
     cfg = Job(scene, JobConfig(), segmenter=named(ONNX)).cfg
     assert cfg.profile == ONNX and {k: getattr(cfg, k) for k in PROFILES[ONNX]} == PROFILES[ONNX]
-    # pinned: the ONNX profile as it was measured (results/dev/onnx_profile_sweep.json); tau at every level, since
-    # classical-v1's tau_scout was not measured with this model
+    # pinned: the ONNX profile as it was measured (results/dev/onnx_profile_sweep.json), tau at every level
     assert PROFILES[ONNX] == {"min_view": 0.3, "absorb": False} and (cfg.tau, cfg.tau_scout) == (0.5, None)
     cfg = Job(scene, JobConfig(min_view=0.0), segmenter=named(ONNX)).cfg  # a dev sweep's variant
     assert (cfg.min_view, cfg.absorb) == (0.0, PROFILES[ONNX]["absorb"])

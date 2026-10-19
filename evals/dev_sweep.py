@@ -15,7 +15,8 @@ pixels, halt causes, looks per level, the ratio to the downscale with its CI); `
 split, the dataset's sha256 (ground truth and images, as evals.harness records them), caps, variants and each row's
 per-image counts (for paired comparisons across runs), as JSON.
 results/dev/v0_sweep.json holds the rows that chose JobConfig.v0, results/dev/onnx_profile_sweep.json those that chose
-the dacl10k ONNX profile (agent.PROFILES), results/dev/tune_sweep.json those that chose classical-v1's tau_scout.
+the dacl10k ONNX profile (agent.PROFILES), results/dev/tune_sweep.json those of the tuning knobs (tau_scout, fill,
+survey_value; none adopted).
 """
 
 import argparse

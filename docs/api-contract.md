@@ -260,9 +260,8 @@ with (`drishyam.agent.WEIGHTS`, e.g. a retrained model installed under the same 
 `min_view` is the smallest share of the photo's long side a look's window may span, which sets the level of a first
 look and the finest level an `escalate` or `verify` look may go to; `absorb` is whether a crack or rust mostly inside
 a spall's or bar's finding joins it (the `ambiguous` request). `classical-v1`: `min_view` 0 (first looks at L1, zoom
-down to L0) and absorption on, the agent as published, and `tau_scout` 0.7 (below).
-`onnx:drishyam_dacl10k.onnx`, the dacl10k-trained model (sha256 `c49416c10087...`): `min_view` 0.3 and absorption
-off, so no `ambiguous` request. Its finest level is the
+down to L0) and absorption on, the agent as published. `onnx:drishyam_dacl10k.onnx`, the dacl10k-trained model
+(sha256 `c49416c10087...`): `min_view` 0.3 and absorption off, so no `ambiguous` request. Its finest level is the
 finest whose 512-px window spans at least 0.3 of the long side: L0 up to 1706 px, L1 up to 3413 px (L0 of a 2048-px
 photo spans 0.25), L2 up to 6826 px (L1 of a 4608-px photo spans 0.22, of a 3648-px one 0.28); on a 4608-px photo
 first looks are at L2, after the L3 survey.
@@ -287,15 +286,18 @@ governor's `warp-spike` override shrank (512, 384, 288, then 256 px) does not mo
 3000-px photo an L1 look at 384 px spans 0.256 of the side. The dev runs had neither (no replay, governor off).
 The ONNX values were chosen on the dev splits only (`results/dev/onnx_profile_sweep.json`).
 
-`tau_scout` is the entropy threshold of a look at L2 or coarser; `tau` (0.5) stays that of every finer look, and an
-`entropy>tau` rationale names the threshold that applied (`"entropy 0.74 > 0.7 at L2"`). `classical-v1` uses 0.7: a
-coarse look that escalates drafts nothing of what it saw, so a survey whose entropy is above 0.5 and at most 0.7 now
-drafts its classes and is checked one level finer (`verify-new-mask`) instead of escalating (`entropy>tau`). On the
-dev splits at the 30 % cap that found x1.22 the recall on CODEBRIM dev100 (95 % CI 1.09-1.43) and x1.03 on synth_dev
-(0.98-1.09) at the same pixels, with 12.40 boxes per clean photo instead of 12.13 and some box on 22 clean photos of
-30 instead of 21 (`results/dev/tune_sweep.json`). It was measured with the classical engine only; a segmenter that
-falls back to `classical-v1` gets it too, and the ONNX profile keeps `tau` at every level. Published held-out results
-predate it. Two other `JobConfig` knobs from the same sweep stay off (measured, not adopted): `fill`, under which a
+Three `JobConfig` knobs from the tuning dev sweep (`results/dev/tune_sweep.json`) are off by default: measured, not
+adopted. `tau_scout`, when set, is the entropy threshold of a look at L2 or coarser; `tau` (0.5) stays that of every
+finer look, and an `entropy>tau` rationale names the threshold that applied (`"entropy 0.74 > 0.7 at L2"`). Unset
+(every profile), `tau` applies at every level. With 0.7 a survey whose entropy is above 0.5 and at most 0.7 drafts
+its classes and is checked one level finer (`verify-new-mask`) instead of escalating (`entropy>tau`) with nothing
+drafted. At the 30 % cap that found x1.03 the recall on synth_dev (95 % CI 0.98-1.09, not a measurable gain) and
+x1.22 on CODEBRIM dev100 (1.09-1.43): 0.153 to 0.186, where the same boxes at random positions find 0.088 and 0.099
+(mean of 30 draws), IoU-only 0.066 to 0.086 against 0.019 and 0.023. It also sent 242 critical boxes to the human
+gate on CODEBRIM dev100 instead of 178 (239 and 176 matching no ground-truth box), put 12.40 boxes on a clean photo
+instead of 12.13 (8 more boxes, on 2 photos of 30) and sat within 0.003 of a clean dev survey's entropy (any value
+in [0.692, 0.703) gives the same dev rows). The sweep's rule asked for a recall gain on synth_dev without more clean
+false alarms: the gain is inside its CI and the clean count rose. The other two: `fill`, under which a
 look that no longer fits under the pixel cap shrinks to what is left (a multiple of 32 px, at least 256) instead of
 the job halting, with that size in `decision.args.size` and a rationale ending `"; gaze 320 px: what the pixel cap
 leaves (108134 px)"` (synth_dev recall x1.03, clean boxes x1.40); and `survey_value`, which when False keeps the
