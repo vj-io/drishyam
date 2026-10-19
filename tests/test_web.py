@@ -1,5 +1,6 @@
 import base64
 import json
+import shlex
 from pathlib import Path
 
 import cv2
@@ -149,6 +150,13 @@ def test_replay_header_validation(photo):
     assert ok.status_code == 200 and steps[0]["cause"] == "replay"
 
 
+def test_a_deeply_nested_replay_header_is_a_422_not_a_server_error(photo):
+    """12,288 unclosed '[' fit the 16 KB cap and the JSON decoder recursed past Python's limit: a RecursionError, a
+    500, and on AWS an ERROR line that fires the AppErrors alarm."""
+    deep = base64.urlsafe_b64encode(b"[" * 12288).decode().rstrip("=")
+    assert len(deep) <= 16_384 and post(photo, headers={"X-Drishyam-Replay": deep}).status_code == 422
+
+
 def drill_records(ev):
     """(the step after the injected spike or None, the step-6 planner event or None) of a drill job's events."""
     steps = [e for e in ev if e["type"] == "step"]
@@ -284,7 +292,7 @@ def test_privacy_blur_applies_before_analysis(monkeypatch):
 @pytest.mark.parametrize("shape", [(64, 100_000), (100_000, 64)])
 def test_a_long_narrow_strip_is_a_job_not_a_server_error(shape):
     """6.4 MP and inside every limit, but its short side shrank to 0 px for the privacy detectors: a 500, and on
-    AWS an ERROR line that fires the AppErrors alarm, for anyone who sends a 0.4 MB PNG."""
+    AWS an ERROR line that fires the AppErrors alarm, for anyone who sends a PNG of about 20 KB."""
     img = np.full((*shape, 3), 150, np.uint8)
     r = post(cv2.imencode(".png", img)[1].tobytes(), "image/png", "?seconds_cap=5")
     assert r.status_code == 200 and lines(r)[-1]["type"] == "done"
@@ -308,12 +316,13 @@ def test_no_upload_metadata_comes_back(photo):
 def test_lambda_access_log_records_no_forwarded_client_address():
     """On Lambda uvicorn's peer is the Web Adapter on 127.0.0.1, and by default uvicorn trusts that peer's
     X-Forwarded-For and logs the address it names as the client (a local run logged a header-supplied 203.0.113.77):
-    a viewer's, or any caller-chosen, address in the 14-day log group, where docs/aws.md says none is kept."""
+    the viewer's or a CloudFront edge address in the 14-day log group, where docs/aws.md says none is kept. The exec
+    line is parsed with uvicorn's own CLI, so the flag in a comment does not count."""
     from uvicorn import main as cli  # the click command run.sh invokes
 
-    flags = {o for p in cli.params for o in (*p.opts, *p.secondary_opts)}
     run = (Path(__file__).resolve().parent.parent / "infra" / "run.sh").read_text()
-    assert "--no-proxy-headers" in flags and "--no-proxy-headers" in run
+    argv = shlex.split(next(ln for ln in run.splitlines() if ln.strip().startswith("exec ")))
+    assert cli.make_context("uvicorn", argv[argv.index("uvicorn") + 1:]).params["proxy_headers"] is False
 
 
 def test_privacy_detectors_give_each_thread_its_own_result():

@@ -242,7 +242,7 @@ def _parse_replay(header: str | None) -> list:
         raise ValueError("replay header too large")
     try:
         data = json.loads(base64.urlsafe_b64decode(header + "=" * (-len(header) % 4)))
-    except (binascii.Error, ValueError, UnicodeDecodeError) as exc:
+    except (binascii.Error, ValueError, UnicodeDecodeError, RecursionError) as exc:
         raise ValueError("replay header is not base64url JSON") from exc
     return data
 
