@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Fold the Kaggle-trained dacl10k segmenter back into the repo (training/README.md, "Kaggle in 6 steps"):
 #
-#   scripts/install_model.sh ~/Downloads/drishyam_dacl10k.zip [--n 200]
+#   scripts/install_model.sh ~/Downloads/drishyam_dacl10k.zip [--n 200 | --no-eval]
 #   scripts/install_model.sh ~/Downloads/drishyam_dacl10k [--n 200]     (the folder Safari expands the zip into)
 #   scripts/install_model.sh best.onnx [best_fp16.onnx] [--n 200]
 #
@@ -21,18 +21,20 @@
 # 4. runs evals.model_eval on --n images of data/synth200: this model (fixed cost model, its own job_ops timing)
 #    against the classical engine, into runs/model-eval/ (a v2 model's own folders and cost table; never
 #    public/results; `make eval-model` adds the leakage check and CODEBRIM and publishes), and prints the before/after
-#    table. 200 is the published eval;
+#    table. 200 is the published eval; --no-eval skips this step (installing before dev-only tuning, so the
+#    held-out set is read once, at the end);
 # 5. prints the git and scripts/aws.sh commands that would make the live site use the model. It does not run them.
 #
 # PY defaults to .venv/bin/python (the repo venv: OpenCV 5, no torch needed).
 set -euo pipefail
 
-usage() { echo "usage: scripts/install_model.sh drishyam_dacl10k.zip | its unpacked folder | best.onnx [best_fp16.onnx]  [--n N]" >&2; exit 2; }
+usage() { echo "usage: scripts/install_model.sh drishyam_dacl10k.zip | its unpacked folder | best.onnx [best_fp16.onnx]  [--n N | --no-eval]" >&2; exit 2; }
 abspath() { [ -e "$1" ] || { echo "no such file or folder: $1" >&2; exit 2; }; echo "$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"; }
-N=200 MODEL="" FP16=""
+N=200 EVAL=1 MODEL="" FP16=""
 while [ $# -gt 0 ]; do
   case $1 in
     --n) [ $# -ge 2 ] || usage; N=$2; shift 2 ;;
+    --no-eval) EVAL=0; shift ;;
     -h|--help) sed -n '2,28p' "$0"; exit 0 ;;
     -*) usage ;;
     *) if [ -z "$MODEL" ]; then MODEL=$(abspath "$1"); elif [ -z "$FP16" ]; then FP16=$(abspath "$1"); else usage; fi
@@ -219,12 +221,16 @@ for i in 01 02 03; do
     || { cat "$SMOKE/bridge_$i.log" >&2; echo "smoke job on bridge_$i.jpg failed" >&2; exit 1; }
 done
 
+if [ "$EVAL" = 0 ]; then
+  echo "== 4/5 eval: skipped (--no-eval)"
+else
 echo "== 4/5 eval: $N images of data/synth200, this model vs classical (runs/model-eval/; the full run is make eval-model)"
 if [ ! -f data/synth200/annotations.json ]; then  # build all 200 first: the harness would build only N
   echo "building data/synth200 (200 images, about 4 minutes)"
   "$PY" -m evals.synth dataset --out data/synth200 --n 200 --seed 7
 fi
 "$PY" -m evals.model_eval --onnx "$DST" --n "$N" --skip-codebrim
+fi
 
 echo "== 5/5 to make the live site use it (not run here; the weights are CC BY-NC 4.0, see models/README.md)"
 ADD="$DST models/README.md"
