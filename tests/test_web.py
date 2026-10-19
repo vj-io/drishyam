@@ -1,5 +1,6 @@
 import base64
 import json
+import shlex
 from pathlib import Path
 
 import cv2
@@ -50,6 +51,21 @@ def test_health_and_security_headers():
         assert b[key] and f"{label}:" in info and b[key] in info, key
     assert "new" in b["dnn_engines"]  # OpenCV 5's cv2.dnn.ENGINE_NEW, the opt-in ONNX segmenter's engine
     assert len(r.content) < 1000  # small: an uptime monitor polls it
+
+
+def test_a_server_error_is_generic_and_keeps_the_api_headers(monkeypatch, photo):
+    """Starlette answers an unhandled error outside the header middleware, so a 500 went out without them."""
+    from drishyam import imaging
+
+    def fail(_):
+        raise RuntimeError("secret detail /var/task/drishyam")
+
+    monkeypatch.setattr(imaging, "decode_image", fail)
+    r = TestClient(app, raise_server_exceptions=False).post("/api/jobs", content=photo,
+                                                            headers={"Content-Type": "image/jpeg"})
+    assert r.status_code == 500 and r.json() == {"error": "internal error"}
+    assert r.headers["cache-control"] == "no-store" and r.headers["x-content-type-options"] == "nosniff"
+    assert r.headers["content-security-policy"] == "default-src 'none'; frame-ancestors 'none'"
 
 
 def test_build_facts_read_the_hal_line_of_an_arm_build(monkeypatch):
@@ -132,6 +148,13 @@ def test_replay_header_validation(photo):
     ok = post(photo, params="?pixel_cap=0.2", headers=hdr([["gaze", 800, 600, 1]]))
     steps = [e for e in lines(ok) if e["type"] == "step"]
     assert ok.status_code == 200 and steps[0]["cause"] == "replay"
+
+
+def test_a_deeply_nested_replay_header_is_a_422_not_a_server_error(photo):
+    """12,288 unclosed '[' fit the 16 KB cap and the JSON decoder recursed past Python's limit: a RecursionError, a
+    500, and on AWS an ERROR line that fires the AppErrors alarm."""
+    deep = base64.urlsafe_b64encode(b"[" * 12288).decode().rstrip("=")
+    assert len(deep) <= 16_384 and post(photo, headers={"X-Drishyam-Replay": deep}).status_code == 422
 
 
 def drill_records(ev):
@@ -264,6 +287,42 @@ def test_privacy_blur_applies_before_analysis(monkeypatch):
     privacy.blur_boxes(blurred, [[100, 100, 200, 200]])
     assert blurred[100:300, 100:300].std() < img[100:300, 100:300].std() / 5
     assert np.array_equal(blurred[400:], img[400:])
+
+
+@pytest.mark.parametrize("shape", [(64, 100_000), (100_000, 64)])
+def test_a_long_narrow_strip_is_a_job_not_a_server_error(shape):
+    """6.4 MP and inside every limit, but its short side shrank to 0 px for the privacy detectors: a 500, and on
+    AWS an ERROR line that fires the AppErrors alarm, for anyone who sends a PNG of about 20 KB."""
+    img = np.full((*shape, 3), 150, np.uint8)
+    r = post(cv2.imencode(".png", img)[1].tobytes(), "image/png", "?seconds_cap=5")
+    assert r.status_code == 200 and lines(r)[-1]["type"] == "done"
+
+
+def test_no_upload_metadata_comes_back(photo):
+    """Every image the API returns (crops, finding crops, heatmap) is re-encoded from pixels, so an upload's EXIF,
+    GPS position included, never comes back."""
+    tiff = b"MM\x00*\x00\x00\x00\x08" + b"\x00\x01" + b"\x88\x25\x00\x04\x00\x00\x00\x01\x00\x00\x00\x1a" + b"\x00" * 4
+    gps = b"\x00\x01" + b"\x00\x01\x00\x02\x00\x00\x00\x02N\x00\x00\x00" + b"\x00" * 4  # GPSLatitudeRef "N"
+    exif = b"Exif\x00\x00" + tiff + gps
+    upload = photo[:2] + b"\xff\xe1" + (len(exif) + 2).to_bytes(2, "big") + exif + photo[2:]
+    ev = lines(post(upload, params="?pixel_cap=1"))
+    assert ev[-1]["type"] == "done"
+    images = [e["heatmap_png_b64"] for e in ev if e["type"] == "overview"]
+    images += [e["crop_jpeg_b64"] for e in ev if e.get("crop_jpeg_b64")]
+    images += [e["finding"]["crop_jpeg_b64"] for e in ev if e["type"] == "finding"]
+    assert len(images) > 3 and not any(b"Exif" in base64.b64decode(b) for b in images)
+
+
+def test_lambda_access_log_records_no_forwarded_client_address():
+    """On Lambda uvicorn's peer is the Web Adapter on 127.0.0.1, and by default uvicorn trusts that peer's
+    X-Forwarded-For and logs the address it names as the client (a local run logged a header-supplied 203.0.113.77):
+    the viewer's or a CloudFront edge address in the 14-day log group, where docs/aws.md says none is kept. The exec
+    line is parsed with uvicorn's own CLI, so the flag in a comment does not count."""
+    from uvicorn import main as cli  # the click command run.sh invokes
+
+    run = (Path(__file__).resolve().parent.parent / "infra" / "run.sh").read_text()
+    argv = shlex.split(next(ln for ln in run.splitlines() if ln.strip().startswith("exec ")))
+    assert cli.make_context("uvicorn", argv[argv.index("uvicorn") + 1:]).params["proxy_headers"] is False
 
 
 def test_privacy_detectors_give_each_thread_its_own_result():

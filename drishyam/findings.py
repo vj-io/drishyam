@@ -179,8 +179,8 @@ def sign(payload: dict, key: bytes, ttl_s: int = TOKEN_TTL_S) -> str:
 def verify(token: str, key: bytes) -> dict:
     try:
         body, mac = token.split(".")
-        expected = hmac.new(key, body.encode(), hashlib.sha256).digest()
-        if not hmac.compare_digest(expected, _unb64(mac)):
+        expected = _b64(hmac.new(key, body.encode(), hashlib.sha256).digest())
+        if not hmac.compare_digest(expected, mac):  # as text: one spelling per MAC, so one token hash per token
             raise SignatureError("signature does not match")
         data = json.loads(_unb64(body))
     except SignatureError:

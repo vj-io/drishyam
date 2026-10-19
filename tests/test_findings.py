@@ -123,6 +123,18 @@ def test_two_decisions_forked_from_one_token_are_visible_siblings():
         assert parent.split(".")[1] not in F._unb64(child.split(".")[0]).decode()
 
 
+def test_a_signed_token_has_one_spelling():
+    """A lenient base64 decoder reads padding and '+' '/' as '-' '_' to the same MAC bytes, so a re-spelt token
+    verified and a second decision forked from one token named a different prev_token_sha256. Only the spelling
+    sign() wrote is accepted."""
+    token = F.sign(F.work_order("j_x", [make()], []), KEY)
+    body, mac = token.split(".")
+    for bad in {token + "=", token + "==", body + "." + mac.translate(str.maketrans("-_", "+/"))} - {token}:
+        with pytest.raises(F.SignatureError):
+            F.verify(bad, KEY)
+    assert F.verify(token, KEY)["job"] == "j_x"
+
+
 def test_tampering_expiry_and_reviewer_validation():
     token = F.sign(F.work_order("j_x", [make()], []), KEY)
     body, mac = token.split(".")

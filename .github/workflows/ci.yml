@@ -15,8 +15,8 @@ jobs:
         os: [ubuntu-24.04, ubuntu-24.04-arm]  # x86 and Arm (Graviton-class) runners
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0 (the v4 tag on 2026-10-19)
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e  # v6.8.0 (the v6 tag on 2026-10-19)
       - run: uv sync --all-extras --locked
       - run: uv run ruff check drishyam tests evals training
       - run: uv run python -c "import cv2, platform; print(cv2.__version__, platform.machine())"
@@ -31,8 +31,8 @@ jobs:
   e2e-mock:  # the page in a real Chromium under the production CSP, against fixtures and a stand-in API
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0 (the v4 tag on 2026-10-19)
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e  # v6.8.0 (the v6 tag on 2026-10-19)
       - run: uv run --no-project --with playwright==1.63.0 playwright install --with-deps chromium
       - run: uv run --no-project --with playwright==1.63.0 python tests/e2e/test_ui_mock.py
         env:
