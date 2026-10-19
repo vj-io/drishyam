@@ -284,5 +284,8 @@ exceed the cap (10 environments live, 5 with a reservation), and `scripts/aws.sh
   users: someone who starts more than 10 jobs in two minutes is blocked until their rate drops. Viewers
   behind one shared IP (an office NAT) share all three limits.
 - A job, including any pacing between steps, must finish within the 60 s function timeout.
-- WAF sampled requests (kept by AWS for 3 hours) hold viewer IPs; CloudFront and WAF access logs are off.
+- WAF sampled requests (kept by AWS for 3 hours) hold viewer IPs; CloudFront and WAF access logs are off. The
+  function's own log names no client address: `infra/run.sh` starts uvicorn with `--no-proxy-headers`, since by
+  default uvicorn trusts the Web Adapter's (127.0.0.1) `X-Forwarded-For` and logs the address it names (seen
+  in a local run; what deployments before this change logged was not checked on AWS).
 - Rotating the signing key invalidates every work order signed before the rotation; no rotation is set up.

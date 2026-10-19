@@ -266,6 +266,41 @@ def test_privacy_blur_applies_before_analysis(monkeypatch):
     assert np.array_equal(blurred[400:], img[400:])
 
 
+@pytest.mark.parametrize("shape", [(64, 100_000), (100_000, 64)])
+def test_a_long_narrow_strip_is_a_job_not_a_server_error(shape):
+    """6.4 MP and inside every limit, but its short side shrank to 0 px for the privacy detectors: a 500, and on
+    AWS an ERROR line that fires the AppErrors alarm, for anyone who sends a 0.4 MB PNG."""
+    img = np.full((*shape, 3), 150, np.uint8)
+    r = post(cv2.imencode(".png", img)[1].tobytes(), "image/png", "?seconds_cap=5")
+    assert r.status_code == 200 and lines(r)[-1]["type"] == "done"
+
+
+def test_no_upload_metadata_comes_back(photo):
+    """Every image the API returns (crops, finding crops, heatmap) is re-encoded from pixels, so an upload's EXIF,
+    GPS position included, never comes back."""
+    tiff = b"MM\x00*\x00\x00\x00\x08" + b"\x00\x01" + b"\x88\x25\x00\x04\x00\x00\x00\x01\x00\x00\x00\x1a" + b"\x00" * 4
+    gps = b"\x00\x01" + b"\x00\x01\x00\x02\x00\x00\x00\x02N\x00\x00\x00" + b"\x00" * 4  # GPSLatitudeRef "N"
+    exif = b"Exif\x00\x00" + tiff + gps
+    upload = photo[:2] + b"\xff\xe1" + (len(exif) + 2).to_bytes(2, "big") + exif + photo[2:]
+    ev = lines(post(upload, params="?pixel_cap=1"))
+    assert ev[-1]["type"] == "done"
+    images = [e["heatmap_png_b64"] for e in ev if e["type"] == "overview"]
+    images += [e["crop_jpeg_b64"] for e in ev if e.get("crop_jpeg_b64")]
+    images += [e["finding"]["crop_jpeg_b64"] for e in ev if e["type"] == "finding"]
+    assert len(images) > 3 and not any(b"Exif" in base64.b64decode(b) for b in images)
+
+
+def test_lambda_access_log_records_no_forwarded_client_address():
+    """On Lambda uvicorn's peer is the Web Adapter on 127.0.0.1, and by default uvicorn trusts that peer's
+    X-Forwarded-For and logs the address it names as the client (a local run logged a header-supplied 203.0.113.77):
+    a viewer's, or any caller-chosen, address in the 14-day log group, where docs/aws.md says none is kept."""
+    from uvicorn import main as cli  # the click command run.sh invokes
+
+    flags = {o for p in cli.params for o in (*p.opts, *p.secondary_opts)}
+    run = (Path(__file__).resolve().parent.parent / "infra" / "run.sh").read_text()
+    assert "--no-proxy-headers" in flags and "--no-proxy-headers" in run
+
+
 def test_privacy_detectors_give_each_thread_its_own_result():
     """Concurrent uploads share one detectors(); YuNet's input size and NanoDet's input are per-call
     state. The low NanoDet threshold makes both results non-empty and distinct."""

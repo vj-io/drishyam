@@ -98,7 +98,8 @@ def privacy_pass(img: np.ndarray, max_person_frac: float = PERSON_FRAC_MAX) -> d
     """Detect on a small copy, blur faces, people and vehicles in place at full resolution."""
     H, W = img.shape[:2]
     k = min(1.0, DETECT_SIDE / max(H, W))
-    small = cv2.resize(img, (round(W * k), round(H * k)), interpolation=cv2.INTER_AREA) if k < 1 else img
+    # at least 1 px: a long narrow strip (64 x 100000 px) would otherwise shrink to 0 rows
+    small = cv2.resize(img, (max(1, round(W * k)), max(1, round(H * k))), interpolation=cv2.INTER_AREA) if k < 1 else img
     det = detectors()
     up = lambda b: [round(b[0] / k), round(b[1] / k), round(b[2] / k), round(b[3] / k)]
     faces = [up(b) for b in det.faces(small)]

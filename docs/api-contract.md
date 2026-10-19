@@ -368,7 +368,7 @@ to `approvals` with `prev_token_sha256`, the SHA-256 hex digest of the request's
 as the review log's `token_in_sha256`). Nothing stops one token being signed into two conflicting decisions,
 but their orders then share one `prev_token_sha256`, and a chained review's `prev_token_sha256` is the hash
 of the token the previous review returned. It is a hash, not the token's MAC, so an order cannot be turned
-back into the token it came from. (`drishyam review` edits an unsigned `work_order.json` and writes no
+back into the token it came from. A token has one spelling: the MAC is compared as written, so a re-padded one, or one with `+` `/` for `-` `_`, is refused with 403 and cannot give a forked decision another hash. (`drishyam review` edits an unsigned `work_order.json` and writes no
 `prev_token_sha256`.)
 Errors: 400 malformed, 403 bad or expired signature, 409 finding not pending.
 
