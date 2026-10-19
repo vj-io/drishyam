@@ -15,8 +15,8 @@ or on any AWS instance: this workstream does not deploy or write to AWS.
 | Where | CPU, threading | OpenCV | What ran | Files |
 | --- | --- | --- | --- | --- |
 | This Mac | Intel Core i9-9880H, x86, 8 cores / 16 threads; macOS GCD | opencv-python-headless 5.0.0 wheel (`uv.lock`), IPP HAL | Metric A, Metric B (1 thread and all 16), dacl10k latency, INT8 | `results/local-macos-x86/{kernels,loop,loop_onnx,int8,int8_repeat}.json` |
-| GitHub `ubuntu-24.04-arm` | Arm (an earlier run reported Neoverse-N2); Linux pthreads | the same version, aarch64 wheel (KleidiCV and carotene HAL) | Metric A, Metric B at 1, 2, 4 threads, micro, macro | `results/linux-aarch64/` once the owner runs the workflow |
-| GitHub `ubuntu-24.04` | x86; Linux pthreads | the same version, x86_64 wheel | the same | `results/linux-x86_64/` once the owner runs the workflow |
+| GitHub `ubuntu-24.04-arm` | Neoverse-N2, 4 logical CPUs; Linux pthreads | the same version, aarch64 wheel (KleidiCV and carotene HAL) | Metric A, Metric B at 1, 2, 4 threads, micro, macro | `results/linux-aarch64/`: `micro.json` (the fixed cost table, 2026-10-18); `kernels.json`, `loop.json`, `macro.json` and `micro_run39220769299.json` from run 39220769299 |
+| GitHub `ubuntu-24.04` | AMD EPYC 7763, 4 logical CPUs; Linux pthreads | the same version, x86_64 wheel (IPP HAL) | the same | `results/linux-x86_64/{micro,macro,kernels,loop}.json`, run 39220769299 |
 | Lambda arm64, 3008 MB | Graviton, 1.7 vCPU of time (below) | the same version, aarch64 wheel | not measured here | the two smoke runs in `docs/report.md` section 5 are the only Lambda timings |
 
 **COOL and AISPL.** The AWS India (AISPL) account could not subscribe to the COOL Marketplace AMI (the agreement was
@@ -201,16 +201,210 @@ The owner runs it, from the repository root:
     gh run download RUN_ID -n bench-linux-aarch64 -D runs/gh/linux-aarch64
     gh run download RUN_ID -n bench-linux-x86_64 -D runs/gh/linux-x86_64
 
-Each artifact holds `micro.json`, `macro.json`, `kernels.json` and `loop.json` at its top level. Copy the files into
-`results/linux-aarch64/` and `results/linux-x86_64/` to publish them:
+Each artifact holds `micro.json`, `macro.json`, `kernels.json` and `loop.json` at its top level. To publish a run:
 
-    cp runs/gh/linux-aarch64/kernels.json runs/gh/linux-aarch64/loop.json results/linux-aarch64/
+    cp runs/gh/linux-aarch64/{kernels,loop,macro}.json results/linux-aarch64/
+    cp runs/gh/linux-aarch64/micro.json results/linux-aarch64/micro_runRUN_ID.json
     cp runs/gh/linux-x86_64/*.json results/linux-x86_64/
 
-Copy `results/linux-aarch64/micro.json` and `macro.json` only on purpose: the evaluation harness charges its fixed
-costs from that `micro.json` (`MICRO_ARM=linux-aarch64` in the Makefile), so replacing it changes the modelled wall
-times of every later eval run (not its decisions). The macro step builds and runs `data/synth200` on the runner, as
-the workflow always has.
+Never copy a run's aarch64 `micro.json` over `results/linux-aarch64/micro.json`: the evaluation harness charges its
+fixed costs from that file (`MICRO_ARM=linux-aarch64` in the Makefile), so replacing it changes the modelled wall
+times of every later eval run (not its decisions); a run's own table is kept beside it under the run's id. A new
+`macro.json` changes the job split that README.md, docs/report.md and bench/README.md quote:
+`tests/test_bench_doc.py` fails until they match it, and checks every table below against the JSON. The macro step
+builds and runs `data/synth200` on the runner, as the workflow always has (timings only; nothing is scored).
+
+### Run 39220769299
+
+GitHub Actions run 39220769299 (`bench-arm64.yml` on `release/v1.1`, `n=200`; the run id is the owner's, the JSON
+does not record it) ran both jobs at the same time on 2026-10-19: the files' start timestamps run from 08:10:33 to
+08:13:26 UTC. It is one run per runner and one round of Metric B, so how far these numbers move between runs on
+GitHub's VMs is not known (the Mac above moved up to about 3 times).
+
+| | `linux-aarch64` | `linux-x86_64` |
+| --- | --- | --- |
+| runner (`provenance.label`) | GitHub ubuntu-24.04-arm runner, not Lambda | GitHub ubuntu-24.04 runner, not Lambda |
+| CPU (`provenance.cpu`), logical CPUs | Neoverse-N2, 4 | AMD EPYC 7763 64-Core Processor, 4 |
+| OS | Linux 6.17.0-1022-azure, glibc 2.39 | the same |
+| OpenCV | 5.0.0, stock (not COOL) | 5.0.0, stock (not COOL) |
+| `build_info_sha256` | `4460ffe25568d7f496997f0593f568f4d91ee4740c97f057b2986c237e8a386c` | `0ef08003c31127b3b5d34410ab13483c511e73b99e278b1a8abd6ddcb265699a` |
+| Baseline; dispatched | NEON FP16; NEON_DOTPROD NEON_FP16 NEON_BF16 | SSE SSE2 SSE3; SSE4_1 SSE4_2 AVX FP16 AVX2 AVX512_SKX |
+| Custom HAL | YES (carotene (ver 0.0.1) KleidiCV (ver 26.03)) | YES (ipp (ver 0.0.1)) |
+| parallel framework | pthreads | pthreads |
+| Python; NumPy | 3.13.16; 2.5.4 | 3.13.16; 2.5.4 |
+| 1-minute load average, lowest to highest | 0.68 to 1.41 | 1.02 to 1.62 |
+
+The load averages are every reading in the run's four files (start and end of each, and of the micro file's
+`job_ops` and DNN blocks). A benchmark on one thread keeps one CPU busy, so about 1 on 4 logical CPUs is the
+benchmark itself; the highest readings came after the 4-thread kernels.
+
+**Like with like.** The same wheel version (5.0.0.93, `uv.lock`), Python, NumPy, kernel, code and inputs, and 4
+logical CPUs each. The builds differ, as they must across architectures (the hashes differ; the aarch64 one equals
+the hash in `results/linux-aarch64/micro.json`, timed on 2026-10-18), and with them the HAL (KleidiCV and carotene
+against IPP) and the SIMD baseline. So every ratio below is core, build and VM together: not Arm's core alone, and not
+KleidiCV alone, since no run here turns a HAL off. The JSON does not say whether the x86 VM's 4 logical CPUs are 4
+cores or 2 cores with two hardware threads each (an EPYC 7763 core runs two, a Neoverse-N2 core one), so the 4-thread
+columns may compare 4 Arm cores with 2 x86 cores.
+
+**Not Lambda.** These are shared GitHub VMs. Their Python is 3.13.16; the function runs Python 3.12
+(`lambda_.Runtime.PYTHON_3_12` in `infra/drishyam_stack.py`). The OpenCV wheel is `abi3` (one build per platform
+for every CPython from 3.7), so the Python version does not change which OpenCV runs, but the interpreter and NumPy
+are each version's own builds. `uv.lock` holds two aarch64 files of the wheel (manylinux2014 and manylinux_2_28); the
+Lambda package is installed for the manylinux_2_28 platform (`scripts/build_lambda.sh`), which file the runner or
+the package got is not recorded, and neither is the function's build hash. Neoverse-N2 is not a Graviton core
+(Graviton2 is Neoverse-N1, Graviton3 V1, Graviton4 V2), and the function has 1.7 vCPU of time, not 4 CPUs.
+
+### Metric A on both runners
+
+The frames and kernels of Metric A above, 30 timed repeats after 3 warm-ups; `all` is 4 threads on both. p50 ms;
+x86 ÷ Arm is x86's p50 over Arm's, from the unrounded values: above 1 Arm is faster, below 1 x86 is.
+
+| kernel | size | Arm, 1 thread | x86, 1 thread | x86 ÷ Arm | Arm, 4 threads | x86, 4 threads | x86 ÷ Arm |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| pyramid | 1024x768 | 0.87 | 0.94 | 1.07 | 0.25 | 0.49 | 2.00 |
+| clahe_lab | 1024x768 | 9.12 | 12.4 | 1.36 | 2.77 | 5.89 | 2.12 |
+| scharr_tensor | 1024x768 | 7.96 | 7.75 | 0.97 | 8.03 | 10.8 | 1.35 |
+| blackhat_tophat | 1024x768 | 9.73 | 5.08 | 0.52 | 9.62 | 5.07 | 0.53 |
+| canny | 1024x768 | 1.89 | 1.85 | 0.98 | 0.62 | 0.79 | 1.27 |
+| components_contours | 1024x768 | 4.43 | 8.47 | 1.91 | 3.14 | 5.63 | 1.79 |
+| warp_gaze | 1024x768 | 1.65 | 2.01 | 1.22 | 0.46 | 0.95 | 2.07 |
+| blob | 1024x768 | 0.77 | 1.10 | 1.44 | 0.49 | 1.05 | 2.15 |
+| pyramid | 2048x1536 | 3.50 | 3.67 | 1.05 | 0.91 | 1.92 | 2.10 |
+| clahe_lab | 2048x1536 | 36.5 | 49.6 | 1.36 | 10.6 | 23.3 | 2.20 |
+| scharr_tensor | 2048x1536 | 44.6 | 42.4 | 0.95 | 10.2 | 18.7 | 1.83 |
+| blackhat_tophat | 2048x1536 | 38.6 | 20.0 | 0.52 | 13.4 | 14.4 | 1.07 |
+| canny | 2048x1536 | 7.91 | 7.66 | 0.97 | 2.59 | 3.28 | 1.27 |
+| components_contours | 2048x1536 | 15.9 | 32.4 | 2.04 | 10.1 | 19.1 | 1.90 |
+| warp_gaze | 2048x1536 | 1.64 | 2.01 | 1.23 | 0.60 | 0.86 | 1.44 |
+| blob | 2048x1536 | 1.80 | 1.22 | 0.68 | 1.07 | 1.10 | 1.03 |
+| pyramid | 4000x3000 | 14.6 | 13.8 | 0.95 | 3.41 | 7.17 | 2.10 |
+| clahe_lab | 4000x3000 | 143.7 | 193.6 | 1.35 | 41.6 | 90.1 | 2.16 |
+| scharr_tensor | 4000x3000 | 141.9 | 122.3 | 0.86 | 47.8 | 70.6 | 1.48 |
+| blackhat_tophat | 4000x3000 | 150.8 | 77.3 | 0.51 | 51.6 | 58.6 | 1.14 |
+| canny | 4000x3000 | 44.5 | 29.9 | 0.67 | 11.3 | 16.5 | 1.46 |
+| components_contours | 4000x3000 | 54.8 | 117.0 | 2.14 | 30.8 | 62.2 | 2.02 |
+| warp_gaze | 4000x3000 | 1.65 | 2.01 | 1.22 | 0.59 | 0.86 | 1.45 |
+| blob | 4000x3000 | 1.78 | 1.22 | 0.68 | 0.90 | 1.12 | 1.26 |
+
+On one thread each runner wins 12 of the 24 kernel and size pairs. x86 wins the black-hat and top-hat pair at every
+size, where Arm takes about twice as long (0.51 to 0.52), Canny (0.67 to 0.98) and the structure tensor (0.86 to
+0.97) at every size, the blob from the two larger frames (0.68) and the 4000x3000 pyramid (0.95). Arm wins contours
+and fitting (1.91 to 2.14), CLAHE in LAB (1.35 to 1.36), the oblique gaze warp (1.22 to 1.23), the blob from
+1024x768 (1.44) and the two smaller pyramids (1.05 and 1.07). On 4 threads Arm wins 23 of 24, by 1.03 (the blob at
+2048x1536) to 2.20 (CLAHE at 2048x1536); the exception is the black-hat and top-hat pair at 1024x768 (0.53), which
+gains nothing from threads at that size on either runner (1.01 and 1.00 times its 1-thread speed). The difference is
+thread scaling: from 1 to 4 threads Arm's pyramid gets 3.5 to 4.3 times faster and x86's 1.9 times, and no x86
+kernel more than 2.34 times against up to 4.37 on Arm; whether x86's 4 logical CPUs are 2 cores (above) is the
+obvious suspect and was not checked.
+
+DNN forwards (bare `forward` of the privacy detector; the dacl10k weights are not on the runners, so no segmenter
+row ran):
+
+| forward | input | threads | Arm, p50 / p95 ms | x86, p50 / p95 ms | x86 ÷ Arm (p50) |
+| --- | --- | --- | --- | --- | --- |
+| NanoDet-Plus | 416x416 | 1 | 40.5 / 40.8 | 24.8 / 25.0 | 0.61 |
+| NanoDet-Plus | 416x416 | 4 | 13.1 / 13.3 | 14.9 / 15.2 | 1.14 |
+
+x86 runs this forward in 0.61 of Arm's time on one thread; on 4 threads Arm is 1.14 times faster (Arm 3.1 times its
+one-thread speed, x86 1.7 times).
+
+### Metric B on both runners
+
+The classical segmenter, the 8 demo photos and 8 synthetic ones, one round, at 1, 2 and 4 threads (`LOOP_THREADS`),
+decisions held fixed as in Metric B above. Job and step columns are p50 / p95 ms.
+
+| threads | prefetch | jobs/s, Arm | jobs/s, x86 | job, Arm | job, x86 | step, Arm | step, x86 | CPU s per job, Arm | CPU s per job, x86 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | off | 3.972 | 3.280 | 173.2 / 415.8 | 213.4 / 518.5 | 53.0 / 59.9 | 65.3 / 75.8 | 0.252 | 0.305 |
+| 1 | warp | 3.989 | 3.300 | 174.1 / 414.1 | 213.6 / 513.3 | 52.7 / 59.4 | 64.7 / 75.9 | 0.257 | 0.311 |
+| 1 | warp+segment | 4.784 | 3.928 | 181.8 / 347.2 | 214.7 / 401.7 | 53.9 / 61.2 | 64.6 / 76.3 | 0.372 | 0.451 |
+| 2 | off | 4.532 | 3.865 | 152.0 / 366.9 | 181.0 / 433.4 | 47.0 / 52.7 | 55.6 / 63.1 | 0.288 | 0.358 |
+| 2 | warp | 4.475 | 3.827 | 154.3 / 368.7 | 182.2 / 438.7 | 47.4 / 53.4 | 55.9 / 63.5 | 0.296 | 0.369 |
+| 2 | warp+segment | 5.462 | 4.120 | 158.3 / 302.7 | 204.3 / 391.7 | 48.1 / 55.2 | 62.3 / 74.6 | 0.406 | 0.577 |
+| 4 | off | 4.883 | 3.837 | 139.5 / 341.6 | 179.7 / 447.7 | 43.6 / 49.7 | 56.4 / 65.0 | 0.349 | 0.553 |
+| 4 | warp | 4.860 | 3.826 | 141.4 / 341.6 | 183.2 / 446.5 | 44.1 / 50.5 | 55.8 / 64.9 | 0.356 | 0.562 |
+| 4 | warp+segment | 5.661 | 4.026 | 154.1 / 285.7 | 208.3 / 400.0 | 46.8 / 52.9 | 62.3 / 78.9 | 0.489 | 0.766 |
+
+On both runners every variant made the same decisions as prefetch-off on every photo, at every thread count
+(`decisions_identical`, `decisions_identical_across_threads`), in 71 steps over the 16 photos; each prefetching
+variant served 19 of 71 looks from the cache (0.27) and dropped 14 of its 58 speculative looks unread, half the Mac's
+two-round counts. `warp+segment` against off, with the null arm `warp` against off in brackets:
+
+| runner, threads | jobs/s | job p50 | job p95 | step p50 | step p95 | CPU s per job |
+| --- | --- | --- | --- | --- | --- | --- |
+| Arm, 1 | +20.5 % (+0.4 %) | +5.0 % (+0.5 %) | -16.5 % (-0.4 %) | +1.7 % (-0.6 %) | +2.2 % (-0.8 %) | +47.6 % (+2.0 %) |
+| Arm, 2 | +20.5 % (-1.3 %) | +4.1 % (+1.5 %) | -17.5 % (+0.5 %) | +2.3 % (+0.9 %) | +4.7 % (+1.3 %) | +41.0 % (+2.8 %) |
+| Arm, 4 | +15.9 % (-0.5 %) | +10.5 % (+1.4 %) | -16.4 % (+0.0 %) | +7.3 % (+1.1 %) | +6.4 % (+1.6 %) | +40.1 % (+2.0 %) |
+| x86, 1 | +19.7 % (+0.6 %) | +0.6 % (+0.1 %) | -22.5 % (-1.0 %) | -1.1 % (-0.9 %) | +0.7 % (+0.1 %) | +47.9 % (+2.0 %) |
+| x86, 2 | +6.6 % (-1.0 %) | +12.9 % (+0.7 %) | -9.6 % (+1.2 %) | +12.1 % (+0.5 %) | +18.2 % (+0.6 %) | +61.2 % (+3.1 %) |
+| x86, 4 | +4.9 % (-0.3 %) | +15.9 % (+1.9 %) | -10.7 % (-0.3 %) | +10.5 % (-1.1 %) | +21.4 % (-0.2 %) | +38.5 % (+1.6 %) |
+
+The null arm stayed within 3.1 % everywhere, much quieter than on the Mac (up to 22 %), so here the differences
+below are larger than the noise this run shows, though it is one round:
+
+- **One thread, both runners: faster whole jobs for half again the CPU.** jobs/s +20.5 % on Arm and +19.7 % on x86,
+  job p95 -16.5 % and -22.5 %, CPU per job +47.6 % and +47.9 %, steps within 2.2 %. Arm's job p50 rose 5.0 %
+  (null +0.5 %). On the Mac the same variant gave jobs/s from -2 % to +15 % across runs.
+- **x86 on 2 and 4 threads: a loss at the step.** step p95 +18.2 % and +21.4 %, step p50 +12.1 % and +10.5 %, job
+  p50 +12.9 % and +15.9 %, for jobs/s +6.6 % and +4.9 % and CPU +61.2 % and +38.5 %.
+- **Arm: the gain holds on 2 threads; on 4 the median pays.** On 2, jobs/s +20.5 %, job p95 -17.5 %, step p95
+  +4.7 % (null +1.3 %), CPU +41.0 %. On 4, jobs/s +15.9 % and job p95 -16.4 %, but job p50 +10.5 % and step p50
+  +7.3 % (null +1.4 % and +1.1 %).
+
+So with a spare core, background segmentation shortens whole jobs on both runners; once OpenCV's own threads fill the
+CPUs it slows the main thread's steps, sooner on x86 than on Arm (the 2-core question again; not measured).
+Prefetching stays off: none of this ran on the function's 1.7 vCPU, and at 2 threads, its setting, the two runners
+disagree at the step.
+
+Arm against x86 with prefetching off: Arm ran 1.21, 1.17 and 1.27 times x86's jobs/s at 1, 2 and 4 threads, and x86
+used 1.21, 1.24 and 1.58 times Arm's CPU per job. x86 gained nothing from 2 to 4 threads (3.865 to 3.837 jobs/s)
+while its CPU per job rose from 0.358 to 0.553 s; Arm went from 4.532 to 4.883 jobs/s.
+
+### Macro: where a job's time goes on both runners
+
+`bench/macro.py` on 200 synthetic 2048x1536 images at the 30 % cap, one worker, one OpenCV thread, the default agent
+on a real clock (live costs and the governor on, so a machine's speed can change what it does). ms per image, with
+the share of total wall time; the first row is the stages `macro.json` labels KleidiCV-covered imgproc, which on x86
+are the same OpenCV calls through IPP:
+
+| stage | Arm | x86 | x86 ÷ Arm |
+| --- | --- | --- | --- |
+| pyramid, saliency, warp, quality gate | 15.0 (7.8 %) | 16.3 (6.6 %) | 1.09 |
+| classical segmenter | 143.0 (73.9 %) | 182.9 (74.5 %) | 1.28 |
+| crack thinning | 8.2 (4.2 %) | 18.1 (7.4 %) | 2.20 |
+| decode | 13.9 (7.2 %) | 13.1 (5.3 %) | 0.94 |
+| Python outside the timed ops | 13.4 (6.9 %) | 15.2 (6.2 %) | 1.13 |
+| whole image, p50 / p95 / p99 | 195.8 / 209.7 / 213.8 | 248.2 / 270.0 / 282.7 | 1.27 |
+
+Arm did 5.13 images/s and x86 4.06 (Arm 1.26 times). They did nearly but not exactly the same work: mean steps 2.94
+and 2.95, mean pixel fraction 0.261 and 0.2614 (live costs and each build's own arithmetic can both change a
+decision; which did is not separated). Of the 52 ms per image x86 needs beyond Arm, 40 are the classical segmenter
+and 10 crack thinning (`measure`'s hit-or-miss thinning, 2.20 times Arm's); x86 decodes faster (0.94). If the
+covered stages ran 1.8 times faster, a whole job would get 1.036 times faster on Arm and 1.030 times on x86.
+
+This replaces the 50-image run of 2026-10-18 in `results/linux-aarch64/macro.json` (5.55 images/s; 75 % in the
+segmenter, now 74 %; the same 8 % covered and 1.04 times); README.md, docs/report.md and bench/README.md now quote
+this one.
+
+### The fixed cost table
+
+The evaluation harness charges each timed op its p50 from `results/linux-aarch64/micro.json` `job_ops` (GitHub's
+arm64 runner, 2026-10-18, the same build hash). This run's aarch64 micro, kept as `micro_run39220769299.json`, does
+not replace it. All 21 of its `job_ops` p50s are below the table's: by 0.1 to 4.3 %, and by 12.3 % for `downscale`
+at 1024x768 (0.071 against 0.081 ms). The table stays as it is. At 2048x1536, the size of the 200-image sets, p50 ms:
+
+| op | table in use | this run, Arm | this run, x86 | x86 ÷ Arm |
+| --- | --- | --- | --- | --- |
+| `pyrDown` | 3.573 | 3.420 | 3.704 | 1.08 |
+| `saliency` | 3.226 | 3.167 | 2.652 | 0.84 |
+| `warp` | 1.614 | 1.613 | 2.017 | 1.25 |
+| `quality` | 0.899 | 0.876 | 0.720 | 0.82 |
+| `segment:accurate` | 59.068 | 58.221 | 74.557 | 1.28 |
+| `segment:fast` | 29.513 | 29.148 | 42.308 | 1.45 |
+| `downscale` | 0.366 | 0.365 | 0.991 | 2.72 |
+
+An x86 table would charge the classical segment op 1.28 (`accurate`) and 1.45 (`fast`) times Arm's and the
+downscale baseline's `INTER_AREA` resize 2.72 times, but saliency and the quality gate 0.84 and 0.82 times.
 
 ## Lambda: threads and the 500 ms step
 
@@ -303,7 +497,13 @@ above on this machine; onnxruntime stays out of the live path.
 
 ## What is not measured
 
-- Lambda itself: no timing in this page comes from the function; the GitHub arm64 runner is a different VM.
+- Lambda itself: no timing in this page comes from the function; the GitHub arm64 runner is a different VM, a
+  different core (Neoverse-N2) and Python 3.13 against the function's 3.12.
 - 2 and 4 threads on this Mac (GCD), and any number on an idle Mac: the machine was shared throughout.
-- The GitHub Arm and x86 runs: the workflow is ready and not triggered; the owner runs it.
+- Run-to-run variation on GitHub's runners: run 39220769299 is one run per runner and one round of Metric B.
+- What KleidiCV itself buys on Arm: no run turns the HAL off, so Arm against x86 is core, build and VM together.
+- Whether the x86 runner's 4 logical CPUs are 4 cores or 2 cores with two hardware threads each.
+- Mask parity between the Arm and x86 builds: `run_all.sh` saves `parity.npz` on each runner, but the workflow does
+  not upload it.
+- The macro worker sweep (`WORKERS`) on GitHub: one worker only.
 - The dacl10k net on Arm, FP32 or INT8: the x86 INT8 result above does not predict it.

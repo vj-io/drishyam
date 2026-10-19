@@ -153,14 +153,24 @@ arms (COOL on c8g, stock on c8g, stock on c7i), each set to terminate itself aft
 bench.compare_arms results/A results/B results/C` would write `docs/cool_benchmark.md` against the PRD's expected
 1.2–1.8× op-level and 1.2–1.3× end-to-end range. None of it has run on AWS.
 
-**What COOL could buy end to end, from GitHub's arm64 runner.** A 50-image macro run with the stock aarch64 wheel
+**What COOL could buy end to end, from GitHub's arm64 runner.** A 200-image macro run with the stock aarch64 wheel
 on GitHub's `ubuntu-24.04-arm` runner (Neoverse-N2, one thread; a GitHub Actions VM, not the Lambda;
 [results/linux-aarch64/macro.json](../results/linux-aarch64/macro.json)) puts 8 % of a job in the stages it labels
-KleidiCV-covered imgproc (pyramid, saliency, warp, quality gate), 75 % in the classical segmenter (imgproc plus
-NumPy), 4 % in crack thinning, 8 % in decode and 6 % in Python. So if COOL made the covered ops 1.8× faster, a whole
+KleidiCV-covered imgproc (pyramid, saliency, warp, quality gate), 74 % in the classical segmenter (imgproc plus
+NumPy), 4 % in crack thinning, 7 % in decode and 7 % in Python. So if COOL made the covered ops 1.8× faster, a whole
 job would get about 1.04× faster; the x86 laptop's 8-image run
 ([results/local-macos-x86/macro.json](../results/local-macos-x86/macro.json)) gives the same 1.04×. The gaze path itself is cheap; most of the time is in segmentation, which is
 where a COOL or DNN speed-up would have to land.
+
+**Arm against x86 on GitHub's runners.** The same workflow run timed the same wheel version on GitHub's x86
+`ubuntu-24.04` runner (AMD EPYC 7763, IPP HAL), 4 logical CPUs and Python 3.13 on both (the Lambda runs 3.12): one
+run each, on shared VMs, not the function and not a Graviton core. On one thread each runner won 12 of 24 kernel and
+size pairs (x86 about twice as fast at black-hat and top-hat, Arm about twice as fast at contours and fitting); on 4
+threads Arm won 23. The agent loop ran 1.17 to 1.27 times as many jobs per second on Arm, and the macro job 1.26
+times as many images per second (per-image p50 195.8 against 248.2 ms), most of the gap in the classical segmenter;
+x86 ran the NanoDet forward in 0.61 of Arm's time on one thread. Every ratio mixes core, OpenCV build (KleidiCV and
+carotene against IPP) and VM, and the run was not repeated. Tables and provenance: [bench.md](bench.md), "Arm against
+x86 on GitHub".
 
 ## 7. Related work
 
