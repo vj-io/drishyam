@@ -255,17 +255,36 @@ it changed, else `rule`. No LLM planner is configured on the live demo: there `p
 
 `profile` (on every step record, the halt record included, and on the work order) names the per-segmenter
 settings the job ran with, `drishyam.agent.PROFILES`, looked up by the segmenter's name (`segmenter` in
-`/api/health`; a segmenter not listed gets `classical-v1`): `min_view`, the smallest share of the photo's long side a
-look's window may span, which sets the level of a first look and the finest level an `escalate` or `verify` look may
-go to, and `absorb`, whether a crack or rust mostly inside a spall's or bar's finding joins it (the `ambiguous`
-request). `classical-v1`: `min_view` 0 (first looks at L1, zoom down to L0) and absorption on, the agent as published.
-`onnx:drishyam_dacl10k.onnx`, the dacl10k-trained model: `min_view` 0.3 and absorption off. On a 4608-px photo (L1
-spans 0.22 of the side) every look is at L2 or coarser: first looks at L2 after the L3 survey; on a 2048-px photo L1
-(0.5) is the finest. A look at the finest level whose entropy is above tau or whose mask is under `A_min` drafts what
-it saw instead of escalating, and its rationale ends `"; L2 is the finest level for onnx:drishyam_dacl10k.onnx
-(min_view 0.3): entropy 0.71, crack area 340 px drafted here, no finer look"`; no `ambiguous` request is sent. A planner `change_level` finer than the finest
-level is clamped to it, and its rationale says so. The ONNX values were chosen on the dev splits only
-(`results/dev/onnx_profile_sweep.json`).
+`/api/health`) and weights: a name not listed, or an ONNX file whose sha256 is not the one its profile was chosen
+with (`drishyam.agent.WEIGHTS`, e.g. a retrained model installed under the same file name), gets `classical-v1`.
+`min_view` is the smallest share of the photo's long side a look's window may span, which sets the level of a first
+look and the finest level an `escalate` or `verify` look may go to; `absorb` is whether a crack or rust mostly inside
+a spall's or bar's finding joins it (the `ambiguous` request). `classical-v1`: `min_view` 0 (first looks at L1, zoom
+down to L0) and absorption on, the agent as published. `onnx:drishyam_dacl10k.onnx`, the dacl10k-trained model
+(sha256 `c49416c10087...`): `min_view` 0.3 and absorption off, so no `ambiguous` request. Its finest level is the
+finest whose 512-px window spans at least 0.3 of the long side: L0 up to 1706 px, L1 up to 3413 px (L0 of a 2048-px
+photo spans 0.25), L2 up to 6826 px (L1 of a 4608-px photo spans 0.22, of a 3648-px one 0.28); on a 4608-px photo
+first looks are at L2, after the L3 survey.
+
+A look at the finest level whose entropy is above tau or whose mask is under `A_min` does not escalate. Its
+rationale ends with what it saw and what it drafted: `"; L2 is the finest level for onnx:drishyam_dacl10k.onnx
+(min_view 0.3): entropy 0.71 > 0.5, crack drafted here; no finer look"`, `"...: crack area 40 px < A_min 64, crack
+not drafted; no finer look"` (a mask under `A_min` is never drafted) or `"...: entropy 0.96 > 0.5, no class; no finer
+look"`. Nor does a verify look go below the finest level: a mask first drafted there is not confirmed one level
+finer, so unless another look's check measures it its finding keeps `verify_iou` `null`, and the look's rationale
+ends `"; new crack mask not verified: L2 is the finest level for onnx:drishyam_dacl10k.onnx (min_view 0.3), no finer
+look"`. A disagreement with a coarser look there gets no extra look (`"; iou 0.31 < 0.5 between L3 and L2 not
+settled: ..."`); the finding of its class, if any, gets the `unconfirmed` request. On CODEBRIM dev100 at the 30 % cap
+this profile made 45 verify looks, all at L2 confirming masks the L3 survey drafted, and none after its 396 first
+looks; 72 of its 661 findings have a `verify_iou`, against 302 verify looks and 417 of 926 findings with the same
+model under `classical-v1` (`verify` in `results/dev/onnx_profile_sweep.json`). A verify at the same level (a
+shifted window) was not built or measured.
+
+A planner `change_level` finer than the finest level is clamped to it, and its rationale says so. Two kinds of look
+are exempt from `min_view`: a replayed look (`X-Drishyam-Replay`) runs at its recorded level, and a gaze the
+governor's `warp-spike` override shrank (512, 384, 288, then 256 px) does not move the finest level, so on a
+3000-px photo an L1 look at 384 px spans 0.256 of the side. The dev runs had neither (no replay, governor off).
+The ONNX values were chosen on the dev splits only (`results/dev/onnx_profile_sweep.json`).
 
 ## `POST /api/kill`
 
@@ -296,11 +315,12 @@ A wrong token is accepted and kills nothing (no oracle). Returns `{"ok": true, "
  "approvals": [{"finding_id": "f2", "decision": "approve", "reviewer": "A. Engineer", "at": "2026-10-24T17:05:00Z",
                 "prev_token_sha256": "<SHA-256 hex of the token this decision was applied to>"}],
  "disclaimer": "AI-assisted, not an inspection. Measurements are image pixels, not millimetres.",
- "profile": "classical-v1"}
+ "profile": "classical-v1", "weights_sha256": null}
 ```
 
 `status` is `blocked` while any critical finding is `pending_review`, else `ready`. `profile` is the job's (see the
-step record); a work order the MCP tools draft has none, since there the client chose every level.
+step record) and `weights_sha256` the sha256 of the ONNX weights that made its looks (`null` for the classical
+engine); a work order the MCP tools draft has neither, since there the client chose every level.
 `not_assessed` lists every window the quality gate refused (`reason` `blur`, `glare` or `dark`;
 `box` clipped to the image), and, with `step` 0, every blown-out or black area the overview found larger than 5 %
 of the image, which gets no look at all, so an area the agent could not read never passes for a clean one.

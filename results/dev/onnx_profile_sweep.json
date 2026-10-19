@@ -12,10 +12,11 @@
   "real_minview": "7bcfe5e + the min_view knob as committed in 7c0bd54 (run from the working tree before that commit)",
   "synth_minview": "same as real_minview",
   "clean_minview": "same as real_minview",
-  "real_head": "7c0bd54",
-  "synth_head": "7c0bd54",
-  "clean_head": "7c0bd54",
-  "real_old_baselines": "7c0bd54"
+  "real_old_baselines": "7c0bd54",
+  "real_head_613c9f2": "613c9f2 (first run at 7c0bd54, head@0.3 again at 8065f4a: every row identical)",
+  "synth_head_613c9f2": "613c9f2 (first run at 7c0bd54: every row identical)",
+  "clean_head_613c9f2": "613c9f2 (first run at 7c0bd54: every row identical)",
+  "verify": "613c9f2, runs/verify_probe.py: the head row's and the old row's jobs at the 30 % cap re-run as dev_sweep runs them (fixed cost table, governor off), reading each job's full step records and findings"
  },
  "variants": {
   "downscale": "one 1024-px downscale of the whole photo, segmented once (no agent rule applies)",
@@ -42,10 +43,28 @@
   "13 configurations were searched (f1m1 ... mv30_noabs, old_noabs); old is the reference, head the shipped agent re-run with no knob set (identical to mv30_noabs on every split but chance_recall, whose random boxes are seeded by the row name), head_governor its deployment behaviour",
   "rows whose variant set knobs explicitly record profile classical-v1: the profile that filled the knobs they left unset; head rows record onnx:drishyam_dacl10k.onnx (checked in every dump)",
   "real_levels ran at 947e702, before the absorb switch existed: absorption on, as in the old agent",
-  "head@0.3 on CODEBRIM was re-run at 8065f4a (the rationale note): its row, per-image counts included, is identical to 7c0bd54's",
+  "the head rows (head, head_governor) ran at 7c0bd54, head@0.3 on CODEBRIM again at 8065f4a (the held-look note), and all of them again at 613c9f2 (notes for skipped verifies, the weights check, dataset hashes): every row, per-image counts included, identical each time; the rows here are 613c9f2's",
+  "datasets: the sha256 of each split's ground truth and images (evals.harness.dataset_sha256), written by the 613c9f2 runs; the files run before it carry none, but every file re-runs the 1024-px downscale and its per-image counts (found, chance, GT boxes per image) are identical in every file of a split (asserted when this file is built)",
   "image_0000668 (2048x1536) has no saliency candidate: every agent configuration halts on 'exhausted' before a look, while the downscale reads it",
   "pairs: paired 95 % bootstrap intervals over images (1000 resamples, seed 0, evals.harness.ratio_ci)"
  ],
+ "datasets": {
+  "real": {
+   "n": 100,
+   "gt_sha256": "b5b6a2b442f558285ec31a7a97747cb5c918a0db4a189b2ddfca9fab710c4cd3",
+   "images_sha256": "445cf8082075eaeccdff012920c475801e3b3200831cfe76c37a972b1fa9a477"
+  },
+  "synth_dev": {
+   "n": 60,
+   "gt_sha256": "ab3ea45abb852fa21e2696721060a4952819196b2959085d6f27866726b74bd3",
+   "images_sha256": "736126cce1714f7fa3823b04d001f0a5f9d913179f959ed34c675f3cd2332777"
+  },
+  "clean": {
+   "n": 30,
+   "gt_sha256": "6007a8bf12e5641f297a1630e2f4dc3f2f335ca1806f8dea3b4daad693df2ecc",
+   "images_sha256": "eaac718e380bfc6eef0571a2c91f21a4019c82f4232866d45624be1f4fa3c373"
+  }
+ },
  "splits": {
   "real": {
    "n": 100,
@@ -1517,7 +1536,7 @@
       "escalate": 39,
       "verify": 45
      },
-     "file": "real_head"
+     "file": "real_head_613c9f2"
     },
     "head@1.0": {
      "recall": 0.4851,
@@ -1566,7 +1585,7 @@
       "escalate": 40,
       "verify": 46
      },
-     "file": "real_head"
+     "file": "real_head_613c9f2"
     },
     "head_governor@0.3": {
      "recall": 0.4002,
@@ -1615,7 +1634,7 @@
       "escalate": 40,
       "verify": 47
      },
-     "file": "real_head"
+     "file": "real_head_613c9f2"
     },
     "head_governor@1.0": {
      "recall": 0.4002,
@@ -1664,7 +1683,7 @@
       "escalate": 42,
       "verify": 47
      },
-     "file": "real_head"
+     "file": "real_head_613c9f2"
     }
    }
   },
@@ -2207,7 +2226,7 @@
       "escalate": 10,
       "verify": 48
      },
-     "file": "synth_head"
+     "file": "synth_head_613c9f2"
     },
     "head@1.0": {
      "recall": 0.645,
@@ -2254,7 +2273,7 @@
       "escalate": 10,
       "verify": 48
      },
-     "file": "synth_head"
+     "file": "synth_head_613c9f2"
     }
    }
   },
@@ -2686,7 +2705,7 @@
      "looks_by_action": {
       "gaze": 82
      },
-     "file": "clean_head"
+     "file": "clean_head_613c9f2"
     },
     "head@1.0": {
      "recall": null,
@@ -2722,14 +2741,14 @@
      "looks_by_action": {
       "gaze": 91
      },
-     "file": "clean_head"
+     "file": "clean_head_613c9f2"
     }
    }
   }
  },
  "pairs": {
   "real": {
-   "real_head:head@0.3 / real_head:downscale": {
+   "real_head_613c9f2:head@0.3 / real_head_613c9f2:downscale": {
     "recall": [
      1.1794,
      [
@@ -2745,7 +2764,7 @@
      ]
     ]
    },
-   "real_head:head@1.0 / real_head:downscale": {
+   "real_head_613c9f2:head@1.0 / real_head_613c9f2:downscale": {
     "recall": [
      1.1941,
      [
@@ -2761,7 +2780,7 @@
      ]
     ]
    },
-   "real_head:head@0.3 / real_old_baselines:old@0.3": {
+   "real_head_613c9f2:head@0.3 / real_old_baselines:old@0.3": {
     "recall": [
      1.3234,
      [
@@ -2777,7 +2796,7 @@
      ]
     ]
    },
-   "real_head:head@1.0 / real_old_baselines:old@1.0": {
+   "real_head_613c9f2:head@1.0 / real_old_baselines:old@1.0": {
     "recall": [
      1.2648,
      [
@@ -2889,7 +2908,7 @@
      ]
     ]
    },
-   "real_head:head@0.3 / real_old_baselines:tiling@L2": {
+   "real_head_613c9f2:head@0.3 / real_old_baselines:tiling@L2": {
     "recall": [
      0.9369,
      [
@@ -2905,7 +2924,7 @@
      ]
     ]
    },
-   "real_head:head@0.3 / real_old_baselines:tiling@L1": {
+   "real_head_613c9f2:head@0.3 / real_old_baselines:tiling@L1": {
     "recall": [
      0.8736,
      [
@@ -2921,7 +2940,7 @@
      ]
     ]
    },
-   "real_head:head@0.3 / real_old_baselines:tiling@L0": {
+   "real_head_613c9f2:head@0.3 / real_old_baselines:tiling@L0": {
     "recall": [
      1.2531,
      [
@@ -2939,7 +2958,7 @@
    }
   },
   "synth_dev": {
-   "synth_head:head@0.3 / synth_onnx:old@0.3": {
+   "synth_head_613c9f2:head@0.3 / synth_onnx:old@0.3": {
     "recall": [
      1.025,
      [
@@ -2955,7 +2974,7 @@
      ]
     ]
    },
-   "synth_head:head@1.0 / synth_onnx:old@1.0": {
+   "synth_head_613c9f2:head@1.0 / synth_onnx:old@1.0": {
     "recall": [
      1.0238,
      [
@@ -3035,7 +3054,7 @@
      ]
     ]
    },
-   "synth_head:head@0.3 / synth_head:downscale": {
+   "synth_head_613c9f2:head@0.3 / synth_head_613c9f2:downscale": {
     "recall": [
      1.0082,
      [
@@ -3053,11 +3072,171 @@
    }
   }
  },
+ "verify": {
+  "what": "A verify look confirms a new mask one level finer (or settles an iou < 0.5 with one extra look). Under the dacl10k profile a first look is at its photo's finest level, so the mask it drafts gets no verify look and its finding no verify_iou; the step's rationale says so ('new <class> mask not verified: L2 is the finest level ...', 'iou ... not settled: ...'). Counted at the 30 % cap on the head row's jobs (head) and the old row's (old: profile classical-v1, same model). 'first looks': rule-chosen gazes after the survey; 'held': looks at the finest level whose entropy or mask size asked for a finer one; 'findings_with_verify_iou': findings a cross-level check measured. A verify at the same level (a shifted window) was not built or measured.",
+  "code": "613c9f2, runs/verify_probe.py: the head row's and the old row's jobs at the 30 % cap re-run as dev_sweep runs them (fixed cost table, governor off), reading each job's full step records and findings",
+  "real": {
+   "head": {
+    "profile": [
+     "onnx:drishyam_dacl10k.onnx"
+    ],
+    "looks": {
+     "escalate L1": 7,
+     "escalate L2": 32,
+     "gaze L1": 41,
+     "gaze L2": 359,
+     "gaze L3": 95,
+     "verify L2": 45
+    },
+    "verify_after": {
+     "gaze/survey L3": 45
+    },
+    "first_looks": {
+     "first looks": 396,
+     "at the finest level": 395
+    },
+    "notes": {
+     "held": 183,
+     "held, drafted here": 168,
+     "mask not verified": 301,
+     "disagreement not settled": 16
+    },
+    "findings": 661,
+    "findings_with_verify_iou": 72,
+    "min_level_by_size": {
+     "2856px:L1": 2,
+     "2596px:L1": 2,
+     "2572px:L1": 1,
+     "6000px:L2": 17,
+     "4608px:L2": 61,
+     "2272px:L1": 6,
+     "2816px:L1": 2,
+     "2592px:L1": 2,
+     "2048px:L1": 2,
+     "3648px:L2": 3,
+     "1600px:L0": 2
+    }
+   },
+   "old": {
+    "profile": [
+     "classical-v1"
+    ],
+    "looks": {
+     "escalate L0": 294,
+     "escalate L1": 21,
+     "escalate L2": 32,
+     "gaze L1": 730,
+     "gaze L2": 4,
+     "gaze L3": 95,
+     "verify L0": 248,
+     "verify L1": 9,
+     "verify L2": 45
+    },
+    "verify_after": {
+     "gaze/survey L3": 45,
+     "escalate/entropy>tau L2": 6,
+     "gaze/best-score L1": 246,
+     "escalate/entropy>tau L1": 1,
+     "verify/verify-new-mask L2": 3,
+     "escalate/area<A_min L1": 1
+    },
+    "first_looks": {
+     "first looks": 730,
+     "at the finest level": 0
+    },
+    "notes": {
+     "held": 0,
+     "held, drafted here": 0,
+     "mask not verified": 0,
+     "disagreement not settled": 0
+    },
+    "findings": 926,
+    "findings_with_verify_iou": 417,
+    "min_level_by_size": {
+     "2856px:L0": 2,
+     "2596px:L0": 2,
+     "2572px:L0": 1,
+     "6000px:L0": 17,
+     "4608px:L0": 61,
+     "2272px:L0": 6,
+     "2816px:L0": 2,
+     "2592px:L0": 2,
+     "2048px:L0": 2,
+     "3648px:L0": 3,
+     "1600px:L0": 2
+    }
+   }
+  },
+  "synth_dev": {
+   "head": {
+    "profile": [
+     "onnx:drishyam_dacl10k.onnx"
+    ],
+    "looks": {
+     "escalate L1": 10,
+     "gaze L1": 54,
+     "gaze L2": 60,
+     "verify L1": 48
+    },
+    "verify_after": {
+     "gaze/survey L2": 48
+    },
+    "first_looks": {
+     "first looks": 54,
+     "at the finest level": 54
+    },
+    "notes": {
+     "held": 8,
+     "held, drafted here": 6,
+     "mask not verified": 42,
+     "disagreement not settled": 6
+    },
+    "findings": 136,
+    "findings_with_verify_iou": 54,
+    "min_level_by_size": {
+     "2048px:L1": 60
+    }
+   },
+   "old": {
+    "profile": [
+     "classical-v1"
+    ],
+    "looks": {
+     "escalate L0": 3,
+     "escalate L1": 10,
+     "gaze L1": 46,
+     "gaze L2": 60,
+     "verify L0": 6,
+     "verify L1": 48
+    },
+    "verify_after": {
+     "escalate/entropy>tau L1": 4,
+     "gaze/survey L2": 48,
+     "verify/verify-new-mask L1": 2
+    },
+    "first_looks": {
+     "first looks": 46,
+     "at the finest level": 0
+    },
+    "notes": {
+     "held": 0,
+     "held, drafted here": 0,
+     "mask not verified": 0,
+     "disagreement not settled": 0
+    },
+    "findings": 127,
+    "findings_with_verify_iou": 57,
+    "min_level_by_size": {
+     "2048px:L0": 60
+    }
+   }
+  }
+ },
  "classical_unchanged": {
-  "what": "The classical engine on synth_dev (60 images, seed 4242) before (832299b) and after (7c0bd54, and again at 8065f4a) this branch: evals.harness --cost-model fixed --micro-arm linux-aarch64 --n 60 --seed 4242 --workers 6, chaos drills at the default 20,20,10, each from a frozen copy of its commit (drishyam.__file__ printed first).",
-  "per_image": "eval_per_image.json: 60/60 images identical once the one key the branch adds is dropped (\"profile\": \"classical-v1\" on each of the 360 Drishyam configs); the head file with those 360 tags removed is byte-identical to the base file (sha256 c93abc40621df7df... for both), at 7c0bd54 and at 8065f4a",
+  "what": "The classical engine on synth_dev (60 images, seed 4242) before (832299b) and after (7c0bd54, and again at 8065f4a and 613c9f2) this branch: evals.harness --cost-model fixed --micro-arm linux-aarch64 --n 60 --seed 4242 --workers 6, chaos drills at the default 20,20,10, each from a frozen copy of its commit (drishyam.__file__ printed first).",
+  "per_image": "eval_per_image.json: 60/60 images identical once the one key the branch adds is dropped (\"profile\": \"classical-v1\" on each of the 360 Drishyam configs); the head file with those 360 tags removed is byte-identical to the base file (sha256 c93abc40621df7df... for both), at 7c0bd54, at 8065f4a and at 613c9f2",
   "summary": "summary.json equal minus provenance (timestamps, load) and the new agent_config.profile (classical-v1); Drishyam recall at the six caps 0.0, 0.315, 0.46, 0.505, 0.545, 0.555 on both",
-  "failures_json": "byte-identical",
+  "failures_json": "byte-identical (at each of the three)",
   "test": "tests/test_agent.py::test_the_classical_profile_is_the_agent_every_classical_number_ran_with pins every resolved JobConfig field of a classical job to the pre-profile defaults"
  },
  "latency": {
@@ -3120,12 +3299,12 @@
     "absorb": true
    }
   },
-  "meaning": "min_view: no look, first or follow-up, spans less than 0.3 of the photo's long side (L2 or coarser on a 4608-px photo, L1 or coarser on a 2048-px one); absorb false: a crack or rust inside a spall's or bar's finding stays a finding of its own. first_level (1), min_level (0), tau (0.5), A_min (64) and v0 (2) stay at the agent's defaults: their sweep rows moved nothing measurable.",
+  "meaning": "min_view: no look the rules or a planner choose, first or follow-up, is finer than the finest level whose 512-px window spans 0.3 of the photo's long side: L2 on dev100's 4608-, 6000- and 3648-px photos (81), L1 on its 2048- to 2856-px ones (17, by long side) and on synth_dev's 2048-px ones, L0 on its 1600-px ones (2). Exempt: a replayed look keeps its recorded level, and a gaze the governor's warp-spike override shrank keeps its level (the dev runs had neither). A mask first drafted at the finest level gets no verify look (see verify). absorb false: a crack or rust inside a spall's or bar's finding stays a finding of its own. The profile applies only to the weights it was chosen with (drishyam_dacl10k.onnx sha256 c49416c10087..., agent.WEIGHTS); other weights under that name get classical-v1. first_level (1), min_level (0), tau (0.5), A_min (64) and v0 (2) stay at the agent's defaults: their sweep rows moved nothing measurable.",
   "why": [
    "levels: on CODEBRIM dev100 finer looks add boxes, not recall: f1m1 0.403 at 85.5 boxes, f2m1 0.405 at 51.4, f2m2 0.397 at 32.8, L3 only (f3m3) 0.345; with absorption off, L2 first and finest found x1.14 the original levels (CI 1.07-1.22)",
    "absorb: 35 of the 82 GT boxes the downscale found and f2m2 missed lay inside a look that segmented the class, which a spall's or bar's finding then absorbed (28 of them cracks); off, f2m2 found x1.19 (CI 1.11-1.31), crack recall 0.20 -> 0.38; with the original levels it is worth x1.15 too (CI 1.08-1.24)",
-   "relative, not absolute: L2 alone lost on synth_dev, x0.88 the old ONNX agent (CI 0.82-0.93), because a 2048-px photo is one L2 view and its thin synthetic cracks need L1; the share of the long side a view spans separates the two sets: 0.22 (L1 at 4608 px) adds boxes only, 0.5 (L1 at 2048 px) adds recall, so any value in (0.22, 0.34] fits both and keeps 6000-px photos at L2",
-   "0.3 inside that interval rather than 0.25 on its edge (L0 of a 2048-px photo spans exactly 0.25): no measurable difference at the 30 % cap on CODEBRIM (x1.005, CI 1.00-1.01) or synth_dev (x1.01, CI 0.97-1.04); uncapped, 0.25's L0 looks found a little more on synth_dev (0.3 against it x0.98, CI 0.95-1.00; IoU-only x0.97, CI 0.94-0.99), at 9.2 boxes per photo against 7.0",
+   "relative, not absolute: L2 alone lost on synth_dev, x0.88 the old ONNX agent (CI 0.82-0.93), because a 2048-px photo is one L2 view and its thin synthetic cracks need L1; the share of the long side a view spans separates the two sets: 0.22 (L1 at 4608 px) adds boxes only, 0.5 (L1 at 2048 px) adds recall. Any value above 0.222 and up to 0.341 keeps L2 the finest level on the 4608- and 6000-px photos (78 of dev100) and allows L1 on 2048-px ones, but the range is not neutral: other dev100 sizes have level breakpoints inside it (L0 of 2272 px at 0.225, 6 photos; L0 of 2048 px at 0.25, 2 photos and every synth_dev photo; L1 of 3648 px at 0.281, 3 photos; L0 of 1600 px at 0.32, 2 photos), so the value chosen inside it moves those photos' finest level",
+   "0.3 rather than 0.25: 0.3 makes the 3648-px photos L2-only and the 2048-px ones L1-only (0.25 allows L1 and L0 on them); both keep L1 on the 2272-px photos and L0 on the 1600-px ones. No measurable difference at the 30 % cap on CODEBRIM (x1.005, CI 1.00-1.01) or synth_dev (x1.01, CI 0.97-1.04); uncapped, 0.25's L0 looks found a little more on synth_dev (0.3 against it x0.98, CI 0.95-1.00; IoU-only x0.97, CI 0.94-0.99), at 9.2 boxes per photo against 7.0. Neither 0.3 nor 0.25 was measured with a verify at the same level",
    "tau 0.7 or off and v0 0 moved recall by at most 0.01 (rows f2m2_tau07 +0.008, f2m2_tauoff +0.010, f2m2_v00 +0.001 on 0.397), so they stay at their defaults"
   ],
   "goals": {
@@ -3133,6 +3312,7 @@
    "b": "partly: 39.1 boxes per photo against 77.8 for L1 tiling and 212 for L0 tiling (both with recall not above it: L1 0.548, x0.87 CI 0.72-1.01; L0 0.382), but L2 tiling with the same model found 0.511 with 23.3 boxes at 0.102 of the pixels: the agent is x0.94 its recall (CI 0.87-1.00), 1.7x its boxes and 1.4x its pixels (it is x1.17 on IoU-only recall, CI 1.04-1.31). At the scale where this model is reliable a 4608-px photo is six tiles, so exhaustive coverage is cheap and the agent's survey plus overlapping looks cost more than it",
    "c": "met: synth_dev x1.03 the old ONNX agent at the 30 % cap (0.615 against 0.600, CI 0.98-1.07) and x1.02 uncapped (0.645 against 0.630, CI 0.98-1.06); clean dev 0.033 boxes per photo for both (1 box on 30 photos)"
   },
-  "what_would_beat_l2_tiling": "Untested proposals (each needs its own dev run): candidates that cover the whole photo at the first-look level for this profile (imaging.find_candidates' saliency threshold 0.5 leaves parts of the photo without a candidate), no separate L3 survey when the first-look level already tiles the photo in a few views, and merging a finding's per-look component boxes the way tiling merges tiles (GREEDYNMM), which would change the box count the harness reports for every policy and so needs the classical numbers re-run."
+  "what_would_beat_l2_tiling": "Untested proposals (each needs its own dev run): candidates that cover the whole photo at the first-look level for this profile (imaging.find_candidates' saliency threshold 0.5 leaves parts of the photo without a candidate), no separate L3 survey when the first-look level already tiles the photo in a few views, and merging a finding's per-look component boxes the way tiling merges tiles (GREEDYNMM), which would change the box count the harness reports for every policy and so needs the classical numbers re-run.",
+  "cost_of_no_finer_verify": "Measured (verify, 30 % cap): on CODEBRIM dev100 the profile made 45 verify looks, all at L2 confirming masks the L3 survey drafted, and none after its 396 first looks (395 at their photo's finest level); 301 looks wrote that their new mask was not verified and 16 that a disagreement was not settled; 72 of its 661 findings carry a verify_iou. With the same model the old settings made 302 verify looks, and 417 of 926 findings carry one. On synth_dev: 48 verify looks (all after the L2 survey), 42 masks not verified, 54 of 136 findings with a verify_iou (old: 54 verify looks, 57 of 127). The recall and false-alarm numbers above already include this; whether a same-level verify (a shifted window) would recover it was not built or measured."
  }
 }
