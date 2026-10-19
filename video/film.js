@@ -653,10 +653,10 @@ function buildReal() {
     const t = svgEl('text', { x: lx, y: ly, fill: bad ? '#FF9A8A' : '#FFC857', 'font-size': 22, 'font-weight': 700, stroke: '#072247', 'stroke-width': 5, 'paint-order': 'stroke' }, g);
     t.textContent = txt; return { g, f }; });
   const win = gazeWindow(sv);
-  const stamp = el('div', 'stamp', plate, ''); css(stamp, { opacity: 0, zIndex: 3, whiteSpace: 'nowrap' });
+  const stamp = el('div', 'stamp', plate, ''); css(stamp, { opacity: 0, zIndex: 3, whiteSpace: 'nowrap', fontSize: '34px' });   // the longest, 'STOPPED · 0 CANDIDATES', is about 560 px
   // the two stamps go where the team's line is not: the spots with the fewest of its points (padded), in this order
   const linePts = (R.seen?.paths || []).flatMap((q) => q.flatMap(([x, y], i) => (i ? [0, 0.25, 0.5, 0.75].map((u) => [lerp(q[i - 1][0], x, u) * k, lerp(q[i - 1][1], y, u) * k]) : [])));
-  const spots = [[80, 560], [520, 140], [80, 140], [520, 560]].map(([x, y]) => ({ x, y, n: linePts.filter(([px, py]) => px > x - 40 && px < x + 540 && py > y - 60 && py < y + 120).length }));
+  const spots = [[80, 560], [470, 140], [80, 140], [470, 560]].map(([x, y]) => ({ x, y, n: linePts.filter(([px, py]) => px > x - 40 && px < x + 600 && py > y - 60 && py < y + 120).length }));
   const [spotV, spotS] = spots.slice().sort((a, b) => a.n - b.n);
   // the readout: each card as the voice reaches it
   const say = LINE.q1.say, d = LINE.q1.dur, T = (w, f = 0) => at('q1') + d * Math.max(0, say.indexOf(w)) / say.length + f;
