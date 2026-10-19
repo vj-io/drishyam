@@ -1,0 +1,365 @@
+{
+ "arm": "local-macos-x86-dacl10k_v2b",
+ "config": {
+  "repeats": 50,
+  "warmup": 5,
+  "cv2_threads": 1,
+  "requested_threads": 1,
+  "sizes": [
+   "1024x768",
+   "2048x1536",
+   "4000x3000"
+  ],
+  "gaze_view_px": 512
+ },
+ "provenance": {
+  "cv2": "5.0.0",
+  "build_info_sha256": "fe5f9337dbc8663639ee7bcb2deb09359893fc8d2aa5b6a447cee2a0117d2ec7",
+  "cv2_baseline": "SSE SSE2 SSE3 SSSE3 SSE4_1",
+  "cv2_dispatch": "SSE4_2 AVX FP16 AVX2 AVX512_SKX",
+  "cv2_parallel_framework": "GCD",
+  "cv2_custom_hal": "YES (ipp (ver 0.0.1))",
+  "cv2_file": "/Users/mac/Documents/Projects/opencv/.venv/lib/python3.13/site-packages/cv2/__init__.py",
+  "under_opt_cool": false,
+  "build": "stock (not COOL)",
+  "machine": "Darwin 25.6.0 x86_64",
+  "platform": "macOS-26.7.1-x86_64-i386-64bit-Mach-O",
+  "cpu": "Intel(R) Core(TM) i9-9880H CPU @ 2.30GHz",
+  "logical_cpus": 16,
+  "cv2_threads": 1,
+  "python": "3.13.16",
+  "numpy": "2.5.4",
+  "timestamp": "2026-10-19T19:34:06Z",
+  "load_avg": [
+   8.47,
+   10.42,
+   11.89
+  ]
+ },
+ "results": [],
+ "job_ops": {
+  "segmenter": "onnx:drishyam_dacl10k_v2b.onnx",
+  "cv2_threads": 1,
+  "provenance": {
+   "cv2": "5.0.0",
+   "build_info_sha256": "fe5f9337dbc8663639ee7bcb2deb09359893fc8d2aa5b6a447cee2a0117d2ec7",
+   "cv2_baseline": "SSE SSE2 SSE3 SSSE3 SSE4_1",
+   "cv2_dispatch": "SSE4_2 AVX FP16 AVX2 AVX512_SKX",
+   "cv2_parallel_framework": "GCD",
+   "cv2_custom_hal": "YES (ipp (ver 0.0.1))",
+   "cv2_file": "/Users/mac/Documents/Projects/opencv/.venv/lib/python3.13/site-packages/cv2/__init__.py",
+   "under_opt_cool": false,
+   "build": "stock (not COOL)",
+   "machine": "Darwin 25.6.0 x86_64",
+   "platform": "macOS-26.7.1-x86_64-i386-64bit-Mach-O",
+   "cpu": "Intel(R) Core(TM) i9-9880H CPU @ 2.30GHz",
+   "logical_cpus": 16,
+   "cv2_threads": 1,
+   "python": "3.13.16",
+   "numpy": "2.5.4",
+   "timestamp": "2026-10-19T19:28:59Z",
+   "load_avg": [
+    10.64,
+    12.27,
+    12.91
+   ]
+  },
+  "results": [
+   {
+    "op": "pyrDown",
+    "size": "1024x768",
+    "n": 50,
+    "min_ms": 3.006,
+    "p50_ms": 3.156,
+    "p95_ms": 3.841,
+    "p99_ms": 4.16,
+    "mean_ms": 3.282
+   },
+   {
+    "op": "saliency",
+    "size": "1024x768",
+    "n": 50,
+    "min_ms": 2.01,
+    "p50_ms": 2.372,
+    "p95_ms": 3.791,
+    "p99_ms": 4.526,
+    "mean_ms": 2.564
+   },
+   {
+    "op": "warp",
+    "size": "1024x768",
+    "n": 50,
+    "min_ms": 2.347,
+    "p50_ms": 2.455,
+    "p95_ms": 3.011,
+    "p99_ms": 3.404,
+    "mean_ms": 2.529
+   },
+   {
+    "op": "quality",
+    "size": "1024x768",
+    "n": 50,
+    "min_ms": 1.505,
+    "p50_ms": 2.022,
+    "p95_ms": 3.864,
+    "p99_ms": 26.157,
+    "mean_ms": 3.072
+   },
+   {
+    "op": "segment:accurate",
+    "size": "1024x768",
+    "n": 50,
+    "min_ms": 1053.266,
+    "p50_ms": 1223.73,
+    "p95_ms": 1499.154,
+    "p99_ms": 1527.238,
+    "mean_ms": 1270.636
+   },
+   {
+    "op": "segment:fast",
+    "size": "1024x768",
+    "n": 50,
+    "min_ms": 383.175,
+    "p50_ms": 423.55,
+    "p95_ms": 462.145,
+    "p99_ms": 485.865,
+    "mean_ms": 425.638
+   },
+   {
+    "op": "downscale",
+    "size": "1024x768",
+    "n": 50,
+    "min_ms": 0.196,
+    "p50_ms": 0.205,
+    "p95_ms": 0.611,
+    "p99_ms": 0.761,
+    "mean_ms": 0.25
+   },
+   {
+    "op": "pyrDown",
+    "size": "2048x1536",
+    "n": 50,
+    "min_ms": 14.628,
+    "p50_ms": 15.858,
+    "p95_ms": 17.209,
+    "p99_ms": 18.393,
+    "mean_ms": 15.834
+   },
+   {
+    "op": "saliency",
+    "size": "2048x1536",
+    "n": 50,
+    "min_ms": 5.796,
+    "p50_ms": 6.493,
+    "p95_ms": 8.23,
+    "p99_ms": 9.074,
+    "mean_ms": 6.685
+   },
+   {
+    "op": "warp",
+    "size": "2048x1536",
+    "n": 50,
+    "min_ms": 2.852,
+    "p50_ms": 2.982,
+    "p95_ms": 3.367,
+    "p99_ms": 3.512,
+    "mean_ms": 3.017
+   },
+   {
+    "op": "quality",
+    "size": "2048x1536",
+    "n": 50,
+    "min_ms": 1.739,
+    "p50_ms": 2.393,
+    "p95_ms": 3.675,
+    "p99_ms": 3.926,
+    "mean_ms": 2.537
+   },
+   {
+    "op": "segment:accurate",
+    "size": "2048x1536",
+    "n": 50,
+    "min_ms": 1267.306,
+    "p50_ms": 1467.676,
+    "p95_ms": 2052.286,
+    "p99_ms": 2120.412,
+    "mean_ms": 1554.02
+   },
+   {
+    "op": "segment:fast",
+    "size": "2048x1536",
+    "n": 50,
+    "min_ms": 373.829,
+    "p50_ms": 406.566,
+    "p95_ms": 498.127,
+    "p99_ms": 545.064,
+    "mean_ms": 414.768
+   },
+   {
+    "op": "downscale",
+    "size": "2048x1536",
+    "n": 50,
+    "min_ms": 1.803,
+    "p50_ms": 2.096,
+    "p95_ms": 2.692,
+    "p99_ms": 2.832,
+    "mean_ms": 2.158
+   },
+   {
+    "op": "pyrDown",
+    "size": "4000x3000",
+    "n": 50,
+    "min_ms": 56.215,
+    "p50_ms": 61.441,
+    "p95_ms": 66.901,
+    "p99_ms": 67.744,
+    "mean_ms": 61.759
+   },
+   {
+    "op": "saliency",
+    "size": "4000x3000",
+    "n": 50,
+    "min_ms": 28.565,
+    "p50_ms": 35.63,
+    "p95_ms": 39.527,
+    "p99_ms": 41.988,
+    "mean_ms": 35.375
+   },
+   {
+    "op": "warp",
+    "size": "4000x3000",
+    "n": 50,
+    "min_ms": 3.17,
+    "p50_ms": 3.906,
+    "p95_ms": 4.489,
+    "p99_ms": 4.905,
+    "mean_ms": 3.899
+   },
+   {
+    "op": "quality",
+    "size": "4000x3000",
+    "n": 50,
+    "min_ms": 2.048,
+    "p50_ms": 3.408,
+    "p95_ms": 4.912,
+    "p99_ms": 5.968,
+    "mean_ms": 3.484
+   },
+   {
+    "op": "segment:accurate",
+    "size": "4000x3000",
+    "n": 50,
+    "min_ms": 1179.744,
+    "p50_ms": 1319.505,
+    "p95_ms": 1398.9,
+    "p99_ms": 1443.035,
+    "mean_ms": 1318.398
+   },
+   {
+    "op": "segment:fast",
+    "size": "4000x3000",
+    "n": 50,
+    "min_ms": 359.257,
+    "p50_ms": 380.73,
+    "p95_ms": 410.61,
+    "p99_ms": 423.731,
+    "mean_ms": 382.954
+   },
+   {
+    "op": "downscale",
+    "size": "4000x3000",
+    "n": 50,
+    "min_ms": 57.095,
+    "p50_ms": 58.627,
+    "p95_ms": 60.932,
+    "p99_ms": 63.02,
+    "mean_ms": 58.882
+   }
+  ]
+ },
+ "dnn": {
+  "onnx": "/Users/mac/Documents/Projects/opencv/models/drishyam_dacl10k_v2b.onnx",
+  "onnx_fp16": "/Users/mac/Documents/Projects/opencv/models/drishyam_dacl10k_v2b.fp16.onnx",
+  "provenance": {
+   "cv2": "5.0.0",
+   "build_info_sha256": "fe5f9337dbc8663639ee7bcb2deb09359893fc8d2aa5b6a447cee2a0117d2ec7",
+   "cv2_baseline": "SSE SSE2 SSE3 SSSE3 SSE4_1",
+   "cv2_dispatch": "SSE4_2 AVX FP16 AVX2 AVX512_SKX",
+   "cv2_parallel_framework": "GCD",
+   "cv2_custom_hal": "YES (ipp (ver 0.0.1))",
+   "cv2_file": "/Users/mac/Documents/Projects/opencv/.venv/lib/python3.13/site-packages/cv2/__init__.py",
+   "under_opt_cool": false,
+   "build": "stock (not COOL)",
+   "machine": "Darwin 25.6.0 x86_64",
+   "platform": "macOS-26.7.1-x86_64-i386-64bit-Mach-O",
+   "cpu": "Intel(R) Core(TM) i9-9880H CPU @ 2.30GHz",
+   "logical_cpus": 16,
+   "cv2_threads": 1,
+   "python": "3.13.16",
+   "numpy": "2.5.4",
+   "timestamp": "2026-10-19T19:37:42Z",
+   "load_avg": [
+    14.52,
+    11.22,
+    11.81
+   ]
+  },
+  "results": [
+   {
+    "op": "nanodet",
+    "size": "416x416",
+    "n": 50,
+    "min_ms": 49.226,
+    "p50_ms": 56.632,
+    "p95_ms": 66.835,
+    "p99_ms": 68.681,
+    "mean_ms": 57.023
+   },
+   {
+    "op": "onnx:fp32@256",
+    "size": "256x256",
+    "n": 50,
+    "min_ms": 283.057,
+    "p50_ms": 298.996,
+    "p95_ms": 325.219,
+    "p99_ms": 434.667,
+    "mean_ms": 305.815
+   },
+   {
+    "op": "onnx:fp32@512",
+    "size": "512x512",
+    "n": 50,
+    "min_ms": 1120.688,
+    "p50_ms": 1186.195,
+    "p95_ms": 1323.138,
+    "p99_ms": 1429.593,
+    "mean_ms": 1211.091
+   },
+   {
+    "op": "onnx:fp16@256",
+    "size": "256x256",
+    "n": 50,
+    "min_ms": 353.36,
+    "p50_ms": 379.658,
+    "p95_ms": 425.048,
+    "p99_ms": 436.544,
+    "mean_ms": 381.944
+   },
+   {
+    "op": "onnx:fp16@512",
+    "size": "512x512",
+    "n": 50,
+    "min_ms": 1375.855,
+    "p50_ms": 1890.825,
+    "p95_ms": 2831.815,
+    "p99_ms": 3239.687,
+    "mean_ms": 1997.099
+   }
+  ]
+ },
+ "load_avg_end": [
+  14.52,
+  11.22,
+  11.81
+ ]
+}
