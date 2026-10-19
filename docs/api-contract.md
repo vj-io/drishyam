@@ -262,7 +262,8 @@ request). `classical-v1`: `min_view` 0 (first looks at L1, zoom down to L0) and 
 `onnx:drishyam_dacl10k.onnx`, the dacl10k-trained model: `min_view` 0.3 and absorption off. On a 4608-px photo (L1
 spans 0.22 of the side) every look is at L2 or coarser: first looks at L2 after the L3 survey; on a 2048-px photo L1
 (0.5) is the finest. A look at the finest level whose entropy is above tau or whose mask is under `A_min` drafts what
-it saw instead of escalating, and no `ambiguous` request is sent. A planner `change_level` finer than the finest
+it saw instead of escalating, and its rationale ends `"; L2 is the finest level for onnx:drishyam_dacl10k.onnx
+(min_view 0.3): entropy 0.71, crack area 340 px drafted here, no finer look"`; no `ambiguous` request is sent. A planner `change_level` finer than the finest
 level is clamped to it, and its rationale says so. The ONNX values were chosen on the dev splits only
 (`results/dev/onnx_profile_sweep.json`).
 

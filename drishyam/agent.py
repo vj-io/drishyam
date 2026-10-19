@@ -568,6 +568,9 @@ class Job:
             elif level > self.min_level and not batch and best and area < cfg.a_min:
                 follow = ("escalate", r, level - 1, "area<A_min", f"{best} area {area} px < {cfg.a_min} at L{level}")
             else:
+                if 0 < level == self.min_level and not batch and (seg.entropy > cfg.tau or (best and area < cfg.a_min)):
+                    why += (f"; L{level} is the finest level for {cfg.profile} (min_view {cfg.min_view:g}): entropy "
+                            f"{seg.entropy:.2f}, {best} area {area} px drafted here, no finer look")
                 if best and (present := self._present(seg, to_l0, level, rejected)):
                     # Every class with a confident mask becomes evidence, most severe first.
                     r.cls = present[0]

@@ -968,7 +968,8 @@ def test_the_onnx_profile_never_looks_finer_than_a_share_of_the_photo(w, h, fine
     job, st = looks()
     assert 512 * 2**finest >= job.cfg.min_view * w > 512 * 2 ** (finest - 1)
     assert st and min(s["decision"]["args"]["level"] for s in st) == finest
-    assert any(s["observation"]["entropy"] > job.cfg.tau and s["decision"]["args"]["level"] == finest for s in st)
+    held = [s for s in st if s["observation"]["entropy"] > job.cfg.tau and s["decision"]["args"]["level"] == finest]
+    assert held and all(f"L{finest} is the finest level for {ONNX} (min_view 0.3)" in s["rationale"] for s in held)
     assert {s["profile"] for s in job.trace} == {ONNX} and job.work_order["profile"] == ONNX
     _, st = looks(profile="classical-v1")  # the same measurements under the original defaults zoom further
     assert min(s["decision"]["args"]["level"] for s in st) < finest
