@@ -157,6 +157,8 @@ def _log_review(token_in: str, token_out: str, wo: dict) -> None:
     _emf("Decision", [{"Name": "Reviews", "Unit": "Count"}], {"Reviews": 1, **record})
 
 app = FastAPI(title="Drishyam", docs_url=None, redoc_url=None, openapi_url=None)
+API_HEADERS = {"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff",
+               "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'"}
 
 
 def error(status: int, message: str) -> JSONResponse:
@@ -172,16 +174,15 @@ async def _invalid(_: Request, exc: RequestValidationError) -> JSONResponse:
 @app.exception_handler(Exception)
 async def _crash(_: Request, exc: Exception) -> JSONResponse:
     log.exception("unhandled error", exc_info=exc)
-    return error(500, "internal error")
+    # Starlette sends this from outside every middleware, so _api_headers never sees it
+    return JSONResponse({"error": "internal error"}, status_code=500, headers=API_HEADERS)
 
 
 @app.middleware("http")
 async def _api_headers(request: Request, call_next):
     response = await call_next(request)
     if request.url.path.startswith("/api/"):
-        response.headers["Cache-Control"] = "no-store"
-        response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'"
+        response.headers.update(API_HEADERS)
     return response
 
 

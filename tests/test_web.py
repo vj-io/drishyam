@@ -52,6 +52,21 @@ def test_health_and_security_headers():
     assert len(r.content) < 1000  # small: an uptime monitor polls it
 
 
+def test_a_server_error_is_generic_and_keeps_the_api_headers(monkeypatch, photo):
+    """Starlette answers an unhandled error outside the header middleware, so a 500 went out without them."""
+    from drishyam import imaging
+
+    def fail(_):
+        raise RuntimeError("secret detail /var/task/drishyam")
+
+    monkeypatch.setattr(imaging, "decode_image", fail)
+    r = TestClient(app, raise_server_exceptions=False).post("/api/jobs", content=photo,
+                                                            headers={"Content-Type": "image/jpeg"})
+    assert r.status_code == 500 and r.json() == {"error": "internal error"}
+    assert r.headers["cache-control"] == "no-store" and r.headers["x-content-type-options"] == "nosniff"
+    assert r.headers["content-security-policy"] == "default-src 'none'; frame-ancestors 'none'"
+
+
 def test_build_facts_read_the_hal_line_of_an_arm_build(monkeypatch):
     """The parser keeps each line as printed, so an aarch64 wheel's HALs show as they are; a missing line is None."""
     from drishyam import web
