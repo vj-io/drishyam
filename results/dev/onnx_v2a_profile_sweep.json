@@ -1,0 +1,14 @@
+{
+ "what": "Dev-only sweep that chooses the dacl10k v2a ONNX segmenter's look profile (drishyam.agent.PROFILES), then compares v2a at that profile with v1 at its own and with the classical engine. Never a held-out set. Pre-registration stub: the rule and the grid below were committed before any v2a sweep row was run or read; the rows, the decision and the comparison are added after.",
+ "segmenter": "onnx:drishyam_dacl10k_v2a.onnx drishyam_dacl10k_v2a.onnx@95b503c2d205 drishyam_dacl10k_v2a.fp16.onnx@0f5fa16e9a65",
+ "costs": "fixed: job_ops p50 ms per call from results/local-macos-x86-dacl10k_v2a/micro.json (v2a timed on this Mac, 1 cv2 thread, load 7.9 at start, 7.8 at end); the baselines are charged the same table; governor overrides off (harness.run_drishyam)",
+ "variants": {
+  "ref": "min_view 0.3, absorb off: v1's profile values (onnx:drishyam_dacl10k.onnx), the reference, listed first",
+  "mv0": "min_view 0, absorb off: any level (L0 the finest everywhere)",
+  "mv15": "min_view 0.15, absorb off: L1 the finest on the 3648- to 6000-px photos, L0 on the 2048- to 2856-px ones",
+  "mv25": "min_view 0.25, absorb off: v1's runner-up (L2 the finest on 3648- to 6000-px photos, L0 on 2048-px ones)",
+  "mv30_abs": "min_view 0.3, absorb on",
+  "old": "min_view 0, absorb on: the classical-v1 values (the agent before profiles)"
+ },
+ "rule": "Stated before any v2a sweep row was run. Reference: ref (v1's values), listed first in every run, so every candidate is paired with it on the same images and the same cost table. A candidate replaces ref only if, at the 30 % cap, (1) its recall is higher than ref's on synth_dev AND on CODEBRIM dev100, each counted only when the paired 95 % bootstrap CI of its recall ratio to ref (vs_ref_ci) lies wholly above 1; and (2) it has no more false alarms on the clean split at the 30 % cap, a harm counted by the same standard: the paired 95 % CI of its boxes-per-photo difference to ref lies wholly above 0, or the CI of the difference in the share of photos with any box (images_with_any_vs_ref_ci) lies wholly above 0. A CI that touches or crosses no change counts as no change, for a gain and for a harm alike. If several candidates pass, the one whose lower vs_ref_ci bound, taken as the smaller of the two splits, is higher. If none passes, v2a gets v1's values (min_view 0.3, absorb off). Everything else (the 1.0 cap, IoU-only recall, boxes on the recall splits, critical boxes, the ratios to L0 tiling and the downscale) is reported, not part of the rule."
+}
