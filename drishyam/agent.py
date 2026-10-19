@@ -181,9 +181,11 @@ class Job:
         self.trace: list[dict] = []
 
     # ---- helpers -------------------------------------------------------------------------------
+    prefetch = None  # off; bench/loop.py sets a drishyam.prefetch.Prefetcher, which serves warps and segmentations
+
     def _timed(self, op, fn, *args, **kw):
         t0 = self.clock()
-        out = fn(*args, **kw)
+        out = fn(*args, **kw) if self.prefetch is None else self.prefetch(self, op, fn, args, kw)
         ms = (self.clock() - t0) * 1000
         self.stats.record(op, ms)
         return out, ms
