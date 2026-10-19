@@ -51,9 +51,14 @@ def test_kaggle_notebook_is_built_from_the_current_script():
     # one notebook per VARIANTS key of the script, and they differ in the VARIANT line alone
     src = (TRAINING / "train_dacl10k.py").read_text()
     variants = re.findall(r'^    "(\w+)": ', src.split("VARIANTS = {")[1].split("\n}")[0], re.MULTILINE)
-    assert variants == list(make_notebook.NOTEBOOKS) == ["v2a", "v2b"]
-    a, b = (make_notebook.NOTEBOOKS[v].read_text().splitlines() for v in variants)
+    assert variants == [*make_notebook.NOTEBOOKS, *make_notebook.COLAB] == ["v2a", "v2b", "v2c"]
+    a, b = (make_notebook.NOTEBOOKS[v].read_text().splitlines() for v in ("v2a", "v2b"))
     assert [(x, y) for x, y in zip(a, b) if x != y] == [('    "VARIANT = \\"v2a\\"\\n",', '    "VARIANT = \\"v2b\\"\\n",')]
+    # the Colab notebook: v2c's cells with the Drive cell just before setup, writing checkpoints to Drive every epoch
+    colab = json.loads(make_notebook.COLAB["v2c"].read_text())["cells"]
+    heads = ["".join(c["source"]).split("\n")[0] for c in colab]
+    assert heads[heads.index("# Setup: the repo files and packages the cells below need") - 1].startswith("# Colab only")
+    assert "--out {CKPT} --resume auto" in "".join(colab[heads.index("# Setup: the repo files and packages the cells below need") - 1]["source"])
 
 
 def test_kaggle_kernel_metadata_per_variant():

@@ -659,6 +659,9 @@ VARIANT = "v2a"
 VARIANTS = {
     "v2a": "",  # recipe v2 on v1's UNet + MobileNetV3-Large: the one Drishyam can deploy today
     "v2b": "--encoder tu-efficientnet_b2",  # recipe v2 on a UNet + EfficientNet-B2: about 1.25x v2a's CPU per look (README 5b)
+    # the Colab run (README 5c): v2a's net with rare classes pushed harder. Not DeepLabV3+: its merged FP32 export fails
+    # parity on OpenCV 5.0.0 ENGINE_NEW (max|dprob| 0.85; its FP16 and 19-logit exports pass), so it could not ship.
+    "v2c": "--class-weight-power 0.75 --class-weight-max 8 --dice-weight 2",
 }
 NOTEBOOK_FLAGS = f"--data /kaggle/input --out /kaggle/working/run --resume auto --hours 11 --variant {VARIANT} " \
                  + VARIANTS[VARIANT]
