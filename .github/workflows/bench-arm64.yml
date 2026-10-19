@@ -1,7 +1,10 @@
 name: bench-arm64
-# Manual only: bench/run_all.sh on GitHub's hosted Arm runner. This is a GitHub Actions VM, not the deployed Lambda,
-# and the JSON says so (provenance.label). The segmenter rows time the classical engine: the dacl10k ONNX files are
-# not in the repository, so no trained-model DNN row runs here.
+# Manual only: bench/run_all.sh (micro, macro, parity, Metric A kernels, Metric B agent loop with and without prefetch)
+# on GitHub's hosted Arm runner and, for Arm against x86, its x86 runner. Both install the same pinned
+# opencv-python-headless version from uv.lock (each architecture's own wheel of it; provenance quotes its build lines).
+# These are GitHub Actions VMs, not the deployed Lambda, and the JSON says so (provenance.label). The segmenter rows
+# time the classical engine: the dacl10k ONNX files are not in the repository, so no trained-model DNN row runs here.
+# Run and fetch: docs/bench.md ("Arm against x86 on GitHub").
 on:
   workflow_dispatch:
     inputs:
@@ -14,20 +17,32 @@ permissions:
 
 jobs:
   bench:
-    runs-on: ubuntu-24.04-arm
-    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04-arm
+            arm: linux-aarch64
+          - runner: ubuntu-24.04
+            arm: linux-x86_64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
       - run: uv sync --all-extras --locked
-      - run: bash bench/run_all.sh linux-aarch64
+      - run: bash bench/run_all.sh ${{ matrix.arm }}
         env:
           N: ${{ inputs.n }}
-          BENCH_LABEL: GitHub arm64 runner (ubuntu-24.04-arm), not Lambda
+          KERNEL_THREADS: "1,all"
+          LOOP_THREADS: "1,2,4"
+          BENCH_LABEL: GitHub ${{ matrix.runner }} runner, not Lambda
       - uses: actions/upload-artifact@v4
         with:
-          name: bench-linux-aarch64
+          name: bench-${{ matrix.arm }}
           path: |
-            results/linux-aarch64/micro.json
-            results/linux-aarch64/macro.json
+            results/${{ matrix.arm }}/micro.json
+            results/${{ matrix.arm }}/macro.json
+            results/${{ matrix.arm }}/kernels.json
+            results/${{ matrix.arm }}/loop.json
           if-no-files-found: error
