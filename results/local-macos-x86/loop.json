@@ -53,18 +53,17 @@
   "cv2_threads": 16,
   "python": "3.13.16",
   "numpy": "2.5.4",
-  "timestamp": "2026-10-19T05:56:12Z",
+  "timestamp": "2026-10-19T06:37:22Z",
   "load_avg": [
-   15.2,
-   16.23,
-   48.37
-  ],
-  "label": "this Mac (i9-9880H, macOS, GCD), shared with other workstreams: see load_avg"
+   9.43,
+   8.59,
+   11.12
+  ]
  },
  "load_avg_end": [
-  17.11,
-  16.22,
-  40.71
+  10.59,
+  10.97,
+  11.72
  ],
  "decisions_identical_across_threads": true,
  "results": [
@@ -73,16 +72,16 @@
    "variant": "off",
    "jobs": 32,
    "steps": 142,
-   "jobs_per_s": 0.9414,
+   "jobs_per_s": 0.7554,
    "job_ms": {
-    "p50": 926.7,
-    "p95": 1989.2
+    "p50": 1085.8,
+    "p95": 2548.4
    },
    "step_ms": {
-    "p50": 217.0,
-    "p95": 320.1
+    "p50": 281.4,
+    "p95": 454.6
    },
-   "cpu_s_per_job": 1.038,
+   "cpu_s_per_job": 1.26,
    "prefetch": {
     "warp_hit_rate": null
    },
@@ -93,16 +92,16 @@
    "variant": "warp",
    "jobs": 32,
    "steps": 142,
-   "jobs_per_s": 0.8766,
+   "jobs_per_s": 0.7601,
    "job_ms": {
-    "p50": 998.2,
-    "p95": 2159.6
+    "p50": 1074.7,
+    "p95": 2547.0
    },
    "step_ms": {
-    "p50": 231.8,
-    "p95": 389.1
+    "p50": 282.5,
+    "p95": 452.9
    },
-   "cpu_s_per_job": 1.114,
+   "cpu_s_per_job": 1.26,
    "prefetch": {
     "warp_miss": 104,
     "submitted": 116,
@@ -117,16 +116,16 @@
    "variant": "warp+segment",
    "jobs": 32,
    "steps": 142,
-   "jobs_per_s": 0.9217,
+   "jobs_per_s": 0.8676,
    "job_ms": {
-    "p50": 1091.1,
-    "p95": 1842.5
+    "p50": 1061.4,
+    "p95": 2061.7
    },
    "step_ms": {
-    "p50": 241.0,
-    "p95": 426.4
+    "p50": 249.6,
+    "p95": 462.9
    },
-   "cpu_s_per_job": 1.647,
+   "cpu_s_per_job": 1.752,
    "prefetch": {
     "warp_miss": 104,
     "submitted": 116,
@@ -142,16 +141,16 @@
    "variant": "off",
    "jobs": 32,
    "steps": 142,
-   "jobs_per_s": 0.89,
+   "jobs_per_s": 1.3331,
    "job_ms": {
-    "p50": 928.0,
-    "p95": 2344.5
+    "p50": 599.0,
+    "p95": 1317.2
    },
    "step_ms": {
-    "p50": 235.5,
-    "p95": 382.9
+    "p50": 154.7,
+    "p95": 231.9
    },
-   "cpu_s_per_job": 1.263,
+   "cpu_s_per_job": 0.94,
    "prefetch": {
     "warp_hit_rate": null
    },
@@ -162,16 +161,16 @@
    "variant": "warp",
    "jobs": 32,
    "steps": 142,
-   "jobs_per_s": 0.8878,
+   "jobs_per_s": 1.2955,
    "job_ms": {
-    "p50": 849.3,
-    "p95": 2080.6
+    "p50": 574.1,
+    "p95": 1357.6
    },
    "step_ms": {
-    "p50": 237.2,
-    "p95": 334.0
+    "p50": 155.6,
+    "p95": 237.7
    },
-   "cpu_s_per_job": 1.277,
+   "cpu_s_per_job": 0.969,
    "prefetch": {
     "warp_miss": 104,
     "submitted": 116,
@@ -186,16 +185,16 @@
    "variant": "warp+segment",
    "jobs": 32,
    "steps": 142,
-   "jobs_per_s": 0.9137,
+   "jobs_per_s": 1.4147,
    "job_ms": {
-    "p50": 929.3,
-    "p95": 1981.0
+    "p50": 608.1,
+    "p95": 1079.4
    },
    "step_ms": {
-    "p50": 257.5,
-    "p95": 419.6
+    "p50": 169.7,
+    "p95": 268.2
    },
-   "cpu_s_per_job": 1.879,
+   "cpu_s_per_job": 1.379,
    "prefetch": {
     "warp_miss": 104,
     "submitted": 116,
