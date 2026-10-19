@@ -741,9 +741,9 @@ def short_provenance(prov: dict, workers: int, threads, micro_arm: str, data_id:
 
 
 def segmenter_id(seg) -> str:
-    """seg.name plus each ONNX file's name and short sha256: every trained model installs as
-    models/drishyam_dacl10k.onnx, and the FP16 net (if any) serves the 'fast' looks, so the name alone does not say
-    which model made a cache."""
+    """seg.name plus each ONNX file's name and short sha256: a retrained model installs under the same name
+    (models/drishyam_dacl10k.onnx, or drishyam_dacl10k_<variant>.onnx), and the FP16 net (if any) serves the 'fast'
+    looks, so the name alone does not say which model made a cache."""
     files = [Path(p) for p in getattr(seg, "files", ()) if p]
     return " ".join([seg.name, *(f"{p.name}@{hashlib.sha256(p.read_bytes()).hexdigest()[:12]}" for p in files)])
 

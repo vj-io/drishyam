@@ -2,7 +2,9 @@
 
 The 19 dacl10k sigmoid channels are merged to Drishyam's 6 classes inside the graph (dacl_common.DrishyamHead,
 mapping from class_map.json), so OnnxSegmenter needs no class_map. H and W are dynamic (multiples of 32).
-Writes <out>/drishyam_dacl10k.onnx (FP32) and drishyam_dacl10k.fp16.onnx (weights in FP16, FP32 inputs/outputs).
+Writes <out>/drishyam_dacl10k.onnx (FP32), drishyam_dacl10k.fp16.onnx (weights in FP16, FP32 inputs/outputs) and
+drishyam_dacl10k_19.onnx (FP32, the 19 dacl10k logits before the merge: another class_map can be tried on it, on dev
+data, without retraining; Drishyam does not load it).
 
     python training/export_onnx.py --ckpt runs/dacl10k/best.pt --out models/
 """
@@ -22,6 +24,27 @@ from dacl_common import DrishyamHead, load_checkpoint, load_class_map
 NAME = "drishyam_dacl10k"
 
 
+def _export(model, path: Path, size: int, slim: bool) -> None:
+    import onnx
+
+    dummy = torch.randn(1, 3, size, size)
+    # The TorchScript exporter, the one checked against OpenCV DNN here. torch >= 2.9 defaults to dynamo=True
+    # (a different graph, and it needs onnxscript); torch 2.2.2 has no such argument.
+    legacy = {"dynamo": False} if "dynamo" in inspect.signature(torch.onnx.export).parameters else {}
+    with torch.no_grad():
+        torch.onnx.export(model, dummy, str(path), opset_version=17, input_names=["input"],
+                          output_names=["logits"], dynamic_axes={"input": {2: "h", 3: "w"}, "logits": {2: "h", 3: "w"}},
+                          **legacy)
+    if slim:
+        try:
+            import onnxslim
+
+            onnxslim.slim(str(path), str(path))  # constant-folds the shape ops OpenCV DNN dislikes
+        except ImportError:
+            print("onnxslim not installed: skipping graph cleanup (pip install onnxslim)")
+    onnx.checker.check_model(onnx.load(str(path)))
+
+
 def export(ckpt: str, out: Path, size: int = 512, slim: bool = True, fp16: bool = True) -> dict[str, Path]:
     import onnx
 
@@ -29,25 +52,9 @@ def export(ckpt: str, out: Path, size: int = 512, slim: bool = True, fp16: bool 
     net, ck = load_checkpoint(ckpt)
     if ck["names"] != names:
         raise SystemExit("checkpoint channels do not match class_map.json 'dacl10k_classes'")
-    model = DrishyamHead(net, groups).eval()
     out.mkdir(parents=True, exist_ok=True)
     paths = {"fp32": out / f"{NAME}.onnx"}
-    dummy = torch.randn(1, 3, size, size)
-    # The TorchScript exporter, the one checked against OpenCV DNN here. torch >= 2.9 defaults to dynamo=True
-    # (a different graph, and it needs onnxscript); torch 2.2.2 has no such argument.
-    legacy = {"dynamo": False} if "dynamo" in inspect.signature(torch.onnx.export).parameters else {}
-    with torch.no_grad():
-        torch.onnx.export(model, dummy, str(paths["fp32"]), opset_version=17, input_names=["input"],
-                          output_names=["logits"], dynamic_axes={"input": {2: "h", 3: "w"}, "logits": {2: "h", 3: "w"}},
-                          **legacy)
-    if slim:
-        try:
-            import onnxslim
-
-            onnxslim.slim(str(paths["fp32"]), str(paths["fp32"]))  # constant-folds the shape ops OpenCV DNN dislikes
-        except ImportError:
-            print("onnxslim not installed: skipping graph cleanup (pip install onnxslim)")
-    onnx.checker.check_model(onnx.load(str(paths["fp32"])))
+    _export(DrishyamHead(net, groups).eval(), paths["fp32"], size, slim)
     if fp16:
         try:
             from onnxconverter_common import float16
@@ -59,6 +66,8 @@ def export(ckpt: str, out: Path, size: int = 512, slim: bool = True, fp16: bool 
             onnx.save(half, str(paths["fp16"]))
         except ImportError:
             print("onnxconverter-common not installed: no FP16 variant (pip install onnxconverter-common)")
+    paths["19"] = out / f"{NAME}_19.onnx"
+    _export(net, paths["19"], size, slim)
     return paths
 
 

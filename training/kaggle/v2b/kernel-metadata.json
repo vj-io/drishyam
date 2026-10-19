@@ -1,0 +1,15 @@
+{
+  "id": "vaibhav2105/drishyam-dacl10k-train-v2b",
+  "title": "Drishyam dacl10k train v2b",
+  "code_file": "../../drishyam_dacl10k_kaggle_v2b.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "machine_shape": "NvidiaTeslaT4",
+  "dataset_sources": ["winterqi131/dacl10k-v2-devphase"],
+  "competition_sources": [],
+  "kernel_sources": [],
+  "model_sources": []
+}
