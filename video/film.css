@@ -26,8 +26,9 @@ body.short, body.short html { width: 1080px; height: 1920px; }
 #strip { position: absolute; left: 40px; right: 40px; top: 30px; height: 50px; display: flex; align-items: center; gap: 22px; padding: 0 18px;
   border: 2.5px solid var(--line); background: rgba(7,34,71,.85); font: 500 21px/1 var(--fm); letter-spacing: .12em; text-transform: uppercase; color: var(--line-2); }
 #strip .a { color: var(--line); font-weight: 700; white-space: nowrap; }
-#strip .b { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; }
+#strip .b { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #strip .b::before { content: '|'; margin-right: 22px; color: var(--line-3); }
+#strip .b code { font: inherit; text-transform: none; letter-spacing: .04em; color: var(--line); }
 #strip .no { color: var(--amber); font-weight: 700; white-space: nowrap; }
 #strip .no b { display: inline-block; min-width: 1.9em; margin: 0 .3em; padding: 2px .25em; border: 2.5px solid var(--amber); text-align: center; }
 

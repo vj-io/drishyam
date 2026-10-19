@@ -126,9 +126,12 @@ function railcall(n, big, label, t0, t1) { CALLS.push({ n, big, label, t0, t1 })
 // ------------------------------------------------------------------ the sheet: frame, strip, rail, captions
 const ORDER = F.order, SC = F.scenes;
 const TITLES = { open: 'Cold open', team: 'Team', problem: 'Problem and user', live: 'Live demo on AWS', break: 'Failure drills, human control', mcp: 'An LLM over MCP',
-  arch: 'Architecture', results: 'Principal results', failures: 'Failure cases', limits: 'Limits', repro: 'Reproduce', end: 'Links' };
+  arch: 'Architecture', results: 'Principal results', real: 'Real photo (ours)', failures: 'Failure cases', limits: 'Limits', repro: 'Reproduce', end: 'Links' };
 const LIT = D.lit, ENTRY = `${LIT.competition} · ${LIT.award} entry`;
-const STRIPB = { open: 'live recording, synthetic sample photo bridge_03', team: ENTRY,
+const PT = window.PRIVATE && window.PRIVATE.team && window.portraitChapter && window.PORTRAITS ? window.PRIVATE.team : null;   // the team's photos and portraits (private)
+const STRIPB = { open: 'live recording, synthetic sample photo bridge_03',
+  team: PT ? `our photos, drawn by OpenCV 5: ${PT.calls.map((c) => `<code>${c}</code>`).join(', ')}` : ENTRY,
+  real: D.real ? `${D.real.trace} · job ${D.real.job} · ${D.real.engine}` : '',
   problem: 'sources: docs/impact-sources.md', live: `recorded on ${D.urls.live.replace('https://', '')}, ${LIT.recorded}`, break: 'live: drills injected on purpose',
   mcp: 'docs/mcp-session: a recorded Claude session', arch: 'docs/architecture.png · docs/agent-loop.svg · public/docs/aws-simple.svg',
   results: 'public/results/*.json, final classical-engine run', failures: 'public/results/failures.json', limits: 'pixels, not millimetres', repro: D.urls.repo.replace('https://', ''), end: '' };
@@ -152,7 +155,7 @@ function buildFrame() {
 function sceneAt(t) { let k = 0; ORDER.forEach((id, i) => { if (t >= SC[id].t0) k = i; }); return k; }
 function drawFrame(t) {
   const k = sceneAt(t), id = ORDER[k], s = SC[id];
-  stripA.textContent = `DRISHYAM // ${TITLES[id]}`; stripB.textContent = STRIPB[id] || '';
+  stripA.textContent = `DRISHYAM // ${TITLES[id]}`; stripB.innerHTML = STRIPB[id] || '';
   const p = seg(t, s.t0, s.t0 + 0.35);
   stripNo.innerHTML = `SHEET <b style="display:inline-block;transform:scale(${(1.7 - 0.7 * eo(p)).toFixed(3)});opacity:${(0.3 + 0.7 * p).toFixed(2)}">${k + 1}</b> OF ${ORDER.length}`;
   chs.forEach((c, i) => { c.className = 'ch' + (i < k ? ' done' : i === k ? ' on' : ''); c.style.transform = `scale(${(1 + 0.1 * bump(seg(t, SC[ORDER[i]].t0, SC[ORDER[i]].t0 + 0.4))).toFixed(3)})`; });
@@ -167,6 +170,8 @@ function drawFrame(t) {
 }
 const RAILNOTE = {
   open: () => `Synthetic sample photo <b>bridge_03</b>, live job <b>${D.guided.job}</b>.`,
+  team: () => (PT ? `<b>${LIT.award}</b> entry, ${LIT.competition}. Each line is traced from the photo at the pyramid level the window’s tag names.` : ''),
+  real: () => `The team’s own photo, <b>${D.real.image}</b>. Job <b>${D.real.job}</b>: ${D.real.engine}, ${D.real.profile}. “By eye” is the team’s reading, not ground truth.`,
   live: () => `Live job <b>${D.guided.job}</b> on ${D.health.host}, ${D.health.arch}, OpenCV ${D.health.opencv}. Retimed to the voice: the speed is shown in the window bar.`,
   break: () => 'Faults injected on purpose: a malformed planner reply, a slowed segmenter, a planner that stalls.',
   mcp: () => 'Calls, values and reasons are copied from <b>exchange.jsonl</b>.',
@@ -225,8 +230,25 @@ function camBoard(B, K, push = 0.08) {
 }
 const typed = (text, p) => text.slice(0, Math.round(text.length * clamp(p)));
 
-// 2. team: two title blocks, drawn by a pen, the camera on the one being read
-function buildTeam() {
+// 2. team: each real photo, turned into its OpenCV line portrait look by look (private inputs), or else two name cards
+function buildTeam() { return PT ? buildPortraits() : buildCards(); }
+function buildPortraits() {
+  const S = scene('team'), s = SC.team, rel = (x) => x - s.t0;
+  // README.md's Team lines, "Name, role (work, work)", as the chapter sets them: "Role: work, work"
+  const [n1, r1, n2, r2] = LIT.team.flatMap((x) => { const m = x.match(/^([^,]+), (.+) \((.+)\)$/); return [m[1], m[2][0].toUpperCase() + m[2].slice(1) + ': ' + m[3]]; });
+  // chapter-relative times. t1 carries both transformations: photo 1 alone for a moment, its six looks, its name and role,
+  // the glide, photo 2 the same; t2 names the two: both plates are framed as it starts and each block lights on its name.
+  const PACE = 0.75, SETTLE = 2.5 * PACE, roleT = (r) => 0.012 * r.replace(': ', '').length + 0.1;   // portraits-chapter.js STEP[5], role typing
+  const p1 = rel(at('t1')) + 0.7, name1At = p1 + SETTLE + 0.45, p2 = name1At + roleT(r1) + 0.7, name2At = p2 + SETTLE + 0.45;
+  const t2 = rel(at('t2')), said = (n) => t2 + LINE.t2.dur * LINE.t2.say.indexOf(n.split(' ')[0]) / LINE.t2.say.length;
+  const both = Math.max(t2 + 0.2, name2At + roleT(r2) - 0.3, p2 + SETTLE + 0.67);
+  const ch = portraitChapter(S.e, { name1: n1, role1: r1, name2: n2, role2: r2, tagline: 'Drawn by OpenCV 5, coarse to fine', w: 1530, h: 836, dur: s.t1 - s.t0,
+    p1, p2, both, name1At, name2At, said1At: said(n1), said2At: said(n2), tag: said(n2) + 0.9, pace: PACE, photos: PT.photos });
+  if (both > said(n1) - 0.1) throw new Error(`team: both plates framed at ${both.toFixed(2)} s, after the voice names ${n1}`);
+  S.draws.push((t) => ch.draw(t - s.t0));
+  ch.sfx.forEach((c) => { if (!(c.type === 'whoosh' && c.t < 0.1)) cue(s.t0 + c.t, c.type, c.x); });   // the film already whooshes at a chapter start
+}
+function buildCards() {
   const S = scene('team'), s = SC.team, B = boardView(S.e), H = B.board;
   el('div', 'abs', H, `<span class="fig">FIG. 0</span> <span class="lab" style="margin-left:14px;font-size:24px">${ENTRY}</span>`).style.cssText = 'left:0;top:40px';
   const cards = LIT.team.map((x) => { const [, name, role, did] = x.match(/^([^,]+), (.+) \((.+)\)$/); return [role.toUpperCase(), name, did.split(', ')]; });   // README.md's Team lines
@@ -452,11 +474,11 @@ function buildArch() {
     [at('a1') - 0.2, WX + 450, 825, whole(1650)], [d('a1', 0.8), WX + 450, 762, 1259, 0.05],   // the AWS path whole, then boxes 2-4 (CloudFront, Function URL, Lambda)
     [at('a2') + 0.2, 1340, 1640, whole(3280)], [d('a2', 0.45), 1481, 821, 728], [d('a2', 0.75), 1464, 1192, 689],
     // OpenCV layer, held still (its header and footnote span the sheet, so a push would cut them): pyramid and saliency, then the virtual PTZ, blur gate and privacy pass
-    [at('a3') + 0.65, 1959, 2459, 1130, 0], [d('a3', 0.6), 760, 2428, 1268, 0],
+    [at('a3') + 0.65, 1959, 2459, 1130, 0], [d('a3', 0.5), 760, 2428, 1268, 0],
     [at('a4') + 0.6, 1645, 2620, 562], [d('a4', 0.55), 1645, 2620, 562], [at('a5') + 0.1, 642, 1223, 1006, 0.05], [d('a5', 0.55), 642, 1223, 996, 0.06]];   // a4 the segment box, a5 the Function URL and Lambda boxes
   // the OpenCV boxes light up as a3 names them (architecture.png pixels)
   // (each goes out as the camera leaves its view: the first two before the left half arrives, the rest as a4 begins)
-  const a3 = LINE.a3.say, L3 = d('a3', 0.6), HL = [['pyramid', [1386, 2206, 1948, 2449], L3], ['saliency', [2000, 2206, 2562, 2449], L3], ['camera', [158, 2518, 720, 2761], at('a4') + 0.4],
+  const a3 = LINE.a3.say, L3 = d('a3', 0.5), HL = [['pyramid', [1386, 2206, 1948, 2449], L3], ['saliency', [2000, 2206, 2562, 2449], L3], ['pan-tilt', [158, 2518, 720, 2761], at('a4') + 0.4], ['camera', [158, 2518, 720, 2761], at('a4') + 0.4],
     ['blur gate', [772, 2518, 1334, 2761], at('a4') + 0.4], ['face', [772, 2206, 1334, 2449], at('a4') + 0.4]]
     .map(([w, [x0, y0, x1, y1], off]) => { const e = el('div', 'abs', board); css(e, { left: x0 + 'px', top: y0 + 'px', width: x1 - x0 + 'px', height: y1 - y0 + 'px', border: '6px solid var(--amber)', opacity: 0 });
       const T = d('a3', a3.indexOf(w) / a3.length); cue(T, 'tick', 3); return [e, T, off]; });
@@ -514,7 +536,7 @@ function buildResults() {
     <div class="mono" style="font-size:21px;line-height:1.35">of exhaustive tiling’s recall (95 % CI ${pc(sy.ratio_ci[0])}–${pc(sy.ratio_ci[1])}), at ${pc(h.pixels_frac)} of the pixels (tiling: ${pc(tl.pixels_frac)})</div>
     <div class="mono" style="font-size:21px;line-height:1.35;margin-top:6px">target ${pc(sy.target)}: <b style="color:var(--red)">missed</b>${sy.ratio_ci[1] >= sy.target ? ' (point estimate)' : ''}</div>`);
   css(card, { left: '1130px', top: '250px', width: '400px', padding: '14px 18px' });
-  const card2 = el('div', 'box', p1, `<div class="lab">ours / one downscale</div><div class="h2" style="font-size:56px;margin:4px 0">${fmt(sy.ds_ratio)}×</div><div class="mono" style="font-size:21px;line-height:1.35">95 % CI ${fmt(sy.ds_ci[0])}–${fmt(sy.ds_ci[1])}: one downscale (${fmt(ds.recall)} at ${pc(ds.pixels_frac)}) does as well or slightly better</div>`);
+  const card2 = el('div', 'box', p1, `<div class="lab">ours / one downscale</div><div class="h2" style="font-size:56px;margin:4px 0">${fmt(sy.ds_ratio)}×</div><div class="mono" style="font-size:21px;line-height:1.35">95 % CI ${fmt(sy.ds_ci[0])}–${fmt(sy.ds_ci[1])}: one downscale (${fmt(ds.recall)} at ${pc(ds.pixels_frac)}) ${sy.ds_ci[1] <= 1 ? 'does as well or slightly better' : 'is slightly ahead, within the noise'}</div>`);
   css(card2, { left: '1130px', top: '600px', width: '400px', padding: '12px 18px' });
   // P2: 4608 px and the ablations
   const lg = D.large, ab = D.abl, p2 = el('div', 'abs', board); css(p2, { left: P2X + 'px', top: '0px', width: '1530px', height: '836px' });
@@ -542,18 +564,20 @@ function buildResults() {
       <div class="mono" style="font-size:26px">of them got a report from Drishyam (${pc(cl.cap)} cap)</div>
       <table class="t" style="margin-top:20px"><tr><th>boxes per image</th><th></th></tr><tr><td>Drishyam</td><td class="n">${fmt(cl.boxes)}</td></tr><tr><td>one downscale</td><td class="n">${fmt(cl.ds_boxes)}</td></tr><tr><td>L0 tiling</td><td class="n">${fmt(cl.tl_boxes)}</td></tr></table>
       <div class="src" style="margin-top:14px">public/results/clean/summary.json · false_alarms</div></div>
-    ${D.model ? `<div id="pend" class="box amb" style="left:0;top:600px;width:1740px;padding:16px 26px"><div class="lab amber">trained segmenter (dacl10k) on the same ${cb.n} CODEBRIM photos · governor off · both charged the ${D.model.arm} cost table</div>
-      <div class="mono" style="font-size:26px;margin-top:10px">recall ${fmt(D.model.recall)} (95 % CI ${fmt(D.model.ci[0])}–${fmt(D.model.ci[1])}) vs ${fmt(D.model.classical)} classical · its boxes at random ${fmt(D.model.chance)} · ${D.model.tiling_wins.length ? 'tiling at ' + D.model.tiling_wins.join(', ') + ' still finds more' : 'no tiling level finds more'} · near-duplicates in its training set: ${D.model.near_dups}</div></div>`
+    ${D.model ? `<div id="pend" class="box amb" style="left:0;top:600px;width:1740px;padding:16px 26px"><div class="lab amber">trained segmenter (dacl10k) on the same ${cb.n} CODEBRIM photos · <span data-w="governor">governor off</span> · <span data-w="same cost table">both charged the ${D.model.arm} cost table</span></div>
+      <div class="mono" style="font-size:26px;margin-top:10px"><span data-w="trained">recall ${fmt(D.model.recall)} (95 % CI ${fmt(D.model.ci[0])}–${fmt(D.model.ci[1])})</span> <span data-w="classical">vs ${fmt(D.model.classical)} classical</span> · <span data-w="random">its boxes at random ${fmt(D.model.chance)}</span> · <span data-w="tiling">${D.model.tiling_wins.length ? 'tiling at ' + D.model.tiling_wins.join(', ') + ' still finds more' : 'no tiling level finds more'}</span> · <span data-w="finds more">near-duplicates in its training set: ${D.model.near_dups}</span></div></div>`
       : '<div id="pend" class="stamp" style="left:330px;top:620px;font-size:46px">trained segmenter: results pending</div>'}`;
   const VW = 1530, VH = 836;
   // the whole chart while it draws and the 85 % card is read; the card alone; the whole chart again for the 0.94x card;
   // each table framed so its first column and heading stay inside the view under the 8 % push
-  // the ablation rows as r5 says them: survey; uncertainty and governor; verify; random order (a camera stop and a row highlight each)
-  const r5 = LINE.r5.say, AB = [['survey', [6]], ['uncertainty', [8, 9]], ['verify', [7]], ['random', [10]]].map(([w, rows]) => [at('r5') + LINE.r5.dur * r5.indexOf(w) / r5.length, rows]);
+  // the ablation rows as r5 says them: survey; the others (verify, uncertainty, governor); random order (a camera stop and a row highlight each)
+  const r5 = LINE.r5.say, AB = [['survey', [6]], ['others', [7, 8, 9]], ['random', [10]]].map(([w, rows]) => [at('r5') + LINE.r5.dur * r5.indexOf(w) / r5.length, rows]);
   const AX = P2X - 20 + 0.46 * 1400;
   const K = [[s.t0, 765, 418, 1660], [at('r1') + LINE.r1.dur * 0.72, 1330, 446, 760], [at('r3') + 0.1, 765, 418, 1660],
     [at('r4') - 0.2, P2X - 20 + 0.46 * 1300, 150, 1300], [at('r5') - 0.1, AX, 705, 1400], ...AB.slice(1).map(([T], i) => [T - 0.2, AX, 712 + 6 * i, 1400]),
-    [at('r6') - 0.2, 380, P3Y + 300, 1150], [at('r7') - 0.1, 1370, P3Y + 300, 1150], [at('r8') - 0.1, 870, P3Y + 420, 1960]];
+    [at('r6') - 0.2, 380, P3Y + 300, 1150], [at('r7') - 0.1, 1370, P3Y + 300, 1150], [at('r8') - 0.1, 870, P3Y + 420, 1960, D.model ? 0.04 : 0.08],
+    // the trained segmenter's line is long: a second stop part way through (still wide enough for the whole card)
+    ...(D.model ? [[at('r8') + LINE.r8.dur * 0.65, 870, P3Y + 470, 1880, 0.04]] : [])];
   const cam = camBoard({ board, VW, VH }, K, 0.08);
   const pend = $('#pend', p3);
   S.draws.push((t) => {
@@ -566,6 +590,12 @@ function buildResults() {
     const cp = seg(t, at('r1') + LINE.r1.dur * 0.35, at('r1') + LINE.r1.dur * 0.35 + 0.4), cp2 = seg(t, at('r3'), at('r3') + 0.4);
     card2.style.top = card.offsetTop + card.offsetHeight + 14 + 'px';   // stacked under the 85 % card, never over it
     css(card, { opacity: cp, transform: `scale(${(0.9 + 0.1 * spring(cp)).toFixed(3)})` }); css(card2, { opacity: cp2, transform: `scale(${(0.9 + 0.1 * spring(cp2)).toFixed(3)})` });
+    if (D.model) {   // a flash of the card per phrase (36 % in 0.1 s, then down): the activity audit sees it; the part said comes in
+      const said = LINE.r8.say.toLowerCase(), parts = [...pend.querySelectorAll('[data-w]')].map((e) => [e, at('r8') + LINE.r8.dur * Math.max(0, said.indexOf(e.dataset.w)) / said.length]);
+      parts.forEach(([e, T]) => { e.style.opacity = (0.12 + 0.88 * seg(t, T - 0.1, T + 0.2)).toFixed(3); });
+      const fl = Math.max(0, ...parts.map(([, T]) => (t < T ? 0 : t < T + 0.1 ? (t - T) / 0.1 : Math.max(0, 1 - (t - T - 0.1) / 0.6))));
+      pend.style.background = `linear-gradient(rgba(255,200,87,${(0.36 * fl).toFixed(3)}), rgba(255,200,87,${(0.36 * fl).toFixed(3)})), rgba(11,50,100,.92)`;
+    }
     const sp = seg(t, at('r8') + 0.2, at('r8') + 0.45); css(pend, { opacity: sp, transform: `${D.model ? '' : 'rotate(-6deg) '}scale(${((D.model ? 1.1 : 1.6) - (D.model ? 0.1 : 0.6) * eo(sp)).toFixed(3)})` });
     const hot = t < end('r5') + 0.3 ? (AB.filter(([T]) => t >= T - 0.1).pop() || [0, []])[1] : [];
     [...p2.querySelectorAll('tr')].forEach((r, i) => { const T = i < 5 ? at('r4') + 0.3 + i * 0.25 : at('r5') + 0.2 + (i - 5) * 0.3; r.style.opacity = 0.15 + 0.85 * seg(t, T, T + 0.25);
@@ -575,6 +605,111 @@ function buildResults() {
   cue(s.t0 + 0.4, 'scribble', 0.9); cue(at('r8') + 0.25, 'stamp'); [at('r4'), at('r6'), at('r7')].forEach((T) => cue(T - 0.9, 'whoosh'));
 }
 
+// 8b. a real photo of our own (video/live/real.*): the recorded job's looks and findings over the photo, then what
+// the team sees in it by eye. The gaze window is the one the portraits use: a white frame, amber corners, a LOOK tag.
+function gazeWindow(host) {
+  const g = svgEl('g', {}, host);
+  const r = svgEl('rect', { fill: 'none', stroke: '#E8F1FF', 'stroke-width': 3 }, g), br = svgEl('path', { fill: 'none', stroke: '#FFC857', 'stroke-width': 5 }, g);
+  const tb = svgEl('rect', { fill: '#FFC857' }, g), tx = svgEl('text', { fill: '#2E2100', 'font-size': 21, 'font-weight': 700, 'dominant-baseline': 'central' }, g);
+  return { g, set([x, y, w, h], label, o = 1) {
+    g.setAttribute('opacity', o); for (const [k, v] of Object.entries({ x, y, width: w, height: h })) r.setAttribute(k, v.toFixed(1));
+    const kb = Math.min(30, w / 4, h / 4); let d = '';
+    for (const [cx, cy, sx, sy] of [[x, y, 1, 1], [x + w, y, -1, 1], [x, y + h, 1, -1], [x + w, y + h, -1, -1]]) d += `M${cx + sx * kb} ${cy + sy * 7}L${cx + sx * 7} ${cy + sy * 7}L${cx + sx * 7} ${cy + sy * kb}`;
+    br.setAttribute('d', d); tx.textContent = label;
+    const tw = label.length * 13.2 + 18, lx = Math.min(x + 12, (host.width?.baseVal.value || 1e9) - tw - 6);   // the tag stays inside the photo
+    tb.setAttribute('x', lx); tb.setAttribute('y', y + 12); tb.setAttribute('width', tw); tb.setAttribute('height', 32);
+    tx.setAttribute('x', lx + 9); tx.setAttribute('y', y + 29); tb.setAttribute('opacity', label ? 1 : 0); tx.setAttribute('opacity', label ? 1 : 0);
+  } };
+}
+function buildReal() {
+  const R = D.real; if (!R) return;
+  const S = scene('real'), s = SC.real, B = boardView(S.e), H = B.board;
+  const PW = 1100, k = PW / R.w, PH = Math.round(R.h * k), CX = 1130, CW = 400;
+  const plate = el('div', 'abs', H); css(plate, { left: '0px', top: '0px', width: PW + 'px', height: PH + 'px', border: '3px solid var(--line)', overflow: 'hidden', background: 'var(--deep)' });
+  const photo = img(R.photo, plate); css(photo, { position: 'absolute', left: 0, top: 0, width: '100%', height: '100%' });
+  // the overview reads the photo whole at one pyramid level: shown as that level, blown up (1:2^L pixels)
+  const lw = Math.ceil(R.w / 2 ** R.ov_level), lh = Math.ceil(R.h / 2 ** R.ov_level), small = el('canvas', 'abs', plate);
+  small.width = lw; small.height = lh; css(small, { left: 0, top: 0, width: '100%', height: '100%', imageRendering: 'pixelated', opacity: 0 });
+  let drawn = false;
+  const label = el('div', 'abs', plate, `<span class="amber">REAL PHOTO (ours):</span> painted plaster wall, no ground truth`);
+  css(label, { left: '18px', bottom: '18px', padding: '9px 16px', background: 'rgba(7,34,71,.94)', border: '3px solid var(--amber)', font: '700 23px/1 var(--fm)', color: 'var(--line)' });
+  const veil = el('div', 'abs', plate); css(veil, { inset: 0, background: 'rgba(7,34,71,.5)', opacity: 0 });
+  const sv = svgEl('svg', { width: PW, height: PH, viewBox: `0 0 ${PW} ${PH}`, class: 'abs', style: 'left:0;top:0;overflow:visible' }, plate);
+  const scan = svgEl('rect', { x: 0, width: PW, height: 6, fill: '#FFC857', opacity: 0 }, sv);
+  const X = (b) => b.map((v) => v * k);
+  const cands = R.cands.map((b) => svgEl('rect', { ...Object.fromEntries(['x', 'y', 'width', 'height'].map((a, i) => [a, X(b)[i]])), fill: 'none', stroke: '#E8F1FF', 'stroke-width': 3, 'stroke-dasharray': '10 8', opacity: 0 }, sv));
+  // the team's line, by eye: a dark band under a red line, drawn on
+  const paths = (R.seen?.paths || []).map((q) => { const d = q.map(([x, y], i) => `${i ? 'L' : 'M'}${(x * k).toFixed(1)} ${(y * k).toFixed(1)}`).join('');
+    const halo = svgEl('path', { d, fill: 'none', stroke: 'rgba(7,34,71,.75)', 'stroke-width': 13, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', pathLength: 1, 'stroke-dasharray': 1 }, sv);
+    const ln = svgEl('path', { d, fill: 'none', stroke: R.hit.length ? '#FFC857' : '#FF9A8A', 'stroke-width': 6, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', pathLength: 1, 'stroke-dasharray': 1 }, sv);
+    return [halo, ln]; });
+  const placed = [];   // finding labels: inside the photo, never on top of each other
+  const fins = R.found.slice().sort((a, b) => a.box[1] - b.box[1]).map((f) => { const [x, y, w, h] = X(f.box), g = svgEl('g', { opacity: 0 }, sv), bad = R.wrong.includes(f.id);
+    svgEl('rect', { x, y, width: Math.max(w, 6), height: Math.max(h, 6), fill: 'none', stroke: f.critical ? '#FF9A8A' : '#FFC857', 'stroke-width': 4 }, g);
+    const txt = `${f.cls.replace('_', ' ')} ${fmt(f.conf)}${R.seen && bad ? ' · false alarm' : ''}`, tw = txt.length * 13.4;
+    let lx = clamp(x, 8, PW - tw - 8), ly = y > 40 ? y - 12 : y + h + 28;
+    while (placed.some(([a, b]) => Math.abs(b - ly) < 28 && lx < a + 460 && a < lx + tw)) ly += 30;
+    placed.push([lx, ly]);
+    const t = svgEl('text', { x: lx, y: ly, fill: bad ? '#FF9A8A' : '#FFC857', 'font-size': 22, 'font-weight': 700, stroke: '#072247', 'stroke-width': 5, 'paint-order': 'stroke' }, g);
+    t.textContent = txt; return { g, f }; });
+  const win = gazeWindow(sv);
+  const stamp = el('div', 'stamp', plate, ''); css(stamp, { opacity: 0, zIndex: 3, whiteSpace: 'nowrap' });
+  // the two stamps go where the team's line is not: the spots with the fewest of its points (padded), in this order
+  const linePts = (R.seen?.paths || []).flatMap((q) => q.flatMap(([x, y], i) => (i ? [0, 0.25, 0.5, 0.75].map((u) => [lerp(q[i - 1][0], x, u) * k, lerp(q[i - 1][1], y, u) * k]) : [])));
+  const spots = [[80, 560], [520, 140], [80, 140], [520, 560]].map(([x, y]) => ({ x, y, n: linePts.filter(([px, py]) => px > x - 40 && px < x + 540 && py > y - 60 && py < y + 120).length }));
+  const [spotV, spotS] = spots.slice().sort((a, b) => a.n - b.n);
+  // the readout: each card as the voice reaches it
+  const say = LINE.q1.say, d = LINE.q1.dur, T = (w, f = 0) => at('q1') + d * Math.max(0, say.indexOf(w)) / say.length + f;
+  // the words each beat lands on (narration.py builds q1 from the trace, so these are in it): the engine, the reading, the report, the verdict
+  const tEng = T(R.kind === 'onnx' ? 'trained' : 'classical'), tRead = T(R.n_looks ? ' took ' : ' read ');
+  const tRep = R.n_looks ? T(say.includes('reported') ? 'reported' : 'pixels', 0.3) : T('saw nothing');
+  const tEnd = R.seen ? T(R.hit.length ? ' found ' : 'missed') : end('q1') - 0.6;
+  const classes = R.found.length ? [...new Set(R.found.map((f) => f.cls.replace('_', ' ')))].join(', ') : 'nothing';
+  const cards = [['ENGINE', R.engine, R.profile, tEng], ['LOOKS', R.n_looks ? `${R.n_looks}` : '0', R.n_looks ? `after an L${R.ov_level} overview` : `the L${R.ov_level} overview found ${R.candidates} candidate regions`, tRead],
+    ['PIXELS READ', '', `of ${R.w} × ${R.h} px`, tRead + 0.35], ['REPORTED', classes, `${R.n_found} finding${R.n_found === 1 ? '' : 's'}`, tRep],
+    ...(R.seen ? [['BY EYE (not ground truth)', R.seen.say.replace(/^the /, ''), R.hit.length ? `found${R.wrong.length ? `; ${R.wrong.length} false alarm${R.wrong.length > 1 ? 's' : ''}` : ''}` : 'missed', tEnd]] : [])]
+    .map(([lab, big, sub, t0], i) => { const c = el('div', 'box', H, `<div class="lab" style="font-size:19px">${lab}</div><div class="h2 amber" style="font-size:${Math.min(44, Math.floor(360 / (0.5 * Math.max(1, big.length))))}px;line-height:44px;height:44px;margin:8px 0 6px;white-space:nowrap"></div><div class="mono" style="font-size:20px;line-height:1.3;color:var(--line-2)">${sub}</div>`);
+      css(c, { left: CX + 'px', top: i * 168 + 'px', width: CW + 'px', height: '152px', padding: '14px 18px', overflow: 'hidden', borderColor: i === 4 ? (R.hit.length ? 'var(--amber)' : 'var(--red)') : 'var(--line)' });
+      return { c, big, t0, v: c.children[1] }; });
+  const lookAt = R.looks.map((L, i) => tRead + (tRep - tRead) * (i + 0.5) / R.looks.length);
+  const ovRect = [10, 10, PW - 20, PH - 20];
+  S.draws.push((t) => {
+    if (!drawn && photo.complete && photo.naturalWidth) { small.getContext('2d').drawImage(photo, 0, 0, lw, lh); drawn = true; }
+    // overview: the window takes the whole photo, the photo turns into its L3 copy while a scan line sweeps it
+    const u0 = s.t0 + 0.5, ov = seg(t, u0, u0 + 0.5), sc = seg(t, u0 + 0.4, tRead - 0.1);
+    small.style.opacity = (0.9 * eo(seg(t, u0 + 0.3, u0 + 0.7)) * (1 - seg(t, tRead - 0.1, tRead + 0.4))).toFixed(3);
+    css(scan, {}); scan.setAttribute('y', (sc * (PH - 6)).toFixed(1)); scan.setAttribute('opacity', sc > 0 && sc < 1 ? 0.85 : 0);
+    cands.forEach((c) => c.setAttribute('opacity', seg(t, tRead - 0.1, tRead + 0.2)));
+    // the window: off the photo's right edge, onto the whole photo, then to each look; it leaves after the last
+    let rect = [PW + 40, PH * 0.3, 260, 260].map((v, i) => lerp(v, ovRect[i], eio(ov))), lab = `OVERVIEW · L${R.ov_level} · 1:${2 ** R.ov_level}`;
+    R.looks.forEach((L, i) => { const p = eio(seg(t, lookAt[i] - 0.35, lookAt[i])); if (p > 0) { rect = rect.map((v, j) => lerp(v, X(L.window)[j], p)); if (p > 0.5) lab = `LOOK ${L.n} · L${L.level} · 1:${2 ** L.level}`; } });
+    const pulse = 1 - 0.03 * bump(seg(t, (R.looks.length ? lookAt[R.looks.length - 1] : u0 + 0.5), (R.looks.length ? lookAt[R.looks.length - 1] : u0 + 0.5) + 0.3));
+    rect = [rect[0] + rect[2] * (1 - pulse) / 2, rect[1] + rect[3] * (1 - pulse) / 2, rect[2] * pulse, rect[3] * pulse];
+    win.set(rect, lab, Math.min(seg(t, u0 - 0.1, u0 + 0.1), 1 - seg(t, tRep + 0.2, tRep + 0.6)));
+    fins.forEach(({ g, f }) => { const T0 = (lookAt[R.looks.findIndex((L) => L.n === f.step)] ?? tRep) + 0.25, p = seg(t, T0, T0 + 0.25);
+      g.setAttribute('opacity', p); g.setAttribute('transform', `translate(${X(f.box)[0]} ${X(f.box)[1]}) scale(${(1.25 - 0.25 * eo(p)).toFixed(3)}) translate(${-X(f.box)[0]} ${-X(f.box)[1]})`); });
+    // the team's line, drawn on as the voice gives the verdict, and the stamp
+    const pp = eio(seg(t, Math.min(tEnd - 0.2, tRep + 0.5), tEnd + 0.7));   // drawn from the report on, finished on the verdict
+    veil.style.opacity = R.seen ? eo(seg(t, Math.min(tEnd - 0.4, tRep + 0.3), Math.min(tEnd - 0.4, tRep + 0.3) + 0.4)).toFixed(3) : 0;
+    paths.forEach(([h, l]) => { h.setAttribute('stroke-dashoffset', 1 - pp); l.setAttribute('stroke-dashoffset', 1 - pp); });
+    const sp = seg(t, R.n_looks ? tRep + 0.2 : tRep, (R.n_looks ? tRep + 0.2 : tRep) + 0.3), vp = seg(t, tEnd + 0.4, tEnd + 0.7);
+    const stop = R.n_looks ? '' : `STOPPED · ${R.candidates} CANDIDATES`, verdict = R.seen ? (R.hit.length ? 'FOUND' : 'MISSED') : '';
+    const showV = vp > 0 && verdict;
+    stamp.textContent = showV ? `${verdict} · BY EYE` : stop; stamp.className = 'stamp' + (showV && !R.hit.length ? ' red' : '');
+    const q = showV ? vp : stop ? sp * (1 - seg(t, tEnd + 0.15, tEnd + 0.4)) : 0;
+    const sp_ = showV ? spotV : spotS;
+    css(stamp, { left: sp_.x + 'px', top: sp_.y + 'px', opacity: q, transform: `rotate(-6deg) scale(${(1.6 - 0.6 * eo(q)).toFixed(3)})` });
+    // the cards
+    cards.forEach((c, i) => { const p = eo(seg(t, c.t0, c.t0 + 0.35)); css(c.c, { opacity: p, transform: `translateX(${((1 - p) * 30).toFixed(1)}px)` });
+      c.v.textContent = i === 2 ? `${(100 * R.pixels_frac * eo(seg(t, c.t0, c.t0 + 0.9))).toFixed(1)} %` : typed(c.big, seg(t, c.t0 + 0.05, c.t0 + 0.45)); });
+  });
+  // the camera holds the whole sheet (photo and cards), pushing in 8 %: a closer view of the photo would cut the cards
+  S.draws.unshift(camBoard(B, [[s.t0, 765, 418, 1665]]));
+  cue(s.t0 + 0.55, 'whoosh'); cue(s.t0 + 0.9, 'scribble', tRead - s.t0 - 1.0); cards.forEach((c, i) => cue(c.t0, 'tick', i + 2)); if (cards[2]) cue(cards[2].t0, 'count', 0.9);
+  R.looks.forEach((L, i) => cue(lookAt[i] - 0.35, 'whoosh')); fins.forEach(({ f }) => cue((lookAt[R.looks.findIndex((L) => L.n === f.step)] ?? tRep) + 0.25, 'pop', 3));
+  if (!R.n_looks) cue(tRep, 'thud'); if (R.seen) cue(tEnd + 0.4, R.hit.length ? 'stamp' : 'alert');
+}
+
 // 9. failure cases: the plates from failures.json, and one CODEBRIM case in words only
 function buildFailures() {
   const S = scene('failures'), s = SC.failures, B = boardView(S.e), H = B.board;
@@ -582,8 +717,10 @@ function buildFailures() {
     const b = el('div', 'box', H); css(b, { left: (i % 2) * 900 + 'px', top: Math.floor(i / 2) * 400 + 'px', width: '755px', height: '322px', overflow: 'hidden' });
     const im = img(f.img, b); css(im, { position: 'absolute', left: '0px', top: '0px', height: '316px', width: '330px', objectFit: 'contain', borderRight: '3px solid var(--line)' });
     el('div', 'abs', b, `<div class="lab" style="color:var(--line-3)">FIG. 5.${i + 1} · ${f.id}</div><div class="h2 amber" style="font-size:40px;margin:10px 0 12px;white-space:normal">${f.cat}</div>
-      <div class="mono" style="font-size:22px;line-height:1.35;white-space:normal"><span style="color:var(--line-2)">rule that would catch it:</span> ${f.ruleShort}</div>
-      <div class="mono" style="font-size:22px;color:var(--red);margin-top:8px">not implemented</div>`).style.cssText = 'left:352px;top:18px;width:385px';
+      ${f.built ? `<div class="mono" style="font-size:22px;line-height:1.35;white-space:normal"><span style="color:var(--line-2)">built:</span> ${f.built}</div>
+      <div class="mono" style="font-size:20px;line-height:1.3;color:var(--red);margin-top:8px;white-space:normal">not yet: ${f.missing}</div>`
+    : `<div class="mono" style="font-size:22px;line-height:1.35;white-space:normal"><span style="color:var(--line-2)">rule that would catch it:</span> ${f.name}</div>
+      <div class="mono" style="font-size:22px;color:var(--red);margin-top:8px">not implemented</div>`}`).style.cssText = 'left:352px;top:18px;width:385px';
     return b;
   });
   const rf = D.real_fail, txt = el('div', 'box amb', H, `<span class="lab amber">CODEBRIM ${rf.id}, in words only</span><span class="mono" style="margin-left:18px;font-size:26px">ground truth <b>${rf.gt}</b> · reported <b>${rf.got}</b></span>`);
@@ -675,7 +812,7 @@ function buildShort() {
 if (SHORT) buildShort();
 else {
   buildFrame();
-  buildOpen(); buildTeam(); buildProblem(); buildLive(); buildBreak(); buildMcp(); buildArch(); buildResults(); buildFailures(); buildLimits(); buildRepro(); buildEnd();
+  buildOpen(); buildTeam(); buildProblem(); buildLive(); buildBreak(); buildMcp(); buildArch(); buildResults(); buildReal(); buildFailures(); buildLimits(); buildRepro(); buildEnd();
   ORDER.forEach((id, i) => { if (i) { cue(SC[id].t0, 'whoosh'); cue(SC[id].t0 + 0.2, 'switch'); } });
   window.DURATION = F.dur;
   window.SFX = SFX.sort((a, b) => a.t - b.t);
