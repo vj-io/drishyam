@@ -659,6 +659,8 @@ def test_dev_sweep_runs_end_to_end_and_writes_its_rows(tmp_path, monkeypatch):
     dev_sweep.main(["tiny", "1.0,0.3", "a=v0:0;b=v0:2", "--workers", "1", "--out", str(out)])
     rows = json.loads(out.read_text())
     assert rows["split"] == "tiny" and rows["n"] == 2
+    records, _ = harness.load_records(tmp_path / "tiny", 2, seed=3)  # the rows say which data they scored
+    assert {k: rows[k] for k in ("dataset_gt_sha256", "dataset_images_sha256")} == harness.dataset_sha256(records)
     assert set(rows["rows"]) == {"downscale", "a@1.0", "a@0.3", "b@1.0", "b@0.3"}
     agents = [r for k, r in rows["rows"].items() if "@" in k]
     assert all(0 < r["pixels_frac"] <= 1 and sum(r["halt"].values()) == 2 for r in agents)

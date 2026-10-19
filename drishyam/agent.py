@@ -56,21 +56,34 @@ V0 = 2.0
 # first and finest level found 0.397 at 33 boxes per photo against 0.403 at 85 for L1; with absorption off, 0.473
 # against 0.415 for the original levels (L1 first, L0 finest; x1.14, CI 1.07-1.22). Absorption had dropped real
 # cracks the model segmented beside a spall (x1.19 with it off, CI 1.11-1.31). On synth_dev (2048 px) L1 looks (0.5
-# of the side) do add recall: L2 alone found x0.88 of the old agent's (CI 0.82-0.93). A share in (0.22, 0.34] keeps
-# L2 on the 4608- and 6000-px photos and L1 on the 2048-px ones; 0.3 found x1.18 a 1024-px downscale on CODEBRIM (CI
-# 1.07-1.31) and x1.03 the old agent on synth_dev (CI 0.98-1.07), at no more false alarms on the clean split. 0.25,
-# which also allows L0 on a 2048-px photo, showed no measurable difference on either at the 30 % cap; uncapped, its L0 looks found a
-# little more on synth_dev (0.3 against it: x0.98, CI 0.95-1.00).
+# of the side) do add recall: L2 alone found x0.88 of the old agent's (CI 0.82-0.93). Any share above 0.222 (L1 at
+# 4608 px) up to 0.341 (L2 at 6000 px) keeps L2 the finest level on those photos and allows L1 on 2048-px ones, but
+# other dev100 sizes have breakpoints inside that range (L0 of 2272 px spans 0.225, L0 of 2048 px 0.25, L1 of 3648 px
+# 0.281, L0 of 1600 px 0.32), so the value still moves levels: 0.3 makes L2 the finest on the 3 photos of 3648 px and
+# L1 on the 2048- and 2272-px ones, and allows L0 on the 2 of 1600 px. 0.3 found x1.18 a 1024-px downscale on
+# CODEBRIM (CI 1.07-1.31) and x1.03 the old agent on synth_dev (CI 0.98-1.07), at no more false alarms on the clean
+# split. 0.25 (L1 on the 3648-px photos, L0 on the 2048-px ones) showed no measurable difference on either at the
+# 30 % cap; uncapped, its L0 looks found a little more on synth_dev (0.3 against it: x0.98, CI 0.95-1.00).
+# A mask first drafted at the finest level gets no verify look (no finer level to confirm it at; its verify_iou stays
+# null, and the step's rationale says so): the dev numbers above ran that way, and a verify at the same level (a
+# shifted window) was not built or measured.
 PROFILES = {
     "classical-v1": {"min_view": 0.0, "absorb": True},
     "onnx:drishyam_dacl10k.onnx": {"min_view": 0.3, "absorb": False},
 }
 
 
+# The weights each ONNX profile was chosen with (the file's sha256): the same file name with other weights (a retrained
+# model installed as models/drishyam_dacl10k.onnx) was not measured, so it gets classical-v1.
+WEIGHTS = {"onnx:drishyam_dacl10k.onnx": "c49416c10087f3c1baa8443b53fc839a3d8eb227ff27a1b4f7be1da964d6ed4a"}
+
+
 def profile_for(segmenter) -> str:
-    """The PROFILES key of a segmenter (its `name`), or classical-v1 for one not calibrated."""
+    """The PROFILES key of a segmenter (its `name`), or classical-v1 for one not calibrated: a name not listed, or
+    weights (its `sha256`) other than those the profile was chosen with (WEIGHTS)."""
     name = getattr(segmenter, "name", None)
-    return name if name in PROFILES else "classical-v1"
+    ok = name in PROFILES and WEIGHTS.get(name) in (None, getattr(segmenter, "sha256", None))
+    return name if ok else "classical-v1"
 
 
 @dataclass
@@ -344,18 +357,27 @@ class Job:
         finding of its best class; `critical`: this look's first critical finding of its own class (a human reviews
         this region anyway); `drafted`: whether this look drafted anything; `areas` (class changes only): the area in
         L0 px of the compared class at the coarser look and of this look's best class, each its largest component as
-        a finding measures it, which say whether a class change is critical."""
+        a finding measures it, which say whether a class change is critical.
+        Returns (the follow-up look or None, a note for this look's rationale: a verify the rules call for that the
+        profile's finest level rules out, else "")."""
         cfg = self.cfg
+        # A verify look goes one level finer; at the profile's finest level (min_view) there is none to go to.
+        finest = (f"L{level} is the finest level for {cfg.profile} (min_view {cfg.min_view:g})"
+                  if 0 < level == self.min_level else None)
         if chk is None:
-            if drafted and level > self.min_level and not self.settings.batch and not r.verified and cfg.verify:
-                return ("verify", r, level - 1, "verify-new-mask",
-                        f"new {best} mask at L{level}; confirming at L{level - 1}")
+            note = ""
+            if drafted and not self.settings.batch and not r.verified and cfg.verify:
+                if level > self.min_level:
+                    return ("verify", r, level - 1, "verify-new-mask",
+                            f"new {best} mask at L{level}; confirming at L{level - 1}"), ""
+                if finest:
+                    note = f"; new {best} mask not verified: {finest}, no finer look"
             r.done = True
-            return None
+            return None, note
         k, a, iou = chk["class"], chk["against_level"], chk["iou"]
         if chk["kind"] == "agree":
             r.verified = r.done = True
-            return None
+            return None, ""
         if chk["kind"] == "class-change":
             # The finer look sees the same place as another class: it keeps that class, the coarser one is recorded
             # (the step's verify.class; the coarser finding is unconfirmed). A human decides when either CLASS is
@@ -376,20 +398,23 @@ class Job:
                     new_events.append({"type": "finding", "finding": crit.to_dict()})
                 new_events.append(review(crit.id, f"class change: {k} at L{a}, {now} at L{level} (same place, iou "
                                          f"{chk['iou_any']:g})", level, [k, now], chk["iou_any"], a, kind="class-change"))
-            return None
+            return None, ""
         disagree = f"iou {iou:g} < {IOU_AGREE} between L{a} and L{level}"
+        note = ""
         if target is not None and target.critical:  # a critical finding goes to a human at once
             new_events.append(review(target.id, disagree, level, [k, k], iou, a, kind="disagree"))
             r.done = True
         elif not r.extra_used and level > self.min_level and cfg.verify and critical is None:  # (a critical finding here: a human
             r.extra_used = True  # reviews this region anyway, so no look is spent to settle the disagreement)
-            return ("verify", r, level - 1, "iou<0.5", disagree)
+            return ("verify", r, level - 1, "iou<0.5", disagree), ""
         else:
             r.done = True
+            if not r.extra_used and finest and cfg.verify and critical is None:
+                note = f"; {disagree} not settled: {finest}, no finer look"
             if target is not None:  # no further look will settle it
                 new_events.append(review(target.id, f"unconfirmed: {disagree}", level, [k, k], iou, a,
                                          kind="unconfirmed"))
-        return None
+        return None, note
 
     # ---- the loop ------------------------------------------------------------------------------
     def run(self):
@@ -403,8 +428,9 @@ class Job:
         self.settings = Settings(size=cfg.size)
         fits = int(math.log2(max(W, H) / cfg.size)) if max(W, H) > cfg.size else 0  # coarsest level a look fits in
         first = max(0, min(cfg.first_level, fits))
-        # min_view: no look, first or follow-up, is finer than the finest level whose window spans that share of the
-        # long side (0: any level), capped where a look still fits in the photo.
+        # min_view: no look the rules or a planner choose, first or follow-up, is finer than the finest level whose
+        # window spans that share of the long side (0: any level), capped where a look still fits in the photo. A
+        # replayed look keeps its recorded level, and a gaze the governor shrank (warp-spike) keeps its level.
         wide = min(fits, self.max_level, max(0, math.ceil(math.log2(cfg.min_view * max(W, H) / cfg.size)))) \
             if cfg.min_view else 0
         first = max(first, wide)
@@ -568,10 +594,15 @@ class Job:
             elif level > self.min_level and not batch and best and area < cfg.a_min:
                 follow = ("escalate", r, level - 1, "area<A_min", f"{best} area {area} px < {cfg.a_min} at L{level}")
             else:
+                present = self._present(seg, to_l0, level, rejected) if best else []
                 if 0 < level == self.min_level and not batch and (seg.entropy > cfg.tau or (best and area < cfg.a_min)):
-                    why += (f"; L{level} is the finest level for {cfg.profile} (min_view {cfg.min_view:g}): entropy "
-                            f"{seg.entropy:.2f}, {best} area {area} px drafted here, no finer look")
-                if best and (present := self._present(seg, to_l0, level, rejected)):
+                    # the escalation the rules call for, held: what this look saw, and what it drafted of it
+                    saw = (f"entropy {seg.entropy:.2f} > {cfg.tau}" if seg.entropy > cfg.tau
+                           else f"{best} area {area} px < A_min {cfg.a_min}")
+                    kept = f"{', '.join(present)} drafted here" if present else f"{best} not drafted" if best else "no class"
+                    why += (f"; L{level} is the finest level for {cfg.profile} (min_view {cfg.min_view:g}): {saw}, "
+                            f"{kept}; no finer look")
+                if present:
                     # Every class with a confident mask becomes evidence, most severe first.
                     r.cls = present[0]
                     # Realised value of the look, in the same units as a region's expected value
@@ -611,8 +642,9 @@ class Job:
                     if chk["kind"] == "class-change":  # in L0 px, by the rule findings use: the largest component
                         areas = (measure(prev.mask(k), 2**prev.level, linear=False)["area_px"],
                                  measure(seg.mask(best), 2**level, linear=False)["area_px"])
-                follow = self._settle(r, chk, level, best, target, drafted.get(best), critical, bool(drafted), new_events,
-                                      areas)
+                follow, note = self._settle(r, chk, level, best, target, drafted.get(best), critical, bool(drafted),
+                                            new_events, areas)
+                why += note
 
             # While replaying, the trace already holds the follow-ups; only the last replayed look may queue one.
             if follow and (not replaying or n_replay == 0):
@@ -690,6 +722,7 @@ class Job:
         coverage = float((sal * seen_any).sum() / max(sal.sum(), 1e-6))
         self.work_order = work_order(self.id, self.findings, self.gaze_path, self.not_assessed)
         self.work_order["profile"] = cfg.profile  # the levels it looked at were this segmenter's (PROFILES)
+        self.work_order["weights_sha256"] = getattr(self.segmenter, "sha256", None)  # the model that looked (WEIGHTS)
         yield {"type": "done", "status": status, "cause": halt_cause,
                "summary": {"steps": len(self.gaze_path), "pixels_used": self.budget.pixels_used,
                            "pixels_frac": round(self.budget.pixels_used / (W * H), 4),

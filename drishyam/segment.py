@@ -9,6 +9,7 @@ entropy, so swapping engines changes no other code.
 from __future__ import annotations
 
 import functools
+import hashlib
 import os
 import threading
 import time
@@ -269,6 +270,13 @@ class ClassicalSegmenter:
         return finish(probs, t0, model, work.shape[0] * work.shape[1])
 
 
+@functools.lru_cache(maxsize=8)
+def _sha256(path: str, mtime_ns: int, size: int) -> str:
+    """sha256 of a weights file, once per (path, mtime, size): every job loads its own segmenter."""
+    with open(path, "rb") as f:
+        return hashlib.file_digest(f, "sha256").hexdigest()
+
+
 class OnnxSegmenter:
     """A segmentation ONNX (N, C, H, W logits) on the OpenCV 5 DNN new engine.
 
@@ -283,6 +291,8 @@ class OnnxSegmenter:
                  class_map: list[int] | None = None, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)):
         self.name = f"onnx:{path.rsplit('/', 1)[-1]}"
         self.files = (path, fp16_path)  # what the nets were read from (evals.harness hashes them)
+        st = os.stat(path)
+        self.sha256 = _sha256(path, st.st_mtime_ns, st.st_size)  # the weights a profile was chosen with (agent.WEIGHTS)
         self.nets = {"accurate": self._load(path)}
         self.nets["fp16"] = self._load(fp16_path) if fp16_path else self.nets["accurate"]
         self.size = input_size

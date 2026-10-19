@@ -258,7 +258,8 @@ class RecordingSegmenter:
 
     def __init__(self) -> None:
         self.inner, self.log = default_segmenter(), []
-        self.name = self.inner.name  # the Job picks its profile by this name (agent.PROFILES)
+        self.name = self.inner.name  # the Job picks its profile by this name and these weights (agent.PROFILES)
+        self.sha256 = getattr(self.inner, "sha256", None)
 
     def predict(self, crop, model="accurate"):
         self.log.append(self.inner.predict(crop, model))

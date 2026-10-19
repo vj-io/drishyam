@@ -889,11 +889,13 @@ def test_a_fixed_cost_table_makes_decisions_independent_of_load(scene):
 ONNX = "onnx:drishyam_dacl10k.onnx"
 
 
-def named(name):
-    """The classical engine under another segmenter's name: profiles are looked up by name alone."""
+def named(name, sha256=None):
+    """The classical engine under another segmenter's name and weights (by default the weights its profile was
+    chosen with): profiles are looked up by both."""
+    from drishyam.agent import WEIGHTS
     from drishyam.segment import ClassicalSegmenter
 
-    return type("Named", (ClassicalSegmenter,), {"name": name})()
+    return type("Named", (ClassicalSegmenter,), {"name": name, "sha256": sha256 or WEIGHTS.get(name)})()
 
 
 def test_the_classical_profile_is_the_agent_every_classical_number_ran_with(scene):
@@ -924,52 +926,161 @@ def test_a_job_takes_its_segmenters_profile_by_name_and_a_knob_set_explicitly_wi
     assert profile_for(ClassicalSegmenter()) == profile_for(object()) == profile_for(named("onnx:other.onnx")) \
         == "classical-v1"  # a segmenter nobody calibrated keeps the original defaults
     assert profile_for(named(ONNX)) == ONNX
+    # the same file name with other weights (a retrained model installed over it) was not what the profile measured
+    assert profile_for(named(ONNX, sha256="0" * 64)) == "classical-v1"
+    assert profile_for(type("NoSha", (ClassicalSegmenter,), {"name": ONNX})()) == "classical-v1"
     cfg = Job(scene, JobConfig(), segmenter=named(ONNX)).cfg
     assert cfg.profile == ONNX and {k: getattr(cfg, k) for k in PROFILES[ONNX]} == PROFILES[ONNX]
     cfg = Job(scene, JobConfig(min_view=0.0), segmenter=named(ONNX)).cfg  # a dev sweep's variant
     assert (cfg.min_view, cfg.absorb) == (0.0, PROFILES[ONNX]["absorb"])
     cfg = Job(scene, JobConfig(profile="classical-v1"), segmenter=named(ONNX)).cfg
     assert (cfg.profile, cfg.min_view, cfg.absorb) == ("classical-v1", 0.0, True)
-    # The eval harness wraps the segmenter to record its looks: the wrapper must carry the name, or every ONNX eval
-    # would silently run the classical profile.
+    # The eval harness wraps the segmenter to record its looks: the wrapper must carry the name and the weights, or
+    # every ONNX eval would silently run the classical profile.
     monkeypatch.setattr(harness, "default_segmenter", lambda: named(ONNX))
-    assert harness.RecordingSegmenter().name == ONNX
+    rec = harness.RecordingSegmenter()
+    assert profile_for(rec) == ONNX and (rec.name, rec.sha256) == (ONNX, named(ONNX).sha256)
+
+
+def test_an_onnx_segmenter_hashes_its_weights_once(tmp_path, monkeypatch):
+    """The profile check reads the weights file's sha256; every job loads its own segmenter, so the hash is cached per
+    path, mtime and size, and a file replaced in place is hashed again."""
+    import hashlib
+
+    from drishyam import segment
+
+    monkeypatch.setattr(segment.OnnxSegmenter, "_load", staticmethod(lambda path: None))
+    w = tmp_path / "drishyam_dacl10k.onnx"
+    w.write_bytes(b"weights v1")
+    calls = []
+    real = hashlib.file_digest
+    monkeypatch.setattr(hashlib, "file_digest", lambda *a: calls.append(1) or real(*a))
+    a, b = segment.OnnxSegmenter(str(w)), segment.OnnxSegmenter(str(w))
+    assert a.sha256 == b.sha256 == hashlib.sha256(b"weights v1").hexdigest() and len(calls) == 1
+    w.write_bytes(b"weights v2, retrained")
+    assert segment.OnnxSegmenter(str(w)).sha256 == hashlib.sha256(b"weights v2, retrained").hexdigest()
 
 
 class Unsure:
     """Dark pixels are spalling at p 0.55: a mask that clears A_min, at an entropy near 1 (> tau) at every level."""
 
+    p = 0.55
+
     def __init__(self, name):
-        self.name = name
+        from drishyam.agent import WEIGHTS
+
+        self.name, self.sha256 = name, WEIGHTS.get(name)
 
     def predict(self, crop, model="accurate"):
         dark = (cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY) < 105).astype(np.float32)
         probs = np.zeros((len(CLASSES), *dark.shape), np.float32)
-        probs[0], probs[CLASSES.index("spalling")] = 1 - 0.55 * dark, 0.55 * dark
+        probs[0], probs[CLASSES.index("spalling")] = 1 - self.p * dark, self.p * dark
         return finish(probs, time.perf_counter(), model)
 
 
-@pytest.mark.parametrize("w, h, finest", [(4608, 3456, 2), (2048, 1536, 1)])
-def test_the_onnx_profile_never_looks_finer_than_a_share_of_the_photo(w, h, finest):
-    """The trained model is reliable on views that span a good share of the photo: under its profile no look, first
-    or follow-up, spans less than min_view (0.3) of the long side, though the measurements ask for finer looks
-    (entropy > tau at every level): L2 on a CODEBRIM-sized 4608-px photo, L1 on a 2048-px one."""
+class Sure(Unsure):
+    """Dark pixels are spalling at p 0.97: a confident mask (entropy < tau) at every level."""
+
+    p = 0.97
+
+
+class Speck(Unsure):
+    """A confident 6 x 6 spalling speck at the centre of every view: 36 px, under A_min, at entropy 0."""
+
+    def predict(self, crop, model="accurate"):
+        h, w = crop.shape[:2]
+        probs = np.zeros((len(CLASSES), h, w), np.float32)
+        probs[0] = 1
+        probs[0, h // 2 - 3 : h // 2 + 3, w // 2 - 3 : w // 2 + 3] = 0.02
+        probs[CLASSES.index("spalling"), h // 2 - 3 : h // 2 + 3, w // 2 - 3 : w // 2 + 3] = 0.98
+        return finish(probs, time.perf_counter(), model)
+
+
+class Haze(Unsure):
+    """Spalling at p 0.4 everywhere: background wins every pixel (no class), yet every pixel is damage-like, so the
+    entropy is 0.97 (> tau)."""
+
+    def predict(self, crop, model="accurate"):
+        probs = np.zeros((len(CLASSES), *crop.shape[:2]), np.float32)
+        probs[0], probs[CLASSES.index("spalling")] = 0.6, 0.4
+        return finish(probs, time.perf_counter(), model)
+
+
+def spots(w, h):
+    """Concrete with four dark spots: the saliency candidates the looks go to."""
     from .conftest import concrete
 
     img = concrete(h, w, 9)
     for fx, fy in ((0.15, 0.2), (0.6, 0.25), (0.4, 0.65), (0.75, 0.75)):
         cv2.circle(img, (int(fx * w), int(fy * h)), w // 50, (45, 45, 45), -1)
+    return img
 
-    def looks(**cfg):
-        job = Job(img, JobConfig(thumbs=False, pixel_cap=1.0, **cfg), clock=FakeClock(), segmenter=Unsure(ONNX))
-        ev = list(job.run())
-        return job, [s for s in steps(ev) if s["decision"]["action"] != "halt"]
 
-    job, st = looks()
+def onnx_looks(img, seg, **cfg):
+    job = Job(img, JobConfig(thumbs=False, pixel_cap=1.0, **cfg), clock=FakeClock(), segmenter=seg)
+    ev = list(job.run())
+    return job, [s for s in steps(ev) if s["decision"]["action"] != "halt"]
+
+
+@pytest.mark.parametrize("w, h, finest", [(4608, 3456, 2), (2048, 1536, 1)])
+def test_the_onnx_profile_never_looks_finer_than_a_share_of_the_photo(w, h, finest):
+    """The trained model is reliable on views that span a good share of the photo: under its profile no look the
+    rules choose, first or follow-up, is finer than the finest level whose 512-px window spans min_view (0.3) of the
+    long side, though the measurements ask for finer looks (entropy > tau at every level): L2 on a CODEBRIM-sized
+    4608-px photo, L1 on a 2048-px one. (Replayed looks and gazes the governor shrank are exempt: api-contract.md.)"""
+    img = spots(w, h)
+    job, st = onnx_looks(img, Unsure(ONNX))
     assert 512 * 2**finest >= job.cfg.min_view * w > 512 * 2 ** (finest - 1)
     assert st and min(s["decision"]["args"]["level"] for s in st) == finest
     held = [s for s in st if s["observation"]["entropy"] > job.cfg.tau and s["decision"]["args"]["level"] == finest]
-    assert held and all(f"L{finest} is the finest level for {ONNX} (min_view 0.3)" in s["rationale"] for s in held)
+    assert held and all(f"L{finest} is the finest level for {ONNX} (min_view 0.3): entropy " in s["rationale"]
+                        and "spalling drafted here; no finer look" in s["rationale"] for s in held)
     assert {s["profile"] for s in job.trace} == {ONNX} and job.work_order["profile"] == ONNX
-    _, st = looks(profile="classical-v1")  # the same measurements under the original defaults zoom further
+    assert job.work_order["weights_sha256"] == Unsure(ONNX).sha256
+    _, st = onnx_looks(img, Unsure(ONNX), profile="classical-v1")  # the same measurements, original defaults
     assert min(s["decision"]["args"]["level"] for s in st) < finest
+
+
+@pytest.mark.parametrize("seg, said", [
+    (Speck(ONNX), "spalling area 36 px < A_min 64, spalling not drafted; no finer look"),
+    (Haze(ONNX), "entropy 0.97 > 0.5, no class; no finer look")])
+def test_a_held_look_says_what_it_drafted_and_never_claims_a_draft_it_did_not_make(seg, said):
+    """A look at the finest level that would have escalated says why (a mask under A_min, or entropy above tau) and
+    what it drafted: here nothing, so no step may say 'drafted here' and no finding exists."""
+    job, st = onnx_looks(spots(2048, 1536), seg)
+    held = [s for s in st if s["decision"]["args"]["level"] == 1]
+    assert held and all(f"; L1 is the finest level for {ONNX} (min_view 0.3): {said}" in s["rationale"] for s in held)
+    assert not any("drafted here" in s["rationale"] for s in st) and not job.findings
+    assert any(s["cause"] in ("entropy>tau", "area<A_min") for s in st)  # coarser looks still escalate to L1
+
+
+def test_a_mask_drafted_at_the_finest_level_gets_no_verify_and_says_so():
+    """The rules confirm a new mask one level finer; at the profile's finest level there is none, so the look says
+    the mask was not verified, no verify look goes to its region and its finding keeps verify_iou null. Under the
+    original defaults the same masks are verified at L0."""
+    img = spots(2048, 1536)
+    job, st = onnx_looks(img, Sure(ONNX))
+    note = f"not verified: L1 is the finest level for {ONNX} (min_view 0.3), no finer look"
+    noted = [s for s in st if note in s["rationale"]]
+    assert noted and all(s["decision"]["args"]["level"] == 1 and s["cause"] == "best-score" for s in noted)
+    regions = {s["region"] for s in noted}
+    assert not any(s["decision"]["action"] == "verify" and s["region"] in regions for s in st)
+    assert all(f.verify_iou is None for f in job.findings if f.region in regions)
+    _, st = onnx_looks(img, Sure(ONNX), profile="classical-v1")
+    assert any(s["cause"] == "verify-new-mask" and s["decision"]["args"]["level"] == 0 for s in st)
+    assert not any("not verified" in s["rationale"] for s in st)
+
+
+def test_a_planner_cannot_zoom_past_the_profiles_finest_level():
+    """A planner's change_level finer than the profile's finest level runs at that level, and the look says so."""
+    import json
+
+    def planner(digest):
+        return json.dumps({"strategy": "change_level", "rationale": "look closer",
+                           "params": {"region_id": digest["top_candidates"][0]["id"], "level": 0}})
+
+    job = Job(spots(2048, 1536), JobConfig(thumbs=False, pixel_cap=1.0, planner_every=2), clock=FakeClock(),
+              segmenter=Unsure(ONNX), planner=planner)
+    asked = [s for s in steps(list(job.run())) if s["cause"] == "planner:change_level"]
+    assert asked and all(s["decision"]["args"]["level"] == 1 and s["rationale"].startswith(
+        "look closer (L0 is finer than this segmenter's finest L1)") for s in asked)
