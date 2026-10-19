@@ -3,7 +3,8 @@
 While the agent segments its current look, one background thread warps, and with `segment=True` also segments, the
 looks it is likely to take next: the head of its queue of forced looks (the survey, a planner's or a replayed look)
 and the `k` best unvisited candidates by the agent's own score. Each result is cached by (cx, cy, level, size, model)
-and handed back when the agent asks for that very look; any other look misses and runs inline as before.
+and handed back when the agent asks for that very look, if the worker has started it (one not yet started is cancelled
+and counted `late`: a hit then would wait behind the look ahead of it); any other look misses and runs inline as before.
 
 Decisions cannot change: a cached result is the same function (`imaging.gaze`, `segment.segment_view`) of the same
 inputs, computed earlier on another thread, and the prefetcher only reads the job. The clock is what changes: the
@@ -35,13 +36,16 @@ class Prefetcher:
         self.pool = ThreadPoolExecutor(1, thread_name_prefix="prefetch")
         self.cache: dict[tuple, tuple] = {}  # key -> (pool future, warp future, segment future or None)
         self.crop, self.seg = None, None  # the look in progress: its crop, and its segmentation's future on a hit
-        self.counts: Counter = Counter()  # warp_hit, warp_miss, seg_hit, submitted, dropped
+        self.counts: Counter = Counter()  # warp_hit, warp_miss, seg_hit, submitted, dropped, late (a miss, see below)
 
     def __call__(self, job, op, fn, args, kw):
         if op == "warp":
             pyr, cx, cy, level = args
             key = (cx, cy, level, kw["size"], job.settings.model)
-            _, wf, sf = self.cache.pop(key, (None, None, None))
+            pf, wf, sf = self.cache.pop(key, (None, None, None))
+            if pf is not None and pf.cancel():  # still queued behind another look on the one worker: waiting would
+                wf = sf = None  # cost that look's warp and forward, so it is a miss, computed inline
+                self.counts["late"] += 1
             self.counts["warp_hit" if wf else "warp_miss"] += 1
             out = wf.result() if wf else fn(*args, **kw)
             self.crop, self.seg = out[0], sf
