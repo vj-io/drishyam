@@ -150,7 +150,9 @@ function buildFrame() {
   ORDER.forEach((id, k) => { const c = el('div', 'ch', rail, `<i>${k + 1}</i><span>${TITLES[id]}</span>`); chs.push(c); });
   railNote = el('div', '', rail); railNote.id = 'railnote';
   railCall = el('div', '', rail); railCall.id = 'railcall';
+  railCall.style.top = chs[chs.length - 1].offsetTop + chs[chs.length - 1].offsetHeight + 14 + 'px';   // under the last index row, however many chapters
   capBox = el('div', '', stage); capBox.id = 'cap'; capSpan = el('span', '', capBox);
+  if (D.standin) el('div', '', stage, `${D.standin} · video/build.py --standin`).id = 'standin';   // on every frame of a stand-in build
 }
 function sceneAt(t) { let k = 0; ORDER.forEach((id, i) => { if (t >= SC[id].t0) k = i; }); return k; }
 function drawFrame(t) {
@@ -170,7 +172,7 @@ function drawFrame(t) {
 }
 const RAILNOTE = {
   open: () => `Synthetic sample photo <b>bridge_03</b>, live job <b>${D.guided.job}</b>.`,
-  team: () => (PT ? `<b>${LIT.award}</b> entry, ${LIT.competition}. Each line is traced from the photo at the pyramid level the window’s tag names.` : ''),
+  team: () => (PT ? `<b>${LIT.award}</b> entry, ${LIT.competition}. Feature regions placed by hand; every line traced by OpenCV at the pyramid level the window’s tag names.` : ''),
   real: () => `The team’s own photo, <b>${D.real.image}</b>. Job <b>${D.real.job}</b>: ${D.real.engine}, ${D.real.profile}. “By eye” is the team’s reading, not ground truth.`,
   live: () => `Live job <b>${D.guided.job}</b> on ${D.health.host}, ${D.health.arch}, OpenCV ${D.health.opencv}. Retimed to the voice: the speed is shown in the window bar.`,
   break: () => 'Faults injected on purpose: a malformed planner reply, a slowed segmenter, a planner that stalls.',
@@ -236,14 +238,18 @@ function buildPortraits() {
   const S = scene('team'), s = SC.team, rel = (x) => x - s.t0;
   // README.md's Team lines, "Name, role (work, work)", as the chapter sets them: "Role: work, work"
   const [n1, r1, n2, r2] = LIT.team.flatMap((x) => { const m = x.match(/^([^,]+), (.+) \((.+)\)$/); return [m[1], m[2][0].toUpperCase() + m[2].slice(1) + ': ' + m[3]]; });
-  // chapter-relative times. t1 carries both transformations: photo 1 alone for a moment, its six looks, its name and role,
-  // the glide, photo 2 the same; t2 names the two: both plates are framed as it starts and each block lights on its name.
+  // chapter-relative times. t1 carries both transformations: photo 1 alone for a moment, its looks and shading pass, its name
+  // and role, the glide, photo 2 held and drawn the same way; t2 names the two: both plates are framed as it starts and each
+  // block lights on its name.
   const PACE = 0.75, SETTLE = 2.5 * PACE, roleT = (r) => 0.012 * r.replace(': ', '').length + 0.1;   // portraits-chapter.js STEP[5], role typing
-  const p1 = rel(at('t1')) + 0.7, name1At = p1 + SETTLE + 0.45, p2 = name1At + roleT(r1) + 0.7, name2At = p2 + SETTLE + 0.45;
+  // HOLD: the second photo, held with the camera settled on it before its first look, as the first is at the chapter start
+  // (narration.py gives t2 the pause this takes)
+  const HOLD = 1.0;
+  const p1 = rel(at('t1')) + 0.7, name1At = p1 + SETTLE + 0.45, p2 = name1At + roleT(r1) + 0.7 + HOLD, name2At = p2 + SETTLE + 0.45;
   const t2 = rel(at('t2')), said = (n) => t2 + LINE.t2.dur * LINE.t2.say.indexOf(n.split(' ')[0]) / LINE.t2.say.length;
   const both = Math.max(t2 + 0.2, name2At + roleT(r2) - 0.3, p2 + SETTLE + 0.67);
   const ch = portraitChapter(S.e, { name1: n1, role1: r1, name2: n2, role2: r2, tagline: 'Drawn by OpenCV 5, coarse to fine', w: 1530, h: 836, dur: s.t1 - s.t0,
-    p1, p2, both, name1At, name2At, said1At: said(n1), said2At: said(n2), tag: said(n2) + 0.9, pace: PACE, photos: PT.photos });
+    p1, p2, both, name1At, name2At, said1At: said(n1), said2At: said(n2), tag: said(n2) + 0.9, pace: PACE, photos: PT.photos, hold: HOLD });
   if (both > said(n1) - 0.1) throw new Error(`team: both plates framed at ${both.toFixed(2)} s, after the voice names ${n1}`);
   S.draws.push((t) => ch.draw(t - s.t0));
   ch.sfx.forEach((c) => { if (!(c.type === 'whoosh' && c.t < 0.1)) cue(s.t0 + c.t, c.type, c.x); });   // the film already whooshes at a chapter start
@@ -597,9 +603,11 @@ function buildResults() {
       pend.style.background = `linear-gradient(rgba(255,200,87,${(0.36 * fl).toFixed(3)}), rgba(255,200,87,${(0.36 * fl).toFixed(3)})), rgba(11,50,100,.92)`;
     }
     const sp = seg(t, at('r8') + 0.2, at('r8') + 0.45); css(pend, { opacity: sp, transform: `${D.model ? '' : 'rotate(-6deg) '}scale(${((D.model ? 1.1 : 1.6) - (D.model ? 0.1 : 0.6) * eo(sp)).toFixed(3)})` });
-    const hot = t < end('r5') + 0.3 ? (AB.filter(([T]) => t >= T - 0.1).pop() || [0, []])[1] : [];
+    // each row group's highlight fades in as its words are said and out as the next group's come in (0.18 s, never a one-frame jump)
+    const hot = (i) => Math.max(0, ...AB.map(([T, rows], j) => { const off = j < AB.length - 1 ? AB[j + 1][0] - 0.1 : end('r5') + 0.3;
+      return rows.includes(i) ? seg(t, T - 0.1, T + 0.08) * (1 - seg(t, off, off + 0.18)) : 0; }));
     [...p2.querySelectorAll('tr')].forEach((r, i) => { const T = i < 5 ? at('r4') + 0.3 + i * 0.25 : at('r5') + 0.2 + (i - 5) * 0.3; r.style.opacity = 0.15 + 0.85 * seg(t, T, T + 0.25);
-      css(r, { background: hot.includes(i) ? 'rgba(255,200,87,.16)' : 'transparent', outline: hot.includes(i) ? '3px solid var(--amber)' : 'none' }); });
+      const w = hot(i); css(r, { background: `rgba(255,200,87,${(0.16 * w).toFixed(3)})`, outline: w > 0 ? `3px solid rgba(255,200,87,${w.toFixed(3)})` : 'none' }); });
   });
   let n = 0; for (const key of ['downscale', 'tiling', 'drishyam']) for (const _ of sy.policies[key]) cue(s.t0 + 1.4 + (n++) * 0.28, 'pop', n);
   cue(s.t0 + 0.4, 'scribble', 0.9); cue(at('r8') + 0.25, 'stamp'); [at('r4'), at('r6'), at('r7')].forEach((T) => cue(T - 0.9, 'whoosh'));
@@ -632,21 +640,21 @@ function buildReal() {
   small.width = lw; small.height = lh; css(small, { left: 0, top: 0, width: '100%', height: '100%', imageRendering: 'pixelated', opacity: 0 });
   let drawn = false;
   const label = el('div', 'abs', plate, `<span class="amber">REAL PHOTO (ours):</span> painted plaster wall, no ground truth`);
-  css(label, { left: '18px', bottom: '18px', padding: '9px 16px', background: 'rgba(7,34,71,.94)', border: '3px solid var(--amber)', font: '700 23px/1 var(--fm)', color: 'var(--line)' });
-  const veil = el('div', 'abs', plate); css(veil, { inset: 0, background: 'rgba(7,34,71,.5)', opacity: 0 });
+  css(label, { left: '18px', bottom: '18px', zIndex: 2, padding: '9px 16px', background: 'rgba(7,34,71,.94)', border: '3px solid var(--amber)', font: '700 23px/1 var(--fm)', color: 'var(--line)' });
+  const veil = el('div', 'abs', plate); css(veil, { inset: 0, background: 'rgba(7,34,71,.15)', opacity: 0 });   // light, and the line thin: the crack stays visible beside the team's line
   const sv = svgEl('svg', { width: PW, height: PH, viewBox: `0 0 ${PW} ${PH}`, class: 'abs', style: 'left:0;top:0;overflow:visible' }, plate);
   const scan = svgEl('rect', { x: 0, width: PW, height: 6, fill: '#FFC857', opacity: 0 }, sv);
   const X = (b) => b.map((v) => v * k);
   const cands = R.cands.map((b) => svgEl('rect', { ...Object.fromEntries(['x', 'y', 'width', 'height'].map((a, i) => [a, X(b)[i]])), fill: 'none', stroke: '#E8F1FF', 'stroke-width': 3, 'stroke-dasharray': '10 8', opacity: 0 }, sv));
   // the team's line, by eye: a dark band under a red line, drawn on
   const paths = (R.seen?.paths || []).map((q) => { const d = q.map(([x, y], i) => `${i ? 'L' : 'M'}${(x * k).toFixed(1)} ${(y * k).toFixed(1)}`).join('');
-    const halo = svgEl('path', { d, fill: 'none', stroke: 'rgba(7,34,71,.75)', 'stroke-width': 13, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', pathLength: 1, 'stroke-dasharray': 1 }, sv);
-    const ln = svgEl('path', { d, fill: 'none', stroke: R.hit.length ? '#FFC857' : '#FF9A8A', 'stroke-width': 6, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', pathLength: 1, 'stroke-dasharray': 1 }, sv);
+    const halo = svgEl('path', { d, fill: 'none', stroke: 'rgba(7,34,71,.75)', 'stroke-width': 9, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', pathLength: 1, 'stroke-dasharray': 1 }, sv);
+    const ln = svgEl('path', { d, fill: 'none', stroke: R.hit.length ? '#FFC857' : '#FF9A8A', 'stroke-width': 4, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', pathLength: 1, 'stroke-dasharray': 1 }, sv);
     return [halo, ln]; });
   const placed = [];   // finding labels: inside the photo, never on top of each other
   const fins = R.found.slice().sort((a, b) => a.box[1] - b.box[1]).map((f) => { const [x, y, w, h] = X(f.box), g = svgEl('g', { opacity: 0 }, sv), bad = R.wrong.includes(f.id);
     svgEl('rect', { x, y, width: Math.max(w, 6), height: Math.max(h, 6), fill: 'none', stroke: f.critical ? '#FF9A8A' : '#FFC857', 'stroke-width': 4 }, g);
-    const txt = `${f.cls.replace('_', ' ')} ${fmt(f.conf)}${R.seen && bad ? ' · false alarm' : ''}`, tw = txt.length * 13.4;
+    const txt = `${f.cls.replace('_', ' ')} ${fmt(f.conf)}${R.seen && bad ? ' · off the team’s line' : ''}`, tw = txt.length * 13.4;
     let lx = clamp(x, 8, PW - tw - 8), ly = y > 40 ? y - 12 : y + h + 28;
     while (placed.some(([a, b]) => Math.abs(b - ly) < 28 && lx < a + 460 && a < lx + tw)) ly += 30;
     placed.push([lx, ly]);
@@ -667,7 +675,7 @@ function buildReal() {
   const classes = R.found.length ? [...new Set(R.found.map((f) => f.cls.replace('_', ' ')))].join(', ') : 'nothing';
   const cards = [['ENGINE', R.engine, R.profile, tEng], ['LOOKS', R.n_looks ? `${R.n_looks}` : '0', R.n_looks ? `after an L${R.ov_level} overview` : `the L${R.ov_level} overview found ${R.candidates} candidate regions`, tRead],
     ['PIXELS READ', '', `of ${R.w} × ${R.h} px`, tRead + 0.35], ['REPORTED', classes, `${R.n_found} finding${R.n_found === 1 ? '' : 's'}`, tRep],
-    ...(R.seen ? [['BY EYE (not ground truth)', R.seen.say.replace(/^the /, ''), R.hit.length ? `found${R.wrong.length ? `; ${R.wrong.length} false alarm${R.wrong.length > 1 ? 's' : ''}` : ''}` : 'missed', tEnd]] : [])]
+    ...(R.seen ? [['BY EYE (not ground truth)', R.seen.say.replace(/^the /, ''), R.hit.length ? `found${R.wrong.length ? `; ${R.wrong.length} off the team’s line` : ''}` : 'missed', tEnd]] : [])]
     .map(([lab, big, sub, t0], i) => { const c = el('div', 'box', H, `<div class="lab" style="font-size:19px">${lab}</div><div class="h2 amber" style="font-size:${Math.min(44, Math.floor(360 / (0.5 * Math.max(1, big.length))))}px;line-height:44px;height:44px;margin:8px 0 6px;white-space:nowrap"></div><div class="mono" style="font-size:20px;line-height:1.3;color:var(--line-2)">${sub}</div>`);
       css(c, { left: CX + 'px', top: i * 168 + 'px', width: CW + 'px', height: '152px', padding: '14px 18px', overflow: 'hidden', borderColor: i === 4 ? (R.hit.length ? 'var(--amber)' : 'var(--red)') : 'var(--line)' });
       return { c, big, t0, v: c.children[1] }; });
@@ -698,7 +706,8 @@ function buildReal() {
     stamp.textContent = showV ? `${verdict} · BY EYE` : stop; stamp.className = 'stamp' + (showV && !R.hit.length ? ' red' : '');
     const q = showV ? vp : stop ? sp * (1 - seg(t, tEnd + 0.15, tEnd + 0.4)) : 0;
     const sp_ = showV ? spotV : spotS;
-    css(stamp, { left: sp_.x + 'px', top: sp_.y + 'px', opacity: q, transform: `rotate(-6deg) scale(${(1.6 - 0.6 * eo(q)).toFixed(3)})` });
+    const qin = showV ? vp : stop ? sp : 0;   // it lands with a scale and leaves by fading only (a growing exit crossed the photo's edge)
+    css(stamp, { left: sp_.x + 'px', top: sp_.y + 'px', opacity: q, transform: `rotate(-6deg) scale(${(1.6 - 0.6 * eo(qin)).toFixed(3)})` });
     // the cards
     cards.forEach((c, i) => { const p = eo(seg(t, c.t0, c.t0 + 0.35)); css(c.c, { opacity: p, transform: `translateX(${((1 - p) * 30).toFixed(1)}px)` });
       c.v.textContent = i === 2 ? `${(100 * R.pixels_frac * eo(seg(t, c.t0, c.t0 + 0.9))).toFixed(1)} %` : typed(c.big, seg(t, c.t0 + 0.05, c.t0 + 0.45)); });

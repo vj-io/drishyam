@@ -39,6 +39,9 @@ MODEL = ROOT / "public/results/codebrim_dacl10k/summary.json"   # the trained se
 # build time (never copied into the repository). Without them the film shows name cards and has no real-photo chapter.
 PRIVATE = pathlib.Path(os.environ.get("DRISHYAM_PRIVATE_DIR", "/Users/mac/Documents/Projects/opencv/private-assets"))
 STANDIN = ROOT / "brag-output" / "standin"   # stand-ins for data still pending (git-ignored): build.py --standin, --check-template
+# a --standin film carries this on every frame (film.js), in its file names and in its MP4 metadata; infra/drishyam_stack.py
+# refuses to deploy an MP4 that carries it
+STANDIN_MARK = "STAND-IN DATA, NOT FOR PUBLICATION"
 
 SRC = []   # (what, value, file, field) for every number and URL the video shows or says
 
@@ -522,6 +525,7 @@ def layout(lines, dur):
             continue
         t0 = t; u = t0 + spec["lead"]
         for k, l in enumerate(mine):
+            u += l.get("pause", 0)   # extra silence before a line, for a beat on screen that needs it
             placed.append({**l, "t": round(u, 3), "dur": dur[l["id"]]})
             u += dur[l["id"]] + (spec["gap"] if k < len(mine) - 1 else 0)
         t1 = u + spec["tail"] + spec.get("hold", 0)
@@ -825,6 +829,7 @@ def main():
     if a.standin:
         standin_summary(STANDIN / "summary.json")
         D = data(STANDIN / "summary.json", real=STANDIN)
+        D["standin"] = STANDIN_MARK
     else:
         D = data()
     # the private inputs reach the page through one generated script (git-ignored): the portraits, or nothing
@@ -874,8 +879,14 @@ def main():
     fast(page, "--out", WORK / "drishyam.mp4", "--fps", 30, "--crf", 20, "--audio", WORK / "mix.wav", "--poster", film_poster(scenes, placed), "--poster-jpg", WORK / "poster.jpg")
     from PIL import Image   # the poster goes in git: a q100 capture is ~1 MB, q85 is a fifth of that and looks the same
     out.mkdir(parents=True, exist_ok=True)
-    Image.open(WORK / "poster.jpg").convert("RGB").save(out / "poster.jpg", quality=85, optimize=True, progressive=True)
-    shutil.move(WORK / "drishyam.mp4", out / "drishyam.mp4"); shutil.copy(WORK / "drishyam.vtt", out / "drishyam.vtt")
+    sfx = "-standin" if a.standin else ""   # a stand-in film never has the published files' names
+    if a.standin:   # the mark goes into the file too, so a renamed copy is still refused at deploy
+        import imageio_ffmpeg
+        subprocess.run([imageio_ffmpeg.get_ffmpeg_exe(), "-y", "-loglevel", "error", "-i", WORK / "drishyam.mp4", "-map", "0", "-c", "copy",
+                        "-metadata", f"comment={STANDIN_MARK}", WORK / "drishyam-standin.mp4"], check=True)
+        (WORK / "drishyam.mp4").unlink()
+    Image.open(WORK / "poster.jpg").convert("RGB").save(out / f"poster{sfx}.jpg", quality=85, optimize=True, progressive=True)
+    shutil.move(WORK / f"drishyam{sfx}.mp4", out / f"drishyam{sfx}.mp4"); shutil.copy(WORK / "drishyam.vtt", out / f"drishyam{sfx}.vtt")
     if not a.no_short and not a.standin:
         short(D, scenes, placed)
 

@@ -68,6 +68,8 @@ def lines(D):
     # 2. team
     add("team", "t1", "Drishyam, an Agentic Vision entry to the OpenCV AI Competition, powered by AWS.")
     add("team", "t2", "Built by Vaibhav Jangid, lead engineer, and Bhavya Dhoot, design and presentation.")
+    if D.get("team"):   # the portraits: the second photo is held 1 s before its looks (film.js HOLD), so t2 waits as long
+        L[-1]["pause"] = 0.95
 
     # 3. problem and user
     assert num(imp["months"]) == 24, "p1 says every two years"
@@ -148,7 +150,7 @@ def lines(D):
         c_in = round(1 / md["chance"])
         leak = [] if md["near_dups"] == 0 else [" ", W(md["near_dups"]), " of these photos have a near-duplicate in its training set."]   # the board shows the count either way
         add("results", "r8", "Governor off, same cost table: a trained segmenter finds ", P(md["recall"]), " of the defects, the classical engine ",
-            (words(round(100 * md["classical"])), f"{round(100 * md['classical'])} %"), "; at random, one in ", (words(c_in), str(c_in)), ". ", *tail, *leak)
+            (words(round(100 * md["classical"])), f"{round(100 * md['classical'])}"), "; at random, ", (f"one in {words(c_in)}", f"1 in {c_in}"), ". ", *tail, *leak)
     else:
         add("results", "r8", "Results for a trained segmenter are pending.")
 
@@ -156,14 +158,16 @@ def lines(D):
     if D.get("real"):
         R = D["real"]; n = R["n_looks"]; seen = R["seen"]
         assert n == len(R["looks"]) and R["n_found"] == len(R["found"]) and (n or not R["found"]), R
+        # the share read, as the PIXELS READ card prints it: one decimal under 10 % (rounding 1.6 to "two" would not match the card)
+        PR = lambda x: (f"{dec(100 * x, 1)} percent", f"{100 * x:.1f} %") if x < 0.1 else P(x)
         missed = bool(seen) and not R["hit"]
         eng = "the trained segmenter" if R["kind"] == "onnx" else "the classical engine"
         parts = ["Our own photo of a painted wall, no ground truth: ", eng]
         if n == 0:
             assert R["candidates"] == 0, "q1 says it saw nothing worth a closer look"
-            parts += [" read ", P(R["pixels_frac"]), " of it, saw nothing worth a look, and ", f"missed {seen['say']}." if missed else "reported nothing."]
+            parts += [" read ", PR(R["pixels_frac"]), " of it, saw nothing worth a look, and ", f"missed {seen['say']}." if missed else "reported nothing."]
         elif not R["found"]:
-            parts += [" took ", W(n), " looks" if n > 1 else " look", " at ", P(R["pixels_frac"]), " of the pixels, reported nothing", f", and missed {seen['say']}." if missed else "."]
+            parts += [" took ", W(n), " looks" if n > 1 else " look", " at ", PR(R["pixels_frac"]), " of the pixels, reported nothing", f", and missed {seen['say']}." if missed else "."]
         else:
             cls = {}
             for x in R["found"]:
@@ -172,10 +176,11 @@ def lines(D):
             said = [SAY_CLS[c][0] if k == 1 or SAY_CLS[c][0] == SAY_CLS[c][1] else f"{words(k)} {SAY_CLS[c][1]}" for c, k in cls.items()]
             listed = said[0] if len(said) == 1 else ", ".join(said[:-1]) + " and " + said[-1]
             k = len(R["wrong"]) if seen else 0
-            # with the team's reading, the verdict says what it found (the card lists the classes); without it, the classes
-            verdict = ([f" and missed {seen['say']}" if missed else f" and found {seen['say']}"] + ([", with ", W(k), " false alarm" if k == 1 else " false alarms"] if k else [])
+            # with the team's reading, the verdict says what it found (the card lists the classes); without it, the classes.
+            # No ground truth: a finding away from the team's line is "off the team's line", not a false alarm
+            verdict = ([f" and missed {seen['say']}" if missed else f" and found {seen['say']}"] + ([", with ", W(k), " finding" if k == 1 else " findings", " off the team's line"] if k else [])
                        if seen else [" and reported ", listed])
-            parts += [" took ", W(n), " looks" if n > 1 else " look", " at ", P(R["pixels_frac"]), " of the pixels", *verdict, "."]
+            parts += [" took ", W(n), " looks" if n > 1 else " look", " at ", PR(R["pixels_frac"]), " of the pixels", *verdict, "."]
         add("real", "q1", *parts)
 
     # 9. failure cases
@@ -183,7 +188,7 @@ def lines(D):
     assert fs["glare_listed"] and fs["formwork_kept_coarse"], fs
     add("failures", "f1", "Failures, in the open: graffiti read as spalling, a formwork line as a crack, glare left for a re-shoot, and blur.")
     assert len(D["fails"]) == 4 and "built" in next(x for x in D["fails"] if x["cat"].startswith("Formwork")), D["fails"]
-    add("failures", "f2", (words(fs["not_built"]).capitalize(), str(fs["not_built"])), " of these rules are not built yet; the straight-line test is, but let this one through at a coarse look.")
+    add("failures", "f2", (words(fs["not_built"]).capitalize(), str(fs["not_built"])), " of these rules are not built yet. The straight-line test is built, but it let this line through at a coarse look.")
     rf = D["real_fail"]
     add("failures", "f3", f"On a real photo, {rf['gt']} was reported as {rf['got']}.")
 
