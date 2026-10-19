@@ -353,6 +353,15 @@ accounting at work (confirms for both reasons, confirms skipped at the pixel and
 p50), and that on this x86 Mac the FP16 file is no faster than the FP32 one (segment:accurate p50 672-805 ms against
 segment:confirm 624-661 ms in the same timing run), so here the FP32 net alone is the cheaper arm.
 
+`results/dev/cascade_dacl10k_v2a+v2b.json` is the first real comparison: v2a (FP32) scouts, v2b confirms, both under
+the classical-v1 profile (`PROFILES` has none of their own yet), charged this x86 Mac's costs (v2a 665-739 ms and v2b
+813-880 ms per look, timed in one run). Read by the rule above it shows no gain on any split, in recall, IoU-only
+recall, false alarms, ms per job or recall per modelled second. On CODEBRIM dev100 the cascade loses recall (x0.83 at
+cap 0.3, x0.85 at 1.0; CIs 0.73-0.93 and 0.76-0.94) and costs more per job (x1.12, x1.08): its confirms spend the pixel
+and seconds caps, so a job takes about a third fewer looks (10.0 against 14.9 at 0.3, 16.0 against 24.2 at 1.0). v2b
+alone also loses recall there (x0.89, x0.90) and is no better on synth_dev (x0.91, x0.97: no clear change); on the
+clean split no arm changes the false alarms. On these splits v2b is not the stronger net, so the cascade stays off.
+
 ## `POST /api/kill`
 
 ```json
