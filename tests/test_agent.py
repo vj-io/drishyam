@@ -85,14 +85,6 @@ def test_tau_scout_sets_escalation_at_coarse_looks_only(scene):
     assert ("escalate", 0, "entropy>tau") in acts(pixel_cap=1.0)
 
 
-def test_a_finer_overview_is_charged_the_level_it_read(scene):
-    """sal_fine: the overview's thin-line maps come from a finer pyramid level, so the overview costs that level's
-    pixels (one level finer: four times as many)."""
-    ov = run(scene, sal_fine=1)[1][1]  # job, overview, ...
-    pyr = imaging.build_pyramid(scene)
-    assert ov["pixels_used"] == pyr[2].shape[0] * pyr[2].shape[1] > 3.9 * run(scene)[1][1]["pixels_used"]
-
-
 @pytest.mark.parametrize("cap", [0.05, 0.1, 0.3])
 def test_pixel_cap_is_never_exceeded(scene, cap):
     _job, events = run(scene, pixel_cap=cap)
@@ -946,7 +938,7 @@ def test_the_classical_profile_is_the_agent_every_classical_number_ran_with(scen
         "max_candidates": 20, "chaos": (), "planner_every": 5, "planner_timeout_s": TIMEOUT_S,
         "usd_per_hour": USD_PER_HOUR, "thumbs": True, "max_steps": 200, "use_uncertainty": True,
         "seed_from_looks": True, "v0": 2.0, "survey": True, "verify": True, "absorb": True, "order": "score", "seed": 0,
-        "governor": True, "sal_fine": 0, "fill": False, "survey_value": True,
+        "governor": True, "fill": False, "survey_value": True,
         "t_hat_ms": None}
 
 
