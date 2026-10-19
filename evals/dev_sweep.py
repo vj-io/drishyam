@@ -10,7 +10,9 @@ bootstrap recall ratio against it; --baselines adds L2/L1/L0 tiling (with an ONN
 job_ops table of results/<--micro-arm>/micro.json (default linux-aarch64, which timed the classical engine; an ONNX
 needs its own table). Prints one JSON row per variant and cap (recall, IoU-only recall, chance, precision, boxes,
 pixels, halt causes, looks per level, the ratio to the downscale with its CI); `--out` also writes them, with the
-split, caps, variants and each row's per-image counts (for paired comparisons across runs), as JSON. results/dev/v0_sweep.json holds the rows that chose JobConfig.v0.
+split, caps, variants and each row's per-image counts (for paired comparisons across runs), as JSON.
+results/dev/v0_sweep.json holds the rows that chose JobConfig.v0, results/dev/onnx_profile_sweep.json those that chose
+the dacl10k ONNX profile (agent.PROFILES).
 """
 
 import argparse
