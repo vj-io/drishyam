@@ -1,6 +1,6 @@
 """Metric B: the end-to-end agent loop, with and without asynchronous look prefetching (drishyam.prefetch).
 
-    python -m bench.loop --arm local-macos-x86 [--threads 1,2,4] [--synth 8] [--rounds 1] [--max-load 4]
+    python -m bench.loop --arm local-macos-x86 [--threads 1,2,4 (macOS: 1,all)] [--synth 8] [--rounds 1] [--max-load 4]
 
 Writes results/<arm>/loop.json (loop_onnx.json when DRISHYAM_ONNX selects the dacl10k segmenter; the prefetch thread
 then segments with a second instance, since one serialises its forwards on a lock). Photos: the eight demo samples
@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 import time
 from collections import Counter
 from pathlib import Path
@@ -115,7 +116,8 @@ def run(arm: str, threads: list[int], n_synth: int = 8, rounds: int = 1, out_dir
 def main(argv=None) -> None:
     ap = argparse.ArgumentParser(prog="python -m bench.loop", description=__doc__.split("\n\n")[0])
     ap.add_argument("--arm", required=True)
-    ap.add_argument("--threads", default="1,2,4", help="comma-separated cv2 thread counts; all = OpenCV's default")
+    ap.add_argument("--threads", default="1,all" if sys.platform == "darwin" else "1,2,4",  # GCD: only 1 and all
+                    help="comma-separated cv2 thread counts; all = OpenCV's default")
     ap.add_argument("--synth", type=int, default=8, help="synthetic 2048x1536 photos besides the 8 samples")
     ap.add_argument("--rounds", type=int, default=1)
     ap.add_argument("--out-dir", default="results")

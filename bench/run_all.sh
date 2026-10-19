@@ -7,8 +7,8 @@
 # PARITY_INPUTS (another arm's parity.npz, so both arms segment identical crops), DRISHYAM_ON_EC2=1 (record IMDSv2
 # instance metadata in the provenance block; nothing else ever calls IMDS), MAX_LOAD (micro and macro exit before
 # timing if the 1-min load average is at or above it), BENCH_LABEL (where this ran, in words: provenance.label),
-# KERNEL_THREADS (Metric A thread counts, "1,all") and LOOP_THREADS (Metric B, "1,2,4"; "1,all" on macOS, whose GCD
-# backend cannot set 2 or 4).
+# KERNEL_THREADS (Metric A thread counts, "1,all") and LOOP_THREADS (Metric B; bench.loop's default, "1,2,4", is "1,all"
+# on macOS, whose GCD backend cannot set 2 or 4).
 set -euo pipefail
 
 arm="${1:?usage: bench/run_all.sh <arm-name>}"
@@ -39,7 +39,6 @@ echo "== kernels, Metric A ($arm)"
 "$py" -m bench.kernels --arm "$arm" --threads "${KERNEL_THREADS:-1,all}" ${MAX_LOAD:+--max-load "$MAX_LOAD"}
 
 echo "== agent loop with and without prefetch, Metric B ($arm)"
-if [ "$(uname)" = Darwin ]; then : "${LOOP_THREADS:=1,all}"; fi
-"$py" -m bench.loop --arm "$arm" --threads "${LOOP_THREADS:-1,2,4}" ${MAX_LOAD:+--max-load "$MAX_LOAD"}
+"$py" -m bench.loop --arm "$arm" ${LOOP_THREADS:+--threads "$LOOP_THREADS"} ${MAX_LOAD:+--max-load "$MAX_LOAD"}
 
 echo "done: $out"
