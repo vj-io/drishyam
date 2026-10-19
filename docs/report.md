@@ -163,14 +163,14 @@ job would get about 1.04× faster; the x86 laptop's 8-image run
 where a COOL or DNN speed-up would have to land.
 
 **Arm against x86 on GitHub's runners.** The same workflow run timed the same wheel version on GitHub's x86
-`ubuntu-24.04` runner (AMD EPYC 7763, IPP HAL), 4 logical CPUs and Python 3.13 on both (the Lambda runs 3.12): one
-run each, on shared VMs, not the function and not a Graviton core. On one thread each runner won 12 of the 24 kernel
-and size pairs (x86 about twice as fast at black-hat and top-hat, Arm about twice as fast at contours and fitting); on
-4 threads Arm won 23 of 24. The agent loop ran 1.17 to 1.27 times as many jobs per second on Arm, and the macro job 1.26
-times as many images per second (per-image p50 195.8 against 248.2 ms), most of the gap in the classical segmenter;
-x86 ran the NanoDet forward in 0.61 of Arm's time on one thread. Every ratio mixes core, OpenCV build (KleidiCV and
-carotene against IPP) and VM, and the run was not repeated. Tables and provenance: [bench.md](bench.md), "Arm against
-x86 on GitHub".
+`ubuntu-24.04` runner (AMD EPYC 7763, IPP HAL), 4 logical CPUs and Python 3.13 on both (the Lambda runs 3.12): one run
+each, on shared VMs, not the function and not a Graviton core. On one thread each runner won 12 of the 24 kernel and
+size pairs (x86 about twice as fast at black-hat and top-hat, Arm about twice as fast at contours and fitting), but 6
+of the 24 differ by less than 6 %, close enough to flip in another run; on 4 threads Arm won 23 of 24. The agent loop
+ran 1.17 to 1.27 times as many jobs per second on Arm, and the macro job 1.26 times as many images per second
+(per-image p50 195.8 against 248.2 ms), most of the gap in the classical segmenter; x86 ran the NanoDet forward in
+0.61 of Arm's time on one thread. Every ratio mixes core, OpenCV build (KleidiCV and carotene against IPP) and VM, and
+the run was not repeated. Tables and provenance: [bench.md](bench.md), "Arm against x86 on GitHub".
 
 ## 7. Related work
 
@@ -491,8 +491,9 @@ notes the large spall it missed.
   re-measured since candidates are seeded.
 - COOL on Graviton was not run (section 6).
 - The arm64 timings come from GitHub's `ubuntu-24.04-arm` runner (`results/linux-aarch64/`, Neoverse-N2, one
-  thread), a GitHub Actions VM, not the deployed Lambda; on the deployed Lambda build the only numbers are the two smoke runs'
+  thread for the cost table), a GitHub Actions VM, not the deployed Lambda; on the deployed Lambda build the only numbers are the two smoke runs'
   step p95s, 67.7 and 83.7 ms, each over one job (section 5). The evals ran on the x86 laptop with those arm64 costs.
+  The Arm-against-x86 comparison (section 6, [bench.md](bench.md)) is one run per runner on shared GitHub VMs.
 - The web demo is stateless; the signed `work_order.json` is its audit trail. There is no approval store, and
   human-approval latency is not measured.
 
