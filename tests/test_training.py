@@ -157,10 +157,10 @@ def test_dataset_rasterises_labelme_polygons_per_class(mods, tmp_path):
 @needs_torch
 def test_one_pixel_crack_survives_a_whole_photo_view(mods, tmp_path):
     """A 1 px wide crack in a 4000 px photo, seen whole at 512 px (7.8x down): recipe v2 draws the polygon at 4x the
-    target and max-pools, so every target pixel the crack crosses is on. Against the max-pool of a source-resolution
-    raster, over 200 random 1-3 px cracks (runs/thin2.py, 2026-10-19): v2 recall 0.93, precision 0.96; drawn straight
-    at 512 (v1), recall 0.59, precision 0.73 (OpenCV still draws a sub-pixel polygon's edge, so v1 keeps a 1 px line,
-    but misses or misplaces much of a crack's footprint)."""
+    target and max-pools, so every target pixel the crack crosses is on. Against the exact max-pool of a fillPoly at
+    source resolution (the truth below), over 200 random 1-3 px cracks (2026-10-19): v2 recall 0.90, precision 0.93;
+    drawn straight at 512 (v1), recall 0.56, precision 0.70 (OpenCV still draws a sub-pixel polygon's edge, so v1
+    keeps a 1 px line, but misses or misplaces much of a crack's footprint)."""
     dacl_common, train = mods[0], mods[1]
     names, _, _ = dacl_common.load_class_map()
     root = tmp_path / "d"
@@ -179,9 +179,15 @@ def test_one_pixel_crack_survives_a_whole_photo_view(mods, tmp_path):
     diag = [crack[round(y * 512 / 3000) - 1 : round(y * 512 / 3000) + 2, round(x * 512 / 4000) - 1 :
                   round(x * 512 / 4000) + 2].any() for x, y in zip(range(100, 2900, 25), range(100, 2900, 25))]
     assert all(diag)
-    # What v2 changes: the footprint, against the max-pool of a source-resolution raster (k = 8 covers 7.8x).
-    # v1 (k = 1) keeps a line too, so presence alone would pass on it; recall separates them.
-    truth = train.rasterise(shapes, {"Crack": 0}, (0, 0, 4000, 3000), 512, 8)[0] > 0
+    # What v2 changes: the footprint. Truth without rasterise: the polygons filled at source resolution, then a target
+    # pixel is on when any source pixel it covers is. v1 (k = 1) keeps a line too, so presence alone would pass on
+    # it; recall separates them.
+    src = np.zeros((3000, 4000), np.uint8)
+    for s in shapes:
+        cv2.fillPoly(src, [np.round(np.asarray(s["points"]) * 16).astype(np.int32)], 1, shift=4)
+    yy, xx = np.nonzero(src)
+    truth = np.zeros((512, 512), bool)
+    truth[yy * 512 // 3000, xx * 512 // 4000] = True
     v1 = train.rasterise(shapes, {"Crack": 0}, (0, 0, 4000, 3000), 512, 1)[0] > 0
     recall = lambda m: (m & truth).sum() / truth.sum()
     assert v1.sum() > 0 and recall(v1) < 0.8 and recall(crack > 0) > 0.9
@@ -313,9 +319,10 @@ def test_onnx_loads_on_opencv_dnn_with_dynamic_hw_and_six_class_output(exported)
 def test_onnxsegmenter_matches_pytorch(exported, mods):
     ckpt, paths = exported
     fp16 = paths.get("fp16")
-    rows = mods[3].run(str(ckpt), str(paths["fp32"]), str(fp16) if fp16 else None, n=2)
+    rows = mods[3].run(str(ckpt), str(paths["fp32"]), str(fp16) if fp16 else None, n=2, onnx19=str(paths["19"]))
     assert all(r["ok"] for r in rows), rows
     assert rows[0]["max_dprob"] < 1e-3
+    assert rows[-1]["case"] == "fp32 19 logits" and rows[-1]["max_dlogit"] < 1e-3  # every channel, merged or not
 
 
 @needs_torch

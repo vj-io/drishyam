@@ -184,10 +184,12 @@ def rasterise(shapes, index: dict, box, size: int, k: int = 1) -> np.ndarray:
 class Dacl10k(Dataset):
     """Official split: annotations/{train,validation}/*.json (labelme polygons) + images/<split>/*.jpg.
 
-    A window of the full-resolution photo is resized to size x size with INTER_AREA, as OnnxSegmenter resizes a
-    gaze view (and like the dacl10k paper's 512 x 512 baselines). Train windows (`crop_box`): v2, with probability
-    `crop_p` a square-ish crop whose side is log-uniform between `crop_min_px` and the photo's short side (every
-    pyramid level the agent looks at), `crop_label_p` of them centred on a labelled pixel, else the whole photo;
+    A window of the full-resolution photo is resized to size x size with one INTER_AREA (like the dacl10k paper's
+    512 x 512 baselines). That matches a gaze view's scale, not its resampling: the agent cuts views from a
+    cv2.pyrDown pyramid with warpPerspective INTER_LINEAR, reflecting at the photo's edges. Train windows
+    (`crop_box`): v2, with probability `crop_p` a square-ish crop whose side is log-uniform between `crop_min_px`
+    and the photo's short side (every pyramid level the agent looks at), `crop_label_p` of them centred on a
+    labelled pixel, else the whole photo;
     v1, 70 % of the time a crop of 30-100 % of each side. `views` (validation): every sample is a stack of fixed,
     seeded windows, one per crop side in source px (clamped to the short side; 0 = the whole photo), the same
     whatever the training flags. Masks: `rasterise`, at min(raster_k, the window's downscale factor rounded up) x
@@ -692,7 +694,8 @@ if __name__ == "__main__":
         raise SystemExit("export failed: see the output above")
     FP32, FP16, F19 = (ONNX / f"drishyam_dacl10k{s}.onnx" for s in ("", ".fp16", "_19"))
 
-# %% Parity: OnnxSegmenter on OpenCV 5 DNN vs PyTorch, 4 crops (validation images, or noise for --synthetic)
+# %% Parity: OnnxSegmenter on OpenCV 5 DNN vs PyTorch, 4 crops (validation images, or noise for --synthetic); the
+# 19-class logits ONNX on cv2.dnn vs the net before the merge
 if __name__ == "__main__":
     samples = Path(tempfile.mkdtemp())
     val = sorted((ROOT / "images" / "validation").glob("*.jpg"))[:4] if ROOT else []
@@ -701,7 +704,7 @@ if __name__ == "__main__":
         img = cv2.imread(str(val[i])) if i < len(val) else noise.integers(0, 256, (576, 768, 3), dtype=np.uint8)
         cv2.imwrite(str(samples / f"{i}.jpg"), cv2.resize(img, (768, 576), interpolation=cv2.INTER_AREA))
     PARITY = tool("parity.py", "--ckpt", CKPT, "--onnx", FP32, *(["--onnx-fp16", FP16] if FP16.exists() else []),
-                  "--samples", samples, "--n", 4)
+                  "--onnx-19", F19, "--samples", samples, "--n", 4)
     PARITY_OK = PARITY in (0, 3)  # 3 is parity.FP16_OVER: FP32 within tolerance, only FP16 over (it is left out)
 
 # %% Package: <out>/drishyam_dacl10k.zip: best.onnx, best_fp16.onnx (if its parity passed), best_19.onnx, metrics, run_info

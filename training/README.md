@@ -73,7 +73,7 @@ Edit `train_dacl10k.py`, never the notebooks: `python training/make_notebook.py`
 | `../scripts/kaggle_train.sh` | `push`, `status`, `output` of a variant's kernel with the kaggle CLI (section 5a) |
 | `../scripts/install_model.sh` | The hand-back: checks, installs into `models/`, smoke jobs, before/after eval, deploy commands |
 | `export_onnx.py` | Checkpoint to FP32 and FP16 ONNX, plus the 19-class logits ONNX; opset 17, dynamic H x W, onnxslim, OpenCV DNN load check |
-| `parity.py` | FR-4 acceptance: 20 fixed crops, PyTorch vs `OnnxSegmenter` |
+| `parity.py` | FR-4 acceptance: 20 fixed crops, PyTorch vs `OnnxSegmenter`; `--onnx-19`, the 19-class ONNX vs the net |
 | `../tests/test_training.py` | Class-map, notebook and kernel-metadata checks always; loader, thin-crack masks, v2 crops and loss, merge, 3-step train, resume refusal, export, DNN load and parity when torch is installed |
 
 ## 1. Released dacl10k weights (checked 2026-10-17)
@@ -139,8 +139,8 @@ row means editing `class_map.json` and re-running `export_onnx.py`; no retrainin
 Proposed 2026-10-19 and **not** adopted: Wetspot and Weathering to corrosion. dacl10k defines Wetspot as moisture and
 Weathering as surface deterioration (dirt, soot, plant growth), not rust, so merging them would label every damp or
 dirty patch as corrosion on the strength of a guess. Measure it instead: recipe v2 runs also export
-`best_19.onnx`, the 19 logits before any merge (installed as `models/eval/NAME_19.onnx`), so any mapping can be
-scored on dev data by taking the max of its channels' logits (what `DrishyamHead` does) without retraining; change
+`best_19.onnx`, the 19 logits before any merge (installed as `models/eval/NAME_19.onnx`, and checked against
+PyTorch by the notebook's parity cell, every channel), so any mapping can be scored on dev data by taking the max of its channels' logits (what `DrishyamHead` does) without retraining; change
 this table only with that result. (One training-time coupling: v2's loss weights, section 5, up-weight only channels
 merged into a defect, so Wetspot and Weathering were trained at weight 1.)
 
@@ -229,19 +229,29 @@ Why: Drishyam's gaze windows are 512 x 2^L source px. L0, 512 px, is about 13 % 
 v1's crops (30 to 100 % of the photo) never showed the model, and on the CODEBRIM dev split the v1 model's L0 tiling
 scored 0.38 against 0.55 at L1 and 0.51 at L2.
 
-- **Crops**: a v2 crop is cut in source px and resized with `INTER_AREA`, as `OnnxSegmenter` resizes a gaze view, so
-  every pyramid level the agent looks at (and the whole photo) is in the training distribution. Centring 60 % of crops
+- **Crops**: a v2 crop is cut in source px and resized with one `INTER_AREA`, so the scale of every pyramid level the
+  agent looks at (and of the whole photo) is in the training distribution. The resampling is not: gaze views are cut
+  from a `cv2.pyrDown` pyramid (a 5-tap Gaussian, then decimation) with `warpPerspective` `INTER_LINEAR`, reflected
+  past the photo's edges (`drishyam/imaging.py`), so their low-pass filter and border content differ from training's
+  (as in v1). A crop built by repeated `pyrDown` could be compared on dev data. Centring 60 % of crops
   on a labelled polygon (uniform over polygons, so thin, numerous cracks get their share against large spalls)
   keeps the fine crops from being mostly background.
 - **Masks**: a downscaled window's polygons are filled, outline included, at min(4, the downscale factor) x the target
-  size and max-pooled, so a target pixel is on when any of its sub-pixels is covered. Against the max-pool of a
-  source-resolution raster, over 200 random 1 to 3 px cracks in a 4000 x 3000 photo seen whole at 512 px
-  (2026-10-19): drawn straight at 512 (v1) recall 0.59, precision 0.73; v2 recall 0.93, precision 0.96.
+  size and max-pooled, so a target pixel is on when any of its sub-pixels is covered. Against the exact max-pool of
+  the polygons filled at source resolution, over 200 random 1 to 3 px cracks in a 4000 x 3000 photo seen whole at
+  512 px (2026-10-19): drawn straight at 512 (v1) recall 0.56, precision 0.70; v2 recall 0.90, precision 0.93.
   OpenCV's `fillPoly` still draws a sub-pixel polygon's edge, so v1 did not drop 1 px cracks outright; it missed or
   misplaced much of their footprint. `tests/test_training.py` checks that a 1 px crack (straight and at 45 degrees)
   in a 4000 px photo is unbroken in the 512 px whole-photo mask. The other side of it: at 8x down a 1 px crack keeps
   an eighth of its contrast in the image, so v2 asks the model to mark lines it can barely see; whether that helps
-  is for the dev eval.
+  is for the dev eval. The cost is width: any covered sub-pixel turns its target pixel on, so a v2 label is wider
+  than a v1 label wherever the window is downscaled. On straight cracks 1 to 16 px wide (2026-10-19, area over
+  length of the label masks), v1 labels already run about one view px wider than the crack (`fillPoly` includes the
+  edge), and v2 adds about 0.4 source px more at L1 and 1.1 at L2; at L0 (k = 1) they are identical. Drishyam's crack
+  `width_px` is area over length (`drishyam/measure.py`), measured at every level, and `elongated` rejects a crack
+  whose length is under 8 widths as a pore, so a v2 model may report wider cracks at L1 and L2 and drop a few more
+  short ones. No eval scores `width_px`: the v2-vs-v1 dev comparison must compare it, and the pore rejections, on
+  the same cracks, not only IoU.
 - **Loss**: each channel merged into a Drishyam defect gets the weight clip(sqrt(median share / share), 1, 4), from
   its share of train pixels (polygon areas from the JSONs, no image read; printed at the start of each session,
   rarest first, and saved in `run_info.json` as `train_pixel_share` and `class_weights`). Crack and ExposedRebars,
@@ -298,8 +308,9 @@ scripts/kaggle_train.sh output v2a
 ```
 
 `push` uploads the notebook as a new kernel version, which Kaggle queues and runs; `status` says queued, running,
-complete or error; `output` downloads into a fresh `runs/kaggle/v2a/<time>/` (`run/drishyam_dacl10k.zip` and the
-kernel log) and prints the install command, which installs the model as `models/drishyam_dacl10k_v2a.onnx`:
+complete or error; `output` downloads into a fresh `runs/kaggle/v2a/<time>/` of the main checkout, even when run
+from a git worktree, which is deleted with its `runs/` (`run/drishyam_dacl10k.zip` and the kernel log), and prints
+the install command, which installs the model as `models/drishyam_dacl10k_v2a.onnx` (run it in the main checkout):
 
 ```
 scripts/install_model.sh runs/kaggle/v2a/<time>/run/drishyam_dacl10k.zip
@@ -375,7 +386,7 @@ not measured. If v2b stops with CUDA out of memory, add `--batch-size 12` to its
 ```
 python training/export_onnx.py --ckpt run/best.pt --out models
 python training/parity.py --ckpt run/best.pt --onnx models/drishyam_dacl10k.onnx \
-       --onnx-fp16 models/drishyam_dacl10k.fp16.onnx
+       --onnx-fp16 models/drishyam_dacl10k.fp16.onnx --onnx-19 models/drishyam_dacl10k_19.onnx
 ```
 
 `export_onnx.py` writes `drishyam_dacl10k.onnx` (opset 17, input `(1,3,H,W)` ImageNet-normalised RGB, output `(1,6,H,W)`
@@ -389,6 +400,9 @@ FP32 passes and only FP16 is over (install the FP32 file alone: the FP16 margin 
 takes 20 fixed 512 x 512 crops of `public/samples/*.jpg` and compares `OnnxSegmenter` (probabilities) with PyTorch at 512 (the accurate path) and 256 (the fast
 path, which also proves the graph is dynamic), for FP32 (tolerance max |dprob| 1e-3) and FP16 (5e-2). It also reports
 max |dlogit| of the raw DNN output, the stricter range-independent number (|dprob| is at most about half of it).
+`--onnx-19` adds the row `fp32 19 logits`: the 19-class ONNX on raw `cv2.dnn` `ENGINE_NEW` at 512 against the
+checkpoint's net before the merge, every channel's sigmoid within the FP32 tolerance. The six-class rows cannot
+cover those channels: `DrishyamHead` discards the nine mapped to background (Wetspot, Weathering, Graffiti, ...).
 Run it where torch and OpenCV 5 coexist (below), with the repo checked out (it imports `drishyam.segment`).
 
 ## 7. Point Drishyam at the model

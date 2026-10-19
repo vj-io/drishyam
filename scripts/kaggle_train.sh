@@ -8,14 +8,15 @@
 #                                                     so `--resume auto` carries on a run that stopped at --hours 11
 #   scripts/kaggle_train.sh status <variant>          the latest version's status (queued, running, complete, error)
 #   scripts/kaggle_train.sh output <variant>          download its drishyam_dacl10k.zip and log into a fresh
-#                                                     runs/kaggle/<variant>/<time>/ and print the install command
+#                                                     runs/kaggle/<variant>/<time>/ of the main checkout (not
+#                                                     a git worktree's) and print the install command
 #
 # The kaggle CLI (the one on PATH, else `uvx kaggle==2.2.4`) reads the owner's own Kaggle credentials itself;
 # this script never reads, prints or passes them. Uploaded: the notebook (it embeds training/'s helpers and
 # drishyam/segment.py) and its metadata, nothing else.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-usage() { sed -n '2,12p' "$0" >&2; exit 2; }
+usage() { sed -n '2,13p' "$0" >&2; exit 2; }
 [ $# -ge 2 ] || usage
 CMD=$1 V=$2
 shift 2
@@ -34,8 +35,8 @@ if f"VARIANT = \\\"{variant}\\\"" not in nb:
     sys.exit(f"{cf} is not the {variant} notebook (its VARIANT line differs)")
 print(m["id"])
 ' "$META" "$V")
-kaggle() {
-  if command -v kaggle >/dev/null 2>&1; then command kaggle "$@"; else uvx "kaggle==2.2.4" "$@"; fi
+kaggle() {  # type -P finds the binary only: `command -v` would find this function
+  if type -P kaggle >/dev/null; then command kaggle "$@"; else uvx "kaggle==2.2.4" "$@"; fi
 }
 
 case $CMD in
@@ -67,8 +68,10 @@ m["kernel_sources"] = [m["id"]]  # this kernel latest output (run/last.pt) under
     ;;
   output)
     [ $# -eq 0 ] || usage
-    mkdir -p "runs/kaggle/$V"
-    OUT=runs/kaggle/$V/$(date +%Y%m%d-%H%M%S)
+    # the main checkout: a worktree (.claude/worktrees/...) is removed with its runs/ when its branch merges
+    MAIN=$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")
+    mkdir -p "$MAIN/runs/kaggle/$V"
+    OUT=$MAIN/runs/kaggle/$V/$(date +%Y%m%d-%H%M%S)
     mkdir "$OUT"  # fresh: never mixes two versions' files
     kaggle kernels output "$KERNEL" -p "$OUT" --file-pattern 'drishyam_dacl10k\.zip$'
     ZIP=$(find "$OUT" -name drishyam_dacl10k.zip | head -1)
