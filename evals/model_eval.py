@@ -126,17 +126,39 @@ def check_arms(split: str, doc: dict, scout: str, confirm: str) -> None:
         raise SystemExit(f"{split}: the arms ran different profiles: {sorted({r['profile'] for r in agents.values()})}")
 
 
+# metric: (its paired CI against scout-only, the value meaning no change, +1 if higher is better / -1 if worse / 0 neither)
+READ = {"recall": ("vs_ref_ci", 1, 1), "recall_iou_only": ("vs_ref_iou_only_ci", 1, 1), "chance_recall": ("chance_vs_ref_ci", 1, 0),
+        "boxes_per_image": ("boxes_diff_vs_ref_ci", 0, 0), "images_with_any": ("images_with_any_vs_ref_ci", 0, 0),
+        "ms_per_job": ("ms_vs_ref_ci", 1, -1), "recall_per_s": ("recall_per_s_vs_ref_ci", 1, 1)}
+
+
+def readings(split: str, r: dict) -> dict:
+    """Each paired 95 % CI against scout-only, gains and harms read by one standard: a change only when the CI excludes
+    no change, a gain or a harm where the direction says which (on the clean split every box is a false alarm), else
+    higher or lower."""
+    out = {}
+    for m, (k, null, good) in READ.items():
+        if (ci := r.get(k)) and None not in ci:
+            good = -1 if split == "clean" and m in ("boxes_per_image", "images_with_any") else good
+            d = (ci[0] > null) - (ci[1] < null)
+            out[m] = "no clear change" if not d else ("lower", "higher")[d > 0] if not good else ("harm", "gain")[d == good]
+    return out
+
+
 def cascade_table(split: str, doc: dict) -> None:
     f = lambda v: "-" if v is None else f"{v:.3f}"
-    ci = lambda r, k: f"{f(r.get(k))} {r.get(k + '_ci', '')}"
-    print(f"\n{split} ({doc['n']} images): ratios are paired against scout-only at the same cap, 95 % bootstrap CIs")
+    rd = lambda r, m: f"[{readings(split, r)[m]}]" if m in readings(split, r) else ""
+    ci = lambda r, k, m: f"x{f(r.get(k))} {r.get(k + '_ci', '')} {rd(r, m)}" if k + "_ci" in r else ""
+    fa = " (all false alarms)" if split == "clean" else ""
+    print(f"\n{split} ({doc['n']} images): against scout-only at the same cap, paired 95 % bootstrap CIs, read alike")
     for k, r in doc["rows"].items():
         if "@" in k:
-            print(f"{k:<13} recall {f(r['recall'])} (IoU-only {f(r['recall_iou_only'])}, chance {f(r['chance_recall'])})"
-                  f" x{ci(r, 'vs_ref')}  ms/job {r['ms_per_job']:.0f} x{ci(r, 'ms_vs_ref')}  recall/s"
-                  f" {f(r['recall_per_s'])} x{ci(r, 'recall_per_s_vs_ref')}  boxes/photo {r['boxes_per_image']:.2f}"
-                  f" {r.get('boxes_vs_ref_ci', '')}  any box {r['images_with_any']:.2f}"
-                  f" {r.get('images_with_any_vs_ref_ci', '')}  confirms/job {r.get('confirms_per_job', 0):.2f}")
+            print(f"{k:<13} recall {f(r['recall'])} {ci(r, 'vs_ref', 'recall')}  IoU-only {f(r['recall_iou_only'])}"
+                  f" {rd(r, 'recall_iou_only')}  chance {f(r['chance_recall'])} {rd(r, 'chance_recall')}"
+                  f"  ms/job {r['ms_per_job']:.0f} {ci(r, 'ms_vs_ref', 'ms_per_job')}  recall/s {f(r['recall_per_s'])}"
+                  f" {ci(r, 'recall_per_s_vs_ref', 'recall_per_s')}  boxes/photo{fa} {r['boxes_per_image']:.2f}"
+                  f" {rd(r, 'boxes_per_image')}  any box {r['images_with_any']:.2f} {rd(r, 'images_with_any')}"
+                  f"  confirms/job {r.get('confirms_per_job', 0):.2f}")
 
 
 def cascade_eval(a, scout: Path, fp16: Path) -> None:
@@ -166,8 +188,9 @@ def cascade_eval(a, scout: Path, fp16: Path) -> None:
         check_arms(split, splits[split], f"onnx:{scout.name}", f"onnx:{confirm.name}")
         cascade_table(split, splits[split])
     dst = REPO / "results" / "dev" / f"cascade_{tag}.json"
+    reads = {s: {k: readings(s, r) for k, r in d["rows"].items() if "ref" in r} for s, d in splits.items()}
     dst.write_text(json.dumps({"label": a.label, "micro_arm": arm, "arms": CASCADE_ARMS, "caps": CASCADE_CAPS,
-                               "splits": splits}, indent=1) + "\n")
+                               "readings": reads, "splits": splits}, indent=1) + "\n")
     print(f"wrote {dst.relative_to(REPO)}")
 
 

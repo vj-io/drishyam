@@ -121,6 +121,7 @@ def row(key: str, records, results, scored: dict, ref: str | None = None) -> dic
         # Boxes: on the clean split every box is a false alarm. Paired, like the recall ratios.
         a, b = (np.array([len(r["configs"][k]["preds"]) for r in results]) for k in (key, ref))
         out |= {"ref": ref, "boxes_vs_ref_ci": harness.boot_ci(lambda i: a[i].sum() / b[i].sum() if b[i].sum() else np.nan, n),
+                "boxes_diff_vs_ref_ci": harness.boot_ci(lambda i: a[i].mean() - b[i].mean(), n),  # per photo: no 0 / 0
                 "images_with_any_vs_ref_ci": harness.boot_ci(lambda i: (a[i] > 0).mean() - (b[i] > 0).mean(), n)}
         wa, wb = (np.array([r["configs"][k]["wall_s"] for r in results]) for k in (key, ref))
         out |= {"ms_vs_ref": wa.mean() / wb.mean(), "ms_vs_ref_ci": harness.boot_ci(lambda i: wa[i].mean() / wb[i].mean(), n)}

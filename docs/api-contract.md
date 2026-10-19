@@ -339,8 +339,12 @@ names the net under `job_ops.confirm`; a fixed-cost cascade refuses a table that
 look charged its `segment:confirm` p50, under the scout's profile, so only the net differs) and the cascade, at caps
 0.3 and 1.0 on the three dev splits (synth_dev, the clean split, CODEBRIM dev100; never a held-out set), checks that
 each arm ran the nets it is named for, and writes `results/dev/cascade_<pair>.json`: recall, IoU-only recall, chance
-recall, boxes per photo, the share of photos with any box, modelled ms per job and recall per modelled second, each
-with a paired 95 % bootstrap CI against the scout alone at the same cap.
+recall, boxes per photo (on the clean split, false alarms), the share of photos with any box, modelled ms per job and
+recall per modelled second, each with a paired 95 % bootstrap CI against the scout alone at the same cap. Its
+`readings` read every one of those CIs by the same standard, for a gain and a harm alike: a change only when the CI
+excludes no change (a ratio of 1; for boxes per photo and the share with any box, a per-photo difference of 0), then
+`gain` or `harm` where the direction says which (fewer false alarms on the clean split is a gain), `higher` or `lower`
+where it does not (chance recall, boxes on a labelled split), else `no clear change`.
 
 ## `POST /api/kill`
 

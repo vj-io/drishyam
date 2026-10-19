@@ -254,6 +254,23 @@ def test_each_dev_sweep_arm_runs_the_nets_it_is_named_for(tmp_path, monkeypatch)
         dev_sweep.task({"id": "a", "path": str(tmp_path / "a.png")}, variants, rows, [1.0])
 
 
+def test_a_dev_sweep_row_reports_modelled_ms_and_recall_per_modelled_second_paired_with_scout_only():
+    gt, miss = {"cls": "crack", "box": [100, 100, 50, 50]}, {"cls": "crack", "box": [900, 700, 50, 50], "conf": 0.5, "area": 9}
+    hit = {**gt, "conf": 0.9, "area": 9}
+    records = [{"id": str(i), "boxes": [gt]} for i in range(4)]
+    cfg = lambda preds, s: {"preds": preds, "preds_union": preds, "wall_s": s, "pixels_frac": 0.5, "net_pixels_frac": 0.5}
+    results = [{"id": str(i), "width": 1024, "height": 768,
+                "configs": {"scout@1.0": cfg([hit] if i < 2 else [], 1.0), "cascade@1.0": cfg([hit] if i < 3 else [miss], 2.0 + i)}}
+               for i in range(4)]
+    scored = {k: harness.score_config(k, records, results) for k in ("scout@1.0", "cascade@1.0")}
+    r = dev_sweep.row("cascade@1.0", records, results, scored, "scout@1.0")
+    assert (r["recall"], r["ms_per_job"], r["recall_per_s"]) == (0.75, 3500.0, round(0.75 / 3.5, 4))
+    assert (r["ms_vs_ref"], r["recall_per_s_vs_ref"]) == (3.5, round(0.75 * 1.0 / (0.5 * 3.5), 4))
+    assert r["ms_vs_ref_ci"][0] >= 2.0 and r["ms_vs_ref_ci"][1] <= 5.0  # every resample costs 2-5 x scout-only's
+    assert r["boxes_diff_vs_ref_ci"][0] >= 0 and r["boxes_diff_vs_ref_ci"][1] <= 1  # per photo: 0 or 1 more box
+    assert dev_sweep.row("scout@1.0", records, results, scored, "scout@1.0").get("ref") is None  # the reference itself
+
+
 def looks_of(config: dict) -> list:
     return [t for t in config["trace"] if t["action"] != "halt"]
 
@@ -281,6 +298,24 @@ def test_a_cost_table_must_have_timed_the_same_confirm_net(tmp_path, monkeypatch
     assert out.areas["corrosion"] == 1600 and net.models == ["accurate"]
 
 
+def test_a_gain_and_a_harm_against_scout_only_are_read_by_the_same_ci_standard():
+    from evals.model_eval import readings
+
+    read = lambda split, **cis: readings(split, cis)
+    # a ratio's CI must exclude 1 on either side, a difference's 0: touching it is no change, gain or harm alike
+    assert read("synth_dev", vs_ref_ci=[1.0, 1.2], recall_per_s_vs_ref_ci=[0.8, 1.0], ms_vs_ref_ci=[1.0, 1.0]) == {
+        "recall": "no clear change", "recall_per_s": "no clear change", "ms_per_job": "no clear change"}
+    assert read("synth_dev", vs_ref_ci=[1.01, 1.2], vs_ref_iou_only_ci=[0.8, 0.99], ms_vs_ref_ci=[0.9, 0.95],
+                recall_per_s_vs_ref_ci=[0.7, 0.8]) == {"recall": "gain", "recall_iou_only": "harm", "ms_per_job": "gain",
+                                                       "recall_per_s": "harm"}
+    assert read("real", ms_vs_ref_ci=[1.2, 1.3], chance_vs_ref_ci=[1.1, 2.0], boxes_diff_vs_ref_ci=[0.1, 0.5]) == {
+        "ms_per_job": "harm", "chance_recall": "higher", "boxes_per_image": "higher"}
+    # on the clean split every box is a false alarm: more is a harm, fewer a gain
+    assert read("clean", boxes_diff_vs_ref_ci=[0.1, 0.5], images_with_any_vs_ref_ci=[-0.2, -0.1]) == {
+        "boxes_per_image": "harm", "images_with_any": "gain"}
+    assert read("clean", images_with_any_vs_ref_ci=[-0.1, 0.0], vs_ref_ci=[None, None]) == {"images_with_any": "no clear change"}
+
+
 def test_the_cascade_eval_times_the_pair_and_sweeps_the_dev_splits_only(tmp_path, monkeypatch):
     from evals import model_eval
 
@@ -299,7 +334,8 @@ def test_the_cascade_eval_times_the_pair_and_sweeps_the_dev_splits_only(tmp_path
         if "evals.dev_sweep" in cmd:
             row = {"recall": 0.5, "recall_iou_only": 0.4, "chance_recall": 0.1, "ms_per_job": 900.0, "recall_per_s": 0.6,
                    "boxes_per_image": 3.0, "images_with_any": 1.0, "profile": "classical-v1"}
-            rows = {f"{k}@{cap}": {**row, "segmenter": s, "confirm": None if wrong and k == "cascade" else c}
+            rows = {f"{k}@{cap}": {**row, "segmenter": s, "confirm": None if wrong and k == "cascade" else c,
+                                   **({"ref": f"scout@{cap}", "vs_ref_ci": [0.9, 0.99]} if k != "scout" else {})}
                     for k, (s, c) in nets.items() for cap in (0.3, 1.0)}
             Path(cmd[cmd.index("--out") + 1]).write_text(json.dumps({"n": 1, "rows": rows}))
 
@@ -315,6 +351,7 @@ def test_the_cascade_eval_times_the_pair_and_sweeps_the_dev_splits_only(tmp_path
     assert all(e["DRISHYAM_ONNX_CONFIRM"] == str(confirm) for _, e in sweeps)
     out = json.loads((tmp_path / "results" / "dev" / "cascade_dacl10k_v2a+v2b.json").read_text())
     assert out["label"] == "x" and set(out["splits"]) == {"synth_dev", "clean"}
+    assert out["readings"]["clean"] == {k: {"recall": "harm"} for k in ("confirm@0.3", "confirm@1.0", "cascade@0.3", "cascade@1.0")}
     wrong.append(True)  # a cascade arm that ran no confirm net is refused, not written up
     with pytest.raises(SystemExit, match="cascade@0.3 ran"):
         model_eval.main(argv)

@@ -40,7 +40,9 @@ def reason(seg, level: int, cfg) -> str | None:
 
 def ms_hat(job) -> float:
     """Predicted ms of one confirm: its fixed cost (JobConfig.t_hat_ms), else its p95 so far, else (none timed yet)
-    the scout's median segment."""
+    the scout's median segment. ponytail: so a job's first confirm, if far slower than the scout, can end past the
+    seconds cap once (the loop's caps are checked before each step, as for the scout's own first look); seed it from
+    the cost table if that ever bites."""
     if t := job.cfg.t_hat_ms:
         return t.get("segment:confirm", t["segment"])
     return job.stats.p("segment:confirm", 95, job.stats.median("segment") or 30.0)
