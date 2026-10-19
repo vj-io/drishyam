@@ -286,6 +286,13 @@ governor's `warp-spike` override shrank (512, 384, 288, then 256 px) does not mo
 3000-px photo an L1 look at 384 px spans 0.256 of the side. The dev runs had neither (no replay, governor off).
 The ONNX values were chosen on the dev splits only (`results/dev/onnx_profile_sweep.json`).
 
+`onnx:drishyam_dacl10k_v2a.onnx`, the retrained v2a model (sha256 `95b503c2...`), keeps v1's values (`min_view` 0.3,
+absorption off), so its finest levels are v1's. The rule written down before its dev sweep asked for higher recall
+than v1's values at the 30 % cap on both synth_dev and CODEBRIM dev100 (each paired 95 % CI above 1), with no more
+false alarms on the clean dev split by the same standard; none of the five candidates met it
+(`results/dev/onnx_v2a_profile_sweep.json`). Any level (`min_view` 0) and absorption on each lost recall on CODEBRIM
+(x0.79, CI 0.70-0.88; x0.89, 0.82-0.95), and 0.15 found x1.02 (0.95-1.10) with 2.2 times the boxes.
+
 Three `JobConfig` knobs from the tuning dev sweep (`results/dev/tune_sweep.json`) are off by default: measured, not
 adopted. `tau_scout`, when set, is the entropy threshold of a look at L2 or coarser; `tau` (0.5) stays that of every
 finer look, and an `entropy>tau` rationale names the threshold that applied (`"entropy 0.74 > 0.7 at L2"`). Unset

@@ -969,6 +969,26 @@ def test_a_job_takes_its_segmenters_profile_by_name_and_a_knob_set_explicitly_wi
     assert profile_for(rec) == ONNX and (rec.name, rec.sha256) == (ONNX, named(ONNX).sha256)
 
 
+def test_the_v2a_profile_is_the_one_its_dev_sweep_chose_and_only_for_its_weights(scene):
+    """results/dev/onnx_v2a_profile_sweep.json: no candidate passed the rule, so v2a keeps v1's values; v1's weights
+    under v2a's file name (or v2a's under v1's) were not what either profile measured."""
+    import json
+    from pathlib import Path
+
+    from drishyam.agent import PROFILES, WEIGHTS, profile_for
+
+    v2a = "onnx:drishyam_dacl10k_v2a.onnx"
+    assert PROFILES[v2a] == {"min_view": 0.3, "absorb": False} == PROFILES[ONNX]
+    assert WEIGHTS[v2a] == "95b503c2d205567c09b19154ff77a5117889b7aba0b19733ed1c178dc4ab1ad1"
+    assert profile_for(named(v2a)) == v2a
+    assert profile_for(named(v2a, sha256=WEIGHTS[ONNX])) == profile_for(named(ONNX, sha256=WEIGHTS[v2a])) == "classical-v1"
+    cfg = Job(scene, JobConfig(), segmenter=named(v2a)).cfg
+    assert (cfg.profile, cfg.min_view, cfg.absorb, cfg.tau, cfg.tau_scout) == (v2a, 0.3, False, 0.5, None)
+    sweep = json.loads((Path(__file__).parents[1] / "results/dev/onnx_v2a_profile_sweep.json").read_text())
+    assert sweep["chosen"]["profile"][v2a] == PROFILES[v2a] and sweep["chosen_variant"] == "ref"
+    assert not any(e["verdict"]["passes"] for e in sweep["evidence"].values())
+
+
 def test_an_onnx_segmenter_hashes_its_weights_once(tmp_path, monkeypatch):
     """The profile check reads the weights file's sha256; every job loads its own segmenter, so the hash is cached per
     path, mtime and size, and a file replaced in place is hashed again."""
