@@ -24,6 +24,7 @@ const size = (L) => (L ? `1/${2 ** L} size` : 'full resolution');
 const scale = (L) => `1:${2 ** L}`;
 const pct = (v) => `${Math.round(Number(v) * 100)}\u00a0%`;  // a no-break space: "19 %" never splits across lines
 const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
+const dec = (v) => Number(v).toPrecision(2);  // 3.98e-04 -> 0.00040: no scientific notation on screen
 /** A damage class in words ("exposed rebar"), and as a label ("Exposed rebar"). */
 export const words = (cls) => String(cls).replaceAll('_', ' ');
 export const label = (cls) => cap(words(cls));
@@ -166,7 +167,7 @@ const CLAUSES = [
   [/^quality gate: (\w+)$/, (m) => `the view failed the quality check (${m[1]}), so it does not trust this look`],
   [/^every candidate has been looked at$/, () => 'every candidate region has been looked at'],
   [/^best score (\S+) < lambda (\S+)/, (m) => (floorBound(m.input)
-    ? `the next look would be worth less than it costs: its score ${m[1]} is under the floor ${m[2]} (the least any look must promise, ε × v0 ÷ t̂)`
+    ? `the next look would be worth less than it costs: its score ${dec(m[1])} is under the floor ${dec(m[2])} (the least any look must promise, ε × v0 ÷ t̂)`
     : 'the next look would be worth less than it costs')],
   [/^kill switch set$/, (m, s) => (s.step > 1 ? 'you pressed KILL' : 'the kill switch was already set before its first look')],
   [/^state preserved for resume$/, (m, s) => (s.step > 1 ? 'its state is kept for Resume' : 'but nothing was looked at, so there is nothing to resume')],

@@ -1380,7 +1380,7 @@ def test_contract_fields_in_words(browser, base):
     expect(p.locator("#narrator")).to_contain_text("it weighs severity 1.5 (crack, seen at 1:4), it is unsure there (uncertainty 0.58)")
     halt = p.locator(".trace__line[data-step]").last
     expect(halt.locator(".trace__why")).to_contain_text(
-        "its score 1.2e-04 is under the floor 2.0e-04 (the least any look must promise, ε × v0 ÷ t̂)")
+        "its score 0.00012 is under the floor 0.00020 (the least any look must promise, ε × v0 ÷ t̂)")
     halt.locator("button").click()
     expect(detail).to_contain_text("Why it stopped")
     expect(detail).to_contain_text("The bar it fell under was the floor, the least any look must promise: ε × v0 ÷ t̂, where v0 is "
