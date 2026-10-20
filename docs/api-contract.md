@@ -293,6 +293,15 @@ false alarms on the clean dev split by the same standard; none of the five candi
 (`results/dev/onnx_v2a_profile_sweep.json`). Any level (`min_view` 0) and absorption on each lost recall on CODEBRIM
 (x0.79, CI 0.70-0.88; x0.89, 0.82-0.95), and 0.15 found x1.02 (0.95-1.10) with 2.2 times the boxes.
 
+`onnx:drishyam_dacl10k_v2b.onnx`, the retrained v2b model (an EfficientNet-B2 UNet, sha256 `47e4b687...`), keeps
+v1's values too, under the same rule, also written down before its sweep (`results/dev/onnx_v2b_profile_sweep.json`).
+No candidate found more than v1's values on synth_dev (each x1.00, CI 0.97-1.03 or narrower), so none could pass.
+On CODEBRIM dev100 any level lost recall (x0.66, CI 0.56-0.77), as did absorption on (x0.84, 0.75-0.91), and 0.15
+found x0.98 (0.90-1.06) with 2.4 times the boxes. Any level, 0.15 and 0.25 put a box on fewer clean photos (5 of
+30 against 13, difference CI -0.43 to -0.10), which the rule reports but does not count. Any level and 0.15 also ran
+into the 20 s time cap on 66 to 80 of the 100 CODEBRIM jobs, because v2b's cost table was timed at a higher machine
+load than v2a's; on synth_dev, which settled the decision, no job went past 13.3 s.
+
 Three `JobConfig` knobs from the tuning dev sweep (`results/dev/tune_sweep.json`) are off by default: measured, not
 adopted. `tau_scout`, when set, is the entropy threshold of a look at L2 or coarser; `tau` (0.5) stays that of every
 finer look, and an `entropy>tau` rationale names the threshold that applied (`"entropy 0.74 > 0.7 at L2"`). Unset
