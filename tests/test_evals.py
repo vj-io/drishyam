@@ -672,6 +672,30 @@ def test_heldout_reads_each_pair_in_both_directions_by_the_dev_criterion():
     assert other["v2a"] == ["codebrim@0.3 modelled ms per job x1.111 (CI 1.05-1.25) against v1"]
 
 
+def test_heldout_docs_quote_the_json():
+    """docs/report.md holds the held-out tables and verdict as evals.heldout renders them from
+    results/heldout_models.json, and the numbers its prose and README.md quote are the JSON's."""
+    from evals import heldout
+
+    out = json.loads((heldout.REPO / "results" / "heldout_models.json").read_text())
+    report, readme = ((heldout.REPO / f).read_text() for f in ("docs/report.md", "README.md"))
+    assert all(t in report for t in heldout.markdown(out).split("\n\n")) and out["dev_choice"]["statement"] in report
+    assert out["dev_choice"]["confirms"] is True and "Held-out confirms the dev choice" in readme
+    t, p, ci = out["table"], out["pairs"], lambda c: f"{c[0]:.2f}–{c[1]:.2f}"
+    v1, cl = t["codebrim@0.3"]["v1"], t["codebrim@0.3"]["classical-v1"]
+    r, s = p["codebrim@0.3: v1 / classical-v1"]["recall"], (lambda m: p[f"synth@0.3: v1 / {m}"]["recall"])
+    crit = [t["codebrim@0.3"][m]["critical_per_image"] for m in ("v1", "v2a", "v2b")]
+    clean = {m: round(t["clean@0.3"][m]["images_with_any"] * 51) for m in ("v1", "v2a", "v2b")}
+    leak = out["leakage"]
+    assert f"{r[0]:.2f}× its recall on CODEBRIM ({v1['recall']:.3f} against {cl['recall']:.3f}, 95 % CI {ci(r[1])}" in report
+    assert f"{r[0]:.2f}× ({ci(r[1])}" in readme and f"{v1['recall']:.2f} of the 200 CODEBRIM photos' defects (95 % CI {ci(v1['recall_ci'])})" in readme
+    assert f"({s('v2a')[0]:.2f}×, {ci(s('v2a')[1])}; {s('v2b')[0]:.2f}×, {ci(s('v2b')[1])})" in report
+    assert f"v1 is {s('v2a')[0]:.2f}× and {s('v2b')[0]:.2f}× them" in readme
+    assert all(f"({crit[0]:.2f} against {crit[1]:.2f} and {crit[2]:.2f}" in d for d in (report, readme))
+    assert clean == {"v1": 0, "v2a": 9, "v2b": 9} and "a box on 9 of the 51 clean photos" in report
+    assert leak["candidates"] == 0 and f"0 candidates of {leak['eval_images']} against {leak['train_images']:,}" in readme
+
+
 # ---------------------------------------------------------------- parity
 def test_parity_compare_saved_files(tmp_path):
     a = np.zeros((2, 8, 8), np.uint8)
