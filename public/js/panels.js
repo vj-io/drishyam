@@ -145,6 +145,8 @@ const CLAUSES = [
   [/^iou ([\d.e+-]+) < [\d.]+ between L(\d) and L(\d)$/, (m) => `the ${scale(m[2])} and ${scale(m[3])} looks disagree (${pct(m[1])} overlap), so it takes one more, finer look`],
   [/^new (\w+) mask at L(\d)$/, (m) => `a new ${words(m[1])} at ${scale(m[2])}`],
   [/^confirming at L(\d)$/, (m) => `so it double-checks at ${scale(m[1])}`],
+  [/^new (\w+) mask not verified: L(\d) is the finest level for \S+ \(min_view ([\d.]+)\), no finer look$/, (m) => `a new ${words(m[1])}, `
+    + `not double-checked: ${size(+m[2])} is the finest this engine looks (every look spans at least ${pct(m[3])} of the photo’s long side), so there is no finer look to confirm it`],
   [/^p95\(segment\) (\d+) ms > SLA (\d+) ms$/, (m) => `the segmenter got slow (${m[1]} ms, limit ${m[2]} ms)`],
   [/^model -> (\w+)$/, (m) => `so it switches to the ${m[1]} model`],
   [/^one level coarser/, () => 'so it looks one level coarser'],

@@ -1,4 +1,4 @@
-// The only module that talks to the network. ?mock=1 swaps the server for fixtures/job.ndjson.
+// The only module that talks to the network. ?mock=1 swaps the server for fixtures/job.ndjson; a `trace` replays a saved job.
 export const MOCK = new URLSearchParams(location.search).get('mock') === '1';
 
 const abortError = () => new DOMException('Aborted', 'AbortError');
@@ -57,9 +57,10 @@ const BUSY = 'The demo is busy: no server is free right now. Wait a few seconds 
 const JOB_LIMIT = 'Too many jobs from this address: 10 starts per 2 minutes. Wait a minute and retry.';
 const throttled = (body, perIp) => (String(body?.error).startsWith('rate limited') ? perIp : BUSY);
 
-/** Async generator of job events. `replay` is a list of [action, x, y, level] to resume from; `params` may carry pace_ms. */
-export async function* streamJob({ blob, params, replay, signal }) {
-  if (MOCK) return yield* mockStream(replay?.length ?? 0, signal);
+/** Async generator of job events. `replay` is a list of [action, x, y, level] to resume from; `params` may carry pace_ms;
+    `trace` (a same-origin .ndjson path) replays that recorded job instead of asking the server. */
+export async function* streamJob({ blob, params, replay, signal, trace }) {
+  if (MOCK || trace) return yield* mockStream(trace ?? 'fixtures/job.ndjson', replay?.length ?? 0, signal);
   const headers = { 'Content-Type': blob.type || 'image/jpeg' };
   if (replay?.length) headers['X-Drishyam-Replay'] = b64url(JSON.stringify(replay.slice(0, 200)));
   const res = await post(`/api/jobs?${new URLSearchParams(params)}`, blob, headers, { signal });
@@ -98,9 +99,9 @@ export async function postKill(job, killToken) {
 let mockOrder = null;
 let mockTokens = 1;
 
-async function* mockStream(replayCount, signal) {
-  const res = await fetch('fixtures/job.ndjson', { signal });
-  if (!res.ok) throw new Error('fixtures/job.ndjson not found');
+async function* mockStream(url, replayCount, signal) {
+  const res = await fetch(url, { signal });
+  if (!res.ok) throw new Error(`${url} not found`);
   for (const line of (await res.text()).split('\n')) {
     if (!line.trim()) continue;
     let ev = JSON.parse(line);

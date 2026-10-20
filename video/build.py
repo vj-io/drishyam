@@ -776,11 +776,12 @@ def make_standin():
 def check_template(narration_lines):
     """Every pending piece switched on at its full length: the trained-segmenter line on a stand-in summary (the classical
     CODEBRIM numbers relabelled as an ONNX run), and the real-photo chapter on each stand-in trace (or the owner's
-    video/live/real.*). The line must switch on and pass every check, the film must fit the 5-minute cap with the
+    video/live/real.* and video/live/variants/*/real.*). The line must switch on and pass every check, the film must fit the 5-minute cap with the
     longest of them, and a summary charged another machine's costs must be refused."""
     tmp = WORK / "template-check"
     fake = standin_summary(tmp / "summary.json")
-    reals = [VIDEO / "live"] if (VIDEO / "live/real.json").exists() else [STANDIN, *sorted((STANDIN / "variants").glob("*"))]
+    reals = ([VIDEO / "live", *sorted((VIDEO / "live/variants").glob("*"))] if (VIDEO / "live/real.json").exists()
+             else [STANDIN, *sorted((STANDIN / "variants").glob("*"))])
     worst = None
     for base in reals:
         D = data(tmp / "summary.json", real=base)

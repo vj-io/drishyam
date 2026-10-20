@@ -85,7 +85,7 @@ def main(argv=None) -> None:
             for r in build_slice(out / "slice")]
     samples = harness.REPO / "public" / "samples"
     recs += [("sample", r["file"][:-4], samples / r["file"], r["boxes"])
-             for r in json.loads((samples / "index.json").read_text())]
+             for r in json.loads((samples / "index.json").read_text()) if r["synthetic"]]  # the real photos have no ground truth
     if a.codebrim:
         cb = Path(a.codebrim)
         recs += [("codebrim", Path(r["path"]).stem, Path(r["path"]), r["boxes"])

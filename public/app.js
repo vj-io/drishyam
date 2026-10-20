@@ -11,13 +11,14 @@ import { initResults } from './js/results.js';
 const PACE = 3500;  // ms each decision stays on screen, with what its look found: the camera moves every few seconds
 const HOLD = 5000;  // the decision that finds the first critical damage stays this long: the hand-off to a person
 const GUIDE = 'bridge_03.jpg';  // exposed rebar: the default run ends with critical findings for a human
+const GUIDE_REAL = 'real_02.jpg';  // our own wall photo the v1 engine took a look at: its guided run replays the recorded job
 const GUIDE_PACE_MS = 1000;  // asks the server to wait this long between looks (pace_ms); its timings exclude the wait
 const KILL_WAIT_S = 8;  // a KILL pressed before the server's first record waits this long for it, then cancels the upload
 const NOTE = 'Press Run and the agent’s reasoning appears here, one decision at a time, in plain words.';
 
 const el = {
   pill: $('#job-pill'), text: $('#job-text'), count: $('#job-steps'), kill: $('#kill'), resume: $('#resume'), sound: $('#sound'),
-  look: $('#look'), runBar: $('#run-bar'), skip: $('#skip'), guided: $('#guided'), recorded: $('#recorded'),
+  look: $('#look'), runBar: $('#run-bar'), skip: $('#skip'), guided: $('#guided'), guidedReal: $('#guided-real'), recorded: $('#recorded'),
   file: $('#file'), drop: $('#drop'), prep: $('#prep'), gallery: $('#gallery'), galleryEmpty: $('#gallery-empty'),
   slider: $('#replay'), sliderOut: $('#replay-out'), play: $('#play'), heat: $('#heat'), tiles: $('#tiles'), tilesNote: $('#tiles-note'),
   detail: $('#step-detail'), done: $('#done'), recap: $('#recap'), narrator: $('#narrator'), narratorSub: $('#narrator-sub'),
@@ -109,7 +110,7 @@ function setMode(mode, text) {
   el.resume.hidden = !(['killed', 'stopped'].includes(mode) || (mode === 'error' && S.steps.length > 0)
     || (mode === 'done' && S.done?.cause === 'kill-switch' && S.done.summary?.steps > 0));  // a halt before any look has nothing to resume
   el.look.disabled = el.runBar.disabled = running || !S.image;
-  el.guided.disabled = running;
+  el.guided.disabled = el.guidedReal.disabled = running;
   if (!running) el.count.textContent = '';
   if (['error', 'killed'].includes(mode) && !S.events.length) narrate(el.text.textContent);  // nothing arrived: the NOTE still says "Sending"
   if (onBar && !running) (el.resume.hidden ? el.look : el.resume).focus({ preventScroll: true });
@@ -121,6 +122,12 @@ function narrate(text, sub = '') {
   el.narrator.textContent = text;
   el.narratorSub.textContent = sub;
 }
+
+// A saved job replayed (?mock=1, or a real photo's recorded trace): no server, and the page says so.
+const recorded = () => MOCK || Boolean(S.opts.trace);
+// Seconds from a fixed cost table (a recorded trace says so in its job record) are modelled, not measured.
+const modelled = () => S.job?.cost_model?.kind === 'fixed';
+const agentTime = () => (modelled() ? 'modelled agent time' : 'agent time');
 
 // The server's pause between looks: as the job record echoes it, else as this page asked for it (pace_ms).
 const paceMs = () => S.job?.pace_ms ?? S.opts.pace ?? 0;
@@ -280,7 +287,8 @@ function handle(ev) {
       showCam(0);
       narrate(photoText());
       if (!S.arrived) {
-        el.text.textContent = S.opts.killHint ? `${MOCK ? 'Recorded run' : 'Live'}: each look is shown the moment it arrives. Press KILL in this bar while it is looking.`
+        el.text.textContent = S.opts.killHint ? `${recorded() ? 'Recorded run' : 'Live'}: each look is shown the moment it arrives. Press KILL in this bar while it is looking.`
+          : S.opts.trace ? `Recorded run of the v1 engine on our own photo, replayed from its saved trace (no server), at reading speed${ev.cost_model?.kind === 'fixed' ? '; its seconds and $ are modelled, not measured' : ''}.`
           : MOCK ? 'Recorded run: replaying a saved job from fixtures (no server), at reading speed.'
             : paceMs() > 0 ? `Paced for viewing: the agent waits ${paceMs() / 1000} s between looks; timings exclude the wait.`
               : 'Running live on the server; each decision is shown at reading speed.';
@@ -432,7 +440,7 @@ function arrive(ev) {
     if (Q.timer || Q.items.length) {
       S.slow = true;
       const n = S.events.filter((e) => e.type === 'step').length;
-      el.text.textContent = `Replay: ${MOCK ? 'the recorded agent' : 'the agent'} took ${ev.summary.seconds} s for its ${n} decisions`  // a phone shows only the start
+      el.text.textContent = `Replay: ${recorded() ? 'the recorded agent' : 'the agent'} took ${ev.summary.seconds} s${modelled() ? ' (modelled)' : ''} for its ${n} decisions`  // a phone shows only the start
         + `${paced()}; we are showing it slowly so you can read it${serverTotal(ev.summary.seconds)}. Skip to end shows the result now.`;
     }
   }
@@ -475,7 +483,7 @@ function buildDone() {
   const orderState = h('span', { class: 'note' });
   const specs = [
     ['looks', sm.steps, {}], ['of the pixels', sm.pixels_frac * 100, { decimals: 1, suffix: ' %' }],
-    ['$ modelled', sm.usd, { decimals: 6, prefix: '$' }], ['seconds of agent time', sm.seconds, { decimals: 1 }],
+    ['$ modelled', sm.usd, { decimals: 6, prefix: '$' }], [`seconds of ${agentTime()}`, sm.seconds, { decimals: 1 }],
     ['findings', sm.findings, {}], ['critical, waiting for you', sm.critical_pending, {}],
   ].map(([label, value, opts]) => ({ value, opts, pair: tile(label) }));
   const cover = h('div', { class: 'meter__fill' });
@@ -548,16 +556,27 @@ function recap() {
   const halt = S.steps.find((s) => s.decision?.action === 'halt');
   const stopped = !halt ? '' : halt.cause !== 'kill-switch' ? ' and the decision to stop'
     : looks ? ' and the stop KILL asked for' : ' and the stop the kill switch made';
+  // a real photo of ours has no ground truth: say what the agent flagged, beside what we see by eye, and score nothing
+  const samples = $$('.thumb', el.gallery).map((b) => b.sample);
+  const real = S.opts.trace ? samples.find((x) => x.file === S.sample && x.synthetic === false) : null;
+  const flagged = S.order.findings.map((f) => `${words(f.cls)} (${f.critical ? 'critical' : 'a draft'})`);
+  const other = real && samples.find((x) => x.synthetic === false && x.trace && x.file !== real.file);
+  const otherBtn = other && h('button', { class: 'btn btn--amber btn--sm', type: 'button' }, 'Our other wall photo');
+  otherBtn?.addEventListener('click', () => guidedReal(other.file));
   el.recap.replaceChildren(
     h('h4', { class: 'recap__t' }, 'What you just saw'),
     h('ul', { class: 'recap__list' },
+      real ? h('li', { class: 'recap__real' }, h('b', {}, 'REAL PHOTO (ours)'), ', no ground truth, so nothing here is scored. '
+        + `On the v1 engine’s recorded run (the dacl10k-trained segmenter) the agent flagged ${flagged.length ? flagged.join(', ') : 'nothing'}${S.overview?.candidates?.length ? '' : ': it saw no region worth a closer look'}. `
+        + `${real.note} Anything we see by eye that it did not flag, it missed.`) : null,
       h('li', {}, h('b', {}, String(S.steps.length)), ` decision${S.steps.length === 1 ? '' : 's'} (${looks ? looks : 'no'} look${looks === 1 ? '' : 's'}${stopped}), `
         + `${S.steps.length === 1 ? 'with its' : 'every one with a'} recorded cause: ${why.join(', ')}.`),
       h('li', {}, h('b', {}, String(crit)), ` critical finding${crit === 1 ? ' was' : 's were'} sent to a person: the agent is not allowed to approve ${crit === 1 ? 'it' : 'them'}.`),
       h('li', {}, h('b', {}, `${Math.round(S.done.coverage * 100)} %`), ' of the salient area was seen at some level (the first survey look counts).'),
-      h('li', {}, h('b', {}, `$${sm.usd.toFixed(6)}`), ` modelled for ${sm.seconds} s of agent time (wall time × $0.339/h, not billed).`)),
+      h('li', {}, h('b', {}, `$${sm.usd.toFixed(6)}`), ` modelled for ${sm.seconds} s of ${agentTime()} (${modelled() ? 'seconds from a fixed cost table' : 'wall time'} × $0.339/h, not billed).`)),
     h('div', { class: 'recap__next' },
       pendingCount() ? h('p', {}, sign, ' takes you to the first card that needs a person: type your name, then Approve or Reject.') : null,
+      otherBtn ? h('p', {}, otherBtn, ' replays the v1 engine’s recorded run on it, also with no ground truth.') : null,
       h('p', {}, breakIt, ' reruns it with a planner that sends a shell command and a segmenter slowed on purpose.'),
       h('p', {}, tryKill, ' starts a run shown live, whose planner stalls 2 s at step 3, so you can halt it with KILL in the bar above.')));
   el.recap.hidden = false;
@@ -573,8 +592,8 @@ function finish(ev) {
   setMode('done', S.note ?? (ev.cause === 'kill-switch'
     ? (sm.steps ? `Halted by KILL at step ${sm.steps}: the trace shows kill-switch and the state is kept. Resume carries on.`
       : 'Halted before its first look: the kill switch was already set, so there is no look to resume. Run starts it again.')
-    : S.slow && !Q.skip ? `The agent took ${sm.seconds} s${paced()}; we replayed it slowly so you can read it${serverTotal(sm.seconds)}.`
-      : `Done in ${sm.seconds} s of agent time: ${sm.steps} looks, ${(sm.pixels_frac * 100).toFixed(1)} % of the pixels${serverTotal(sm.seconds)}.`));
+    : S.slow && !Q.skip ? `The agent took ${sm.seconds} s${modelled() ? ' (modelled)' : ''}${paced()}; we replayed it slowly so you can read it${serverTotal(sm.seconds)}.`
+      : `Done in ${sm.seconds} s of ${agentTime()}: ${sm.steps} looks, ${(sm.pixels_frac * 100).toFixed(1)} % of the pixels${serverTotal(sm.seconds)}.`));
   narrate(n ? `${n} critical finding${n === 1 ? ' needs' : 's need'} you. Sign ${n === 1 ? 'it' : 'them'} off in step 4: the agent cannot.`
     : 'Nothing critical was found, so nothing needs your sign-off.',
   `It stopped because ${stopWords(ev.cause, sm.steps)}${S.steps.length ? `: step ${S.steps.at(-1).step} says why` : ''}.`);
@@ -622,11 +641,11 @@ async function run(opts = {}) {
   clearTimeout(Q.timer);
   Object.assign(Q, { items: [], timer: 0, skip: Boolean(opts.killHint) });  // a KILL drill is shown live: never behind the job it asks to stop
   const active = document.activeElement;  // all hidden or disabled while running
-  const refocus = [el.look, el.runBar, el.resume, el.guided].includes(active) || el.recap.contains(active);
+  const refocus = [el.look, el.runBar, el.resume, el.guided, el.guidedReal].includes(active) || el.recap.contains(active);
   if (!opts.replay) clearJob();  // the last run goes at once: the page answers the click before the server does
-  setMode('running', MOCK ? 'Recorded run: replaying a saved job (no server).'
+  setMode('running', recorded() ? 'Recorded run: replaying a saved job (no server).'
     : opts.replay ? 'Resuming: re-sending the photo and replaying the moves so far…' : undefined);
-  narrate(MOCK ? 'Loading the recorded job…' : `Sending the photo (${(S.image.blob.size / 1e6).toFixed(1)} MB). On the server it is decoded, `
+  narrate(recorded() ? 'Loading the recorded job…' : `Sending the photo (${(S.image.blob.size / 1e6).toFixed(1)} MB). On the server it is decoded, `
     + 'and faces and people are blurred, before the agent’s first look.');
   if (refocus) el.skip.focus({ preventScroll: true });  // the safe next key press: show the result now
   scrollToViewer();
@@ -640,7 +659,7 @@ async function run(opts = {}) {
     }
   }, 100);
   try {
-    for await (const ev of streamJob({ blob: S.image.blob, params: params(opts), replay: opts.replay, signal: S.ctl.signal })) arrive(ev);
+    for await (const ev of streamJob({ blob: S.image.blob, params: params(opts), replay: opts.replay, trace: opts.trace, signal: S.ctl.signal })) arrive(ev);
     arrive({ type: 'end' });
   } catch (err) {
     if (err.name === 'AbortError') return;
@@ -687,7 +706,7 @@ function kill() {
     S.note = `The job had already finished on the server (the agent took ${S.arrived.summary.seconds} s) before KILL could reach it; here is its result.`;
     return skip();
   }
-  if (!S.events.length && !MOCK) {  // the job id and kill token come with the server's first record (a Resume's too)
+  if (!S.events.length && !recorded()) {  // the job id and kill token come with the server's first record (a Resume's too)
     if (S.killPending) return;
     S.killPending = true;
     el.text.textContent = 'KILL pressed before the server answered: the page has no job id yet, so KILL is sent the moment it arrives.';
@@ -701,7 +720,7 @@ function kill() {
     }, KILL_WAIT_S * 1000);
     return;
   }
-  if (MOCK) return stop(S.events.length ? '' : ' (the recording had not started)');  // no server to tell
+  if (recorded()) return stop(S.events.length ? '' : ' (the recording had not started)');  // no server to tell
   sendKill(S.job);
 }
 
@@ -709,7 +728,7 @@ function resume() {
   const moves = S.steps.filter((s) => ['gaze', 'escalate', 'verify'].includes(s.decision?.action) && pointOf(s))
     .map((s) => [s.decision.action, s.decision.args.x, s.decision.args.y, s.decision.args.level, s.decision.args.size]
       .filter((v) => v !== undefined));
-  run({ pace: S.opts.pace, chaos: S.opts.chaos, replay: moves.slice(0, 200) });
+  run({ pace: S.opts.pace, chaos: S.opts.chaos, trace: S.opts.trace, replay: moves.slice(0, 200) });
 }
 
 async function guided() {
@@ -718,6 +737,18 @@ async function guided() {
   const btn = !MOCK && $(`.thumb[data-file="${GUIDE}"]`, el.gallery);
   if (btn && S.sample !== GUIDE) await choose(btn);
   run({ pace: GUIDE_PACE_MS, guided: true });
+}
+
+/** The guided run on one of our own wall photos: the v1 engine's recorded job on it is replayed (no server), so the page
+    shows exactly the run the docs report. */
+async function guidedReal(file = GUIDE_REAL) {
+  if (S.mode === 'running') return;
+  await S.ready;
+  const btn = $(`.thumb[data-file="${file}"]`, el.gallery);
+  if (!btn?.sample.trace) return;
+  if (S.sample !== file) await choose(btn);
+  if (S.sample !== file) return;  // the photo did not load: never replay a job over another photo
+  run({ trace: `samples/${btn.sample.trace}`, guided: true });
 }
 
 // ---- image picking -----------------------------------------------------------------------------------
@@ -773,17 +804,20 @@ async function loadSamples() {
   el.galleryEmpty.hidden = items.length > 0;
   const btns = items.map((s) => {
     const thumb = /^\w[\w./-]*$/.test(s.thumb ?? '') && !s.thumb.includes('..') ? s.thumb : s.file;
-    const btn = h('button', { class: 'thumb', type: 'button', 'aria-pressed': 'false', 'data-file': s.file },
+    const real = s.synthetic === false;
+    if (!/^[\w.-]+\.ndjson$/.test(s.trace ?? '')) delete s.trace;
+    const btn = h('button', { class: real ? 'thumb thumb--real' : 'thumb', type: 'button', 'aria-pressed': 'false', 'data-file': s.file },
       h('img', { src: `samples/${thumb}`, alt: '', loading: 'lazy', width: 96, height: 72 }),
       h('span', { class: 'thumb__t' }, String(s.title ?? s.file)),
       s.note ? h('span', { class: 'thumb__n' }, String(s.note)) : null,
-      s.synthetic ? h('span', { class: 'tag' }, 'synthetic') : null);
+      s.synthetic ? h('span', { class: 'tag' }, 'synthetic') : real ? h('span', { class: 'tag tag--real' }, 'real photo') : null);
     btn.sample = s;
     btn.addEventListener('click', () => choose(btn));
     return btn;
   });
   el.gallery.replaceChildren(...btns.map((b) => h('li', {}, b)));
   if (!items.length) el.say1.textContent = 'Drop your own JPEG or PNG to start.';
+  el.guidedReal.hidden = !btns.some((b) => b.dataset.file === GUIDE_REAL && b.sample.trace);
   return btns.find((b) => b.dataset.file === GUIDE) ?? btns[0];
 }
 
@@ -791,6 +825,7 @@ async function loadSamples() {
 el.look.addEventListener('click', () => run());
 el.runBar.addEventListener('click', () => run());
 el.guided.addEventListener('click', guided);
+el.guidedReal.addEventListener('click', () => guidedReal());
 el.skip.addEventListener('click', skip);
 el.kill.addEventListener('click', kill);
 el.resume.addEventListener('click', resume);

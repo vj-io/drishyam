@@ -72,6 +72,7 @@
       <p class="gloss">It works like a PTZ camera (pan-tilt-zoom), done in software: it pans and zooms across one big photo instead of moving a real camera.</p>
       <div class="cta">
         <button class="btn btn--amber btn--xl" id="guided" type="button"><span>Watch it inspect a bridge <span class="cta__time">(under 40 s)</span></span></button>
+        <button class="btn btn--amber btn--xl" id="guided-real" type="button" hidden><span>Watch it on a real wall <span class="cta__time">(our own photo, recorded)</span></span></button>
         <a class="btn" id="own" href="#step-photo">Try your own photo</a>
         <a class="cta__link" id="video-link" href="#video" hidden>Watch the video</a>
       </div>
@@ -615,7 +616,7 @@
   <dl class="faq">
     <div class="faq__item">
       <dt>Is this live or recorded?</dt>
-      <dd>Live. The photo goes to the API and every look is computed on the spot with stock OpenCV 5. The page then shows the decisions at reading speed; the agent itself is much faster. The status bar shows the agent&rsquo;s own time; the upload, decode and privacy blur on the server come on top of it. <a href="?mock=1#demo">Watch a recorded run</a> replays a saved job instead, and is labelled recorded.</dd>
+      <dd>Live. The photo goes to the API and every look is computed on the spot with stock OpenCV 5. The page then shows the decisions at reading speed; the agent itself is much faster. The status bar shows the agent&rsquo;s own time; the upload, decode and privacy blur on the server come on top of it. <a href="?mock=1#demo">Watch a recorded run</a> replays a saved job instead, and is labelled recorded. So does <b>Watch it on a real wall</b>: it replays the v1 engine&rsquo;s saved run on our own photo, so you see exactly the run the docs report; pick that photo and press Run to run it live on the server&rsquo;s own engine (named at the foot of the page), whose result can differ.</dd>
     </div>
     <div class="faq__item">
       <dt>What is OpenCV doing here?</dt>
@@ -631,7 +632,7 @@
     </div>
     <div class="faq__item">
       <dt>What are the limits?</dt>
-      <dd>It measures image pixels, not millimetres, because a photo has no scale reference. It is AI-assisted, not an inspection. The sample photos are synthetic; on real CODEBRIM photos the classical segmenter limits recall for every approach (FIG. 4.2). Uploads are capped at 4.4 MB, and bigger photos are shrunk in your browser first.</dd>
+      <dd>It measures image pixels, not millimetres, because a photo has no scale reference. It is AI-assisted, not an inspection. The bridge samples are synthetic. The two marked REAL PHOTO (ours) are our own photos of a painted plaster wall with no ground truth: on them the page shows what the agent flagged and scores nothing. On real CODEBRIM photos the classical segmenter limits recall for every approach (FIG. 4.2). Uploads are capped at 4.4 MB, and bigger photos are shrunk in your browser first.</dd>
     </div>
   </dl>
 </section>
@@ -658,7 +659,7 @@
       </nav>
       <p class="note" id="api-status" role="status">Checking the API&hellip;</p>
       <p class="note" id="api-build" hidden></p>
-      <p class="note">Pixels, not millimetres. AI-assisted, not an inspection. Synthetic samples are labelled synthetic.</p>
+      <p class="note">Pixels, not millimetres. AI-assisted, not an inspection. Synthetic samples are labelled synthetic; our own photos are labelled REAL PHOTO (ours).</p>
     </div>
   </div>
 </footer>
