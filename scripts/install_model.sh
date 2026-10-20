@@ -165,7 +165,8 @@ if not rp.exists() and pp.exists():
 if sessions:
     last = sessions[-1]  # the session that exported the weights
     v = ", ".join(f"{k} {val}" for k, val in last["versions"].items() if val)
-    src = f"git `{last['git_sha']}`" if last.get("git_sha") else "no git checkout (Kaggle)"
+    host = "Colab" if last["flags"].get("out", "").startswith("/content/") else "Kaggle"  # Colab writes to its Drive mount
+    src = f"git `{last['git_sha']}`" if last.get("git_sha") else f"no git checkout ({host})"
     run = (f"Trained with Python {last['python']}, {v} ({len(sessions)} session(s); every one is in "
            f"`{name}.run_info.json`). Source: {src}; notebook sources sha256 `{last['source_sha256']}` "
            "(`training/make_notebook.py`'s `source_sha256()` at the commit the notebook was built from).")
