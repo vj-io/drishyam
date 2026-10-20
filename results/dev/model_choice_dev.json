@@ -3,7 +3,7 @@
  "criterion": "Recall at the 30 % cap (JobConfig's default) on CODEBRIM dev100 (real photos) and on synth_dev. Model A is better than model B on a split when the paired 95 % bootstrap CI of A's recall ratio to B (images resampled together, evals.harness.boot_ci) lies wholly above 1, worse when it lies wholly below 1; a CI that touches or crosses 1 is no measurable difference. On the clean dev split at the 30 % cap A harms against B when the paired CI of A's boxes-per-photo difference to B, or of its difference in the share of photos with any box, lies wholly above 0, by the same standard. A model is best on dev when, against each of the other three, it is better on at least one recall split, worse on neither and has no clean harm. If no model qualifies, none is best on dev by this standard, and the pairs say where each wins and loses. Modelled ms per job, the 1.0 cap, IoU-only recall, critical boxes and the ratios to L0 tiling and the downscale are reported, not part of the criterion; ms from cost tables timed at different machine loads are not comparable between models (each table's load is listed).",
  "cost_tables": "Each model is charged its own table, timed on this Mac (x86, 1 cv2 thread per worker): v2b results/local-macos-x86-dacl10k_v2b/micro.json (2026-10-19T19:28Z, 1-min load 10.64 at start, 14.52 at end), v2a results/local-macos-x86-dacl10k_v2a/micro.json (2026-10-19T16:27Z, 1-min load 7.93 at start, 7.81 at end), v1 results/local-macos-x86-dacl10k-retime/micro.json (2026-10-19T16:31Z, 1-min load 8.0 at start, 7.39 at end), the classical engine results/local-macos-x86/micro.json (2026-10-17T20:19Z, 1-min load 23.82 at start, none recorded at end). One look at 4000x3000 (warp, quality and segment:accurate, p50) costs 1326.8 ms on v2b's table, 526.5 on v2a's, 568.1 on v1's and 108.0 on the classical engine's. v2a re-timed in v2b's window (runs/v2a/micro/local-macos-x86-dacl10k_v2a/micro.json, load 14.08 to 11.22) costs 1304.5: per look v2b costs 0.87 to 1.04 times v2a in one window across the three timed sizes, against 2.10 to 2.52 between their own tables, so the ms gap between v2b and v2a below is the machine load at timing, not the model. v1 and v2a were timed in one window (0.97 to 1.10 per look). The classical table's high load overstates its ms, so the ONNX models' ratios to it understate their extra cost at equal load.",
  "best_on_dev": "No model is best on dev by the criterion. At the 30 % cap the three ONNX models find the same share on CODEBRIM dev100 (v2b 0.480, v2a 0.480, v1 0.479; v2b/v1 x1.00, CI 0.93-1.09, v2a/v1 x1.00, CI 0.93-1.09, v2b/v2a x1.00, CI 0.94-1.06) and no pair of them differs measurably on synth_dev (v2b 0.565, v2a 0.630, v1 0.615; v2b/v2a x0.90, CI 0.80-1.01, v2b/v1 x0.92, CI 0.83-1.02, v2a/v1 x1.02, CI 0.94-1.10). Each finds about three times what the classical engine finds on CODEBRIM (0.153; v2b x3.14, CI 2.42-4.24, v2a x3.14, CI 2.38-4.22, v1 x3.13, CI 2.37-4.31); on synth_dev v2a and v1 find more than the classical engine (x1.25, CI 1.08-1.45; x1.22, CI 1.08-1.38) and v2b no measurable amount more (x1.12, CI 0.95-1.32). What separates the ONNX models is false alarms on the clean photos: v1 put 0.033 boxes on a clean photo (a box on 1 of 30), v2a 0.700 (5 of 30), v2b 1.267 (13 of 30), the classical engine 12.133 (21 of 30). v2a put more boxes on them than v1 (+0.67 boxes per photo, CI +0.07 to +1.47), v2b more than v1 (+1.23 boxes per photo, CI +0.57 to +2.07; +0.40 in the share of photos with a box, CI +0.20 to +0.60) and a box on more photos than v2a (+0.27 in the share, CI +0.10 to +0.47). v1 is the only model with no measurable loss against any other (where_each_loses): no worse than v2a and v2b on recall, not better either, and fewer clean false alarms.",
- "recommendation": "On the dev splits only: run the dacl10k v1 model (onnx:drishyam_dacl10k.onnx, at its profile) as the live engine's segmenter in place of the classical engine, and do not switch to v2a or v2b. Against the classical engine v1 finds 3.13 times (CI 2.37-4.31) its CODEBRIM recall and 1.22 times (CI 1.08-1.38) its synth_dev recall, with 12.1 fewer boxes per clean photo (-12.10 boxes per photo, CI -18.90 to -6.60), at 2.00 times the modelled ms per CODEBRIM job (CI 1.89-2.11; 3368 ms against 1686, each on its own table). The retrained models find no more and add clean false alarms; v2b also has lower IoU-only recall than v1 on synth_dev (x0.89, CI 0.80-0.98). v1's one measurable cost against them is the human gate: it sends 7.24 critical boxes per CODEBRIM photo to review, against v2a's 4.22 and v2b's 3.94 (v2a/v1 x0.58, CI 0.45-0.80; v2b/v1 x0.54, CI 0.41-0.75). None of this was measured on a held-out set or on the Lambda's arm64 CPU; every ms here comes from this Mac's x86 tables.",
+ "recommendation": "On the dev splits only: run the dacl10k v1 model (onnx:drishyam_dacl10k.onnx, at its profile) as the live engine's segmenter in place of the classical engine, and do not switch to v2a or v2b. Against the classical engine v1 finds 3.13 times (CI 2.37-4.31) its CODEBRIM recall and 1.22 times (CI 1.08-1.38) its synth_dev recall, with 12.1 fewer boxes per clean photo (-12.10 boxes per photo, CI -18.90 to -6.60), at 2.00 times the modelled ms per CODEBRIM job (CI 1.89-2.11; 3368 ms against 1686, each on its own table). The retrained models find no more and add clean false alarms; v2b also has lower IoU-only recall than v1 on synth_dev (x0.89, CI 0.80-0.98). v1's measurable costs against them: the human gate, as it sends 7.24 critical boxes per CODEBRIM photo to review, against v2a's 4.22 and v2b's 3.94 (v2a/v1 x0.58, CI 0.45-0.80; v2b/v1 x0.54, CI 0.41-0.75); and against v2a, whose table was timed in the same window, 1.05 times (CI 1.03-1.08) its modelled ms per CODEBRIM job, though 0.96 times (CI 0.94-0.98) on synth_dev. None of this was measured on a held-out set or on the Lambda's arm64 CPU; every ms here comes from this Mac's x86 tables.",
  "models": {
   "v2b": {
    "segmenter": "onnx:drishyam_dacl10k_v2b.onnx drishyam_dacl10k_v2b.onnx@47e4b687d179 drishyam_dacl10k_v2b.fp16.onnx@3f8b8648ccfd",
@@ -4067,6 +4067,344 @@
     }
    }
   },
+  "grid_synth_dev": {
+   "file": "runs/v2a/grid_synth_dev.json",
+   "segmenter": "onnx:drishyam_dacl10k_v2a.onnx drishyam_dacl10k_v2a.onnx@95b503c2d205 drishyam_dacl10k_v2a.fp16.onnx@0f5fa16e9a65",
+   "micro_arm": "local-macos-x86-dacl10k_v2a",
+   "variants": {
+    "ref": {
+     "min_view": 0.3,
+     "absorb": false
+    },
+    "mv0": {
+     "min_view": 0.0,
+     "absorb": false
+    },
+    "mv15": {
+     "min_view": 0.15,
+     "absorb": false
+    },
+    "mv25": {
+     "min_view": 0.25,
+     "absorb": false
+    },
+    "mv30_abs": {
+     "min_view": 0.3,
+     "absorb": true
+    },
+    "old": {
+     "min_view": 0.0,
+     "absorb": true
+    }
+   },
+   "code": "8dad39ea40faf710384b07a021175a4c039fc726",
+   "code_end": null,
+   "dirty_files": 0,
+   "drishyam_evals_changed_since": [
+    "drishyam/agent.py"
+   ],
+   "workers": 4,
+   "load": {
+    "start": 11.08,
+    "end": 10.81,
+    "from": "2026-10-19T16:54:42Z",
+    "to": "2026-10-19T17:16:50Z",
+    "min": 10.94,
+    "median": 12.43,
+    "max": 18.09,
+    "samples": 22,
+    "other_top_processes_max_cpu_pct": {
+     "WhatsApp": 181.6,
+     "QuickLookUIService": 151.3,
+     "(2.1.283)": 109.6,
+     "WindowServer": 107.1
+    }
+   }
+  },
+  "grid_clean": {
+   "file": "runs/v2a/grid_clean.json",
+   "segmenter": "onnx:drishyam_dacl10k_v2a.onnx drishyam_dacl10k_v2a.onnx@95b503c2d205 drishyam_dacl10k_v2a.fp16.onnx@0f5fa16e9a65",
+   "micro_arm": "local-macos-x86-dacl10k_v2a",
+   "variants": {
+    "ref": {
+     "min_view": 0.3,
+     "absorb": false
+    },
+    "mv0": {
+     "min_view": 0.0,
+     "absorb": false
+    },
+    "mv15": {
+     "min_view": 0.15,
+     "absorb": false
+    },
+    "mv25": {
+     "min_view": 0.25,
+     "absorb": false
+    },
+    "mv30_abs": {
+     "min_view": 0.3,
+     "absorb": true
+    },
+    "old": {
+     "min_view": 0.0,
+     "absorb": true
+    }
+   },
+   "code": "8dad39ea40faf710384b07a021175a4c039fc726",
+   "code_end": null,
+   "dirty_files": 0,
+   "drishyam_evals_changed_since": [
+    "drishyam/agent.py"
+   ],
+   "workers": 4,
+   "load": {
+    "start": 7.47,
+    "end": 11.08,
+    "from": "2026-10-19T16:44:53Z",
+    "to": "2026-10-19T16:54:41Z",
+    "min": 12.04,
+    "median": 14.07,
+    "max": 18.29,
+    "samples": 9,
+    "other_top_processes_max_cpu_pct": {}
+   }
+  },
+  "grid_real": {
+   "file": "runs/v2a/grid_real.json",
+   "segmenter": "onnx:drishyam_dacl10k_v2a.onnx drishyam_dacl10k_v2a.onnx@95b503c2d205 drishyam_dacl10k_v2a.fp16.onnx@0f5fa16e9a65",
+   "micro_arm": "local-macos-x86-dacl10k_v2a",
+   "variants": {
+    "ref": {
+     "min_view": 0.3,
+     "absorb": false
+    },
+    "mv0": {
+     "min_view": 0.0,
+     "absorb": false
+    },
+    "mv15": {
+     "min_view": 0.15,
+     "absorb": false
+    },
+    "mv25": {
+     "min_view": 0.25,
+     "absorb": false
+    },
+    "mv30_abs": {
+     "min_view": 0.3,
+     "absorb": true
+    },
+    "old": {
+     "min_view": 0.0,
+     "absorb": true
+    }
+   },
+   "code": "8dad39ea40faf710384b07a021175a4c039fc726",
+   "code_end": null,
+   "dirty_files": 0,
+   "drishyam_evals_changed_since": [
+    "drishyam/agent.py"
+   ],
+   "workers": 4,
+   "load": {
+    "start": 10.81,
+    "end": 11.81,
+    "from": "2026-10-19T17:16:51Z",
+    "to": "2026-10-19T19:28:33Z",
+    "min": 6.98,
+    "median": 12.55,
+    "max": 42.69,
+    "samples": 132,
+    "other_top_processes_max_cpu_pct": {
+     "com.apple.Virtualization.VirtualMachine": 412.7,
+     "python": 330.8,
+     "Claude": 216.5,
+     "claude": 173.9,
+     "(2.1.283)": 152.4,
+     "WhatsApp": 143.0,
+     "QuickLookUIService": 128.9,
+     "Brave": 118.3,
+     "com.docker.backend": 116.0,
+     "WindowServer": 109.9,
+     "bun": 108.7,
+     "Python": 100.0,
+     "(bun)": 99.0,
+     "Application": 87.5
+    }
+   }
+  },
+  "v1_head_synth_dev": {
+   "file": "runs/v2a/v1_head_synth_dev.json",
+   "segmenter": "onnx:drishyam_dacl10k.onnx drishyam_dacl10k.onnx@c49416c10087 drishyam_dacl10k.fp16.onnx@f9b06fabbe47",
+   "micro_arm": "local-macos-x86-dacl10k-retime",
+   "variants": {
+    "head": {}
+   },
+   "code": "ad0c2173c7db23e17a11016de70bf267bec285bf",
+   "code_end": null,
+   "dirty_files": 0,
+   "drishyam_evals_changed_since": [
+    "drishyam/agent.py"
+   ],
+   "workers": 4,
+   "load": {
+    "start": 11.97,
+    "end": 8.77,
+    "from": "2026-10-19T19:59:57Z",
+    "to": "2026-10-19T20:10:23Z",
+    "min": 9.03,
+    "median": 11.254999999999999,
+    "max": 15.62,
+    "samples": 10,
+    "other_top_processes_max_cpu_pct": {
+     "python": 136.5,
+     "claude": 134.2,
+     "com.apple.Virtualization.VirtualMachine": 121.3
+    }
+   }
+  },
+  "v1_head_clean": {
+   "file": "runs/v2a/v1_head_clean.json",
+   "segmenter": "onnx:drishyam_dacl10k.onnx drishyam_dacl10k.onnx@c49416c10087 drishyam_dacl10k.fp16.onnx@f9b06fabbe47",
+   "micro_arm": "local-macos-x86-dacl10k-retime",
+   "variants": {
+    "head": {}
+   },
+   "code": "ad0c2173c7db23e17a11016de70bf267bec285bf",
+   "code_end": null,
+   "dirty_files": 0,
+   "drishyam_evals_changed_since": [
+    "drishyam/agent.py"
+   ],
+   "workers": 4,
+   "load": {
+    "start": 12.45,
+    "end": 11.97,
+    "from": "2026-10-19T19:52:29Z",
+    "to": "2026-10-19T19:59:56Z",
+    "min": 12.17,
+    "median": 16.29,
+    "max": 21.98,
+    "samples": 8,
+    "other_top_processes_max_cpu_pct": {
+     "com.apple.Virtualization.VirtualMachine": 476.3,
+     "python": 296.2,
+     "WhatsApp": 96.1,
+     "Brave": 95.5
+    }
+   }
+  },
+  "v1_head_real": {
+   "file": "runs/v2b/v1_head_real.json",
+   "segmenter": "onnx:drishyam_dacl10k.onnx drishyam_dacl10k.onnx@c49416c10087 drishyam_dacl10k.fp16.onnx@f9b06fabbe47",
+   "micro_arm": "local-macos-x86-dacl10k-retime",
+   "variants": {
+    "head": {}
+   },
+   "code": "7f37505c079ed9d4974ff3ec231b9c4f92fce5a1",
+   "code_end": "7f37505c079ed9d4974ff3ec231b9c4f92fce5a1",
+   "dirty_files": 0,
+   "drishyam_evals_changed_since": [
+    "drishyam/agent.py"
+   ],
+   "workers": 6,
+   "load": {
+    "start": 9.59,
+    "end": 8.32,
+    "from": "2026-10-19T23:41:20Z",
+    "to": "2026-10-20T00:33:09Z",
+    "min": 8.97,
+    "median": 13.3,
+    "max": 21.71,
+    "samples": 51,
+    "other_top_processes_max_cpu_pct": {
+     "com.apple.Virtualization.VirtualMachine": 571.7,
+     "next-server": 254.8,
+     "claude": 149.5,
+     "contactsd": 120.2,
+     "WhatsApp": 109.4,
+     "Brave": 104.5,
+     "bun": 99.5
+    }
+   }
+  },
+  "v2a_head_synth_dev": {
+   "file": "runs/v2b/v2a_head_synth_dev.json",
+   "segmenter": "onnx:drishyam_dacl10k_v2a.onnx drishyam_dacl10k_v2a.onnx@95b503c2d205 drishyam_dacl10k_v2a.fp16.onnx@0f5fa16e9a65",
+   "micro_arm": "local-macos-x86-dacl10k_v2a",
+   "variants": {
+    "head": {}
+   },
+   "code": "0e9c63b47fe2b64a8bbfc13cf50aac81ab25b688",
+   "code_end": "0e9c63b47fe2b64a8bbfc13cf50aac81ab25b688",
+   "dirty_files": 0,
+   "drishyam_evals_changed_since": [],
+   "workers": 6,
+   "load": {
+    "start": 11.47,
+    "end": 9.61,
+    "from": "2026-10-20T00:59:00Z",
+    "to": "2026-10-20T01:00:21Z",
+    "min": 10.16,
+    "median": 10.705,
+    "max": 11.25,
+    "samples": 2,
+    "other_top_processes_max_cpu_pct": {
+     "com.apple.Virtualization.VirtualMachine": 182.6
+    }
+   }
+  },
+  "v2a_head_clean": {
+   "file": "runs/v2b/v2a_head_clean.json",
+   "segmenter": "onnx:drishyam_dacl10k_v2a.onnx drishyam_dacl10k_v2a.onnx@95b503c2d205 drishyam_dacl10k_v2a.fp16.onnx@0f5fa16e9a65",
+   "micro_arm": "local-macos-x86-dacl10k_v2a",
+   "variants": {
+    "head": {}
+   },
+   "code": "0e9c63b47fe2b64a8bbfc13cf50aac81ab25b688",
+   "code_end": "0e9c63b47fe2b64a8bbfc13cf50aac81ab25b688",
+   "dirty_files": 0,
+   "drishyam_evals_changed_since": [],
+   "workers": 6,
+   "load": {
+    "start": 12.17,
+    "end": 11.77,
+    "from": "2026-10-20T00:58:18Z",
+    "to": "2026-10-20T00:58:59Z",
+    "min": null,
+    "median": [],
+    "max": null,
+    "samples": 0,
+    "other_top_processes_max_cpu_pct": {}
+   }
+  },
+  "v2a_head_real": {
+   "file": "runs/v2b/v2a_head_real.json",
+   "segmenter": "onnx:drishyam_dacl10k_v2a.onnx drishyam_dacl10k_v2a.onnx@95b503c2d205 drishyam_dacl10k_v2a.fp16.onnx@0f5fa16e9a65",
+   "micro_arm": "local-macos-x86-dacl10k_v2a",
+   "variants": {
+    "head": {}
+   },
+   "code": "0e9c63b47fe2b64a8bbfc13cf50aac81ab25b688",
+   "code_end": "0e9c63b47fe2b64a8bbfc13cf50aac81ab25b688",
+   "dirty_files": 0,
+   "drishyam_evals_changed_since": [],
+   "workers": 6,
+   "load": {
+    "start": 9.61,
+    "end": 8.65,
+    "from": "2026-10-20T01:00:21Z",
+    "to": "2026-10-20T01:04:46Z",
+    "min": 9.29,
+    "median": 9.940000000000001,
+    "max": 10.95,
+    "samples": 4,
+    "other_top_processes_max_cpu_pct": {
+     "com.apple.Virtualization.VirtualMachine": 341.0
+    }
+   }
+  },
   "v2b_grid_synth_dev": {
    "file": "runs/v2b/v2b_grid_synth_dev.json",
    "segmenter": "onnx:drishyam_dacl10k_v2b.onnx drishyam_dacl10k_v2b.onnx@47e4b687d179 drishyam_dacl10k_v2b.fp16.onnx@3f8b8648ccfd",
@@ -4238,344 +4576,6 @@
      "python": 99.1,
      "Python": 98.9,
      "WindowServer": 83.0
-    }
-   }
-  },
-  "grid_synth_dev": {
-   "file": "runs/v2a/grid_synth_dev.json",
-   "segmenter": "onnx:drishyam_dacl10k_v2a.onnx drishyam_dacl10k_v2a.onnx@95b503c2d205 drishyam_dacl10k_v2a.fp16.onnx@0f5fa16e9a65",
-   "micro_arm": "local-macos-x86-dacl10k_v2a",
-   "variants": {
-    "ref": {
-     "min_view": 0.3,
-     "absorb": false
-    },
-    "mv0": {
-     "min_view": 0.0,
-     "absorb": false
-    },
-    "mv15": {
-     "min_view": 0.15,
-     "absorb": false
-    },
-    "mv25": {
-     "min_view": 0.25,
-     "absorb": false
-    },
-    "mv30_abs": {
-     "min_view": 0.3,
-     "absorb": true
-    },
-    "old": {
-     "min_view": 0.0,
-     "absorb": true
-    }
-   },
-   "code": "8dad39ea40faf710384b07a021175a4c039fc726",
-   "code_end": null,
-   "dirty_files": 0,
-   "drishyam_evals_changed_since": [
-    "drishyam/agent.py"
-   ],
-   "workers": 4,
-   "load": {
-    "start": 11.08,
-    "end": 10.81,
-    "from": "2026-10-19T16:54:42Z",
-    "to": "2026-10-19T17:16:50Z",
-    "min": 10.94,
-    "median": 12.43,
-    "max": 18.09,
-    "samples": 22,
-    "other_top_processes_max_cpu_pct": {
-     "WhatsApp": 181.6,
-     "QuickLookUIService": 151.3,
-     "(2.1.283)": 109.6,
-     "WindowServer": 107.1
-    }
-   }
-  },
-  "grid_clean": {
-   "file": "runs/v2a/grid_clean.json",
-   "segmenter": "onnx:drishyam_dacl10k_v2a.onnx drishyam_dacl10k_v2a.onnx@95b503c2d205 drishyam_dacl10k_v2a.fp16.onnx@0f5fa16e9a65",
-   "micro_arm": "local-macos-x86-dacl10k_v2a",
-   "variants": {
-    "ref": {
-     "min_view": 0.3,
-     "absorb": false
-    },
-    "mv0": {
-     "min_view": 0.0,
-     "absorb": false
-    },
-    "mv15": {
-     "min_view": 0.15,
-     "absorb": false
-    },
-    "mv25": {
-     "min_view": 0.25,
-     "absorb": false
-    },
-    "mv30_abs": {
-     "min_view": 0.3,
-     "absorb": true
-    },
-    "old": {
-     "min_view": 0.0,
-     "absorb": true
-    }
-   },
-   "code": "8dad39ea40faf710384b07a021175a4c039fc726",
-   "code_end": null,
-   "dirty_files": 0,
-   "drishyam_evals_changed_since": [
-    "drishyam/agent.py"
-   ],
-   "workers": 4,
-   "load": {
-    "start": 7.47,
-    "end": 11.08,
-    "from": "2026-10-19T16:44:53Z",
-    "to": "2026-10-19T16:54:41Z",
-    "min": 12.04,
-    "median": 14.07,
-    "max": 18.29,
-    "samples": 9,
-    "other_top_processes_max_cpu_pct": {}
-   }
-  },
-  "grid_real": {
-   "file": "runs/v2a/grid_real.json",
-   "segmenter": "onnx:drishyam_dacl10k_v2a.onnx drishyam_dacl10k_v2a.onnx@95b503c2d205 drishyam_dacl10k_v2a.fp16.onnx@0f5fa16e9a65",
-   "micro_arm": "local-macos-x86-dacl10k_v2a",
-   "variants": {
-    "ref": {
-     "min_view": 0.3,
-     "absorb": false
-    },
-    "mv0": {
-     "min_view": 0.0,
-     "absorb": false
-    },
-    "mv15": {
-     "min_view": 0.15,
-     "absorb": false
-    },
-    "mv25": {
-     "min_view": 0.25,
-     "absorb": false
-    },
-    "mv30_abs": {
-     "min_view": 0.3,
-     "absorb": true
-    },
-    "old": {
-     "min_view": 0.0,
-     "absorb": true
-    }
-   },
-   "code": "8dad39ea40faf710384b07a021175a4c039fc726",
-   "code_end": null,
-   "dirty_files": 0,
-   "drishyam_evals_changed_since": [
-    "drishyam/agent.py"
-   ],
-   "workers": 4,
-   "load": {
-    "start": 10.81,
-    "end": 11.81,
-    "from": "2026-10-19T17:16:51Z",
-    "to": "2026-10-19T19:28:33Z",
-    "min": 6.98,
-    "median": 12.55,
-    "max": 42.69,
-    "samples": 132,
-    "other_top_processes_max_cpu_pct": {
-     "com.apple.Virtualization.VirtualMachine": 412.7,
-     "python": 330.8,
-     "Claude": 216.5,
-     "claude": 173.9,
-     "(2.1.283)": 152.4,
-     "WhatsApp": 143.0,
-     "QuickLookUIService": 128.9,
-     "Brave": 118.3,
-     "com.docker.backend": 116.0,
-     "WindowServer": 109.9,
-     "bun": 108.7,
-     "Python": 100.0,
-     "(bun)": 99.0,
-     "Application": 87.5
-    }
-   }
-  },
-  "v2a_head_synth_dev": {
-   "file": "runs/v2b/v2a_head_synth_dev.json",
-   "segmenter": "onnx:drishyam_dacl10k_v2a.onnx drishyam_dacl10k_v2a.onnx@95b503c2d205 drishyam_dacl10k_v2a.fp16.onnx@0f5fa16e9a65",
-   "micro_arm": "local-macos-x86-dacl10k_v2a",
-   "variants": {
-    "head": {}
-   },
-   "code": "0e9c63b47fe2b64a8bbfc13cf50aac81ab25b688",
-   "code_end": "0e9c63b47fe2b64a8bbfc13cf50aac81ab25b688",
-   "dirty_files": 0,
-   "drishyam_evals_changed_since": [],
-   "workers": 6,
-   "load": {
-    "start": 11.47,
-    "end": 9.61,
-    "from": "2026-10-20T00:59:00Z",
-    "to": "2026-10-20T01:00:21Z",
-    "min": 10.16,
-    "median": 10.705,
-    "max": 11.25,
-    "samples": 2,
-    "other_top_processes_max_cpu_pct": {
-     "com.apple.Virtualization.VirtualMachine": 182.6
-    }
-   }
-  },
-  "v2a_head_clean": {
-   "file": "runs/v2b/v2a_head_clean.json",
-   "segmenter": "onnx:drishyam_dacl10k_v2a.onnx drishyam_dacl10k_v2a.onnx@95b503c2d205 drishyam_dacl10k_v2a.fp16.onnx@0f5fa16e9a65",
-   "micro_arm": "local-macos-x86-dacl10k_v2a",
-   "variants": {
-    "head": {}
-   },
-   "code": "0e9c63b47fe2b64a8bbfc13cf50aac81ab25b688",
-   "code_end": "0e9c63b47fe2b64a8bbfc13cf50aac81ab25b688",
-   "dirty_files": 0,
-   "drishyam_evals_changed_since": [],
-   "workers": 6,
-   "load": {
-    "start": 12.17,
-    "end": 11.77,
-    "from": "2026-10-20T00:58:18Z",
-    "to": "2026-10-20T00:58:59Z",
-    "min": null,
-    "median": [],
-    "max": null,
-    "samples": 0,
-    "other_top_processes_max_cpu_pct": {}
-   }
-  },
-  "v2a_head_real": {
-   "file": "runs/v2b/v2a_head_real.json",
-   "segmenter": "onnx:drishyam_dacl10k_v2a.onnx drishyam_dacl10k_v2a.onnx@95b503c2d205 drishyam_dacl10k_v2a.fp16.onnx@0f5fa16e9a65",
-   "micro_arm": "local-macos-x86-dacl10k_v2a",
-   "variants": {
-    "head": {}
-   },
-   "code": "0e9c63b47fe2b64a8bbfc13cf50aac81ab25b688",
-   "code_end": "0e9c63b47fe2b64a8bbfc13cf50aac81ab25b688",
-   "dirty_files": 0,
-   "drishyam_evals_changed_since": [],
-   "workers": 6,
-   "load": {
-    "start": 9.61,
-    "end": 8.65,
-    "from": "2026-10-20T01:00:21Z",
-    "to": "2026-10-20T01:04:46Z",
-    "min": 9.29,
-    "median": 9.940000000000001,
-    "max": 10.95,
-    "samples": 4,
-    "other_top_processes_max_cpu_pct": {
-     "com.apple.Virtualization.VirtualMachine": 341.0
-    }
-   }
-  },
-  "v1_head_synth_dev": {
-   "file": "runs/v2a/v1_head_synth_dev.json",
-   "segmenter": "onnx:drishyam_dacl10k.onnx drishyam_dacl10k.onnx@c49416c10087 drishyam_dacl10k.fp16.onnx@f9b06fabbe47",
-   "micro_arm": "local-macos-x86-dacl10k-retime",
-   "variants": {
-    "head": {}
-   },
-   "code": "ad0c2173c7db23e17a11016de70bf267bec285bf",
-   "code_end": null,
-   "dirty_files": 0,
-   "drishyam_evals_changed_since": [
-    "drishyam/agent.py"
-   ],
-   "workers": 4,
-   "load": {
-    "start": 11.97,
-    "end": 8.77,
-    "from": "2026-10-19T19:59:57Z",
-    "to": "2026-10-19T20:10:23Z",
-    "min": 9.03,
-    "median": 11.254999999999999,
-    "max": 15.62,
-    "samples": 10,
-    "other_top_processes_max_cpu_pct": {
-     "python": 136.5,
-     "claude": 134.2,
-     "com.apple.Virtualization.VirtualMachine": 121.3
-    }
-   }
-  },
-  "v1_head_clean": {
-   "file": "runs/v2a/v1_head_clean.json",
-   "segmenter": "onnx:drishyam_dacl10k.onnx drishyam_dacl10k.onnx@c49416c10087 drishyam_dacl10k.fp16.onnx@f9b06fabbe47",
-   "micro_arm": "local-macos-x86-dacl10k-retime",
-   "variants": {
-    "head": {}
-   },
-   "code": "ad0c2173c7db23e17a11016de70bf267bec285bf",
-   "code_end": null,
-   "dirty_files": 0,
-   "drishyam_evals_changed_since": [
-    "drishyam/agent.py"
-   ],
-   "workers": 4,
-   "load": {
-    "start": 12.45,
-    "end": 11.97,
-    "from": "2026-10-19T19:52:29Z",
-    "to": "2026-10-19T19:59:56Z",
-    "min": 12.17,
-    "median": 16.29,
-    "max": 21.98,
-    "samples": 8,
-    "other_top_processes_max_cpu_pct": {
-     "com.apple.Virtualization.VirtualMachine": 476.3,
-     "python": 296.2,
-     "WhatsApp": 96.1,
-     "Brave": 95.5
-    }
-   }
-  },
-  "v1_head_real": {
-   "file": "runs/v2b/v1_head_real.json",
-   "segmenter": "onnx:drishyam_dacl10k.onnx drishyam_dacl10k.onnx@c49416c10087 drishyam_dacl10k.fp16.onnx@f9b06fabbe47",
-   "micro_arm": "local-macos-x86-dacl10k-retime",
-   "variants": {
-    "head": {}
-   },
-   "code": "7f37505c079ed9d4974ff3ec231b9c4f92fce5a1",
-   "code_end": "7f37505c079ed9d4974ff3ec231b9c4f92fce5a1",
-   "dirty_files": 0,
-   "drishyam_evals_changed_since": [
-    "drishyam/agent.py"
-   ],
-   "workers": 6,
-   "load": {
-    "start": 9.59,
-    "end": 8.32,
-    "from": "2026-10-19T23:41:20Z",
-    "to": "2026-10-20T00:33:09Z",
-    "min": 8.97,
-    "median": 13.3,
-    "max": 21.71,
-    "samples": 51,
-    "other_top_processes_max_cpu_pct": {
-     "com.apple.Virtualization.VirtualMachine": 571.7,
-     "next-server": 254.8,
-     "claude": 149.5,
-     "contactsd": 120.2,
-     "WhatsApp": 109.4,
-     "Brave": 104.5,
-     "bun": 99.5
     }
    }
   },

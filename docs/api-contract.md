@@ -311,7 +311,8 @@ same number of boxes at random positions finds 0.24, 0.27 and 0.23 (IoU-only 0.2
 classical engine finds on CODEBRIM (0.153; v1 x3.13, CI 2.37-4.31). They differ in false alarms on the 30 clean
 photos: v1 put a box on 1, v2a on 5, v2b on 13, and v2a and v2b each put measurably more boxes on them than v1
 (+0.67 and +1.23 per photo). v1 sends more critical boxes to the human gate on CODEBRIM (7.24 per photo against
-4.22 and 3.94). On dev only, the recommendation is v1 for the live engine, which runs the classical engine today: it
+4.22 and 3.94), and its modelled ms per CODEBRIM job are 1.05 times v2a's (CI 1.03-1.08; both tables were timed in
+one window). On dev only, the recommendation is v1 for the live engine, which runs the classical engine today: it
 is the one model with no measurable loss against any other, at 2.00 times the classical engine's modelled ms per
 CODEBRIM job on this Mac (CI 1.89-2.11). v2b's ms there are about 2.5 times v2a's, but timed in one window a v2b
 look costs 0.87 to 1.04 times a v2a look: its table was timed at a higher machine load. No held-out set was run.
