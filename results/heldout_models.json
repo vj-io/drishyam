@@ -9,11 +9,16 @@
   "no_measurable_loss": [
    "v1"
   ],
-  "confirms": null,
-  "statement": "Incomplete, no verdict on the dev choice yet: not run yet: v2b codebrim, v2b synth, v2b clean."
+  "confirms": true,
+  "statement": "Held-out confirms the dev choice: v1 is again the only model with no measurable loss against any other on CODEBRIM eval200, synth200 or the clean set."
  },
  "verdicts": {
   "v1 vs v2a": {
+   "codebrim": "same",
+   "synth": "better",
+   "clean_harm": false
+  },
+  "v1 vs v2b": {
    "codebrim": "same",
    "synth": "better",
    "clean_harm": false
@@ -28,7 +33,27 @@
    "synth": "worse",
    "clean_harm": true
   },
+  "v2a vs v2b": {
+   "codebrim": "same",
+   "synth": "better",
+   "clean_harm": false
+  },
   "v2a vs classical-v1": {
+   "codebrim": "better",
+   "synth": "better",
+   "clean_harm": false
+  },
+  "v2b vs v1": {
+   "codebrim": "same",
+   "synth": "worse",
+   "clean_harm": true
+  },
+  "v2b vs v2a": {
+   "codebrim": "same",
+   "synth": "worse",
+   "clean_harm": false
+  },
+  "v2b vs classical-v1": {
    "codebrim": "better",
    "synth": "better",
    "clean_harm": false
@@ -39,6 +64,11 @@
    "clean_harm": true
   },
   "classical-v1 vs v2a": {
+   "codebrim": "worse",
+   "synth": "worse",
+   "clean_harm": true
+  },
+  "classical-v1 vs v2b": {
    "codebrim": "worse",
    "synth": "worse",
    "clean_harm": true
@@ -54,45 +84,74 @@
    "clean@1.0 +0.902 boxes per clean photo (CI +0.294 to +1.627) against v1",
    "clean@1.0 +0.196 share of clean photos with a box (CI +0.098 to +0.294) against v1"
   ],
-  "v2b": [],
+  "v2b": [
+   "synth@0.3 recall x0.896 (CI 0.85-0.94) against v1",
+   "synth@0.3 IoU-only recall x0.869 (CI 0.82-0.92) against v1",
+   "synth@0.3 recall x0.944 (CI 0.89-1.00) against v2a",
+   "synth@0.3 IoU-only recall x0.922 (CI 0.87-0.98) against v2a",
+   "synth@1.0 recall x0.919 (CI 0.88-0.96) against v1",
+   "synth@1.0 IoU-only recall x0.894 (CI 0.85-0.94) against v1",
+   "synth@1.0 recall x0.949 (CI 0.90-1.00) against v2a",
+   "synth@1.0 IoU-only recall x0.933 (CI 0.89-0.98) against v2a",
+   "clean@0.3 +0.510 boxes per clean photo (CI +0.137 to +1.020) against v1",
+   "clean@0.3 +0.176 share of clean photos with a box (CI +0.078 to +0.275) against v1",
+   "clean@1.0 +0.843 boxes per clean photo (CI +0.275 to +1.549) against v1",
+   "clean@1.0 +0.216 share of clean photos with a box (CI +0.118 to +0.333) against v1"
+  ],
   "classical-v1": [
    "codebrim@0.3 recall x0.394 (CI 0.33-0.46) against v1",
    "codebrim@0.3 IoU-only recall x0.315 (CI 0.24-0.40) against v1",
    "codebrim@0.3 recall x0.404 (CI 0.35-0.47) against v2a",
    "codebrim@0.3 IoU-only recall x0.325 (CI 0.25-0.41) against v2a",
+   "codebrim@0.3 recall x0.399 (CI 0.34-0.47) against v2b",
+   "codebrim@0.3 IoU-only recall x0.317 (CI 0.24-0.41) against v2b",
    "codebrim@1.0 recall x0.444 (CI 0.38-0.52) against v1",
    "codebrim@1.0 IoU-only recall x0.389 (CI 0.30-0.48) against v1",
    "codebrim@1.0 recall x0.452 (CI 0.39-0.52) against v2a",
    "codebrim@1.0 IoU-only recall x0.403 (CI 0.32-0.49) against v2a",
+   "codebrim@1.0 recall x0.445 (CI 0.39-0.51) against v2b",
+   "codebrim@1.0 IoU-only recall x0.391 (CI 0.31-0.49) against v2b",
    "synth@0.3 recall x0.748 (CI 0.69-0.81) against v1",
    "synth@0.3 IoU-only recall x0.682 (CI 0.62-0.75) against v1",
    "synth@0.3 recall x0.788 (CI 0.72-0.86) against v2a",
    "synth@0.3 IoU-only recall x0.723 (CI 0.65-0.80) against v2a",
+   "synth@0.3 recall x0.835 (CI 0.76-0.91) against v2b",
+   "synth@0.3 IoU-only recall x0.784 (CI 0.71-0.86) against v2b",
    "synth@1.0 recall x0.856 (CI 0.80-0.91) against v1",
    "synth@1.0 IoU-only recall x0.767 (CI 0.71-0.83) against v1",
    "synth@1.0 recall x0.883 (CI 0.83-0.95) against v2a",
    "synth@1.0 IoU-only recall x0.801 (CI 0.74-0.87) against v2a",
+   "synth@1.0 recall x0.931 (CI 0.87-0.99) against v2b",
+   "synth@1.0 IoU-only recall x0.858 (CI 0.80-0.93) against v2b",
    "clean@0.3 +7.078 boxes per clean photo (CI +4.628 to +9.589) against v1",
    "clean@0.3 +0.667 share of clean photos with a box (CI +0.529 to +0.784) against v1",
    "clean@0.3 +6.549 boxes per clean photo (CI +4.117 to +9.021) against v2a",
    "clean@0.3 +0.490 share of clean photos with a box (CI +0.314 to +0.647) against v2a",
+   "clean@0.3 +6.569 boxes per clean photo (CI +4.176 to +9.119) against v2b",
+   "clean@0.3 +0.490 share of clean photos with a box (CI +0.333 to +0.627) against v2b",
    "clean@1.0 +10.902 boxes per clean photo (CI +7.019 to +14.902) against v1",
    "clean@1.0 +0.706 share of clean photos with a box (CI +0.569 to +0.824) against v1",
    "clean@1.0 +10.000 boxes per clean photo (CI +6.233 to +14.020) against v2a",
-   "clean@1.0 +0.510 share of clean photos with a box (CI +0.333 to +0.667) against v2a"
+   "clean@1.0 +0.510 share of clean photos with a box (CI +0.333 to +0.667) against v2a",
+   "clean@1.0 +10.059 boxes per clean photo (CI +6.098 to +14.118) against v2b",
+   "clean@1.0 +0.490 share of clean photos with a box (CI +0.333 to +0.647) against v2b"
   ]
  },
  "other_measurable_costs": {
   "v1": [
    "codebrim@0.3 critical boxes per photo x2.192 (CI 1.79-2.61) against v2a",
    "codebrim@0.3 modelled ms per job x1.046 (CI 1.03-1.06) against v2a",
+   "codebrim@0.3 critical boxes per photo x2.064 (CI 1.65-2.49) against v2b",
    "codebrim@0.3 critical boxes per photo x5.549 (CI 3.57-8.82) against classical-v1",
    "codebrim@0.3 modelled ms per job x1.990 (CI 1.92-2.06) against classical-v1",
    "codebrim@1.0 critical boxes per photo x2.221 (CI 1.82-2.66) against v2a",
    "codebrim@1.0 modelled ms per job x1.036 (CI 1.02-1.06) against v2a",
+   "codebrim@1.0 critical boxes per photo x2.090 (CI 1.67-2.52) against v2b",
    "codebrim@1.0 critical boxes per photo x4.096 (CI 2.73-6.20) against classical-v1",
    "codebrim@1.0 modelled ms per job x1.226 (CI 1.17-1.29) against classical-v1",
+   "synth@0.3 critical boxes per photo x1.200 (CI 1.05-1.41) against v2b",
    "synth@0.3 modelled ms per job x5.097 (CI 5.02-5.17) against classical-v1",
+   "synth@1.0 critical boxes per photo x1.159 (CI 1.02-1.35) against v2b",
    "synth@1.0 modelled ms per job x3.358 (CI 3.23-3.48) against classical-v1",
    "clean@0.3 modelled ms per job x4.713 (CI 4.38-4.99) against classical-v1",
    "clean@1.0 modelled ms per job x3.353 (CI 3.14-3.58) against classical-v1"
@@ -103,20 +162,45 @@
    "codebrim@1.0 critical boxes per photo x1.844 (CI 1.32-2.75) against classical-v1",
    "codebrim@1.0 modelled ms per job x1.183 (CI 1.12-1.25) against classical-v1",
    "synth@0.3 modelled ms per job x1.031 (CI 1.02-1.04) against v1",
+   "synth@0.3 critical boxes per photo x1.348 (CI 1.20-1.52) against v2b",
    "synth@0.3 modelled ms per job x5.257 (CI 5.18-5.32) against classical-v1",
    "synth@1.0 modelled ms per job x1.062 (CI 1.04-1.09) against v1",
+   "synth@1.0 critical boxes per photo x1.350 (CI 1.21-1.52) against v2b",
    "synth@1.0 modelled ms per job x3.564 (CI 3.43-3.70) against classical-v1",
    "clean@0.3 modelled ms per job x1.024 (CI 1.02-1.03) against v1",
    "clean@0.3 modelled ms per job x4.826 (CI 4.47-5.12) against classical-v1",
    "clean@1.0 modelled ms per job x1.018 (CI 1.00-1.03) against v1",
    "clean@1.0 modelled ms per job x3.412 (CI 3.19-3.64) against classical-v1"
   ],
-  "v2b": [],
+  "v2b": [
+   "codebrim@0.3 modelled ms per job x2.352 (CI 2.31-2.40) against v1",
+   "codebrim@0.3 modelled ms per job x2.462 (CI 2.42-2.50) against v2a",
+   "codebrim@0.3 critical boxes per photo x2.688 (CI 1.90-4.08) against classical-v1",
+   "codebrim@0.3 modelled ms per job x4.682 (CI 4.51-4.87) against classical-v1",
+   "codebrim@1.0 modelled ms per job x2.393 (CI 2.34-2.45) against v1",
+   "codebrim@1.0 modelled ms per job x2.480 (CI 2.43-2.53) against v2a",
+   "codebrim@1.0 critical boxes per photo x1.960 (CI 1.41-2.91) against classical-v1",
+   "codebrim@1.0 modelled ms per job x2.934 (CI 2.77-3.12) against classical-v1",
+   "synth@0.3 modelled ms per job x2.496 (CI 2.47-2.53) against v1",
+   "synth@0.3 modelled ms per job x2.420 (CI 2.39-2.44) against v2a",
+   "synth@0.3 modelled ms per job x12.721 (CI 12.53-12.89) against classical-v1",
+   "synth@1.0 modelled ms per job x2.607 (CI 2.54-2.68) against v1",
+   "synth@1.0 modelled ms per job x2.456 (CI 2.40-2.52) against v2a",
+   "synth@1.0 modelled ms per job x8.753 (CI 8.40-9.10) against classical-v1",
+   "clean@0.3 modelled ms per job x2.498 (CI 2.47-2.54) against v1",
+   "clean@0.3 modelled ms per job x2.439 (CI 2.42-2.48) against v2a",
+   "clean@0.3 modelled ms per job x11.770 (CI 10.90-12.48) against classical-v1",
+   "clean@1.0 modelled ms per job x2.513 (CI 2.44-2.59) against v1",
+   "clean@1.0 modelled ms per job x2.469 (CI 2.39-2.56) against v2a",
+   "clean@1.0 modelled ms per job x8.425 (CI 7.87-9.00) against classical-v1"
+  ],
   "classical-v1": [
    "synth@0.3 critical boxes per photo x1.981 (CI 1.52-2.57) against v1",
    "synth@0.3 critical boxes per photo x1.764 (CI 1.43-2.15) against v2a",
+   "synth@0.3 critical boxes per photo x2.378 (CI 1.86-3.04) against v2b",
    "synth@1.0 critical boxes per photo x2.939 (CI 2.24-3.84) against v1",
-   "synth@1.0 critical boxes per photo x2.523 (CI 1.97-3.15) against v2a"
+   "synth@1.0 critical boxes per photo x2.523 (CI 1.97-3.15) against v2a",
+   "synth@1.0 critical boxes per photo x3.407 (CI 2.60-4.39) against v2b"
   ]
  },
  "synth_large": {
@@ -313,6 +397,22 @@
    ],
    "machine": "Darwin 25.6.0 x86_64, 16 logical CPUs; eval ran 6 worker(s) x 1 cv2 thread(s); micro arm local-macos-x86-dacl10k_v2a"
   },
+  "v2b codebrim": {
+   "folder": "runs/model-eval/onnx-v2b-codebrim",
+   "code_commit": "6ece97b",
+   "finished": "2026-10-20T07:42:51Z",
+   "load_avg_start": [
+    2.22,
+    4.06,
+    6.96
+   ],
+   "load_avg_end": [
+    5.76,
+    6.54,
+    7.48
+   ],
+   "machine": "Darwin 25.6.0 x86_64, 16 logical CPUs; eval ran 6 worker(s) x 1 cv2 thread(s); micro arm local-macos-x86-dacl10k_v2b"
+  },
   "classical-v1 codebrim": {
    "folder": "runs/model-eval/classical-codebrim",
    "code_commit": "3e54409",
@@ -361,6 +461,22 @@
    ],
    "machine": "Darwin 25.6.0 x86_64, 16 logical CPUs; eval ran 6 worker(s) x 1 cv2 thread(s); micro arm local-macos-x86-dacl10k_v2a"
   },
+  "v2b synth": {
+   "folder": "runs/model-eval/onnx-v2b-synth",
+   "code_commit": "6ece97b",
+   "finished": "2026-10-20T08:03:42Z",
+   "load_avg_start": [
+    5.46,
+    6.46,
+    7.45
+   ],
+   "load_avg_end": [
+    5.31,
+    6.94,
+    7.51
+   ],
+   "machine": "Darwin 25.6.0 x86_64, 16 logical CPUs; eval ran 6 worker(s) x 1 cv2 thread(s); micro arm local-macos-x86-dacl10k_v2b"
+  },
   "classical-v1 synth": {
    "folder": "runs/model-eval/classical-synth",
    "code_commit": "3e54409",
@@ -408,6 +524,22 @@
     9.67
    ],
    "machine": "Darwin 25.6.0 x86_64, 16 logical CPUs; eval ran 6 worker(s) x 1 cv2 thread(s); micro arm local-macos-x86-dacl10k_v2a"
+  },
+  "v2b clean": {
+   "folder": "runs/model-eval/onnx-v2b-clean",
+   "code_commit": "6ece97b",
+   "finished": "2026-10-20T08:09:12Z",
+   "load_avg_start": [
+    5.31,
+    6.94,
+    7.51
+   ],
+   "load_avg_end": [
+    4.55,
+    6.4,
+    7.14
+   ],
+   "machine": "Darwin 25.6.0 x86_64, 16 logical CPUs; eval ran 6 worker(s) x 1 cv2 thread(s); micro arm local-macos-x86-dacl10k_v2b"
   },
   "classical-v1 clean": {
    "folder": "runs/model-eval/classical-clean",
@@ -523,8 +655,10 @@
  "published": [
   "public/results/codebrim_dacl10k/summary.json",
   "public/results/codebrim_dacl10k_v2a/summary.json",
+  "public/results/codebrim_dacl10k_v2b/summary.json",
   "public/results/synth_dacl10k/summary.json",
-  "public/results/synth_dacl10k_v2a/summary.json"
+  "public/results/synth_dacl10k_v2a/summary.json",
+  "public/results/synth_dacl10k_v2b/summary.json"
  ],
  "table": {
   "codebrim@0.3": {
@@ -708,6 +842,97 @@
     "ms_vs_tiling_L0_ci": [
      0.0666,
      0.0717
+    ]
+   },
+   "v2b": {
+    "recall": 0.4866,
+    "recall_ci": [
+     0.4397,
+     0.5286
+    ],
+    "recall_iou_only": 0.251,
+    "chance_recall": 0.2849,
+    "chance_recall_iou_only": 0.0801,
+    "precision": 0.0748,
+    "fp_per_image": 41.085,
+    "boxes_per_image": 44.405,
+    "pixels_frac": 0.1423,
+    "net_pixels_frac": 0.1266,
+    "images_with_any": 0.945,
+    "critical_per_image": 4.65,
+    "findings_per_image": 6.6,
+    "per_class": {
+     "crack": 0.5546,
+     "spalling": 0.6947,
+     "efflorescence": 0.52,
+     "exposed_rebar": 0.0,
+     "corrosion": 0.5964
+    },
+    "ms_per_job": 8079.0012,
+    "recall_per_s": 0.0602,
+    "vs_downscale": 1.1036,
+    "vs_downscale_ci": [
+     1.0292,
+     1.1948
+    ],
+    "vs_downscale_iou_only_ci": [
+     1.3922,
+     1.7852
+    ],
+    "vs_tiling_L0": 1.0327,
+    "vs_tiling_L0_ci": [
+     0.9682,
+     1.094
+    ],
+    "vs_tiling_L0_iou_only_ci": [
+     1.0655,
+     1.5578
+    ],
+    "pixels_vs_tiling_L0": 0.0877,
+    "halt": {
+     "cap-hit": 34,
+     "exhausted": 10,
+     "stop-rule": 156
+    },
+    "looks_mean": 5.915,
+    "looks_by_level": {
+     "L1": 95,
+     "L2": 895,
+     "L3": 193
+    },
+    "looks_by_action": {
+     "gaze": 984,
+     "escalate": 127,
+     "verify": 72
+    },
+    "segmenter": "onnx:drishyam_dacl10k_v2b.onnx",
+    "confirm": null,
+    "profile": "onnx:drishyam_dacl10k_v2b.onnx",
+    "boxes_per_image_ci": [
+     39.3331,
+     48.9151
+    ],
+    "images_with_any_ci": [
+     0.91,
+     0.97
+    ],
+    "critical_per_image_ci": [
+     3.8,
+     5.485
+    ],
+    "ms_per_job_ci": [
+     7823.384,
+     8351.8762
+    ],
+    "ms_vs_downscale": 5.7172,
+    "ms_vs_downscale_ci": [
+     5.5341,
+     5.9136
+    ],
+    "ms_vs_tiling_L0": 0.0677,
+    "ms_vs_tiling_L0_ci": [
+     0.0653,
+     0.0703
     ]
    },
    "classical-v1": {
@@ -987,6 +1212,97 @@
      0.0784
     ]
    },
+   "v2b": {
+    "recall": 0.4985,
+    "recall_ci": [
+     0.4525,
+     0.5401
+    ],
+    "recall_iou_only": 0.2582,
+    "chance_recall": 0.3086,
+    "chance_recall_iou_only": 0.0849,
+    "precision": 0.0712,
+    "fp_per_image": 44.92,
+    "boxes_per_image": 48.365,
+    "pixels_frac": 0.172,
+    "net_pixels_frac": 0.1564,
+    "images_with_any": 0.96,
+    "critical_per_image": 4.9,
+    "findings_per_image": 7.175,
+    "per_class": {
+     "crack": 0.5903,
+     "spalling": 0.7,
+     "efflorescence": 0.52,
+     "exposed_rebar": 0.0,
+     "corrosion": 0.5994
+    },
+    "ms_per_job": 8756.6046,
+    "recall_per_s": 0.0569,
+    "vs_downscale": 1.1306,
+    "vs_downscale_ci": [
+     1.0583,
+     1.2249
+    ],
+    "vs_downscale_iou_only_ci": [
+     1.4269,
+     1.8409
+    ],
+    "vs_tiling_L0": 1.0579,
+    "vs_tiling_L0_ci": [
+     0.9962,
+     1.1183
+    ],
+    "vs_tiling_L0_iou_only_ci": [
+     1.1035,
+     1.5937
+    ],
+    "pixels_vs_tiling_L0": 0.106,
+    "halt": {
+     "stop-rule": 187,
+     "exhausted": 13
+    },
+    "looks_mean": 6.375,
+    "looks_by_level": {
+     "L0": 7,
+     "L1": 180,
+     "L2": 895,
+     "L3": 193
+    },
+    "looks_by_action": {
+     "gaze": 1069,
+     "escalate": 133,
+     "verify": 73
+    },
+    "segmenter": "onnx:drishyam_dacl10k_v2b.onnx",
+    "confirm": null,
+    "profile": "onnx:drishyam_dacl10k_v2b.onnx",
+    "boxes_per_image_ci": [
+     43.4995,
+     53.2602
+    ],
+    "images_with_any_ci": [
+     0.93,
+     0.9801
+    ],
+    "critical_per_image_ci": [
+     4.0494,
+     5.7351
+    ],
+    "ms_per_job_ci": [
+     8468.8025,
+     9063.9385
+    ],
+    "ms_vs_downscale": 6.1967,
+    "ms_vs_downscale_ci": [
+     6.0016,
+     6.4097
+    ],
+    "ms_vs_tiling_L0": 0.0734,
+    "ms_vs_tiling_L0_ci": [
+     0.0694,
+     0.0776
+    ]
+   },
    "classical-v1": {
     "recall": 0.222,
     "recall_ci": [
@@ -1197,6 +1513,64 @@
      0.0128
     ]
    },
+   "v2b": {
+    "recall": 0.4409,
+    "recall_ci": [
+     0.3895,
+     0.4887
+    ],
+    "recall_iou_only": 0.1596,
+    "chance_recall": 0.2528,
+    "chance_recall_iou_only": 0.0463,
+    "precision": 0.186,
+    "fp_per_image": 8.25,
+    "boxes_per_image": 10.135,
+    "pixels_frac": 0.0726,
+    "net_pixels_frac": 0.0248,
+    "images_with_any": 0.945,
+    "critical_per_image": 1.51,
+    "findings_per_image": 2.13,
+    "per_class": {
+     "crack": 0.4475,
+     "spalling": 0.6868,
+     "efflorescence": 0.5657,
+     "exposed_rebar": 0.0,
+     "corrosion": 0.5045
+    },
+    "ms_per_job": 1413.1141,
+    "recall_per_s": 0.312,
+    "vs_tiling_L0": 0.9358,
+    "vs_tiling_L0_ci": [
+     0.8496,
+     1.0197
+    ],
+    "vs_tiling_L0_iou_only_ci": [
+     0.6568,
+     1.0232
+    ],
+    "pixels_vs_tiling_L0": 0.0448,
+    "boxes_per_image_ci": [
+     8.8899,
+     11.4704
+    ],
+    "images_with_any_ci": [
+     0.91,
+     0.975
+    ],
+    "critical_per_image_ci": [
+     1.27,
+     1.7552
+    ],
+    "ms_per_job_ci": [
+     1409.2484,
+     1417.194
+    ],
+    "ms_vs_tiling_L0": 0.0118,
+    "ms_vs_tiling_L0_ci": [
+     0.0113,
+     0.0124
+    ]
+   },
    "classical-v1": {
     "recall": 0.1982,
     "recall_ci": [
@@ -1369,6 +1743,63 @@
     "ms_vs_downscale_ci": [
      78.3798,
      86.1117
+    ]
+   },
+   "v2b": {
+    "recall": 0.4712,
+    "recall_ci": [
+     0.4292,
+     0.5069
+    ],
+    "recall_iou_only": 0.1964,
+    "chance_recall": 0.1697,
+    "chance_recall_iou_only": 0.0326,
+    "precision": 0.0128,
+    "fp_per_image": 296.225,
+    "boxes_per_image": 300.055,
+    "pixels_frac": 1.6229,
+    "net_pixels_frac": 1.6229,
+    "images_with_any": 1.0,
+    "critical_per_image": 17.99,
+    "findings_per_image": 74.62,
+    "per_class": {
+     "crack": 0.5063,
+     "spalling": 0.7421,
+     "efflorescence": 0.3543,
+     "exposed_rebar": 0.0,
+     "corrosion": 0.6202
+    },
+    "ms_per_job": 119337.013,
+    "recall_per_s": 0.0039,
+    "vs_downscale": 1.0686,
+    "vs_downscale_ci": [
+     0.9806,
+     1.177
+    ],
+    "vs_downscale_iou_only_ci": [
+     0.9773,
+     1.5226
+    ],
+    "boxes_per_image_ci": [
+     269.9295,
+     331.7036
+    ],
+    "images_with_any_ci": [
+     1.0,
+     1.0
+    ],
+    "critical_per_image_ci": [
+     14.7949,
+     21.1306
+    ],
+    "ms_per_job_ci": [
+     114120.5559,
+     125157.603
+    ],
+    "ms_vs_downscale": 84.4497,
+    "ms_vs_downscale_ci": [
+     80.6093,
+     88.6311
     ]
    },
    "classical-v1": {
@@ -1608,6 +2039,96 @@
     "ms_vs_tiling_L0_ci": [
      0.144,
      0.1488
+    ]
+   },
+   "v2b": {
+    "recall": 0.5725,
+    "recall_ci": [
+     0.5344,
+     0.6079
+    ],
+    "recall_iou_only": 0.5414,
+    "chance_recall": 0.0414,
+    "chance_recall_iou_only": 0.0207,
+    "precision": 0.315,
+    "fp_per_image": 4.1,
+    "boxes_per_image": 5.985,
+    "pixels_frac": 0.2569,
+    "net_pixels_frac": 0.2412,
+    "images_with_any": 0.955,
+    "critical_per_image": 0.675,
+    "findings_per_image": 2.18,
+    "per_class": {
+     "crack": 0.4537,
+     "spalling": 0.9053,
+     "efflorescence": 0.1515,
+     "exposed_rebar": 0.0,
+     "corrosion": 0.9667
+    },
+    "ms_per_job": 4286.8336,
+    "recall_per_s": 0.1335,
+    "vs_downscale": 1.1763,
+    "vs_downscale_ci": [
+     1.1087,
+     1.2549
+    ],
+    "vs_downscale_iou_only_ci": [
+     1.109,
+     1.2525
+    ],
+    "vs_tiling_L0": 0.7818,
+    "vs_tiling_L0_ci": [
+     0.7398,
+     0.8189
+    ],
+    "vs_tiling_L0_iou_only_ci": [
+     0.7166,
+     0.7979
+    ],
+    "pixels_vs_tiling_L0": 0.1541,
+    "halt": {
+     "cap-hit": 183,
+     "stop-rule": 13,
+     "exhausted": 4
+    },
+    "looks_mean": 2.895,
+    "looks_by_level": {
+     "L1": 383,
+     "L2": 196
+    },
+    "looks_by_action": {
+     "gaze": 412,
+     "verify": 126,
+     "escalate": 41
+    },
+    "segmenter": "onnx:drishyam_dacl10k_v2b.onnx",
+    "confirm": null,
+    "profile": "onnx:drishyam_dacl10k_v2b.onnx",
+    "boxes_per_image_ci": [
+     5.455,
+     6.57
+    ],
+    "images_with_any_ci": [
+     0.925,
+     0.98
+    ],
+    "critical_per_image_ci": [
+     0.53,
+     0.8201
+    ],
+    "ms_per_job_ci": [
+     4212.997,
+     4353.1209
+    ],
+    "ms_vs_downscale": 2.9167,
+    "ms_vs_downscale_ci": [
+     2.8664,
+     2.9618
+    ],
+    "ms_vs_tiling_L0": 0.146,
+    "ms_vs_tiling_L0_ci": [
+     0.1435,
+     0.1483
     ]
    },
    "classical-v1": {
@@ -1881,6 +2402,95 @@
      0.1789
     ]
    },
+   "v2b": {
+    "recall": 0.6021,
+    "recall_ci": [
+     0.565,
+     0.6369
+    ],
+    "recall_iou_only": 0.574,
+    "chance_recall": 0.0607,
+    "chance_recall_iou_only": 0.034,
+    "precision": 0.2782,
+    "fp_per_image": 5.19,
+    "boxes_per_image": 7.19,
+    "pixels_frac": 0.3052,
+    "net_pixels_frac": 0.2896,
+    "images_with_any": 0.955,
+    "critical_per_image": 0.785,
+    "findings_per_image": 2.505,
+    "per_class": {
+     "crack": 0.489,
+     "spalling": 0.929,
+     "efflorescence": 0.202,
+     "exposed_rebar": 0.0,
+     "corrosion": 0.9917
+    },
+    "ms_per_job": 5141.2032,
+    "recall_per_s": 0.1171,
+    "vs_downscale": 1.2371,
+    "vs_downscale_ci": [
+     1.1626,
+     1.3231
+    ],
+    "vs_downscale_iou_only_ci": [
+     1.174,
+     1.3323
+    ],
+    "vs_tiling_L0": 0.8222,
+    "vs_tiling_L0_ci": [
+     0.7815,
+     0.8601
+    ],
+    "vs_tiling_L0_iou_only_ci": [
+     0.7632,
+     0.8438
+    ],
+    "pixels_vs_tiling_L0": 0.1831,
+    "halt": {
+     "stop-rule": 172,
+     "exhausted": 28
+    },
+    "looks_mean": 3.475,
+    "looks_by_level": {
+     "L1": 499,
+     "L2": 196
+    },
+    "looks_by_action": {
+     "gaze": 528,
+     "verify": 126,
+     "escalate": 41
+    },
+    "segmenter": "onnx:drishyam_dacl10k_v2b.onnx",
+    "confirm": null,
+    "profile": "onnx:drishyam_dacl10k_v2b.onnx",
+    "boxes_per_image_ci": [
+     6.49,
+     7.9505
+    ],
+    "images_with_any_ci": [
+     0.925,
+     0.98
+    ],
+    "critical_per_image_ci": [
+     0.605,
+     0.97
+    ],
+    "ms_per_job_ci": [
+     4971.8024,
+     5310.6041
+    ],
+    "ms_vs_downscale": 3.498,
+    "ms_vs_downscale_ci": [
+     3.3827,
+     3.6132
+    ],
+    "ms_vs_tiling_L0": 0.1751,
+    "ms_vs_tiling_L0_ci": [
+     0.1694,
+     0.1809
+    ]
+   },
    "classical-v1": {
     "recall": 0.5607,
     "recall_ci": [
@@ -2089,6 +2699,64 @@
      0.0502
     ]
    },
+   "v2b": {
+    "recall": 0.4867,
+    "recall_ci": [
+     0.4467,
+     0.5269
+    ],
+    "recall_iou_only": 0.4601,
+    "chance_recall": 0.0266,
+    "chance_recall_iou_only": 0.0178,
+    "precision": 0.6027,
+    "fp_per_image": 1.035,
+    "boxes_per_image": 2.605,
+    "pixels_frac": 0.25,
+    "net_pixels_frac": 0.0833,
+    "images_with_any": 0.865,
+    "critical_per_image": 0.305,
+    "findings_per_image": 1.51,
+    "per_class": {
+     "crack": 0.2863,
+     "spalling": 0.8521,
+     "efflorescence": 0.0202,
+     "exposed_rebar": 0.0,
+     "corrosion": 0.9833
+    },
+    "ms_per_job": 1469.772,
+    "recall_per_s": 0.3311,
+    "vs_tiling_L0": 0.6646,
+    "vs_tiling_L0_ci": [
+     0.6191,
+     0.7079
+    ],
+    "vs_tiling_L0_iou_only_ci": [
+     0.5987,
+     0.6901
+    ],
+    "pixels_vs_tiling_L0": 0.15,
+    "boxes_per_image_ci": [
+     2.345,
+     2.875
+    ],
+    "images_with_any_ci": [
+     0.82,
+     0.91
+    ],
+    "critical_per_image_ci": [
+     0.225,
+     0.385
+    ],
+    "ms_per_job_ci": [
+     1469.772,
+     1469.772
+    ],
+    "ms_vs_tiling_L0": 0.0501,
+    "ms_vs_tiling_L0_ci": [
+     0.0501,
+     0.0501
+    ]
+   },
    "classical-v1": {
     "recall": 0.4956,
     "recall_ci": [
@@ -2261,6 +2929,63 @@
     "ms_vs_downscale_ci": [
      19.9327,
      19.9327
+    ]
+   },
+   "v2b": {
+    "recall": 0.7322,
+    "recall_ci": [
+     0.7024,
+     0.766
+    ],
+    "recall_iou_only": 0.713,
+    "chance_recall": 0.0444,
+    "chance_recall_iou_only": 0.0237,
+    "precision": 0.3418,
+    "fp_per_image": 4.67,
+    "boxes_per_image": 7.095,
+    "pixels_frac": 1.6667,
+    "net_pixels_frac": 1.6667,
+    "images_with_any": 0.995,
+    "critical_per_image": 0.37,
+    "findings_per_image": 4.6,
+    "per_class": {
+     "crack": 0.8326,
+     "spalling": 0.9586,
+     "efflorescence": 0.2424,
+     "exposed_rebar": 0.0,
+     "corrosion": 1.0
+    },
+    "ms_per_job": 29353.52,
+    "recall_per_s": 0.0249,
+    "vs_downscale": 1.5046,
+    "vs_downscale_ci": [
+     1.4126,
+     1.6152
+    ],
+    "vs_downscale_iou_only_ci": [
+     1.4491,
+     1.6703
+    ],
+    "boxes_per_image_ci": [
+     6.4699,
+     7.7351
+    ],
+    "images_with_any_ci": [
+     0.985,
+     1.0
+    ],
+    "critical_per_image_ci": [
+     0.29,
+     0.455
+    ],
+    "ms_per_job_ci": [
+     29353.52,
+     29353.52
+    ],
+    "ms_vs_downscale": 19.9715,
+    "ms_vs_downscale_ci": [
+     19.9715,
+     19.9715
     ]
    },
    "classical-v1": {
@@ -2459,6 +3184,76 @@
     "ms_vs_tiling_L0_ci": [
      0.1194,
      0.14
+    ]
+   },
+   "v2b": {
+    "recall": null,
+    "recall_ci": [
+     null,
+     null
+    ],
+    "recall_iou_only": null,
+    "chance_recall": null,
+    "chance_recall_iou_only": null,
+    "precision": 0.0,
+    "fp_per_image": 0.5098,
+    "boxes_per_image": 0.5098,
+    "pixels_frac": 0.2336,
+    "net_pixels_frac": 0.218,
+    "images_with_any": 0.1765,
+    "critical_per_image": 0.0196,
+    "findings_per_image": 0.1961,
+    "per_class": {
+     "crack": null,
+     "spalling": null,
+     "efflorescence": null,
+     "exposed_rebar": null,
+     "corrosion": null
+    },
+    "ms_per_job": 3913.6341,
+    "recall_per_s": null,
+    "halt": {
+     "cap-hit": 39,
+     "stop-rule": 5,
+     "exhausted": 7
+    },
+    "looks_mean": 2.6471,
+    "looks_by_level": {
+     "L1": 91,
+     "L2": 44
+    },
+    "looks_by_action": {
+     "gaze": 133,
+     "escalate": 2
+    },
+    "segmenter": "onnx:drishyam_dacl10k_v2b.onnx",
+    "confirm": null,
+    "profile": "onnx:drishyam_dacl10k_v2b.onnx",
+    "boxes_per_image_ci": [
+     0.1373,
+     1.0196
+    ],
+    "images_with_any_ci": [
+     0.0784,
+     0.2745
+    ],
+    "critical_per_image_ci": [
+     0.0,
+     0.0588
+    ],
+    "ms_per_job_ci": [
+     3624.8006,
+     4165.6148
+    ],
+    "ms_vs_downscale": 2.6669,
+    "ms_vs_downscale_ci": [
+     2.4701,
+     2.8431
+    ],
+    "ms_vs_tiling_L0": 0.1304,
+    "ms_vs_tiling_L0_ci": [
+     0.1197,
+     0.1405
     ]
    },
    "classical-v1": {
@@ -2672,6 +3467,75 @@
      0.1616
     ]
    },
+   "v2b": {
+    "recall": null,
+    "recall_ci": [
+     null,
+     null
+    ],
+    "recall_iou_only": null,
+    "chance_recall": null,
+    "chance_recall_iou_only": null,
+    "precision": 0.0,
+    "fp_per_image": 0.8431,
+    "boxes_per_image": 0.8431,
+    "pixels_frac": 0.2663,
+    "net_pixels_frac": 0.2507,
+    "images_with_any": 0.2157,
+    "critical_per_image": 0.0392,
+    "findings_per_image": 0.2353,
+    "per_class": {
+     "crack": null,
+     "spalling": null,
+     "efflorescence": null,
+     "exposed_rebar": null,
+     "corrosion": null
+    },
+    "ms_per_job": 4491.3012,
+    "recall_per_s": null,
+    "halt": {
+     "stop-rule": 26,
+     "exhausted": 25
+    },
+    "looks_mean": 3.0392,
+    "looks_by_level": {
+     "L1": 111,
+     "L2": 44
+    },
+    "looks_by_action": {
+     "gaze": 153,
+     "escalate": 2
+    },
+    "segmenter": "onnx:drishyam_dacl10k_v2b.onnx",
+    "confirm": null,
+    "profile": "onnx:drishyam_dacl10k_v2b.onnx",
+    "boxes_per_image_ci": [
+     0.2745,
+     1.549
+    ],
+    "images_with_any_ci": [
+     0.1176,
+     0.3333
+    ],
+    "critical_per_image_ci": [
+     0.0,
+     0.1176
+    ],
+    "ms_per_job_ci": [
+     4036.9378,
+     4924.5515
+    ],
+    "ms_vs_downscale": 3.0606,
+    "ms_vs_downscale_ci": [
+     2.7467,
+     3.3558
+    ],
+    "ms_vs_tiling_L0": 0.1496,
+    "ms_vs_tiling_L0_ci": [
+     0.1342,
+     0.1651
+    ]
+   },
    "classical-v1": {
     "recall": null,
     "recall_ci": [
@@ -2841,6 +3705,54 @@
      0.0502
     ]
    },
+   "v2b": {
+    "recall": null,
+    "recall_ci": [
+     null,
+     null
+    ],
+    "recall_iou_only": null,
+    "chance_recall": null,
+    "chance_recall_iou_only": null,
+    "precision": 0.0,
+    "fp_per_image": 0.2157,
+    "boxes_per_image": 0.2157,
+    "pixels_frac": 0.2474,
+    "net_pixels_frac": 0.0825,
+    "images_with_any": 0.098,
+    "critical_per_image": 0.0196,
+    "findings_per_image": 0.098,
+    "per_class": {
+     "crack": null,
+     "spalling": null,
+     "efflorescence": null,
+     "exposed_rebar": null,
+     "corrosion": null
+    },
+    "ms_per_job": 1467.4722,
+    "recall_per_s": null,
+    "boxes_per_image_ci": [
+     0.0392,
+     0.4706
+    ],
+    "images_with_any_ci": [
+     0.0392,
+     0.1765
+    ],
+    "critical_per_image_ci": [
+     0.0,
+     0.0588
+    ],
+    "ms_per_job_ci": [
+     1462.8726,
+     1469.772
+    ],
+    "ms_vs_tiling_L0": 0.0489,
+    "ms_vs_tiling_L0_ci": [
+     0.0467,
+     0.0501
+    ]
+   },
    "classical-v1": {
     "recall": null,
     "recall_ci": [
@@ -2985,6 +3897,54 @@
     "ms_vs_downscale_ci": [
      19.9327,
      21.3285
+    ]
+   },
+   "v2b": {
+    "recall": null,
+    "recall_ci": [
+     null,
+     null
+    ],
+    "recall_iou_only": null,
+    "chance_recall": null,
+    "chance_recall_iou_only": null,
+    "precision": 0.0,
+    "fp_per_image": 3.0784,
+    "boxes_per_image": 3.0784,
+    "pixels_frac": 1.6705,
+    "net_pixels_frac": 1.6705,
+    "images_with_any": 0.6275,
+    "critical_per_image": 0.0,
+    "findings_per_image": 1.2157,
+    "per_class": {
+     "crack": null,
+     "spalling": null,
+     "efflorescence": null,
+     "exposed_rebar": null,
+     "corrosion": null
+    },
+    "ms_per_job": 30019.8478,
+    "recall_per_s": null,
+    "boxes_per_image_ci": [
+     1.8824,
+     4.4907
+    ],
+    "images_with_any_ci": [
+     0.4902,
+     0.7451
+    ],
+    "critical_per_image_ci": [
+     0.0,
+     0.0
+    ],
+    "ms_per_job_ci": [
+     29353.52,
+     31352.5035
+    ],
+    "ms_vs_downscale": 20.4568,
+    "ms_vs_downscale_ci": [
+     19.9715,
+     21.4321
     ]
    },
    "classical-v1": {
@@ -3693,6 +4653,64 @@
     ]
    ]
   },
+  "codebrim@0.3: v1 / v2b": {
+   "boxes": [
+    1.0321,
+    [
+     0.922,
+     1.1489
+    ]
+   ],
+   "critical": [
+    2.0645,
+    [
+     1.6523,
+     2.4869
+    ]
+   ],
+   "ms": [
+    0.4251,
+    [
+     0.4172,
+     0.4333
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    1.425,
+    [
+     -3.4506,
+     6.4363
+    ]
+   ],
+   "any_box_share_diff": [
+    0.02,
+    [
+     0.0,
+     0.045
+    ]
+   ],
+   "recall": [
+    1.0122,
+    [
+     0.9637,
+     1.0617
+    ]
+   ],
+   "iou_only": [
+    1.0071,
+    [
+     0.9271,
+     1.0869
+    ]
+   ],
+   "chance": [
+    1.05,
+    [
+     0.9582,
+     1.158
+    ]
+   ]
+  },
   "codebrim@0.3: v1 / classical-v1": {
    "boxes": [
     0.0498,
@@ -3748,6 +4766,64 @@
     [
      1.899,
      3.2286
+    ]
+   ]
+  },
+  "codebrim@0.3: v2a / v2b": {
+   "boxes": [
+    0.9291,
+    [
+     0.8597,
+     1.003
+    ]
+   ],
+   "critical": [
+    0.9419,
+    [
+     0.861,
+     1.0314
+    ]
+   ],
+   "ms": [
+    0.4062,
+    [
+     0.4,
+     0.4131
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    -3.15,
+    [
+     -6.4204,
+     0.1155
+    ]
+   ],
+   "any_box_share_diff": [
+    0.015,
+    [
+     -0.01,
+     0.04
+    ]
+   ],
+   "recall": [
+    0.9866,
+    [
+     0.9533,
+     1.0235
+    ]
+   ],
+   "iou_only": [
+    0.974,
+    [
+     0.9188,
+     1.0406
+    ]
+   ],
+   "chance": [
+    1.0562,
+    [
+     0.9686,
+     1.1583
     ]
    ]
   },
@@ -3809,6 +4885,64 @@
     ]
    ]
   },
+  "codebrim@0.3: v2b / classical-v1": {
+   "boxes": [
+    0.0482,
+    [
+     0.0419,
+     0.0542
+    ]
+   ],
+   "critical": [
+    2.6879,
+    [
+     1.904,
+     4.0827
+    ]
+   ],
+   "ms": [
+    4.6816,
+    [
+     4.5097,
+     4.8674
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    -876.595,
+    [
+     -966.894,
+     -800.3084
+    ]
+   ],
+   "any_box_share_diff": [
+    -0.055,
+    [
+     -0.09,
+     -0.03
+    ]
+   ],
+   "recall": [
+    2.5076,
+    [
+     2.1406,
+     2.9629
+    ]
+   ],
+   "iou_only": [
+    3.1567,
+    [
+     2.4548,
+     4.1167
+    ]
+   ],
+   "chance": [
+    2.3301,
+    [
+     1.7944,
+     3.0431
+    ]
+   ]
+  },
   "codebrim@1.0: v1 / v2a": {
    "boxes": [
     1.1092,
@@ -3864,6 +4998,64 @@
     [
      0.8898,
      1.0669
+    ]
+   ]
+  },
+  "codebrim@1.0: v1 / v2b": {
+   "boxes": [
+    1.0329,
+    [
+     0.9267,
+     1.1503
+    ]
+   ],
+   "critical": [
+    2.0898,
+    [
+     1.6689,
+     2.523
+    ]
+   ],
+   "ms": [
+    0.4178,
+    [
+     0.4088,
+     0.4272
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    1.59,
+    [
+     -3.6102,
+     7.0502
+    ]
+   ],
+   "any_box_share_diff": [
+    0.005,
+    [
+     -0.015,
+     0.025
+    ]
+   ],
+   "recall": [
+    1.0024,
+    [
+     0.9572,
+     1.0464
+    ]
+   ],
+   "iou_only": [
+    1.0046,
+    [
+     0.9279,
+     1.0821
+    ]
+   ],
+   "chance": [
+    0.9865,
+    [
+     0.9024,
+     1.0713
     ]
    ]
   },
@@ -3925,6 +5117,64 @@
     ]
    ]
   },
+  "codebrim@1.0: v2a / v2b": {
+   "boxes": [
+    0.9311,
+    [
+     0.8684,
+     1.0036
+    ]
+   ],
+   "critical": [
+    0.9408,
+    [
+     0.8646,
+     1.0283
+    ]
+   ],
+   "ms": [
+    0.4032,
+    [
+     0.396,
+     0.4111
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    -3.33,
+    [
+     -6.6051,
+     0.1655
+    ]
+   ],
+   "any_box_share_diff": [
+    0.01,
+    [
+     -0.015,
+     0.04
+    ]
+   ],
+   "recall": [
+    0.9845,
+    [
+     0.9538,
+     1.0177
+    ]
+   ],
+   "iou_only": [
+    0.9701,
+    [
+     0.9125,
+     1.0353
+    ]
+   ],
+   "chance": [
+    1.0115,
+    [
+     0.9323,
+     1.0898
+    ]
+   ]
+  },
   "codebrim@1.0: v2a / classical-v1": {
    "boxes": [
     0.0276,
@@ -3980,6 +5230,64 @@
     [
      1.7467,
      2.7891
+    ]
+   ]
+  },
+  "codebrim@1.0: v2b / classical-v1": {
+   "boxes": [
+    0.0297,
+    [
+     0.0264,
+     0.0329
+    ]
+   ],
+   "critical": [
+    1.96,
+    [
+     1.4076,
+     2.9136
+    ]
+   ],
+   "ms": [
+    2.9337,
+    [
+     2.7725,
+     3.1214
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    -1580.8,
+    [
+     -1712.0095,
+     -1457.8857
+    ]
+   ],
+   "any_box_share_diff": [
+    -0.04,
+    [
+     -0.07,
+     -0.0199
+    ]
+   ],
+   "recall": [
+    2.246,
+    [
+     1.9513,
+     2.5948
+    ]
+   ],
+   "iou_only": [
+    2.5588,
+    [
+     2.0576,
+     3.2447
+    ]
+   ],
+   "chance": [
+    2.1757,
+    [
+     1.7344,
+     2.7864
     ]
    ]
   },
@@ -4041,6 +5349,64 @@
     ]
    ]
   },
+  "synth@0.3: v1 / v2b": {
+   "boxes": [
+    1.051,
+    [
+     0.9616,
+     1.1389
+    ]
+   ],
+   "critical": [
+    1.2,
+    [
+     1.05,
+     1.4052
+    ]
+   ],
+   "ms": [
+    0.4007,
+    [
+     0.3959,
+     0.4055
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    0.305,
+    [
+     -0.24,
+     0.8201
+    ]
+   ],
+   "any_box_share_diff": [
+    -0.035,
+    [
+     -0.07,
+     -0.005
+    ]
+   ],
+   "recall": [
+    1.1163,
+    [
+     1.0636,
+     1.1721
+    ]
+   ],
+   "iou_only": [
+    1.1503,
+    [
+     1.0889,
+     1.2162
+    ]
+   ],
+   "chance": [
+    1.5357,
+    [
+     1.027,
+     2.3753
+    ]
+   ]
+  },
   "synth@0.3: v1 / classical-v1": {
    "boxes": [
     0.3285,
@@ -4096,6 +5462,64 @@
     [
      1.4072,
      3.935
+    ]
+   ]
+  },
+  "synth@0.3: v2a / v2b": {
+   "boxes": [
+    1.0084,
+    [
+     0.9244,
+     1.0854
+    ]
+   ],
+   "critical": [
+    1.3481,
+    [
+     1.2039,
+     1.52
+    ]
+   ],
+   "ms": [
+    0.4132,
+    [
+     0.409,
+     0.4176
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    0.05,
+    [
+     -0.4701,
+     0.4951
+    ]
+   ],
+   "any_box_share_diff": [
+    -0.01,
+    [
+     -0.04,
+     0.015
+    ]
+   ],
+   "recall": [
+    1.0594,
+    [
+     1.0025,
+     1.1184
+    ]
+   ],
+   "iou_only": [
+    1.0847,
+    [
+     1.025,
+     1.148
+    ]
+   ],
+   "chance": [
+    1.5,
+    [
+     1.0,
+     2.3338
     ]
    ]
   },
@@ -4157,6 +5581,64 @@
     ]
    ]
   },
+  "synth@0.3: v2b / classical-v1": {
+   "boxes": [
+    0.3125,
+    [
+     0.2789,
+     0.3538
+    ]
+   ],
+   "critical": [
+    0.4206,
+    [
+     0.329,
+     0.5366
+    ]
+   ],
+   "ms": [
+    12.7212,
+    [
+     12.531,
+     12.893
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    -13.165,
+    [
+     -15.395,
+     -11.1045
+    ]
+   ],
+   "any_box_share_diff": [
+    -0.01,
+    [
+     -0.04,
+     0.02
+    ]
+   ],
+   "recall": [
+    1.1981,
+    [
+     1.0988,
+     1.3144
+    ]
+   ],
+   "iou_only": [
+    1.2753,
+    [
+     1.1597,
+     1.417
+    ]
+   ],
+   "chance": [
+    1.4737,
+    [
+     0.8063,
+     2.9091
+    ]
+   ]
+  },
   "synth@1.0: v1 / v2a": {
    "boxes": [
     0.9869,
@@ -4212,6 +5694,64 @@
     [
      0.48,
      1.182
+    ]
+   ]
+  },
+  "synth@1.0: v1 / v2b": {
+   "boxes": [
+    0.9958,
+    [
+     0.9024,
+     1.0895
+    ]
+   ],
+   "critical": [
+    1.1592,
+    [
+     1.0184,
+     1.3535
+    ]
+   ],
+   "ms": [
+    0.3836,
+    [
+     0.3734,
+     0.3944
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    -0.03,
+    [
+     -0.725,
+     0.5951
+    ]
+   ],
+   "any_box_share_diff": [
+    -0.035,
+    [
+     -0.07,
+     -0.005
+    ]
+   ],
+   "recall": [
+    1.0885,
+    [
+     1.0405,
+     1.1379
+    ]
+   ],
+   "iou_only": [
+    1.1186,
+    [
+     1.0668,
+     1.1754
+    ]
+   ],
+   "chance": [
+    0.8293,
+    [
+     0.5333,
+     1.3235
     ]
    ]
   },
@@ -4273,6 +5813,64 @@
     ]
    ]
   },
+  "synth@1.0: v2a / v2b": {
+   "boxes": [
+    1.009,
+    [
+     0.9259,
+     1.0969
+    ]
+   ],
+   "critical": [
+    1.3503,
+    [
+     1.2086,
+     1.521
+    ]
+   ],
+   "ms": [
+    0.4072,
+    [
+     0.3971,
+     0.4173
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    0.065,
+    [
+     -0.56,
+     0.6851
+    ]
+   ],
+   "any_box_share_diff": [
+    0.0,
+    [
+     -0.025,
+     0.02
+    ]
+   ],
+   "recall": [
+    1.0541,
+    [
+     1.0048,
+     1.1055
+    ]
+   ],
+   "iou_only": [
+    1.0722,
+    [
+     1.0228,
+     1.1257
+    ]
+   ],
+   "chance": [
+    1.0976,
+    [
+     0.74,
+     1.613
+    ]
+   ]
+  },
   "synth@1.0: v2a / classical-v1": {
    "boxes": [
     0.2194,
@@ -4331,6 +5929,64 @@
     ]
    ]
   },
+  "synth@1.0: v2b / classical-v1": {
+   "boxes": [
+    0.2174,
+    [
+     0.1899,
+     0.2481
+    ]
+   ],
+   "critical": [
+    0.2935,
+    [
+     0.2279,
+     0.3841
+    ]
+   ],
+   "ms": [
+    8.7534,
+    [
+     8.403,
+     9.0998
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    -25.88,
+    [
+     -30.4952,
+     -22.0192
+    ]
+   ],
+   "any_box_share_diff": [
+    -0.015,
+    [
+     -0.04,
+     0.01
+    ]
+   ],
+   "recall": [
+    1.0739,
+    [
+     1.0053,
+     1.1469
+    ]
+   ],
+   "iou_only": [
+    1.1652,
+    [
+     1.0808,
+     1.253
+    ]
+   ],
+   "chance": [
+    1.7826,
+    [
+     1.0799,
+     3.1252
+    ]
+   ]
+  },
   "clean@0.3: v1 / v2a": {
    "boxes": [
     0.0,
@@ -4358,6 +6014,43 @@
     [
      -1.0392,
      -0.1176
+    ]
+   ],
+   "any_box_share_diff": [
+    -0.1765,
+    [
+     -0.2745,
+     -0.0784
+    ]
+   ]
+  },
+  "clean@0.3: v1 / v2b": {
+   "boxes": [
+    0.0,
+    [
+     0.0,
+     0.0
+    ]
+   ],
+   "critical": [
+    0.0,
+    [
+     0.0,
+     0.0
+    ]
+   ],
+   "ms": [
+    0.4004,
+    [
+     0.3939,
+     0.4041
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    -0.5098,
+    [
+     -1.0196,
+     -0.1373
     ]
    ],
    "any_box_share_diff": [
@@ -4405,6 +6098,43 @@
     ]
    ]
   },
+  "clean@0.3: v2a / v2b": {
+   "boxes": [
+    1.0385,
+    [
+     0.2222,
+     3.8339
+    ]
+   ],
+   "critical": [
+    0.0,
+    [
+     0.0,
+     0.0
+    ]
+   ],
+   "ms": [
+    0.41,
+    [
+     0.4035,
+     0.4133
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    0.0196,
+    [
+     -0.6672,
+     0.6863
+    ]
+   ],
+   "any_box_share_diff": [
+    0.0,
+    [
+     -0.1373,
+     0.1373
+    ]
+   ]
+  },
   "clean@0.3: v2a / classical-v1": {
    "boxes": [
     0.0748,
@@ -4439,6 +6169,43 @@
     [
      -0.6471,
      -0.3137
+    ]
+   ]
+  },
+  "clean@0.3: v2b / classical-v1": {
+   "boxes": [
+    0.072,
+    [
+     0.0235,
+     0.1493
+    ]
+   ],
+   "critical": [
+    1.0,
+    [
+     0.0,
+     3.0
+    ]
+   ],
+   "ms": [
+    11.7704,
+    [
+     10.9049,
+     12.4834
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    -6.5686,
+    [
+     -9.1191,
+     -4.176
+    ]
+   ],
+   "any_box_share_diff": [
+    -0.4902,
+    [
+     -0.6275,
+     -0.3333
     ]
    ]
   },
@@ -4479,6 +6246,43 @@
     ]
    ]
   },
+  "clean@1.0: v1 / v2b": {
+   "boxes": [
+    0.0,
+    [
+     0.0,
+     0.0
+    ]
+   ],
+   "critical": [
+    0.0,
+    [
+     0.0,
+     0.0
+    ]
+   ],
+   "ms": [
+    0.398,
+    [
+     0.3854,
+     0.4102
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    -0.8431,
+    [
+     -1.549,
+     -0.2745
+    ]
+   ],
+   "any_box_share_diff": [
+    -0.2157,
+    [
+     -0.3333,
+     -0.1176
+    ]
+   ]
+  },
   "clean@1.0: v1 / classical-v1": {
    "boxes": [
     0.0,
@@ -4516,6 +6320,43 @@
     ]
    ]
   },
+  "clean@1.0: v2a / v2b": {
+   "boxes": [
+    1.0698,
+    [
+     0.2916,
+     3.5335
+    ]
+   ],
+   "critical": [
+    0.0,
+    [
+     0.0,
+     0.0
+    ]
+   ],
+   "ms": [
+    0.405,
+    [
+     0.391,
+     0.4182
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    0.0588,
+    [
+     -0.9025,
+     1.0
+    ]
+   ],
+   "any_box_share_diff": [
+    -0.0196,
+    [
+     -0.1765,
+     0.1373
+    ]
+   ]
+  },
   "clean@1.0: v2a / classical-v1": {
    "boxes": [
     0.0827,
@@ -4550,6 +6391,43 @@
     [
      -0.6667,
      -0.3328
+    ]
+   ]
+  },
+  "clean@1.0: v2b / classical-v1": {
+   "boxes": [
+    0.0773,
+    [
+     0.0245,
+     0.1663
+    ]
+   ],
+   "critical": [
+    2.0,
+    [
+     0.0,
+     6.0
+    ]
+   ],
+   "ms": [
+    8.4245,
+    [
+     7.8745,
+     9.003
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    -10.0588,
+    [
+     -14.1181,
+     -6.0975
+    ]
+   ],
+   "any_box_share_diff": [
+    -0.4902,
+    [
+     -0.6471,
+     -0.3333
     ]
    ]
   },
