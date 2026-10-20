@@ -4,27 +4,33 @@ The web demo (the FastAPI app and the static site) runs on AWS only, as one CDK 
 `us-east-1`: the API on Lambda arm64 (Graviton) and the static site in a private S3 bucket, both reached
 only through CloudFront and AWS WAF.
 
-**Status: deployed** on 2026-10-18 (India time) to `us-east-1` from commit ca69037 and smoke-tested. The latest
-smoke run (`scripts/aws.sh smoke` with `WAF_LOOP=1`: checks 1 to 5 and 7 under [Smoke](#smoke)) passed:
-`/api/health` answered from `aws-lambda` on `aarch64` with OpenCV 5.0.0 (`stock (not COOL)`) and commit ca69037, a
-job on `bridge_03.jpg` streamed to `done` (`awaiting_review`, 6 steps), KILL halted a second job after 3 steps, an
-unsigned `POST` through CloudFront got 403, the raw Function URL got 403, the WAF answered 429 at the 14th
-empty-bodied job start, and the step p95 was 67.7 ms over the first job's 6 steps. An earlier run against the same
-build, three minutes before and without the WAF check, also passed but measured more weakly: step p95 83.7 ms over
-6 steps, and KILL halted the second job only after 6 steps. Both summary lines, copied here because
-`runs/aws-smoke.log` is git-ignored (the timestamps are UTC):
+**Status: deployed** on 2026-10-21 (India time) to `us-east-1` from commit dda3080, with the v1 segmenter
+(`ONNX=models/drishyam_dacl10k.onnx ONNX_FP16=models/drishyam_dacl10k.fp16.onnx RESERVED=none scripts/aws.sh deploy`)
+and the submission film in the site bucket (`video/drishyam.mp4`, served with byte ranges). The smoke run
+(`scripts/aws.sh smoke` with `WAF_LOOP=1`: checks 1 to 5 and 7 under [Smoke](#smoke)) passed: `/api/health` answered
+from `aws-lambda` on `aarch64` with OpenCV 5.0.0 (`stock (not COOL)`), segmenter `onnx:drishyam_dacl10k.onnx` and
+commit dda3080, a job on `bridge_03.jpg` streamed to `done` (`awaiting_review`, 6 steps), KILL halted a second job
+after 3 steps, an unsigned `POST` through CloudFront got 403, the raw Function URL got 403, and the WAF answered 429
+at the 18th empty-bodied job start. The startup log has `DRISHYAM_CV_THREADS=2: cv2.getNumThreads() = 2`. The step
+p95 was 1138.9 ms over 6 steps: with v1 a step costs 0.56 to 1.14 s at p95 over the seven smoke runs since the v1
+deploy, against 67.7 to 88.0 ms for the classical engine, so the governor's 500 ms target sends most later looks to
+the fast FP16 net. The summary line, copied here because `runs/aws-smoke.log` is git-ignored (UTC; earlier lines are
+in `video/live/aws-smoke.log`):
 
 ```
-smoke 2026-10-18T07:09:20Z https://d1xg58guluup8c.cloudfront.net commit=ca690371bf3c21eb5efc61f58f9048322a41ec52 package=vSxCotfLF5Ja/atXtqO5ddXcvT9YHElpHTOQZ8woQvA= ttfb_first=1.307764s ttfb_warm=1.241300s step_p95_ms=83.7 result=pass
-smoke 2026-10-18T07:12:25Z https://d1xg58guluup8c.cloudfront.net commit=ca690371bf3c21eb5efc61f58f9048322a41ec52 package=vSxCotfLF5Ja/atXtqO5ddXcvT9YHElpHTOQZ8woQvA= ttfb_first=1.267549s ttfb_warm=1.335864s step_p95_ms=67.7 result=pass
+smoke 2026-10-20T21:12:31Z https://d1xg58guluup8c.cloudfront.net commit=dda308072fb4e63997a4df809a2f57abd0d3dbc0 package=r7K9s9XZtHmkq0+f2OtXiTy1CUyFo5xf2GzQkv6UJMs= ttfb_first=5.516721s ttfb_warm=0.913209s step_p95_ms=1138.9 result=pass
 ```
+
+The first smoke after the v1 deploy failed KILL only: the kill reached a cold environment and the job finished
+first. The fix (a job start warms a second environment) is under [Smoke](#smoke), check 3.
 
 On the live site the WAF's 429 carries the JSON body `{"error": "rate limited: 10 job starts per 2 min per IP; wait
-and retry"}`, and a review reply carries `prev_token_sha256` (both checked on 2026-10-18).
-**Until the next deploy:** the deployed build (commit ca69037, `/api/health` version 1.0.2) predates the numbers in
-the README and the report, so its FIG. 4 and FIG. 5 show the evaluation from before the arm64 re-run (commit 46f01b5)
-and its guided-run button still says "about 45 s". The costs below are list-price estimates until the first bill; the
-dashboard screenshot is not added yet.
+and retry"}`, and a review reply carries `prev_token_sha256` (both checked on 2026-10-18). Cost Explorer, month to
+date on 2026-10-21: 0.62 USD before credits (0.59 of it the WAF), 0.00 USD after them; the
+[Cost estimate](#cost-estimate) below is list price at an assumed judging load. The CloudWatch dashboard `Drishyam`
+over the three days to that deploy (four of its eight widgets, from `GetMetricWidgetImage`):
+
+![CloudWatch dashboard: jobs by status, job seconds, Lambda invocations and duration](aws-dashboard.png)
 
 Three parts depend on app changes made outside `infra/` (all three are in):
 `drishyam/web.py` must read the signing key from the secret named by `DRISHYAM_SIGNING_KEY_SECRET_ARN`
