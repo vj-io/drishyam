@@ -116,7 +116,7 @@ def run(base, server_log=None):
         page = p.page
         csp = page.request.get(base + "/").headers.get("content-security-policy", "")
         assert "script-src 'self'" in csp, "production CSP missing from the document"
-        expect(page.locator("#gallery .thumb")).to_have_count(8, timeout=15000)
+        expect(page.locator("#gallery .thumb")).to_have_count(10, timeout=15000)
 
         # 1. The guided run: bridge_03 (exposed rebar) is preselected, the run is paced and stays on screen,
         #    then the page hands the critical findings to a person, whose approval the server signs.
@@ -210,7 +210,7 @@ def run(base, server_log=None):
         # planner_timeout parks the job for 2 s at step 3, so the click lands while it is still running.
         # A fresh page first: otherwise the previous job's trace lines would satisfy the waits at once.
         page.reload()
-        expect(page.locator("#gallery .thumb")).to_have_count(8, timeout=15000)
+        expect(page.locator("#gallery .thumb")).to_have_count(10, timeout=15000)
         p.pick("bridge_05.jpg")
         expect(page.locator("#look")).to_be_enabled(timeout=15000)
         page.locator("#advanced summary").click()
@@ -260,9 +260,38 @@ def run(base, server_log=None):
         p.clean()
         print("ok  no CSP violations, no console errors")
 
+        # 3b. The guided run on a real photo of ours: the v1 engine's recorded job is replayed from public/samples (no job
+        #     on the server), labelled as our photo with no ground truth, and the recap says what the agent flagged.
+        page.reload()
+        expect(page.locator("#gallery .thumb")).to_have_count(10, timeout=15000)
+        index = json.loads((ROOT / "public/samples/index.json").read_text())
+        real = next(s for s in index if s["file"] == "real_02.jpg")
+        recorded = [json.loads(ln) for ln in (ROOT / "public/samples" / real["trace"]).read_text().splitlines()]
+        expect(page.locator("#gallery .thumb--real .thumb__t")).to_have_text([real["title"]] * 2)
+        jobs = sum("/api/jobs" in u for u in p.requests)
+        page.locator("#guided-real").click()
+        expect(page.locator("#gallery .thumb[data-file='real_02.jpg']")).to_have_attribute("aria-pressed", "true", timeout=15000)
+        p.wait_done(timeout=60)
+        assert sum("/api/jobs" in u for u in p.requests) == jobs, "the real-photo guided run replays a recording: no job on the server"
+        expect(page.locator("#trace .trace__line[data-step]")).to_have_count(sum(e["type"] == "step" for e in recorded))
+        expect(page.locator("#findings .finding")).to_have_count(recorded[-1]["summary"]["findings"])
+        expect(page.locator("#job-text")).to_contain_text("(modelled)")
+        expect(page.locator("#recap .recap__real")).to_contain_text("REAL PHOTO (ours), no ground truth")
+        expect(page.locator("#recap .recap__real")).to_contain_text(real["note"])
+        p.plain()
+        page.wait_for_timeout(1500)                       # the smooth scroll to the recap
+        assert p.recap_in_view(), "the recap must be on screen at the end of the real-photo guided run"
+        page.screenshot(path=str(SHOTS / "live-desktop-real.png"))
+        page.get_by_role("button", name="Our other wall photo").click()
+        expect(page.locator("#gallery .thumb[data-file='real_01.jpg']")).to_have_attribute("aria-pressed", "true", timeout=15000)
+        expect(page.locator("#recap .recap__real")).to_contain_text("flagged nothing", timeout=30000)
+        assert sum("/api/jobs" in u for u in p.requests) == jobs
+        p.clean()
+        print("ok  real photos: the v1 runs replayed from their recordings (no server job), labelled, recap says what it flagged")
+
         # 4. Phone width: no horizontal scroll after a run.
         m = Page(browser, base, viewport={"width": 375, "height": 812}, is_mobile=True, has_touch=True)
-        expect(m.page.locator("#gallery .thumb")).to_have_count(8, timeout=15000)
+        expect(m.page.locator("#gallery .thumb")).to_have_count(10, timeout=15000)
         cta = m.page.locator("#guided").bounding_box()
         assert cta["y"] + cta["height"] <= 812, f"CTA below the fold at 375 px: {cta}"
         m.pick("bridge_01.jpg")

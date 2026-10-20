@@ -366,5 +366,25 @@
     ]
    }
   ]
+ },
+ {
+  "file": "real_01.jpg",
+  "thumb": "thumbs/real_01.jpg",
+  "title": "REAL PHOTO (ours), painted plaster wall, no ground truth",
+  "note": "By eye, one hairline crack runs corner to corner (our reading, not ground truth).",
+  "synthetic": false,
+  "width": 3000,
+  "height": 2250,
+  "trace": "real_01.ndjson"
+ },
+ {
+  "file": "real_02.jpg",
+  "thumb": "thumbs/real_02.jpg",
+  "title": "REAL PHOTO (ours), painted plaster wall, no ground truth",
+  "note": "By eye, two long cracks run across the paint (our reading, not ground truth).",
+  "synthetic": false,
+  "width": 3000,
+  "height": 2250,
+  "trace": "real_02.ndjson"
  }
 ]

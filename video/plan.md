@@ -116,7 +116,11 @@ To record the final trace (the owner, with the final engine): `uv run drishyam r
 $DRISHYAM_PRIVATE_DIR/real-photos/clean/IMG_2332.jpg --cost-model fixed --out runs/real` (for the trained segmenter add
 `DRISHYAM_ONNX=<model>` and `--micro-arm <its -dacl10k table>`), then copy `runs/real/<job>/trace.jsonl` to
 `video/live/real.ndjson` with the `*_b64` fields removed (as `build.py --make-standin` does), write `video/live/real.json`,
-run `--check-template`, then the build.
+run `--check-template`, then the build. Recorded 2026-10-20 with v1 (`DRISHYAM_ONNX=models/drishyam_dacl10k.onnx
+DRISHYAM_ONNX_FP16=models/drishyam_dacl10k.fp16.onnx`, `--micro-arm local-macos-x86-dacl10k-retime`): IMG_2332 is
+`video/live/real.*` (job `j_2b765d`: no candidate region, nothing found), IMG_2330 is `video/live/variants/IMG_2330/real.*`
+(job `j_67658a`: one look, one crack on the team's line), which `--check-template` also measures. The site replays the same
+two jobs, embedded images kept, from `public/samples/real_01.ndjson` and `real_02.ndjson`.
 
 The stand-ins (`build.py --make-standin`, git-ignored under `brag-output/standin/`): the classical engine on IMG_2332
 (the render's real photo: one L3 overview, no candidate region, nothing found, the crack missed) and on IMG_2330 (two

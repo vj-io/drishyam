@@ -285,7 +285,7 @@ The FR-21 ablations (random gaze order, no uncertainty term, no survey look, no 
   0.23 of the pixels on average: the 125 of 200 jobs that hit the cap each use 0.27 (so p50 = p95 = 0.27), and the
   other 75 stop earlier, at 0.18 (71 on the stop rule, 4 with every candidate looked at).
 
-The images are procedural (`evals/synth.py`): 2048×1536 weathered concrete with drawn cracks, spalls, efflorescence, exposed rebar and rust run-off, plus graffiti, formwork lines, water stains, blur and glare as distractors. The eight bundled samples in `public/samples/` come from the same generator.
+The images are procedural (`evals/synth.py`): 2048×1536 weathered concrete with drawn cracks, spalls, efflorescence, exposed rebar and rust run-off, plus graffiti, formwork lines, water stains, blur and glare as distractors. The eight bundled samples in `public/samples/` come from the same generator. The two others there, `real_01` and `real_02`, are our own photos of a painted plaster wall with no ground truth, so no number in this report uses them; the site replays the v1 segmenter's recorded run on each (`real_0N.ndjson`; the same runs as `video/live/real.ndjson` and `video/live/variants/IMG_2330/real.ndjson`).
 
 ![Recall against pixels processed](recall_vs_pixels.png)
 
