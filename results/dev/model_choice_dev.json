@@ -1,4 +1,5067 @@
 {
- "what": "Dev-only comparison of the four segmenters the live engine could run, each at its own profile (drishyam.agent.PROFILES) and charged its own cost table: the dacl10k v2a and v2b ONNX models, the dacl10k v1 ONNX model and the classical engine. Never a held-out set. Pre-registration stub: the criterion below was committed while v2b's grid was running and before any v2b row existed; v2a's and v1's dev rows had been read. The rows, the pairs and the recommendation are added after.",
- "criterion": "Recall at the 30 % cap (JobConfig's default) on CODEBRIM dev100 (real photos) and on synth_dev. Model A is better than model B on a split when the paired 95 % bootstrap CI of A's recall ratio to B (images resampled together, evals.harness.boot_ci) lies wholly above 1, worse when it lies wholly below 1; a CI that touches or crosses 1 is no measurable difference. On the clean dev split at the 30 % cap A harms against B when the paired CI of A's boxes-per-photo difference to B, or of its difference in the share of photos with any box, lies wholly above 0, by the same standard. A model is best on dev when, against each of the other three, it is better on at least one recall split, worse on neither and has no clean harm. If no model qualifies, none is best on dev by this standard, and the pairs say where each wins and loses. Modelled ms per job, the 1.0 cap, IoU-only recall, critical boxes and the ratios to L0 tiling and the downscale are reported, not part of the criterion; ms from cost tables timed at different machine loads are not comparable between models (each table's load is listed)."
+ "what": "Dev-only comparison of the four segmenters the live engine could run, each at its own profile (drishyam.agent.PROFILES) and charged its own cost table: the dacl10k v2a and v2b ONNX models, the dacl10k v1 ONNX model and the classical engine. Never a held-out set. The criterion was committed in 7f37505 (2026-10-19T21:26:42Z) while v2b's grid was running, before its first row file was written (runs/v2b/v2b_grid_clean.json, 21:27:57Z); v2a's and v1's dev rows had been read. It is unchanged.",
+ "criterion": "Recall at the 30 % cap (JobConfig's default) on CODEBRIM dev100 (real photos) and on synth_dev. Model A is better than model B on a split when the paired 95 % bootstrap CI of A's recall ratio to B (images resampled together, evals.harness.boot_ci) lies wholly above 1, worse when it lies wholly below 1; a CI that touches or crosses 1 is no measurable difference. On the clean dev split at the 30 % cap A harms against B when the paired CI of A's boxes-per-photo difference to B, or of its difference in the share of photos with any box, lies wholly above 0, by the same standard. A model is best on dev when, against each of the other three, it is better on at least one recall split, worse on neither and has no clean harm. If no model qualifies, none is best on dev by this standard, and the pairs say where each wins and loses. Modelled ms per job, the 1.0 cap, IoU-only recall, critical boxes and the ratios to L0 tiling and the downscale are reported, not part of the criterion; ms from cost tables timed at different machine loads are not comparable between models (each table's load is listed).",
+ "cost_tables": "Each model is charged its own table, timed on this Mac (x86, 1 cv2 thread per worker): v2b results/local-macos-x86-dacl10k_v2b/micro.json (2026-10-19T19:28Z, 1-min load 10.64 at start, 14.52 at end), v2a results/local-macos-x86-dacl10k_v2a/micro.json (2026-10-19T16:27Z, 1-min load 7.93 at start, 7.81 at end), v1 results/local-macos-x86-dacl10k-retime/micro.json (2026-10-19T16:31Z, 1-min load 8.0 at start, 7.39 at end), the classical engine results/local-macos-x86/micro.json (2026-10-17T20:19Z, 1-min load 23.82 at start, none recorded at end). One look at 4000x3000 (warp, quality and segment:accurate, p50) costs 1326.8 ms on v2b's table, 526.5 on v2a's, 568.1 on v1's and 108.0 on the classical engine's. v2a re-timed in v2b's window (runs/v2a/micro/local-macos-x86-dacl10k_v2a/micro.json, load 14.08 to 11.22) costs 1304.5: per look v2b costs 0.87 to 1.04 times v2a in one window across the three timed sizes, against 2.10 to 2.52 between their own tables, so the ms gap between v2b and v2a below is the machine load at timing, not the model. v1 and v2a were timed in one window (0.97 to 1.10 per look). The classical table's high load overstates its ms, so the ONNX models' ratios to it understate their extra cost at equal load.",
+ "best_on_dev": "No model is best on dev by the criterion. At the 30 % cap the three ONNX models find the same share on CODEBRIM dev100 (v2b 0.480, v2a 0.480, v1 0.479; v2b/v1 x1.00, CI 0.93-1.09, v2a/v1 x1.00, CI 0.93-1.09, v2b/v2a x1.00, CI 0.94-1.06) and no pair of them differs measurably on synth_dev (v2b 0.565, v2a 0.630, v1 0.615; v2b/v2a x0.90, CI 0.80-1.01, v2b/v1 x0.92, CI 0.83-1.02, v2a/v1 x1.02, CI 0.94-1.10). Each finds about three times what the classical engine finds on CODEBRIM (0.153; v2b x3.14, CI 2.42-4.24, v2a x3.14, CI 2.38-4.22, v1 x3.13, CI 2.37-4.31); on synth_dev v2a and v1 find more than the classical engine (x1.25, CI 1.08-1.45; x1.22, CI 1.08-1.38) and v2b no measurable amount more (x1.12, CI 0.95-1.32). What separates the ONNX models is false alarms on the clean photos: v1 put 0.033 boxes on a clean photo (a box on 1 of 30), v2a 0.700 (5 of 30), v2b 1.267 (13 of 30), the classical engine 12.133 (21 of 30). v2a put more boxes on them than v1 (+0.67 boxes per photo, CI +0.07 to +1.47), v2b more than v1 (+1.23 boxes per photo, CI +0.57 to +2.07; +0.40 in the share of photos with a box, CI +0.20 to +0.60) and a box on more photos than v2a (+0.27 in the share, CI +0.10 to +0.47). v1 is the only model with no measurable loss against any other (where_each_loses): no worse than v2a and v2b on recall, not better either, and fewer clean false alarms.",
+ "recommendation": "On the dev splits only: run the dacl10k v1 model (onnx:drishyam_dacl10k.onnx, at its profile) as the live engine's segmenter in place of the classical engine, and do not switch to v2a or v2b. Against the classical engine v1 finds 3.13 times (CI 2.37-4.31) its CODEBRIM recall and 1.22 times (CI 1.08-1.38) its synth_dev recall, with 12.1 fewer boxes per clean photo (-12.10 boxes per photo, CI -18.90 to -6.60), at 2.00 times the modelled ms per CODEBRIM job (CI 1.89-2.11; 3368 ms against 1686, each on its own table). The retrained models find no more and add clean false alarms; v2b also has lower IoU-only recall than v1 on synth_dev (x0.89, CI 0.80-0.98). v1's one measurable cost against them is the human gate: it sends 7.24 critical boxes per CODEBRIM photo to review, against v2a's 4.22 and v2b's 3.94 (v2a/v1 x0.58, CI 0.45-0.80; v2b/v1 x0.54, CI 0.41-0.75). None of this was measured on a held-out set or on the Lambda's arm64 CPU; every ms here comes from this Mac's x86 tables.",
+ "models": {
+  "v2b": {
+   "segmenter": "onnx:drishyam_dacl10k_v2b.onnx drishyam_dacl10k_v2b.onnx@47e4b687d179 drishyam_dacl10k_v2b.fp16.onnx@3f8b8648ccfd",
+   "profile": "onnx:drishyam_dacl10k_v2b.onnx",
+   "profile_values": {
+    "min_view": 0.3,
+    "absorb": false
+   },
+   "rows": "v2b_grid_<split>:ref@<cap> (the grid row of the chosen values; head check: v2b_head)",
+   "cost_table": {
+    "file": "results/local-macos-x86-dacl10k_v2b/micro.json",
+    "timestamp": "2026-10-19T19:28:59Z",
+    "load_start": [
+     10.64,
+     12.27,
+     12.91
+    ],
+    "load_end": [
+     14.52,
+     11.22,
+     11.81
+    ],
+    "per_look_p50_ms": {
+     "1024x768": 1228.2,
+     "2048x1536": 1473.1,
+     "4000x3000": 1326.8
+    }
+   }
+  },
+  "v2a": {
+   "segmenter": "onnx:drishyam_dacl10k_v2a.onnx drishyam_dacl10k_v2a.onnx@95b503c2d205 drishyam_dacl10k_v2a.fp16.onnx@0f5fa16e9a65",
+   "profile": "onnx:drishyam_dacl10k_v2a.onnx",
+   "profile_values": {
+    "min_view": 0.3,
+    "absorb": false
+   },
+   "rows": "grid_<split>:ref@<cap> (the grid row of the chosen values; head check: v2a_head)",
+   "cost_table": {
+    "file": "results/local-macos-x86-dacl10k_v2a/micro.json",
+    "timestamp": "2026-10-19T16:27:17Z",
+    "load_start": [
+     7.93,
+     6.31,
+     4.57
+    ],
+    "load_end": [
+     7.81,
+     7.08,
+     5.3
+    ],
+    "per_look_p50_ms": {
+     "1024x768": 585.2,
+     "2048x1536": 607.6,
+     "4000x3000": 526.5
+    }
+   }
+  },
+  "v1": {
+   "segmenter": "onnx:drishyam_dacl10k.onnx drishyam_dacl10k.onnx@c49416c10087 drishyam_dacl10k.fp16.onnx@f9b06fabbe47",
+   "profile": "onnx:drishyam_dacl10k.onnx",
+   "profile_values": {
+    "min_view": 0.3,
+    "absorb": false
+   },
+   "rows": "v1_head_<split>:head@<cap> (no knob set: the profile by name)",
+   "cost_table": {
+    "file": "results/local-macos-x86-dacl10k-retime/micro.json",
+    "timestamp": "2026-10-19T16:31:22Z",
+    "load_start": [
+     8.0,
+     7.17,
+     5.37
+    ],
+    "load_end": [
+     7.39,
+     7.11,
+     5.76
+    ],
+    "per_look_p50_ms": {
+     "1024x768": 641.4,
+     "2048x1536": 591.7,
+     "4000x3000": 568.1
+    }
+   }
+  },
+  "classical-v1": {
+   "segmenter": "classical-v1",
+   "profile": "classical-v1",
+   "profile_values": {
+    "min_view": 0.0,
+    "absorb": true
+   },
+   "rows": "classical_<split>:head@<cap> (no knob set: the profile by name)",
+   "cost_table": {
+    "file": "results/local-macos-x86/micro.json",
+    "timestamp": "2026-10-17T20:19:11Z",
+    "load_start": [
+     23.82,
+     19.13,
+     15.69
+    ],
+    "load_end": null,
+    "per_look_p50_ms": {
+     "1024x768": 102.6,
+     "2048x1536": 108.8,
+     "4000x3000": 108.0
+    }
+   }
+  }
+ },
+ "datasets": {
+  "synth_dev": {
+   "n": 60,
+   "gt_sha256": "ab3ea45abb852fa21e2696721060a4952819196b2959085d6f27866726b74bd3",
+   "images_sha256": "736126cce1714f7fa3823b04d001f0a5f9d913179f959ed34c675f3cd2332777"
+  },
+  "clean": {
+   "n": 30,
+   "gt_sha256": "6007a8bf12e5641f297a1630e2f4dc3f2f335ca1806f8dea3b4daad693df2ecc",
+   "images_sha256": "eaac718e380bfc6eef0571a2c91f21a4019c82f4232866d45624be1f4fa3c373"
+  },
+  "real": {
+   "n": 100,
+   "gt_sha256": "b5b6a2b442f558285ec31a7a97747cb5c918a0db4a189b2ddfca9fab710c4cd3",
+   "images_sha256": "445cf8082075eaeccdff012920c475801e3b3200831cfe76c37a972b1fa9a477"
+  }
+ },
+ "verdicts": {
+  "v2b vs v2a": {
+   "real": "same",
+   "synth_dev": "same",
+   "clean_harm": true
+  },
+  "v2b vs v1": {
+   "real": "same",
+   "synth_dev": "same",
+   "clean_harm": true
+  },
+  "v2b vs classical-v1": {
+   "real": "better",
+   "synth_dev": "same",
+   "clean_harm": false
+  },
+  "v2a vs v2b": {
+   "real": "same",
+   "synth_dev": "same",
+   "clean_harm": false
+  },
+  "v2a vs v1": {
+   "real": "same",
+   "synth_dev": "same",
+   "clean_harm": true
+  },
+  "v2a vs classical-v1": {
+   "real": "better",
+   "synth_dev": "better",
+   "clean_harm": false
+  },
+  "v1 vs v2b": {
+   "real": "same",
+   "synth_dev": "same",
+   "clean_harm": false
+  },
+  "v1 vs v2a": {
+   "real": "same",
+   "synth_dev": "same",
+   "clean_harm": false
+  },
+  "v1 vs classical-v1": {
+   "real": "better",
+   "synth_dev": "better",
+   "clean_harm": false
+  },
+  "classical-v1 vs v2b": {
+   "real": "worse",
+   "synth_dev": "same",
+   "clean_harm": true
+  },
+  "classical-v1 vs v2a": {
+   "real": "worse",
+   "synth_dev": "worse",
+   "clean_harm": true
+  },
+  "classical-v1 vs v1": {
+   "real": "worse",
+   "synth_dev": "worse",
+   "clean_harm": true
+  }
+ },
+ "best": [],
+ "where_each_loses": {
+  "v2b": [
+   "synth_dev@0.3 IoU-only recall x0.890 (CI 0.80-0.98) against v1",
+   "synth_dev@1.0 IoU-only recall x0.903 (CI 0.83-0.98) against v1",
+   "clean@0.3 +0.267 share of clean photos with a box (CI +0.100 to +0.467) against v2a",
+   "clean@0.3 +1.233 boxes per clean photo (CI +0.567 to +2.067) against v1",
+   "clean@0.3 +0.400 share of clean photos with a box (CI +0.200 to +0.600) against v1",
+   "clean@1.0 +0.233 share of clean photos with a box (CI +0.067 to +0.433) against v2a",
+   "clean@1.0 +1.267 boxes per clean photo (CI +0.632 to +2.100) against v1",
+   "clean@1.0 +0.433 share of clean photos with a box (CI +0.233 to +0.633) against v1"
+  ],
+  "classical-v1": [
+   "synth_dev@0.3 recall x0.802 (CI 0.69-0.93) against v2a",
+   "synth_dev@0.3 IoU-only recall x0.737 (CI 0.61-0.90) against v2a",
+   "synth_dev@0.3 recall x0.821 (CI 0.72-0.93) against v1",
+   "synth_dev@0.3 IoU-only recall x0.737 (CI 0.62-0.86) against v1",
+   "synth_dev@1.0 IoU-only recall x0.821 (CI 0.68-0.98) against v2b",
+   "synth_dev@1.0 recall x0.847 (CI 0.75-0.96) against v2a",
+   "synth_dev@1.0 IoU-only recall x0.748 (CI 0.62-0.90) against v2a",
+   "synth_dev@1.0 recall x0.860 (CI 0.77-0.96) against v1",
+   "synth_dev@1.0 IoU-only recall x0.742 (CI 0.63-0.86) against v1",
+   "clean@0.3 +10.867 boxes per clean photo (CI +5.233 to +17.768) against v2b",
+   "clean@0.3 +11.433 boxes per clean photo (CI +5.832 to +18.434) against v2a",
+   "clean@0.3 +0.533 share of clean photos with a box (CI +0.266 to +0.800) against v2a",
+   "clean@0.3 +12.100 boxes per clean photo (CI +6.599 to +18.903) against v1",
+   "clean@0.3 +0.667 share of clean photos with a box (CI +0.500 to +0.833) against v1",
+   "clean@1.0 +14.533 boxes per clean photo (CI +7.833 to +22.800) against v2b",
+   "clean@1.0 +0.333 share of clean photos with a box (CI +0.033 to +0.600) against v2b",
+   "clean@1.0 +14.833 boxes per clean photo (CI +7.767 to +23.302) against v2a",
+   "clean@1.0 +0.567 share of clean photos with a box (CI +0.267 to +0.833) against v2a",
+   "clean@1.0 +15.800 boxes per clean photo (CI +9.032 to +23.768) against v1",
+   "clean@1.0 +0.767 share of clean photos with a box (CI +0.632 to +0.900) against v1",
+   "real@0.3 recall x0.318 (CI 0.24-0.41) against v2b",
+   "real@0.3 IoU-only recall x0.251 (CI 0.16-0.36) against v2b",
+   "real@0.3 recall x0.318 (CI 0.24-0.42) against v2a",
+   "real@0.3 IoU-only recall x0.271 (CI 0.18-0.38) against v2a",
+   "real@0.3 recall x0.319 (CI 0.23-0.42) against v1",
+   "real@0.3 IoU-only recall x0.247 (CI 0.16-0.35) against v1",
+   "real@1.0 recall x0.373 (CI 0.28-0.49) against v2b",
+   "real@1.0 IoU-only recall x0.330 (CI 0.23-0.44) against v2b",
+   "real@1.0 recall x0.374 (CI 0.27-0.48) against v2a",
+   "real@1.0 IoU-only recall x0.357 (CI 0.25-0.47) against v2a",
+   "real@1.0 recall x0.372 (CI 0.27-0.50) against v1",
+   "real@1.0 IoU-only recall x0.323 (CI 0.22-0.43) against v1"
+  ],
+  "v2a": [
+   "clean@0.3 +0.667 boxes per clean photo (CI +0.067 to +1.468) against v1",
+   "clean@1.0 +0.967 boxes per clean photo (CI +0.200 to +1.867) against v1",
+   "clean@1.0 +0.200 share of clean photos with a box (CI +0.033 to +0.367) against v1"
+  ]
+ },
+ "table": {
+  "synth_dev@0.3": {
+   "v2b": {
+    "row": "v2b_grid_synth_dev:ref@0.3",
+    "profiles": [
+     "classical-v1"
+    ],
+    "recall": 0.565,
+    "recall_ci": [
+     0.4928,
+     0.6464
+    ],
+    "recall_iou_only": 0.525,
+    "chance_recall": 0.065,
+    "chance_recall_iou_only": 0.01,
+    "boxes_per_image": 5.6,
+    "images_with_any": 0.9667,
+    "critical_per_image": 0.6333,
+    "pixels_frac": 0.2573,
+    "vs_downscale": 1.1649,
+    "vs_downscale_ci": [
+     1.0532,
+     1.2989
+    ],
+    "vs_downscale_iou_only_ci": [
+     1.0495,
+     1.3816
+    ],
+    "vs_tiling_L0": 0.7434,
+    "vs_tiling_L0_ci": [
+     0.6643,
+     0.824
+    ],
+    "vs_tiling_L0_iou_only_ci": [
+     0.634,
+     0.7922
+    ],
+    "pixels_vs_tiling_L0": 0.1544,
+    "halt": {
+     "cap-hit": 54,
+     "stop-rule": 6
+    },
+    "looks_mean": 2.9,
+    "boxes_per_image_ci": [
+     4.6329,
+     6.6333
+    ],
+    "images_with_any_ci": [
+     0.9167,
+     1.0
+    ],
+    "critical_per_image_ci": [
+     0.4163,
+     0.8833
+    ],
+    "ms_per_job": 4294.195,
+    "ms_per_job_ci": [
+     4171.4408,
+     4392.3983
+    ],
+    "jobs_at_20s": 0,
+    "ms_vs_tiling_L0": 0.1463,
+    "ms_vs_downscale": 2.9217,
+    "ms_vs_tiling_L0_ci": [
+     0.1421,
+     0.1496
+    ],
+    "ms_vs_downscale_ci": [
+     2.8382,
+     2.9885
+    ]
+   },
+   "v2a": {
+    "row": "grid_synth_dev:ref@0.3",
+    "profiles": [
+     "classical-v1"
+    ],
+    "recall": 0.63,
+    "recall_ci": [
+     0.5514,
+     0.698
+    ],
+    "recall_iou_only": 0.59,
+    "chance_recall": 0.075,
+    "chance_recall_iou_only": 0.035,
+    "boxes_per_image": 6.0667,
+    "images_with_any": 0.9833,
+    "critical_per_image": 0.9167,
+    "pixels_frac": 0.2587,
+    "vs_downscale": 1.3263,
+    "vs_downscale_ci": [
+     1.1758,
+     1.5068
+    ],
+    "vs_downscale_iou_only_ci": [
+     1.1568,
+     1.494
+    ],
+    "vs_tiling_L0": 0.8344,
+    "vs_tiling_L0_ci": [
+     0.7484,
+     0.9091
+    ],
+    "vs_tiling_L0_iou_only_ci": [
+     0.7258,
+     0.8867
+    ],
+    "pixels_vs_tiling_L0": 0.1552,
+    "halt": {
+     "cap-hit": 55,
+     "stop-rule": 5
+    },
+    "looks_mean": 2.9167,
+    "boxes_per_image_ci": [
+     4.9829,
+     7.15
+    ],
+    "images_with_any_ci": [
+     0.95,
+     1.0
+    ],
+    "critical_per_image_ci": [
+     0.65,
+     1.2333
+    ],
+    "ms_per_job": 1784.6742,
+    "ms_per_job_ci": [
+     1744.1655,
+     1825.1828
+    ],
+    "jobs_at_20s": 0,
+    "ms_vs_tiling_L0": 0.1476,
+    "ms_vs_downscale": 2.9418,
+    "ms_vs_tiling_L0_ci": [
+     0.1442,
+     0.1509
+    ],
+    "ms_vs_downscale_ci": [
+     2.875,
+     3.0086
+    ]
+   },
+   "v1": {
+    "row": "v1_head_synth_dev:head@0.3",
+    "profiles": [
+     "onnx:drishyam_dacl10k.onnx"
+    ],
+    "recall": 0.615,
+    "recall_ci": [
+     0.5468,
+     0.6786
+    ],
+    "recall_iou_only": 0.59,
+    "chance_recall": 0.05,
+    "chance_recall_iou_only": 0.015,
+    "boxes_per_image": 5.9833,
+    "images_with_any": 0.95,
+    "critical_per_image": 0.8167,
+    "pixels_frac": 0.2545,
+    "vs_downscale": 1.0082,
+    "vs_downscale_ci": [
+     0.9389,
+     1.0763
+    ],
+    "vs_downscale_iou_only_ci": [
+     0.931,
+     1.0654
+    ],
+    "vs_tiling_L0": 0.8849,
+    "vs_tiling_L0_ci": [
+     0.8169,
+     0.9587
+    ],
+    "vs_tiling_L0_iou_only_ci": [
+     0.8,
+     0.9422
+    ],
+    "pixels_vs_tiling_L0": 0.1527,
+    "halt": {
+     "cap-hit": 52,
+     "stop-rule": 8
+    },
+    "looks_mean": 2.8667,
+    "boxes_per_image_ci": [
+     4.95,
+     7.0833
+    ],
+    "images_with_any_ci": [
+     0.8833,
+     1.0
+    ],
+    "critical_per_image_ci": [
+     0.55,
+     1.1167
+    ],
+    "ms_per_job": 1709.8133,
+    "ms_per_job_ci": [
+     1660.5092,
+     1759.1175
+    ],
+    "jobs_at_20s": 0,
+    "ms_vs_tiling_L0": 0.1452,
+    "ms_vs_downscale": 2.8993,
+    "ms_vs_tiling_L0_ci": [
+     0.1411,
+     0.1494
+    ],
+    "ms_vs_downscale_ci": [
+     2.8157,
+     2.9829
+    ]
+   },
+   "classical-v1": {
+    "row": "classical_synth_dev:head@0.3",
+    "profiles": [
+     "classical-v1"
+    ],
+    "recall": 0.505,
+    "recall_ci": [
+     0.4388,
+     0.5829
+    ],
+    "recall_iou_only": 0.435,
+    "chance_recall": 0.02,
+    "chance_recall_iou_only": 0.005,
+    "boxes_per_image": 17.9,
+    "images_with_any": 0.9667,
+    "critical_per_image": 1.5833,
+    "pixels_frac": 0.26,
+    "vs_downscale": 1.0202,
+    "vs_downscale_ci": [
+     0.9189,
+     1.1349
+    ],
+    "vs_downscale_iou_only_ci": [
+     0.9268,
+     1.1858
+    ],
+    "vs_tiling_L0": 0.9712,
+    "vs_tiling_L0_ci": [
+     0.8558,
+     1.0962
+    ],
+    "vs_tiling_L0_iou_only_ci": [
+     0.8999,
+     1.2576
+    ],
+    "pixels_vs_tiling_L0": 0.156,
+    "halt": {
+     "cap-hit": 56,
+     "stop-rule": 4
+    },
+    "looks_mean": 2.9333,
+    "boxes_per_image_ci": [
+     14.8,
+     21.2671
+    ],
+    "images_with_any_ci": [
+     0.9167,
+     1.0
+    ],
+    "critical_per_image_ci": [
+     0.9,
+     2.3667
+    ],
+    "ms_per_job": 335.7133,
+    "ms_per_job_ci": [
+     328.4567,
+     341.1558
+    ],
+    "jobs_at_20s": 0,
+    "ms_vs_tiling_L0": 0.1613,
+    "ms_vs_downscale": 1.0703,
+    "ms_vs_tiling_L0_ci": [
+     0.1578,
+     0.1639
+    ],
+    "ms_vs_downscale_ci": [
+     1.0471,
+     1.0876
+    ]
+   }
+  },
+  "synth_dev@1.0": {
+   "v2b": {
+    "row": "v2b_grid_synth_dev:ref@1.0",
+    "profiles": [
+     "classical-v1"
+    ],
+    "recall": 0.6,
+    "recall_ci": [
+     0.5307,
+     0.6726
+    ],
+    "recall_iou_only": 0.56,
+    "chance_recall": 0.075,
+    "chance_recall_iou_only": 0.03,
+    "boxes_per_image": 6.6667,
+    "images_with_any": 0.9667,
+    "critical_per_image": 0.7,
+    "pixels_frac": 0.3059,
+    "vs_downscale": 1.2371,
+    "vs_downscale_ci": [
+     1.1089,
+     1.3979
+    ],
+    "vs_downscale_iou_only_ci": [
+     1.1134,
+     1.4933
+    ],
+    "vs_tiling_L0": 0.7895,
+    "vs_tiling_L0_ci": [
+     0.7215,
+     0.8603
+    ],
+    "vs_tiling_L0_iou_only_ci": [
+     0.6882,
+     0.8428
+    ],
+    "pixels_vs_tiling_L0": 0.1835,
+    "halt": {
+     "exhausted": 4,
+     "stop-rule": 56
+    },
+    "looks_mean": 3.4833,
+    "boxes_per_image_ci": [
+     5.5329,
+     7.8667
+    ],
+    "images_with_any_ci": [
+     0.9167,
+     1.0
+    ],
+    "critical_per_image_ci": [
+     0.45,
+     0.9833
+    ],
+    "ms_per_job": 5153.4792,
+    "ms_per_job_ci": [
+     4858.8683,
+     5448.0902
+    ],
+    "jobs_at_20s": 0,
+    "ms_vs_tiling_L0": 0.1756,
+    "ms_vs_downscale": 3.5063,
+    "ms_vs_tiling_L0_ci": [
+     0.1655,
+     0.1856
+    ],
+    "ms_vs_downscale_ci": [
+     3.3059,
+     3.7068
+    ]
+   },
+   "v2a": {
+    "row": "grid_synth_dev:ref@1.0",
+    "profiles": [
+     "classical-v1"
+    ],
+    "recall": 0.655,
+    "recall_ci": [
+     0.5736,
+     0.7202
+    ],
+    "recall_iou_only": 0.615,
+    "chance_recall": 0.08,
+    "chance_recall_iou_only": 0.045,
+    "boxes_per_image": 6.9667,
+    "images_with_any": 0.9833,
+    "critical_per_image": 1.0,
+    "pixels_frac": 0.2976,
+    "vs_downscale": 1.3789,
+    "vs_downscale_ci": [
+     1.219,
+     1.579
+    ],
+    "vs_downscale_iou_only_ci": [
+     1.1978,
+     1.5676
+    ],
+    "vs_tiling_L0": 0.8675,
+    "vs_tiling_L0_ci": [
+     0.7843,
+     0.9375
+    ],
+    "vs_tiling_L0_iou_only_ci": [
+     0.7616,
+     0.9231
+    ],
+    "pixels_vs_tiling_L0": 0.1785,
+    "halt": {
+     "exhausted": 1,
+     "stop-rule": 59
+    },
+    "looks_mean": 3.3833,
+    "boxes_per_image_ci": [
+     5.7829,
+     8.25
+    ],
+    "images_with_any_ci": [
+     0.95,
+     1.0
+    ],
+    "critical_per_image_ci": [
+     0.7,
+     1.3337
+    ],
+    "ms_per_job": 2068.2308,
+    "ms_per_job_ci": [
+     1946.7063,
+     2179.6288
+    ],
+    "jobs_at_20s": 0,
+    "ms_vs_tiling_L0": 0.171,
+    "ms_vs_downscale": 3.4092,
+    "ms_vs_tiling_L0_ci": [
+     0.161,
+     0.1802
+    ],
+    "ms_vs_downscale_ci": [
+     3.2089,
+     3.5928
+    ]
+   },
+   "v1": {
+    "row": "v1_head_synth_dev:head@1.0",
+    "profiles": [
+     "onnx:drishyam_dacl10k.onnx"
+    ],
+    "recall": 0.645,
+    "recall_ci": [
+     0.5741,
+     0.7108
+    ],
+    "recall_iou_only": 0.62,
+    "chance_recall": 0.07,
+    "chance_recall_iou_only": 0.03,
+    "boxes_per_image": 7.0,
+    "images_with_any": 0.95,
+    "critical_per_image": 0.9,
+    "pixels_frac": 0.2934,
+    "vs_downscale": 1.0574,
+    "vs_downscale_ci": [
+     0.9704,
+     1.1441
+    ],
+    "vs_downscale_iou_only_ci": [
+     0.9669,
+     1.1377
+    ],
+    "vs_tiling_L0": 0.9281,
+    "vs_tiling_L0_ci": [
+     0.8626,
+     0.9923
+    ],
+    "vs_tiling_L0_iou_only_ci": [
+     0.8437,
+     0.9851
+    ],
+    "pixels_vs_tiling_L0": 0.176,
+    "halt": {
+     "stop-rule": 59,
+     "exhausted": 1
+    },
+    "looks_mean": 3.3333,
+    "boxes_per_image_ci": [
+     5.6,
+     8.5504
+    ],
+    "images_with_any_ci": [
+     0.8833,
+     1.0
+    ],
+    "critical_per_image_ci": [
+     0.5833,
+     1.2667
+    ],
+    "ms_per_job": 1985.9167,
+    "ms_per_job_ci": [
+     1877.4475,
+     2114.1075
+    ],
+    "jobs_at_20s": 0,
+    "ms_vs_tiling_L0": 0.1687,
+    "ms_vs_downscale": 3.3674,
+    "ms_vs_tiling_L0_ci": [
+     0.1595,
+     0.1796
+    ],
+    "ms_vs_downscale_ci": [
+     3.1835,
+     3.5848
+    ]
+   },
+   "classical-v1": {
+    "row": "classical_synth_dev:head@1.0",
+    "profiles": [
+     "classical-v1"
+    ],
+    "recall": 0.555,
+    "recall_ci": [
+     0.488,
+     0.6238
+    ],
+    "recall_iou_only": 0.46,
+    "chance_recall": 0.045,
+    "chance_recall_iou_only": 0.025,
+    "boxes_per_image": 30.6,
+    "images_with_any": 0.9833,
+    "critical_per_image": 3.0333,
+    "pixels_frac": 0.4559,
+    "vs_downscale": 1.1212,
+    "vs_downscale_ci": [
+     1.0309,
+     1.2247
+    ],
+    "vs_downscale_iou_only_ci": [
+     1.0089,
+     1.2298
+    ],
+    "vs_tiling_L0": 1.0673,
+    "vs_tiling_L0_ci": [
+     0.964,
+     1.1848
+    ],
+    "vs_tiling_L0_iou_only_ci": [
+     0.9534,
+     1.3108
+    ],
+    "pixels_vs_tiling_L0": 0.2735,
+    "halt": {
+     "stop-rule": 57,
+     "exhausted": 3
+    },
+    "looks_mean": 5.2833,
+    "boxes_per_image_ci": [
+     24.5996,
+     36.9179
+    ],
+    "images_with_any_ci": [
+     0.95,
+     1.0
+    ],
+    "critical_per_image_ci": [
+     1.6329,
+     4.6837
+    ],
+    "ms_per_job": 591.5108,
+    "ms_per_job_ci": [
+     546.1567,
+     633.2367
+    ],
+    "jobs_at_20s": 0,
+    "ms_vs_tiling_L0": 0.2842,
+    "ms_vs_downscale": 1.8858,
+    "ms_vs_tiling_L0_ci": [
+     0.2624,
+     0.3043
+    ],
+    "ms_vs_downscale_ci": [
+     1.7412,
+     2.0188
+    ]
+   }
+  },
+  "clean@0.3": {
+   "v2b": {
+    "row": "v2b_grid_clean:ref@0.3",
+    "profiles": [
+     "classical-v1"
+    ],
+    "recall": null,
+    "recall_ci": [
+     null,
+     null
+    ],
+    "recall_iou_only": null,
+    "chance_recall": null,
+    "chance_recall_iou_only": null,
+    "boxes_per_image": 1.2667,
+    "images_with_any": 0.4333,
+    "critical_per_image": 0.0333,
+    "pixels_frac": 0.2434,
+    "vs_downscale": null,
+    "vs_downscale_ci": null,
+    "vs_downscale_iou_only_ci": null,
+    "vs_tiling_L0": null,
+    "vs_tiling_L0_ci": null,
+    "vs_tiling_L0_iou_only_ci": null,
+    "pixels_vs_tiling_L0": null,
+    "halt": {
+     "cap-hit": 24,
+     "exhausted": 2,
+     "stop-rule": 4
+    },
+    "looks_mean": 2.7333,
+    "boxes_per_image_ci": [
+     0.6333,
+     2.1
+    ],
+    "images_with_any_ci": [
+     0.2667,
+     0.6333
+    ],
+    "critical_per_image_ci": [
+     0.0,
+     0.1
+    ],
+    "ms_per_job": 4048.6867,
+    "ms_per_job_ci": [
+     3704.975,
+     4294.195
+    ],
+    "jobs_at_20s": 0,
+    "ms_vs_tiling_L0": 0.1379,
+    "ms_vs_downscale": 2.7546,
+    "ms_vs_tiling_L0_ci": [
+     0.1262,
+     0.1463
+    ],
+    "ms_vs_downscale_ci": [
+     2.5208,
+     2.9217
+    ]
+   },
+   "v2a": {
+    "row": "grid_clean:ref@0.3",
+    "profiles": [
+     "classical-v1"
+    ],
+    "recall": null,
+    "recall_ci": [
+     null,
+     null
+    ],
+    "recall_iou_only": null,
+    "chance_recall": null,
+    "chance_recall_iou_only": null,
+    "boxes_per_image": 0.7,
+    "images_with_any": 0.1667,
+    "critical_per_image": 0.0,
+    "pixels_frac": 0.2378,
+    "vs_downscale": null,
+    "vs_downscale_ci": null,
+    "vs_downscale_iou_only_ci": null,
+    "vs_tiling_L0": null,
+    "vs_tiling_L0_ci": null,
+    "vs_tiling_L0_iou_only_ci": null,
+    "pixels_vs_tiling_L0": null,
+    "halt": {
+     "stop-rule": 6,
+     "exhausted": 2,
+     "cap-hit": 22
+    },
+    "looks_mean": 2.6667,
+    "boxes_per_image_ci": [
+     0.1,
+     1.5
+    ],
+    "images_with_any_ci": [
+     0.0333,
+     0.3
+    ],
+    "critical_per_image_ci": [
+     0.0,
+     0.0
+    ],
+    "ms_per_job": 1632.7673,
+    "ms_per_job_ci": [
+     1490.9877,
+     1754.2927
+    ],
+    "jobs_at_20s": 0,
+    "ms_vs_tiling_L0": 0.135,
+    "ms_vs_downscale": 2.6914,
+    "ms_vs_tiling_L0_ci": [
+     0.1233,
+     0.1451
+    ],
+    "ms_vs_downscale_ci": [
+     2.4577,
+     2.8917
+    ]
+   },
+   "v1": {
+    "row": "v1_head_clean:head@0.3",
+    "profiles": [
+     "onnx:drishyam_dacl10k.onnx"
+    ],
+    "recall": null,
+    "recall_ci": [
+     null,
+     null
+    ],
+    "recall_iou_only": null,
+    "chance_recall": null,
+    "chance_recall_iou_only": null,
+    "boxes_per_image": 0.0333,
+    "images_with_any": 0.0333,
+    "critical_per_image": 0.0,
+    "pixels_frac": 0.2434,
+    "vs_downscale": null,
+    "vs_downscale_ci": null,
+    "vs_downscale_iou_only_ci": null,
+    "vs_tiling_L0": null,
+    "vs_tiling_L0_ci": null,
+    "vs_tiling_L0_iou_only_ci": null,
+    "pixels_vs_tiling_L0": null,
+    "halt": {
+     "stop-rule": 4,
+     "exhausted": 2,
+     "cap-hit": 24
+    },
+    "looks_mean": 2.7333,
+    "boxes_per_image_ci": [
+     0.0,
+     0.1
+    ],
+    "images_with_any_ci": [
+     0.0,
+     0.1
+    ],
+    "critical_per_image_ci": [
+     0.0,
+     0.0
+    ],
+    "ms_per_job": 1630.926,
+    "ms_per_job_ci": [
+     1473.1523,
+     1729.535
+    ],
+    "jobs_at_20s": 0,
+    "ms_vs_tiling_L0": 0.1385,
+    "ms_vs_downscale": 2.7655,
+    "ms_vs_tiling_L0_ci": [
+     0.1251,
+     0.1469
+    ],
+    "ms_vs_downscale_ci": [
+     2.498,
+     2.9327
+    ]
+   },
+   "classical-v1": {
+    "row": "classical_clean:head@0.3",
+    "profiles": [
+     "classical-v1"
+    ],
+    "recall": null,
+    "recall_ci": [
+     null,
+     null
+    ],
+    "recall_iou_only": null,
+    "chance_recall": null,
+    "chance_recall_iou_only": null,
+    "boxes_per_image": 12.1333,
+    "images_with_any": 0.7,
+    "critical_per_image": 0.6333,
+    "pixels_frac": 0.2545,
+    "vs_downscale": null,
+    "vs_downscale_ci": null,
+    "vs_downscale_iou_only_ci": null,
+    "vs_tiling_L0": null,
+    "vs_tiling_L0_ci": null,
+    "vs_tiling_L0_iou_only_ci": null,
+    "pixels_vs_tiling_L0": null,
+    "halt": {
+     "cap-hit": 26,
+     "exhausted": 2,
+     "stop-rule": 2
+    },
+    "looks_mean": 2.8667,
+    "boxes_per_image_ci": [
+     6.6325,
+     18.97
+    ],
+    "images_with_any_ci": [
+     0.5333,
+     0.8667
+    ],
+    "critical_per_image_ci": [
+     0.0333,
+     1.6342
+    ],
+    "ms_per_job": 328.4567,
+    "ms_per_job_ci": [
+     313.9433,
+     339.3417
+    ],
+    "jobs_at_20s": 0,
+    "ms_vs_tiling_L0": 0.1578,
+    "ms_vs_downscale": 1.0471,
+    "ms_vs_tiling_L0_ci": [
+     0.1509,
+     0.1631
+    ],
+    "ms_vs_downscale_ci": [
+     1.0009,
+     1.0818
+    ]
+   }
+  },
+  "clean@1.0": {
+   "v2b": {
+    "row": "v2b_grid_clean:ref@1.0",
+    "profiles": [
+     "classical-v1"
+    ],
+    "recall": null,
+    "recall_ci": [
+     null,
+     null
+    ],
+    "recall_iou_only": null,
+    "chance_recall": null,
+    "chance_recall_iou_only": null,
+    "boxes_per_image": 1.3,
+    "images_with_any": 0.4667,
+    "critical_per_image": 0.0333,
+    "pixels_frac": 0.2684,
+    "vs_downscale": null,
+    "vs_downscale_ci": null,
+    "vs_downscale_iou_only_ci": null,
+    "vs_tiling_L0": null,
+    "vs_tiling_L0_ci": null,
+    "vs_tiling_L0_iou_only_ci": null,
+    "pixels_vs_tiling_L0": null,
+    "halt": {
+     "stop-rule": 22,
+     "exhausted": 8
+    },
+    "looks_mean": 3.0333,
+    "boxes_per_image_ci": [
+     0.6667,
+     2.1
+    ],
+    "images_with_any_ci": [
+     0.3,
+     0.6667
+    ],
+    "critical_per_image_ci": [
+     0.0,
+     0.1
+    ],
+    "ms_per_job": 4490.604,
+    "ms_per_job_ci": [
+     3950.485,
+     4932.52
+    ],
+    "jobs_at_20s": 0,
+    "ms_vs_tiling_L0": 0.153,
+    "ms_vs_downscale": 3.0553,
+    "ms_vs_tiling_L0_ci": [
+     0.1346,
+     0.168
+    ],
+    "ms_vs_downscale_ci": [
+     2.6878,
+     3.356
+    ]
+   },
+   "v2a": {
+    "row": "grid_clean:ref@1.0",
+    "profiles": [
+     "classical-v1"
+    ],
+    "recall": null,
+    "recall_ci": [
+     null,
+     null
+    ],
+    "recall_iou_only": null,
+    "chance_recall": null,
+    "chance_recall_iou_only": null,
+    "boxes_per_image": 1.0,
+    "images_with_any": 0.2333,
+    "critical_per_image": 0.0,
+    "pixels_frac": 0.2684,
+    "vs_downscale": null,
+    "vs_downscale_ci": null,
+    "vs_downscale_iou_only_ci": null,
+    "vs_tiling_L0": null,
+    "vs_tiling_L0_ci": null,
+    "vs_tiling_L0_iou_only_ci": null,
+    "pixels_vs_tiling_L0": null,
+    "halt": {
+     "stop-rule": 22,
+     "exhausted": 8
+    },
+    "looks_mean": 3.0333,
+    "boxes_per_image_ci": [
+     0.2333,
+     1.9
+    ],
+    "images_with_any_ci": [
+     0.0667,
+     0.4
+    ],
+    "critical_per_image_ci": [
+     0.0,
+     0.0
+    ],
+    "ms_per_job": 1855.562,
+    "ms_per_job_ci": [
+     1632.766,
+     2058.104
+    ],
+    "jobs_at_20s": 0,
+    "ms_vs_tiling_L0": 0.1534,
+    "ms_vs_downscale": 3.0587,
+    "ms_vs_tiling_L0_ci": [
+     0.135,
+     0.1702
+    ],
+    "ms_vs_downscale_ci": [
+     2.6914,
+     3.3925
+    ]
+   },
+   "v1": {
+    "row": "v1_head_clean:head@1.0",
+    "profiles": [
+     "onnx:drishyam_dacl10k.onnx"
+    ],
+    "recall": null,
+    "recall_ci": [
+     null,
+     null
+    ],
+    "recall_iou_only": null,
+    "chance_recall": null,
+    "chance_recall_iou_only": null,
+    "boxes_per_image": 0.0333,
+    "images_with_any": 0.0333,
+    "critical_per_image": 0.0,
+    "pixels_frac": 0.2684,
+    "vs_downscale": null,
+    "vs_downscale_ci": null,
+    "vs_downscale_iou_only_ci": null,
+    "vs_tiling_L0": null,
+    "vs_tiling_L0_ci": null,
+    "vs_tiling_L0_iou_only_ci": null,
+    "pixels_vs_tiling_L0": null,
+    "halt": {
+     "stop-rule": 18,
+     "exhausted": 12
+    },
+    "looks_mean": 3.0333,
+    "boxes_per_image_ci": [
+     0.0,
+     0.1
+    ],
+    "images_with_any_ci": [
+     0.0,
+     0.1
+    ],
+    "critical_per_image_ci": [
+     0.0,
+     0.0
+    ],
+    "ms_per_job": 1808.421,
+    "ms_per_job_ci": [
+     1591.482,
+     1985.9163
+    ],
+    "jobs_at_20s": 0,
+    "ms_vs_tiling_L0": 0.1536,
+    "ms_vs_downscale": 3.0665,
+    "ms_vs_tiling_L0_ci": [
+     0.1352,
+     0.1687
+    ],
+    "ms_vs_downscale_ci": [
+     2.6986,
+     3.3674
+    ]
+   },
+   "classical-v1": {
+    "row": "classical_clean:head@1.0",
+    "profiles": [
+     "classical-v1"
+    ],
+    "recall": null,
+    "recall_ci": [
+     null,
+     null
+    ],
+    "recall_iou_only": null,
+    "chance_recall": null,
+    "chance_recall_iou_only": null,
+    "boxes_per_image": 15.8333,
+    "images_with_any": 0.8,
+    "critical_per_image": 1.0,
+    "pixels_frac": 0.4129,
+    "vs_downscale": null,
+    "vs_downscale_ci": null,
+    "vs_downscale_iou_only_ci": null,
+    "vs_tiling_L0": null,
+    "vs_tiling_L0_ci": null,
+    "vs_tiling_L0_iou_only_ci": null,
+    "pixels_vs_tiling_L0": null,
+    "halt": {
+     "stop-rule": 24,
+     "exhausted": 5,
+     "cap-hit": 1
+    },
+    "looks_mean": 4.7667,
+    "boxes_per_image_ci": [
+     9.0658,
+     23.77
+    ],
+    "images_with_any_ci": [
+     0.6667,
+     0.9333
+    ],
+    "critical_per_image_ci": [
+     0.0333,
+     2.6667
+    ],
+    "ms_per_job": 535.2717,
+    "ms_per_job_ci": [
+     455.4483,
+     618.7233
+    ],
+    "jobs_at_20s": 0,
+    "ms_vs_tiling_L0": 0.2572,
+    "ms_vs_downscale": 1.7065,
+    "ms_vs_tiling_L0_ci": [
+     0.2189,
+     0.2973
+    ],
+    "ms_vs_downscale_ci": [
+     1.452,
+     1.9725
+    ]
+   }
+  },
+  "real@0.3": {
+   "v2b": {
+    "row": "v2b_grid_real:ref@0.3",
+    "profiles": [
+     "classical-v1"
+    ],
+    "recall": 0.4803,
+    "recall_ci": [
+     0.4232,
+     0.532
+    ],
+    "recall_iou_only": 0.2616,
+    "chance_recall": 0.2401,
+    "chance_recall_iou_only": 0.0621,
+    "boxes_per_image": 41.32,
+    "images_with_any": 0.9,
+    "critical_per_image": 3.94,
+    "pixels_frac": 0.1412,
+    "vs_downscale": 1.1044,
+    "vs_downscale_ci": [
+     1.0195,
+     1.1908
+    ],
+    "vs_downscale_iou_only_ci": [
+     1.1676,
+     1.6304
+    ],
+    "vs_tiling_L0": 0.9306,
+    "vs_tiling_L0_ci": [
+     0.766,
+     1.0968
+    ],
+    "vs_tiling_L0_iou_only_ci": [
+     0.7734,
+     1.4875
+    ],
+    "pixels_vs_tiling_L0": 0.0868,
+    "halt": {
+     "cap-hit": 18,
+     "stop-rule": 76,
+     "exhausted": 6
+    },
+    "looks_mean": 5.83,
+    "boxes_per_image_ci": [
+     35.0288,
+     47.7713
+    ],
+    "images_with_any_ci": [
+     0.84,
+     0.95
+    ],
+    "critical_per_image_ci": [
+     3.1198,
+     4.78
+    ],
+    "ms_per_job": 7961.6659,
+    "ms_per_job_ci": [
+     7573.523,
+     8352.3518
+    ],
+    "jobs_at_20s": 0,
+    "ms_vs_tiling_L0": 0.0668,
+    "ms_vs_downscale": 5.6258,
+    "ms_vs_tiling_L0_ci": [
+     0.0635,
+     0.0704
+    ],
+    "ms_vs_downscale_ci": [
+     5.3431,
+     5.9136
+    ]
+   },
+   "v2a": {
+    "row": "grid_real:ref@0.3",
+    "profiles": [
+     "classical-v1"
+    ],
+    "recall": 0.4803,
+    "recall_ci": [
+     0.4158,
+     0.5394
+    ],
+    "recall_iou_only": 0.2425,
+    "chance_recall": 0.2664,
+    "chance_recall_iou_only": 0.0681,
+    "boxes_per_image": 42.17,
+    "images_with_any": 0.89,
+    "critical_per_image": 4.22,
+    "pixels_frac": 0.1409,
+    "vs_downscale": 1.1014,
+    "vs_downscale_ci": [
+     1.0203,
+     1.197
+    ],
+    "vs_downscale_iou_only_ci": [
+     1.1,
+     1.5617
+    ],
+    "vs_tiling_L0": 0.9504,
+    "vs_tiling_L0_ci": [
+     0.7623,
+     1.1429
+    ],
+    "vs_tiling_L0_iou_only_ci": [
+     0.7571,
+     1.4245
+    ],
+    "pixels_vs_tiling_L0": 0.0866,
+    "halt": {
+     "cap-hit": 18,
+     "stop-rule": 75,
+     "exhausted": 7
+    },
+    "looks_mean": 5.81,
+    "boxes_per_image_ci": [
+     35.7078,
+     49.5305
+    ],
+    "images_with_any_ci": [
+     0.83,
+     0.95
+    ],
+    "critical_per_image_ci": [
+     3.4398,
+     5.07
+    ],
+    "ms_per_job": 3197.288,
+    "ms_per_job_ci": [
+     3044.6496,
+     3354.3791
+    ],
+    "jobs_at_20s": 0,
+    "ms_vs_tiling_L0": 0.0674,
+    "ms_vs_downscale": 5.5164,
+    "ms_vs_tiling_L0_ci": [
+     0.0641,
+     0.0712
+    ],
+    "ms_vs_downscale_ci": [
+     5.2457,
+     5.7957
+    ]
+   },
+   "v1": {
+    "row": "v1_head_real:head@0.3",
+    "profiles": [
+     "onnx:drishyam_dacl10k.onnx"
+    ],
+    "recall": 0.4791,
+    "recall_ci": [
+     0.4041,
+     0.5441
+    ],
+    "recall_iou_only": 0.2664,
+    "chance_recall": 0.2306,
+    "chance_recall_iou_only": 0.0729,
+    "boxes_per_image": 39.12,
+    "images_with_any": 0.91,
+    "critical_per_image": 7.24,
+    "pixels_frac": 0.1404,
+    "vs_downscale": 1.1794,
+    "vs_downscale_ci": [
+     1.0695,
+     1.3052
+    ],
+    "vs_downscale_iou_only_ci": [
+     1.3169,
+     1.8346
+    ],
+    "vs_tiling_L0": 1.2531,
+    "vs_tiling_L0_ci": [
+     0.9335,
+     1.6024
+    ],
+    "vs_tiling_L0_iou_only_ci": [
+     1.0284,
+     2.3947
+    ],
+    "pixels_vs_tiling_L0": 0.0862,
+    "halt": {
+     "stop-rule": 76,
+     "cap-hit": 17,
+     "exhausted": 7
+    },
+    "looks_mean": 5.79,
+    "boxes_per_image_ci": [
+     31.84,
+     48.03
+    ],
+    "images_with_any_ci": [
+     0.85,
+     0.96
+    ],
+    "critical_per_image_ci": [
+     4.9697,
+     9.9512
+    ],
+    "ms_per_job": 3367.5987,
+    "ms_per_job_ci": [
+     3184.0153,
+     3546.5654
+    ],
+    "jobs_at_20s": 0,
+    "ms_vs_tiling_L0": 0.0663,
+    "ms_vs_downscale": 5.4983,
+    "ms_vs_tiling_L0_ci": [
+     0.0629,
+     0.0701
+    ],
+    "ms_vs_downscale_ci": [
+     5.2145,
+     5.7679
+    ]
+   },
+   "classical-v1": {
+    "row": "classical_real:head@0.3",
+    "profiles": [
+     "classical-v1"
+    ],
+    "recall": 0.1529,
+    "recall_ci": [
+     0.1192,
+     0.1884
+    ],
+    "recall_iou_only": 0.0657,
+    "chance_recall": 0.0848,
+    "chance_recall_iou_only": 0.0131,
+    "boxes_per_image": 867.94,
+    "images_with_any": 0.99,
+    "critical_per_image": 1.78,
+    "pixels_frac": 0.2815,
+    "vs_downscale": 0.9343,
+    "vs_downscale_ci": [
+     0.7443,
+     1.1482
+    ],
+    "vs_downscale_iou_only_ci": [
+     0.5735,
+     1.2449
+    ],
+    "vs_tiling_L0": 0.7273,
+    "vs_tiling_L0_ci": [
+     0.5699,
+     0.9672
+    ],
+    "vs_tiling_L0_iou_only_ci": [
+     0.6988,
+     1.5429
+    ],
+    "pixels_vs_tiling_L0": 0.1729,
+    "halt": {
+     "stop-rule": 6,
+     "cap-hit": 91,
+     "exhausted": 3
+    },
+    "looks_mean": 14.95,
+    "boxes_per_image_ci": [
+     736.1225,
+     1020.673
+    ],
+    "images_with_any_ci": [
+     0.96,
+     1.0
+    ],
+    "critical_per_image_ci": [
+     1.1198,
+     2.47
+    ],
+    "ms_per_job": 1685.5867,
+    "ms_per_job_ci": [
+     1551.3748,
+     1818.2598
+    ],
+    "jobs_at_20s": 0,
+    "ms_vs_tiling_L0": 0.1817,
+    "ms_vs_downscale": 4.8458,
+    "ms_vs_tiling_L0_ci": [
+     0.1776,
+     0.185
+    ],
+    "ms_vs_downscale_ci": [
+     4.504,
+     5.1873
+    ]
+   }
+  },
+  "real@1.0": {
+   "v2b": {
+    "row": "v2b_grid_real:ref@1.0",
+    "profiles": [
+     "classical-v1"
+    ],
+    "recall": 0.4839,
+    "recall_ci": [
+     0.4263,
+     0.5342
+    ],
+    "recall_iou_only": 0.2676,
+    "chance_recall": 0.2569,
+    "chance_recall_iou_only": 0.0741,
+    "boxes_per_image": 43.92,
+    "images_with_any": 0.92,
+    "critical_per_image": 4.07,
+    "pixels_frac": 0.17,
+    "vs_downscale": 1.1126,
+    "vs_downscale_ci": [
+     1.0279,
+     1.1968
+    ],
+    "vs_downscale_iou_only_ci": [
+     1.2,
+     1.6667
+    ],
+    "vs_tiling_L0": 0.9375,
+    "vs_tiling_L0_ci": [
+     0.7762,
+     1.1026
+    ],
+    "vs_tiling_L0_iou_only_ci": [
+     0.7924,
+     1.5103
+    ],
+    "pixels_vs_tiling_L0": 0.1044,
+    "halt": {
+     "stop-rule": 92,
+     "exhausted": 8
+    },
+    "looks_mean": 6.27,
+    "boxes_per_image_ci": [
+     38.0697,
+     50.0307
+    ],
+    "images_with_any_ci": [
+     0.87,
+     0.97
+    ],
+    "critical_per_image_ci": [
+     3.2597,
+     4.8802
+    ],
+    "ms_per_job": 8609.8085,
+    "ms_per_job_ci": [
+     8188.2077,
+     9030.893
+    ],
+    "jobs_at_20s": 0,
+    "ms_vs_tiling_L0": 0.0722,
+    "ms_vs_downscale": 6.0837,
+    "ms_vs_tiling_L0_ci": [
+     0.0667,
+     0.0786
+    ],
+    "ms_vs_downscale_ci": [
+     5.7932,
+     6.3712
+    ]
+   },
+   "v2a": {
+    "row": "grid_real:ref@1.0",
+    "profiles": [
+     "classical-v1"
+    ],
+    "recall": 0.4827,
+    "recall_ci": [
+     0.4189,
+     0.5416
+    ],
+    "recall_iou_only": 0.2473,
+    "chance_recall": 0.27,
+    "chance_recall_iou_only": 0.0526,
+    "boxes_per_image": 45.96,
+    "images_with_any": 0.91,
+    "critical_per_image": 4.34,
+    "pixels_frac": 0.1689,
+    "vs_downscale": 1.1068,
+    "vs_downscale_ci": [
+     1.0239,
+     1.2014
+    ],
+    "vs_downscale_iou_only_ci": [
+     1.1265,
+     1.5858
+    ],
+    "vs_tiling_L0": 0.9551,
+    "vs_tiling_L0_ci": [
+     0.7694,
+     1.146
+    ],
+    "vs_tiling_L0_iou_only_ci": [
+     0.7793,
+     1.4385
+    ],
+    "pixels_vs_tiling_L0": 0.1037,
+    "halt": {
+     "stop-rule": 92,
+     "exhausted": 8
+    },
+    "looks_mean": 6.25,
+    "boxes_per_image_ci": [
+     38.898,
+     53.8113
+    ],
+    "images_with_any_ci": [
+     0.86,
+     0.96
+    ],
+    "critical_per_image_ci": [
+     3.5897,
+     5.1602
+    ],
+    "ms_per_job": 3464.6433,
+    "ms_per_job_ci": [
+     3296.7481,
+     3643.2586
+    ],
+    "jobs_at_20s": 0,
+    "ms_vs_tiling_L0": 0.073,
+    "ms_vs_downscale": 5.9777,
+    "ms_vs_tiling_L0_ci": [
+     0.0672,
+     0.0798
+    ],
+    "ms_vs_downscale_ci": [
+     5.6969,
+     6.2711
+    ]
+   },
+   "v1": {
+    "row": "v1_head_real:head@1.0",
+    "profiles": [
+     "onnx:drishyam_dacl10k.onnx"
+    ],
+    "recall": 0.4851,
+    "recall_ci": [
+     0.4114,
+     0.5468
+    ],
+    "recall_iou_only": 0.2736,
+    "chance_recall": 0.2198,
+    "chance_recall_iou_only": 0.0597,
+    "boxes_per_image": 41.24,
+    "images_with_any": 0.92,
+    "critical_per_image": 7.42,
+    "pixels_frac": 0.164,
+    "vs_downscale": 1.1941,
+    "vs_downscale_ci": [
+     1.0837,
+     1.3222
+    ],
+    "vs_downscale_iou_only_ci": [
+     1.3611,
+     1.8741
+    ],
+    "vs_tiling_L0": 1.2688,
+    "vs_tiling_L0_ci": [
+     0.9492,
+     1.6251
+    ],
+    "vs_tiling_L0_iou_only_ci": [
+     1.0599,
+     2.4433
+    ],
+    "pixels_vs_tiling_L0": 0.1008,
+    "halt": {
+     "stop-rule": 92,
+     "exhausted": 8
+    },
+    "looks_mean": 6.15,
+    "boxes_per_image_ci": [
+     33.779,
+     49.6825
+    ],
+    "images_with_any_ci": [
+     0.87,
+     0.97
+    ],
+    "critical_per_image_ci": [
+     5.139,
+     10.13
+    ],
+    "ms_per_job": 3580.5928,
+    "ms_per_job_ci": [
+     3397.1616,
+     3761.7766
+    ],
+    "jobs_at_20s": 0,
+    "ms_vs_tiling_L0": 0.0705,
+    "ms_vs_downscale": 5.846,
+    "ms_vs_tiling_L0_ci": [
+     0.0655,
+     0.0762
+    ],
+    "ms_vs_downscale_ci": [
+     5.5567,
+     6.1289
+    ]
+   },
+   "classical-v1": {
+    "row": "classical_real:head@1.0",
+    "profiles": [
+     "classical-v1"
+    ],
+    "recall": 0.1804,
+    "recall_ci": [
+     0.1421,
+     0.2178
+    ],
+    "recall_iou_only": 0.0884,
+    "chance_recall": 0.1004,
+    "chance_recall_iou_only": 0.0323,
+    "boxes_per_image": 1492.61,
+    "images_with_any": 0.99,
+    "critical_per_image": 2.87,
+    "pixels_frac": 0.5208,
+    "vs_downscale": 1.1022,
+    "vs_downscale_ci": [
+     0.9178,
+     1.3137
+    ],
+    "vs_downscale_iou_only_ci": [
+     0.8953,
+     1.5668
+    ],
+    "vs_tiling_L0": 0.858,
+    "vs_tiling_L0_ci": [
+     0.6949,
+     1.0822
+    ],
+    "vs_tiling_L0_iou_only_ci": [
+     1.0159,
+     1.9214
+    ],
+    "pixels_vs_tiling_L0": 0.32,
+    "halt": {
+     "stop-rule": 93,
+     "exhausted": 5,
+     "cap-hit": 2
+    },
+    "looks_mean": 26.64,
+    "boxes_per_image_ci": [
+     1285.0953,
+     1740.071
+    ],
+    "images_with_any_ci": [
+     0.96,
+     1.0
+    ],
+    "critical_per_image_ci": [
+     1.86,
+     3.9303
+    ],
+    "ms_per_job": 2949.5945,
+    "ms_per_job_ci": [
+     2735.9347,
+     3174.4629
+    ],
+    "jobs_at_20s": 0,
+    "ms_vs_tiling_L0": 0.3179,
+    "ms_vs_downscale": 8.4796,
+    "ms_vs_tiling_L0_ci": [
+     0.3009,
+     0.3355
+    ],
+    "ms_vs_downscale_ci": [
+     7.9265,
+     9.0535
+    ]
+   }
+  }
+ },
+ "pairs": {
+  "synth_dev@0.3: v2b / v2a": {
+   "recall": [
+    0.8968,
+    [
+     0.797,
+     1.0083
+    ]
+   ],
+   "iou_only": [
+    0.8898,
+    [
+     0.7863,
+     1.0
+    ]
+   ],
+   "chance": [
+    0.8667,
+    [
+     0.5,
+     1.4286
+    ]
+   ],
+   "boxes": [
+    0.9231,
+    [
+     0.7846,
+     1.0719
+    ]
+   ],
+   "critical": [
+    0.6909,
+    [
+     0.5146,
+     0.8704
+    ]
+   ],
+   "ms": [
+    2.4062,
+    [
+     2.3636,
+     2.4478
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    -0.4667,
+    [
+     -1.4,
+     0.4004
+    ]
+   ],
+   "any_box_share_diff": [
+    -0.0167,
+    [
+     -0.05,
+     0.0
+    ]
+   ],
+   "reading": {
+    "recall": "no measurable difference",
+    "iou_only": "no measurable difference",
+    "boxes_per_photo_diff": "no measurable difference",
+    "any_box_share_diff": "no measurable difference"
+   }
+  },
+  "synth_dev@0.3: v2b / v1": {
+   "recall": [
+    0.9187,
+    [
+     0.8283,
+     1.0153
+    ]
+   ],
+   "iou_only": [
+    0.8898,
+    [
+     0.8,
+     0.9753
+    ]
+   ],
+   "chance": [
+    1.3,
+    [
+     0.5,
+     5.0125
+    ]
+   ],
+   "boxes": [
+    0.9359,
+    [
+     0.8281,
+     1.0604
+    ]
+   ],
+   "critical": [
+    0.7755,
+    [
+     0.5745,
+     1.0
+    ]
+   ],
+   "ms": [
+    2.5115,
+    [
+     2.4828,
+     2.5557
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    -0.3833,
+    [
+     -1.0667,
+     0.3337
+    ]
+   ],
+   "any_box_share_diff": [
+    0.0167,
+    [
+     -0.05,
+     0.0667
+    ]
+   ],
+   "reading": {
+    "recall": "no measurable difference",
+    "iou_only": "lower",
+    "boxes_per_photo_diff": "no measurable difference",
+    "any_box_share_diff": "no measurable difference"
+   }
+  },
+  "synth_dev@0.3: v2b / classical-v1": {
+   "recall": [
+    1.1188,
+    [
+     0.9473,
+     1.32
+    ]
+   ],
+   "iou_only": [
+    1.2069,
+    [
+     1.0,
+     1.4583
+    ]
+   ],
+   "chance": [
+    3.25,
+    [
+     1.1429,
+     13.0
+    ]
+   ],
+   "boxes": [
+    0.3128,
+    [
+     0.2561,
+     0.3807
+    ]
+   ],
+   "critical": [
+    0.4,
+    [
+     0.2685,
+     0.6297
+    ]
+   ],
+   "ms": [
+    12.7913,
+    [
+     12.4987,
+     13.0739
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    -12.3,
+    [
+     -15.4004,
+     -9.2663
+    ]
+   ],
+   "any_box_share_diff": [
+    0.0,
+    [
+     -0.0667,
+     0.0667
+    ]
+   ],
+   "reading": {
+    "recall": "no measurable difference",
+    "iou_only": "no measurable difference",
+    "boxes_per_photo_diff": "fewer",
+    "any_box_share_diff": "no measurable difference"
+   }
+  },
+  "synth_dev@0.3: v2a / v1": {
+   "recall": [
+    1.0244,
+    [
+     0.943,
+     1.1008
+    ]
+   ],
+   "iou_only": [
+    1.0,
+    [
+     0.9132,
+     1.0816
+    ]
+   ],
+   "chance": [
+    1.5,
+    [
+     0.6429,
+     5.5
+    ]
+   ],
+   "boxes": [
+    1.0139,
+    [
+     0.8774,
+     1.1879
+    ]
+   ],
+   "critical": [
+    1.1224,
+    [
+     0.9091,
+     1.4196
+    ]
+   ],
+   "ms": [
+    1.0438,
+    [
+     1.0202,
+     1.0689
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    0.0833,
+    [
+     -0.7837,
+     1.0337
+    ]
+   ],
+   "any_box_share_diff": [
+    0.0333,
+    [
+     0.0,
+     0.0833
+    ]
+   ],
+   "reading": {
+    "recall": "no measurable difference",
+    "iou_only": "no measurable difference",
+    "boxes_per_photo_diff": "no measurable difference",
+    "any_box_share_diff": "no measurable difference"
+   }
+  },
+  "synth_dev@0.3: v2a / classical-v1": {
+   "recall": [
+    1.2475,
+    [
+     1.0776,
+     1.4479
+    ]
+   ],
+   "iou_only": [
+    1.3563,
+    [
+     1.108,
+     1.6401
+    ]
+   ],
+   "chance": [
+    3.75,
+    [
+     1.3104,
+     15.0
+    ]
+   ],
+   "boxes": [
+    0.3389,
+    [
+     0.2816,
+     0.408
+    ]
+   ],
+   "critical": [
+    0.5789,
+    [
+     0.4,
+     0.9194
+    ]
+   ],
+   "ms": [
+    5.3161,
+    [
+     5.2217,
+     5.4066
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    -11.8333,
+    [
+     -14.8338,
+     -8.8833
+    ]
+   ],
+   "any_box_share_diff": [
+    0.0167,
+    [
+     -0.0333,
+     0.0667
+    ]
+   ],
+   "reading": {
+    "recall": "higher",
+    "iou_only": "higher",
+    "boxes_per_photo_diff": "fewer",
+    "any_box_share_diff": "no measurable difference"
+   }
+  },
+  "synth_dev@0.3: v1 / classical-v1": {
+   "recall": [
+    1.2178,
+    [
+     1.0784,
+     1.3821
+    ]
+   ],
+   "iou_only": [
+    1.3563,
+    [
+     1.1632,
+     1.6134
+    ]
+   ],
+   "chance": [
+    2.5,
+    [
+     0.6,
+     9.0
+    ]
+   ],
+   "boxes": [
+    0.3343,
+    [
+     0.2841,
+     0.3971
+    ]
+   ],
+   "critical": [
+    0.5158,
+    [
+     0.3245,
+     0.8401
+    ]
+   ],
+   "ms": [
+    5.0931,
+    [
+     4.9488,
+     5.2158
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    -11.9167,
+    [
+     -14.9179,
+     -9.1329
+    ]
+   ],
+   "any_box_share_diff": [
+    -0.0167,
+    [
+     -0.0833,
+     0.0333
+    ]
+   ],
+   "reading": {
+    "recall": "higher",
+    "iou_only": "higher",
+    "boxes_per_photo_diff": "fewer",
+    "any_box_share_diff": "no measurable difference"
+   }
+  },
+  "synth_dev@1.0: v2b / v2a": {
+   "recall": [
+    0.916,
+    [
+     0.8333,
+     1.0083
+    ]
+   ],
+   "iou_only": [
+    0.9106,
+    [
+     0.827,
+     1.0
+    ]
+   ],
+   "chance": [
+    0.9375,
+    [
+     0.4667,
+     1.8344
+    ]
+   ],
+   "boxes": [
+    0.9569,
+    [
+     0.8199,
+     1.094
+    ]
+   ],
+   "critical": [
+    0.7,
+    [
+     0.5231,
+     0.8689
+    ]
+   ],
+   "ms": [
+    2.4917,
+    [
+     2.3754,
+     2.6114
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    -0.3,
+    [
+     -1.3333,
+     0.5833
+    ]
+   ],
+   "any_box_share_diff": [
+    -0.0167,
+    [
+     -0.05,
+     0.0
+    ]
+   ],
+   "reading": {
+    "recall": "no measurable difference",
+    "iou_only": "no measurable difference",
+    "boxes_per_photo_diff": "no measurable difference",
+    "any_box_share_diff": "no measurable difference"
+   }
+  },
+  "synth_dev@1.0: v2b / v1": {
+   "recall": [
+    0.9302,
+    [
+     0.8538,
+     1.016
+    ]
+   ],
+   "iou_only": [
+    0.9032,
+    [
+     0.8333,
+     0.9811
+    ]
+   ],
+   "chance": [
+    1.0714,
+    [
+     0.5,
+     2.6006
+    ]
+   ],
+   "boxes": [
+    0.9524,
+    [
+     0.8461,
+     1.0879
+    ]
+   ],
+   "critical": [
+    0.7778,
+    [
+     0.5555,
+     1.0306
+    ]
+   ],
+   "ms": [
+    2.595,
+    [
+     2.4713,
+     2.7269
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    -0.3333,
+    [
+     -1.2171,
+     0.5333
+    ]
+   ],
+   "any_box_share_diff": [
+    0.0167,
+    [
+     -0.05,
+     0.0667
+    ]
+   ],
+   "reading": {
+    "recall": "no measurable difference",
+    "iou_only": "lower",
+    "boxes_per_photo_diff": "no measurable difference",
+    "any_box_share_diff": "no measurable difference"
+   }
+  },
+  "synth_dev@1.0: v2b / classical-v1": {
+   "recall": [
+    1.0811,
+    [
+     0.9291,
+     1.2377
+    ]
+   ],
+   "iou_only": [
+    1.2174,
+    [
+     1.0183,
+     1.4667
+    ]
+   ],
+   "chance": [
+    1.6667,
+    [
+     0.8458,
+     3.75
+    ]
+   ],
+   "boxes": [
+    0.2179,
+    [
+     0.1785,
+     0.2618
+    ]
+   ],
+   "critical": [
+    0.2308,
+    [
+     0.1392,
+     0.4123
+    ]
+   ],
+   "ms": [
+    8.7124,
+    [
+     8.1222,
+     9.4225
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    -23.9333,
+    [
+     -30.0017,
+     -18.5496
+    ]
+   ],
+   "any_box_share_diff": [
+    -0.0167,
+    [
+     -0.0667,
+     0.0333
+    ]
+   ],
+   "reading": {
+    "recall": "no measurable difference",
+    "iou_only": "higher",
+    "boxes_per_photo_diff": "fewer",
+    "any_box_share_diff": "no measurable difference"
+   }
+  },
+  "synth_dev@1.0: v2a / v1": {
+   "recall": [
+    1.0155,
+    [
+     0.942,
+     1.0887
+    ]
+   ],
+   "iou_only": [
+    0.9919,
+    [
+     0.9115,
+     1.0645
+    ]
+   ],
+   "chance": [
+    1.1429,
+    [
+     0.5908,
+     2.6
+    ]
+   ],
+   "boxes": [
+    0.9952,
+    [
+     0.8717,
+     1.165
+    ]
+   ],
+   "critical": [
+    1.1111,
+    [
+     0.8431,
+     1.4572
+    ]
+   ],
+   "ms": [
+    1.0414,
+    [
+     0.9912,
+     1.099
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    -0.0333,
+    [
+     -1.0004,
+     1.0167
+    ]
+   ],
+   "any_box_share_diff": [
+    0.0333,
+    [
+     0.0,
+     0.0833
+    ]
+   ],
+   "reading": {
+    "recall": "no measurable difference",
+    "iou_only": "no measurable difference",
+    "boxes_per_photo_diff": "no measurable difference",
+    "any_box_share_diff": "no measurable difference"
+   }
+  },
+  "synth_dev@1.0: v2a / classical-v1": {
+   "recall": [
+    1.1802,
+    [
+     1.0381,
+     1.33
+    ]
+   ],
+   "iou_only": [
+    1.337,
+    [
+     1.1081,
+     1.6053
+    ]
+   ],
+   "chance": [
+    1.7778,
+    [
+     0.8182,
+     4.0036
+    ]
+   ],
+   "boxes": [
+    0.2277,
+    [
+     0.1895,
+     0.2719
+    ]
+   ],
+   "critical": [
+    0.3297,
+    [
+     0.2172,
+     0.5726
+    ]
+   ],
+   "ms": [
+    3.4965,
+    [
+     3.2919,
+     3.7502
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    -23.6333,
+    [
+     -29.3175,
+     -18.1663
+    ]
+   ],
+   "any_box_share_diff": [
+    0.0,
+    [
+     -0.05,
+     0.05
+    ]
+   ],
+   "reading": {
+    "recall": "higher",
+    "iou_only": "higher",
+    "boxes_per_photo_diff": "fewer",
+    "any_box_share_diff": "no measurable difference"
+   }
+  },
+  "synth_dev@1.0: v1 / classical-v1": {
+   "recall": [
+    1.1622,
+    [
+     1.0427,
+     1.2925
+    ]
+   ],
+   "iou_only": [
+    1.3478,
+    [
+     1.1569,
+     1.5928
+    ]
+   ],
+   "chance": [
+    1.5556,
+    [
+     0.6667,
+     3.8
+    ]
+   ],
+   "boxes": [
+    0.2288,
+    [
+     0.1884,
+     0.2768
+    ]
+   ],
+   "critical": [
+    0.2967,
+    [
+     0.1837,
+     0.5155
+    ]
+   ],
+   "ms": [
+    3.3574,
+    [
+     3.1484,
+     3.5889
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    -23.6,
+    [
+     -29.3837,
+     -18.3996
+    ]
+   ],
+   "any_box_share_diff": [
+    -0.0333,
+    [
+     -0.1,
+     0.0333
+    ]
+   ],
+   "reading": {
+    "recall": "higher",
+    "iou_only": "higher",
+    "boxes_per_photo_diff": "fewer",
+    "any_box_share_diff": "no measurable difference"
+   }
+  },
+  "clean@0.3: v2b / v2a": {
+   "boxes": [
+    1.8095,
+    [
+     0.7187,
+     12.0375
+    ]
+   ],
+   "critical": [
+    null,
+    [
+     null,
+     null
+    ]
+   ],
+   "ms": [
+    2.4796,
+    [
+     2.3624,
+     2.6044
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    0.5667,
+    [
+     -0.3667,
+     1.6333
+    ]
+   ],
+   "any_box_share_diff": [
+    0.2667,
+    [
+     0.1,
+     0.4667
+    ]
+   ],
+   "reading": {
+    "boxes_per_photo_diff": "no measurable difference",
+    "any_box_share_diff": "more"
+   }
+  },
+  "clean@0.3: v2b / v1": {
+   "boxes": [
+    38.0,
+    [
+     8.35,
+     59.9
+    ]
+   ],
+   "critical": [
+    null,
+    [
+     null,
+     null
+    ]
+   ],
+   "ms": [
+    2.4824,
+    [
+     2.3665,
+     2.6086
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    1.2333,
+    [
+     0.5667,
+     2.0667
+    ]
+   ],
+   "any_box_share_diff": [
+    0.4,
+    [
+     0.2,
+     0.6
+    ]
+   ],
+   "reading": {
+    "boxes_per_photo_diff": "more",
+    "any_box_share_diff": "more"
+   }
+  },
+  "clean@0.3: v2b / classical-v1": {
+   "boxes": [
+    0.1044,
+    [
+     0.0433,
+     0.2266
+    ]
+   ],
+   "critical": [
+    0.0526,
+    [
+     0.0,
+     0.75
+    ]
+   ],
+   "ms": [
+    12.3264,
+    [
+     11.5789,
+     12.931
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    -10.8667,
+    [
+     -17.7683,
+     -5.2333
+    ]
+   ],
+   "any_box_share_diff": [
+    -0.2667,
+    [
+     -0.5667,
+     0.0333
+    ]
+   ],
+   "reading": {
+    "boxes_per_photo_diff": "fewer",
+    "any_box_share_diff": "no measurable difference"
+   }
+  },
+  "clean@0.3: v2a / v1": {
+   "boxes": [
+    21.0,
+    [
+     1.5,
+     39.9
+    ]
+   ],
+   "critical": [
+    null,
+    [
+     null,
+     null
+    ]
+   ],
+   "ms": [
+    1.0011,
+    [
+     0.9631,
+     1.026
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    0.6667,
+    [
+     0.0667,
+     1.4675
+    ]
+   ],
+   "any_box_share_diff": [
+    0.1333,
+    [
+     0.0,
+     0.3
+    ]
+   ],
+   "reading": {
+    "boxes_per_photo_diff": "more",
+    "any_box_share_diff": "no measurable difference"
+   }
+  },
+  "clean@0.3: v2a / classical-v1": {
+   "boxes": [
+    0.0577,
+    [
+     0.0084,
+     0.1647
+    ]
+   ],
+   "critical": [
+    0.0,
+    [
+     0.0,
+     0.0
+    ]
+   ],
+   "ms": [
+    4.971,
+    [
+     4.6524,
+     5.2177
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    -11.4333,
+    [
+     -18.4342,
+     -5.8317
+    ]
+   ],
+   "any_box_share_diff": [
+    -0.5333,
+    [
+     -0.8,
+     -0.2658
+    ]
+   ],
+   "reading": {
+    "boxes_per_photo_diff": "fewer",
+    "any_box_share_diff": "fewer"
+   }
+  },
+  "clean@0.3: v1 / classical-v1": {
+   "boxes": [
+    0.0027,
+    [
+     0.0,
+     0.0096
+    ]
+   ],
+   "critical": [
+    0.0,
+    [
+     0.0,
+     0.0
+    ]
+   ],
+   "ms": [
+    4.9654,
+    [
+     4.6052,
+     5.2657
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    -12.1,
+    [
+     -18.9033,
+     -6.5992
+    ]
+   ],
+   "any_box_share_diff": [
+    -0.6667,
+    [
+     -0.8333,
+     -0.5
+    ]
+   ],
+   "reading": {
+    "boxes_per_photo_diff": "fewer",
+    "any_box_share_diff": "fewer"
+   }
+  },
+  "clean@1.0: v2b / v2a": {
+   "boxes": [
+    1.3,
+    [
+     0.5672,
+     5.5
+    ]
+   ],
+   "critical": [
+    null,
+    [
+     null,
+     null
+    ]
+   ],
+   "ms": [
+    2.4201,
+    [
+     2.2782,
+     2.5917
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    0.3,
+    [
+     -0.7,
+     1.3667
+    ]
+   ],
+   "any_box_share_diff": [
+    0.2333,
+    [
+     0.0667,
+     0.4333
+    ]
+   ],
+   "reading": {
+    "boxes_per_photo_diff": "no measurable difference",
+    "any_box_share_diff": "more"
+   }
+  },
+  "clean@1.0: v2b / v1": {
+   "boxes": [
+    39.0,
+    [
+     8.5,
+     60.0
+    ]
+   ],
+   "critical": [
+    null,
+    [
+     null,
+     null
+    ]
+   ],
+   "ms": [
+    2.4832,
+    [
+     2.3547,
+     2.628
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    1.2667,
+    [
+     0.6325,
+     2.1
+    ]
+   ],
+   "any_box_share_diff": [
+    0.4333,
+    [
+     0.2333,
+     0.6333
+    ]
+   ],
+   "reading": {
+    "boxes_per_photo_diff": "more",
+    "any_box_share_diff": "more"
+   }
+  },
+  "clean@1.0: v2b / classical-v1": {
+   "boxes": [
+    0.0821,
+    [
+     0.0369,
+     0.1749
+    ]
+   ],
+   "critical": [
+    0.0333,
+    [
+     0.0,
+     0.5
+    ]
+   ],
+   "ms": [
+    8.3894,
+    [
+     7.5712,
+     9.4388
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    -14.5333,
+    [
+     -22.8,
+     -7.8333
+    ]
+   ],
+   "any_box_share_diff": [
+    -0.3333,
+    [
+     -0.6,
+     -0.0333
+    ]
+   ],
+   "reading": {
+    "boxes_per_photo_diff": "fewer",
+    "any_box_share_diff": "fewer"
+   }
+  },
+  "clean@1.0: v2a / v1": {
+   "boxes": [
+    30.0,
+    [
+     3.775,
+     54.0
+    ]
+   ],
+   "critical": [
+    null,
+    [
+     null,
+     null
+    ]
+   ],
+   "ms": [
+    1.0261,
+    [
+     0.9817,
+     1.0709
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    0.9667,
+    [
+     0.2,
+     1.8667
+    ]
+   ],
+   "any_box_share_diff": [
+    0.2,
+    [
+     0.0325,
+     0.3667
+    ]
+   ],
+   "reading": {
+    "boxes_per_photo_diff": "more",
+    "any_box_share_diff": "more"
+   }
+  },
+  "clean@1.0: v2a / classical-v1": {
+   "boxes": [
+    0.0632,
+    [
+     0.0136,
+     0.1586
+    ]
+   ],
+   "critical": [
+    0.0,
+    [
+     0.0,
+     0.0
+    ]
+   ],
+   "ms": [
+    3.4666,
+    [
+     3.1635,
+     3.8326
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    -14.8333,
+    [
+     -23.3017,
+     -7.7667
+    ]
+   ],
+   "any_box_share_diff": [
+    -0.5667,
+    [
+     -0.8333,
+     -0.2667
+    ]
+   ],
+   "reading": {
+    "boxes_per_photo_diff": "fewer",
+    "any_box_share_diff": "fewer"
+   }
+  },
+  "clean@1.0: v1 / classical-v1": {
+   "boxes": [
+    0.0021,
+    [
+     0.0,
+     0.0074
+    ]
+   ],
+   "critical": [
+    0.0,
+    [
+     0.0,
+     0.0
+    ]
+   ],
+   "ms": [
+    3.3785,
+    [
+     3.0708,
+     3.7455
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    -15.8,
+    [
+     -23.7683,
+     -9.0317
+    ]
+   ],
+   "any_box_share_diff": [
+    -0.7667,
+    [
+     -0.9,
+     -0.6325
+    ]
+   ],
+   "reading": {
+    "boxes_per_photo_diff": "fewer",
+    "any_box_share_diff": "fewer"
+   }
+  },
+  "real@0.3: v2b / v2a": {
+   "recall": [
+    1.0,
+    [
+     0.9434,
+     1.0595
+    ]
+   ],
+   "iou_only": [
+    1.0788,
+    [
+     0.9775,
+     1.1828
+    ]
+   ],
+   "chance": [
+    0.9013,
+    [
+     0.7894,
+     1.038
+    ]
+   ],
+   "boxes": [
+    0.9798,
+    [
+     0.8653,
+     1.0893
+    ]
+   ],
+   "critical": [
+    0.9336,
+    [
+     0.8189,
+     1.0527
+    ]
+   ],
+   "ms": [
+    2.4901,
+    [
+     2.4472,
+     2.532
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    -0.85,
+    [
+     -6.1605,
+     3.6603
+    ]
+   ],
+   "any_box_share_diff": [
+    0.01,
+    [
+     -0.02,
+     0.05
+    ]
+   ],
+   "reading": {
+    "recall": "no measurable difference",
+    "iou_only": "no measurable difference",
+    "boxes_per_photo_diff": "no measurable difference",
+    "any_box_share_diff": "no measurable difference"
+   }
+  },
+  "real@0.3: v2b / v1": {
+   "recall": [
+    1.0025,
+    [
+     0.9262,
+     1.0912
+    ]
+   ],
+   "iou_only": [
+    0.9821,
+    [
+     0.8832,
+     1.0778
+    ]
+   ],
+   "chance": [
+    1.0415,
+    [
+     0.9081,
+     1.1977
+    ]
+   ],
+   "boxes": [
+    1.0562,
+    [
+     0.9101,
+     1.2452
+    ]
+   ],
+   "critical": [
+    0.5442,
+    [
+     0.4137,
+     0.7471
+    ]
+   ],
+   "ms": [
+    2.3642,
+    [
+     2.3075,
+     2.4302
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    2.2,
+    [
+     -3.951,
+     8.3417
+    ]
+   ],
+   "any_box_share_diff": [
+    -0.01,
+    [
+     -0.04,
+     0.02
+    ]
+   ],
+   "reading": {
+    "recall": "no measurable difference",
+    "iou_only": "no measurable difference",
+    "boxes_per_photo_diff": "no measurable difference",
+    "any_box_share_diff": "no measurable difference"
+   }
+  },
+  "real@0.3: v2b / classical-v1": {
+   "recall": [
+    3.1406,
+    [
+     2.4235,
+     4.2367
+    ]
+   ],
+   "iou_only": [
+    3.9818,
+    [
+     2.7954,
+     6.1088
+    ]
+   ],
+   "chance": [
+    2.831,
+    [
+     1.9033,
+     4.5779
+    ]
+   ],
+   "boxes": [
+    0.0476,
+    [
+     0.0399,
+     0.0563
+    ]
+   ],
+   "critical": [
+    2.2135,
+    [
+     1.5229,
+     3.4682
+    ]
+   ],
+   "ms": [
+    4.7234,
+    [
+     4.4636,
+     4.9994
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    -826.62,
+    [
+     -976.8003,
+     -694.8737
+    ]
+   ],
+   "any_box_share_diff": [
+    -0.09,
+    [
+     -0.14,
+     -0.04
+    ]
+   ],
+   "reading": {
+    "recall": "higher",
+    "iou_only": "higher",
+    "boxes_per_photo_diff": "fewer",
+    "any_box_share_diff": "fewer"
+   }
+  },
+  "real@0.3: v2a / v1": {
+   "recall": [
+    1.0025,
+    [
+     0.9254,
+     1.0943
+    ]
+   ],
+   "iou_only": [
+    0.9103,
+    [
+     0.8145,
+     1.0358
+    ]
+   ],
+   "chance": [
+    1.1554,
+    [
+     0.9851,
+     1.346
+    ]
+   ],
+   "boxes": [
+    1.078,
+    [
+     0.9161,
+     1.3109
+    ]
+   ],
+   "critical": [
+    0.5829,
+    [
+     0.4545,
+     0.7996
+    ]
+   ],
+   "ms": [
+    0.9494,
+    [
+     0.9281,
+     0.9717
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    3.05,
+    [
+     -3.8733,
+     10.3402
+    ]
+   ],
+   "any_box_share_diff": [
+    -0.02,
+    [
+     -0.05,
+     0.0
+    ]
+   ],
+   "reading": {
+    "recall": "no measurable difference",
+    "iou_only": "no measurable difference",
+    "boxes_per_photo_diff": "no measurable difference",
+    "any_box_share_diff": "no measurable difference"
+   }
+  },
+  "real@0.3: v2a / classical-v1": {
+   "recall": [
+    3.1406,
+    [
+     2.3806,
+     4.2211
+    ]
+   ],
+   "iou_only": [
+    3.6909,
+    [
+     2.6176,
+     5.563
+    ]
+   ],
+   "chance": [
+    3.1408,
+    [
+     2.191,
+     4.8847
+    ]
+   ],
+   "boxes": [
+    0.0486,
+    [
+     0.0405,
+     0.0578
+    ]
+   ],
+   "critical": [
+    2.3708,
+    [
+     1.616,
+     3.8292
+    ]
+   ],
+   "ms": [
+    1.8968,
+    [
+     1.791,
+     2.0116
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    -825.77,
+    [
+     -977.5387,
+     -694.672
+    ]
+   ],
+   "any_box_share_diff": [
+    -0.1,
+    [
+     -0.16,
+     -0.04
+    ]
+   ],
+   "reading": {
+    "recall": "higher",
+    "iou_only": "higher",
+    "boxes_per_photo_diff": "fewer",
+    "any_box_share_diff": "fewer"
+   }
+  },
+  "real@0.3: v1 / classical-v1": {
+   "recall": [
+    3.1328,
+    [
+     2.3716,
+     4.3125
+    ]
+   ],
+   "iou_only": [
+    4.0545,
+    [
+     2.8685,
+     6.2143
+    ]
+   ],
+   "chance": [
+    2.7183,
+    [
+     1.7104,
+     4.5003
+    ]
+   ],
+   "boxes": [
+    0.0451,
+    [
+     0.036,
+     0.0559
+    ]
+   ],
+   "critical": [
+    4.0674,
+    [
+     2.4858,
+     6.6671
+    ]
+   ],
+   "ms": [
+    1.9979,
+    [
+     1.8911,
+     2.1128
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    -828.82,
+    [
+     -977.8687,
+     -696.1765
+    ]
+   ],
+   "any_box_share_diff": [
+    -0.08,
+    [
+     -0.14,
+     -0.03
+    ]
+   ],
+   "reading": {
+    "recall": "higher",
+    "iou_only": "higher",
+    "boxes_per_photo_diff": "fewer",
+    "any_box_share_diff": "fewer"
+   }
+  },
+  "real@1.0: v2b / v2a": {
+   "recall": [
+    1.0025,
+    [
+     0.9465,
+     1.0605
+    ]
+   ],
+   "iou_only": [
+    1.0821,
+    [
+     0.9829,
+     1.1834
+    ]
+   ],
+   "chance": [
+    0.9513,
+    [
+     0.841,
+     1.065
+    ]
+   ],
+   "boxes": [
+    0.9556,
+    [
+     0.8378,
+     1.0749
+    ]
+   ],
+   "critical": [
+    0.9378,
+    [
+     0.8263,
+     1.0582
+    ]
+   ],
+   "ms": [
+    2.485,
+    [
+     2.4285,
+     2.5382
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    -2.04,
+    [
+     -8.1202,
+     3.0902
+    ]
+   ],
+   "any_box_share_diff": [
+    0.01,
+    [
+     0.0,
+     0.03
+    ]
+   ],
+   "reading": {
+    "recall": "no measurable difference",
+    "iou_only": "no measurable difference",
+    "boxes_per_photo_diff": "no measurable difference",
+    "any_box_share_diff": "no measurable difference"
+   }
+  },
+  "real@1.0: v2b / v1": {
+   "recall": [
+    0.9975,
+    [
+     0.925,
+     1.0858
+    ]
+   ],
+   "iou_only": [
+    0.9782,
+    [
+     0.8853,
+     1.0743
+    ]
+   ],
+   "chance": [
+    1.1685,
+    [
+     1.0058,
+     1.3818
+    ]
+   ],
+   "boxes": [
+    1.065,
+    [
+     0.9208,
+     1.2439
+    ]
+   ],
+   "critical": [
+    0.5485,
+    [
+     0.4211,
+     0.7491
+    ]
+   ],
+   "ms": [
+    2.4046,
+    [
+     2.3379,
+     2.4843
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    2.68,
+    [
+     -3.616,
+     8.6502
+    ]
+   ],
+   "any_box_share_diff": [
+    0.0,
+    [
+     -0.03,
+     0.03
+    ]
+   ],
+   "reading": {
+    "recall": "no measurable difference",
+    "iou_only": "no measurable difference",
+    "boxes_per_photo_diff": "no measurable difference",
+    "any_box_share_diff": "no measurable difference"
+   }
+  },
+  "real@1.0: v2b / classical-v1": {
+   "recall": [
+    2.6821,
+    [
+     2.0533,
+     3.6338
+    ]
+   ],
+   "iou_only": [
+    3.027,
+    [
+     2.2803,
+     4.3335
+    ]
+   ],
+   "chance": [
+    2.5595,
+    [
+     1.8112,
+     3.8565
+    ]
+   ],
+   "boxes": [
+    0.0294,
+    [
+     0.0251,
+     0.0342
+    ]
+   ],
+   "critical": [
+    1.4181,
+    [
+     0.9871,
+     2.215
+    ]
+   ],
+   "ms": [
+    2.919,
+    [
+     2.6852,
+     3.1813
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    -1448.69,
+    [
+     -1692.216,
+     -1243.1058
+    ]
+   ],
+   "any_box_share_diff": [
+    -0.07,
+    [
+     -0.12,
+     -0.02
+    ]
+   ],
+   "reading": {
+    "recall": "higher",
+    "iou_only": "higher",
+    "boxes_per_photo_diff": "fewer",
+    "any_box_share_diff": "fewer"
+   }
+  },
+  "real@1.0: v2a / v1": {
+   "recall": [
+    0.9951,
+    [
+     0.9213,
+     1.0826
+    ]
+   ],
+   "iou_only": [
+    0.9039,
+    [
+     0.8075,
+     1.0211
+    ]
+   ],
+   "chance": [
+    1.2283,
+    [
+     1.0352,
+     1.5169
+    ]
+   ],
+   "boxes": [
+    1.1145,
+    [
+     0.9438,
+     1.3505
+    ]
+   ],
+   "critical": [
+    0.5849,
+    [
+     0.458,
+     0.7975
+    ]
+   ],
+   "ms": [
+    0.9676,
+    [
+     0.9399,
+     1.0002
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    4.72,
+    [
+     -2.73,
+     12.423
+    ]
+   ],
+   "any_box_share_diff": [
+    -0.01,
+    [
+     -0.03,
+     0.0
+    ]
+   ],
+   "reading": {
+    "recall": "no measurable difference",
+    "iou_only": "no measurable difference",
+    "boxes_per_photo_diff": "no measurable difference",
+    "any_box_share_diff": "no measurable difference"
+   }
+  },
+  "real@1.0: v2a / classical-v1": {
+   "recall": [
+    2.6755,
+    [
+     2.0672,
+     3.6501
+    ]
+   ],
+   "iou_only": [
+    2.7973,
+    [
+     2.1361,
+     3.9435
+    ]
+   ],
+   "chance": [
+    2.6905,
+    [
+     1.9714,
+     3.8493
+    ]
+   ],
+   "boxes": [
+    0.0308,
+    [
+     0.0259,
+     0.0364
+    ]
+   ],
+   "critical": [
+    1.5122,
+    [
+     1.0625,
+     2.3479
+    ]
+   ],
+   "ms": [
+    1.1746,
+    [
+     1.0772,
+     1.2909
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    -1446.65,
+    [
+     -1691.3977,
+     -1239.6345
+    ]
+   ],
+   "any_box_share_diff": [
+    -0.08,
+    [
+     -0.13,
+     -0.03
+    ]
+   ],
+   "reading": {
+    "recall": "higher",
+    "iou_only": "higher",
+    "boxes_per_photo_diff": "fewer",
+    "any_box_share_diff": "fewer"
+   }
+  },
+  "real@1.0: v1 / classical-v1": {
+   "recall": [
+    2.6887,
+    [
+     2.0111,
+     3.6636
+    ]
+   ],
+   "iou_only": [
+    3.0946,
+    [
+     2.3025,
+     4.4517
+    ]
+   ],
+   "chance": [
+    2.1905,
+    [
+     1.5308,
+     3.2395
+    ]
+   ],
+   "boxes": [
+    0.0276,
+    [
+     0.0222,
+     0.0335
+    ]
+   ],
+   "critical": [
+    2.5854,
+    [
+     1.7465,
+     3.9949
+    ]
+   ],
+   "ms": [
+    1.2139,
+    [
+     1.1168,
+     1.3189
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    -1451.37,
+    [
+     -1691.973,
+     -1246.869
+    ]
+   ],
+   "any_box_share_diff": [
+    -0.07,
+    [
+     -0.12,
+     -0.02
+    ]
+   ],
+   "reading": {
+    "recall": "higher",
+    "iou_only": "higher",
+    "boxes_per_photo_diff": "fewer",
+    "any_box_share_diff": "fewer"
+   }
+  }
+ },
+ "head_check": {
+  "v2a synth_dev@0.3": {
+   "profiles": [
+    "onnx:drishyam_dacl10k_v2a.onnx"
+   ],
+   "boxes_identical": true,
+   "found_identical": true,
+   "ms_identical": true
+  },
+  "v2a synth_dev@1.0": {
+   "profiles": [
+    "onnx:drishyam_dacl10k_v2a.onnx"
+   ],
+   "boxes_identical": true,
+   "found_identical": true,
+   "ms_identical": true
+  },
+  "v2a clean@0.3": {
+   "profiles": [
+    "onnx:drishyam_dacl10k_v2a.onnx"
+   ],
+   "boxes_identical": true,
+   "found_identical": true,
+   "ms_identical": true
+  },
+  "v2a clean@1.0": {
+   "profiles": [
+    "onnx:drishyam_dacl10k_v2a.onnx"
+   ],
+   "boxes_identical": true,
+   "found_identical": true,
+   "ms_identical": true
+  },
+  "v2a real@0.3": {
+   "profiles": [
+    "onnx:drishyam_dacl10k_v2a.onnx"
+   ],
+   "boxes_identical": true,
+   "found_identical": true,
+   "ms_identical": true
+  },
+  "v2a real@1.0": {
+   "profiles": [
+    "onnx:drishyam_dacl10k_v2a.onnx"
+   ],
+   "boxes_identical": true,
+   "found_identical": true,
+   "ms_identical": true
+  },
+  "v2b synth_dev@0.3": {
+   "profiles": [
+    "onnx:drishyam_dacl10k_v2b.onnx"
+   ],
+   "boxes_identical": true,
+   "found_identical": true,
+   "ms_identical": true
+  },
+  "v2b synth_dev@1.0": {
+   "profiles": [
+    "onnx:drishyam_dacl10k_v2b.onnx"
+   ],
+   "boxes_identical": true,
+   "found_identical": true,
+   "ms_identical": true
+  },
+  "v2b clean@0.3": {
+   "profiles": [
+    "onnx:drishyam_dacl10k_v2b.onnx"
+   ],
+   "boxes_identical": true,
+   "found_identical": true,
+   "ms_identical": true
+  },
+  "v2b clean@1.0": {
+   "profiles": [
+    "onnx:drishyam_dacl10k_v2b.onnx"
+   ],
+   "boxes_identical": true,
+   "found_identical": true,
+   "ms_identical": true
+  },
+  "v2b real@0.3": {
+   "profiles": [
+    "onnx:drishyam_dacl10k_v2b.onnx"
+   ],
+   "boxes_identical": true,
+   "found_identical": true,
+   "ms_identical": true
+  },
+  "v2b real@1.0": {
+   "profiles": [
+    "onnx:drishyam_dacl10k_v2b.onnx"
+   ],
+   "boxes_identical": true,
+   "found_identical": true,
+   "ms_identical": true
+  }
+ },
+ "files": {
+  "classical_synth_dev": {
+   "file": "runs/v2b/classical_synth_dev.json",
+   "segmenter": "classical-v1",
+   "micro_arm": "local-macos-x86",
+   "variants": {
+    "head": {}
+   },
+   "code": "7f37505c079ed9d4974ff3ec231b9c4f92fce5a1",
+   "code_end": "7f37505c079ed9d4974ff3ec231b9c4f92fce5a1",
+   "dirty_files": 0,
+   "drishyam_evals_changed_since": [
+    "drishyam/agent.py"
+   ],
+   "workers": 6,
+   "load": {
+    "start": 9.46,
+    "end": 10.73,
+    "from": "2026-10-20T00:33:39Z",
+    "to": "2026-10-20T00:34:48Z",
+    "min": 10.06,
+    "median": 10.06,
+    "max": 10.06,
+    "samples": 1,
+    "other_top_processes_max_cpu_pct": {
+     "com.apple.Virtualization.VirtualMachine": 103.5
+    }
+   }
+  },
+  "classical_clean": {
+   "file": "runs/v2b/classical_clean.json",
+   "segmenter": "classical-v1",
+   "micro_arm": "local-macos-x86",
+   "variants": {
+    "head": {}
+   },
+   "code": "7f37505c079ed9d4974ff3ec231b9c4f92fce5a1",
+   "code_end": "7f37505c079ed9d4974ff3ec231b9c4f92fce5a1",
+   "dirty_files": 0,
+   "drishyam_evals_changed_since": [
+    "drishyam/agent.py"
+   ],
+   "workers": 6,
+   "load": {
+    "start": 8.05,
+    "end": 9.76,
+    "from": "2026-10-20T00:33:09Z",
+    "to": "2026-10-20T00:33:39Z",
+    "min": 8.65,
+    "median": 8.65,
+    "max": 8.65,
+    "samples": 1,
+    "other_top_processes_max_cpu_pct": {
+     "com.apple.Virtualization.VirtualMachine": 111.8
+    }
+   }
+  },
+  "classical_real": {
+   "file": "runs/v2b/classical_real.json",
+   "segmenter": "classical-v1",
+   "micro_arm": "local-macos-x86",
+   "variants": {
+    "head": {}
+   },
+   "code": "7f37505c079ed9d4974ff3ec231b9c4f92fce5a1",
+   "code_end": "7f37505c079ed9d4974ff3ec231b9c4f92fce5a1",
+   "dirty_files": 0,
+   "drishyam_evals_changed_since": [
+    "drishyam/agent.py"
+   ],
+   "workers": 6,
+   "load": {
+    "start": 10.35,
+    "end": 9.31,
+    "from": "2026-10-20T00:34:49Z",
+    "to": "2026-10-20T00:46:47Z",
+    "min": 9.18,
+    "median": 12.035,
+    "max": 21.7,
+    "samples": 12,
+    "other_top_processes_max_cpu_pct": {
+     "com.apple.Virtualization.VirtualMachine": 501.9,
+     "WhatsApp": 89.7
+    }
+   }
+  },
+  "v2b_grid_synth_dev": {
+   "file": "runs/v2b/v2b_grid_synth_dev.json",
+   "segmenter": "onnx:drishyam_dacl10k_v2b.onnx drishyam_dacl10k_v2b.onnx@47e4b687d179 drishyam_dacl10k_v2b.fp16.onnx@3f8b8648ccfd",
+   "micro_arm": "local-macos-x86-dacl10k_v2b",
+   "variants": {
+    "ref": {
+     "min_view": 0.3,
+     "absorb": false
+    },
+    "mv0": {
+     "min_view": 0.0,
+     "absorb": false
+    },
+    "mv15": {
+     "min_view": 0.15,
+     "absorb": false
+    },
+    "mv25": {
+     "min_view": 0.25,
+     "absorb": false
+    },
+    "mv30_abs": {
+     "min_view": 0.3,
+     "absorb": true
+    },
+    "old": {
+     "min_view": 0.0,
+     "absorb": true
+    }
+   },
+   "code": "7f37505c079ed9d4974ff3ec231b9c4f92fce5a1",
+   "code_end": "7f37505c079ed9d4974ff3ec231b9c4f92fce5a1",
+   "dirty_files": 0,
+   "drishyam_evals_changed_since": [
+    "drishyam/agent.py"
+   ],
+   "workers": 6,
+   "load": {
+    "start": 22.34,
+    "end": 12.39,
+    "from": "2026-10-19T21:27:58Z",
+    "to": "2026-10-19T21:49:08Z",
+    "min": 13.98,
+    "median": 18.63,
+    "max": 33.84,
+    "samples": 21,
+    "other_top_processes_max_cpu_pct": {
+     "com.apple.Virtualization.VirtualMachine": 575.9,
+     "com.docker.backend": 136.0,
+     "Brave": 125.6,
+     "(2.1.283)": 123.2
+    }
+   }
+  },
+  "v2b_grid_clean": {
+   "file": "runs/v2b/v2b_grid_clean.json",
+   "segmenter": "onnx:drishyam_dacl10k_v2b.onnx drishyam_dacl10k_v2b.onnx@47e4b687d179 drishyam_dacl10k_v2b.fp16.onnx@3f8b8648ccfd",
+   "micro_arm": "local-macos-x86-dacl10k_v2b",
+   "variants": {
+    "ref": {
+     "min_view": 0.3,
+     "absorb": false
+    },
+    "mv0": {
+     "min_view": 0.0,
+     "absorb": false
+    },
+    "mv15": {
+     "min_view": 0.15,
+     "absorb": false
+    },
+    "mv25": {
+     "min_view": 0.25,
+     "absorb": false
+    },
+    "mv30_abs": {
+     "min_view": 0.3,
+     "absorb": true
+    },
+    "old": {
+     "min_view": 0.0,
+     "absorb": true
+    }
+   },
+   "code": "ad0c2173c7db23e17a11016de70bf267bec285bf",
+   "code_end": "7f37505c079ed9d4974ff3ec231b9c4f92fce5a1",
+   "dirty_files": 0,
+   "drishyam_evals_changed_since": [
+    "drishyam/agent.py"
+   ],
+   "workers": 6,
+   "load": {
+    "start": 7.58,
+    "end": 22.34,
+    "from": "2026-10-19T21:17:26Z",
+    "to": "2026-10-19T21:27:57Z",
+    "min": 11.14,
+    "median": 39.2,
+    "max": 113.68,
+    "samples": 10,
+    "other_top_processes_max_cpu_pct": {
+     "com.apple.Virtualization.VirtualMachine": 336.0,
+     "python": 126.7,
+     "(bun)": 118.5,
+     "Google": 105.4,
+     "node": 101.4,
+     "claude": 98.9,
+     "WindowServer": 88.0
+    }
+   }
+  },
+  "v2b_grid_real": {
+   "file": "runs/v2b/v2b_grid_real.json",
+   "segmenter": "onnx:drishyam_dacl10k_v2b.onnx drishyam_dacl10k_v2b.onnx@47e4b687d179 drishyam_dacl10k_v2b.fp16.onnx@3f8b8648ccfd",
+   "micro_arm": "local-macos-x86-dacl10k_v2b",
+   "variants": {
+    "ref": {
+     "min_view": 0.3,
+     "absorb": false
+    },
+    "mv0": {
+     "min_view": 0.0,
+     "absorb": false
+    },
+    "mv15": {
+     "min_view": 0.15,
+     "absorb": false
+    },
+    "mv25": {
+     "min_view": 0.25,
+     "absorb": false
+    },
+    "mv30_abs": {
+     "min_view": 0.3,
+     "absorb": true
+    },
+    "old": {
+     "min_view": 0.0,
+     "absorb": true
+    }
+   },
+   "code": "7f37505c079ed9d4974ff3ec231b9c4f92fce5a1",
+   "code_end": "7f37505c079ed9d4974ff3ec231b9c4f92fce5a1",
+   "dirty_files": 0,
+   "drishyam_evals_changed_since": [
+    "drishyam/agent.py"
+   ],
+   "workers": 6,
+   "load": {
+    "start": 12.39,
+    "end": 9.59,
+    "from": "2026-10-19T21:49:08Z",
+    "to": "2026-10-19T23:41:20Z",
+    "min": 8.82,
+    "median": 13.445,
+    "max": 22.33,
+    "samples": 112,
+    "other_top_processes_max_cpu_pct": {
+     "com.apple.Virtualization.VirtualMachine": 772.8,
+     "claude": 183.0,
+     "(2.1.283)": 177.4,
+     "Brave": 160.2,
+     "Claude": 142.7,
+     "(bun)": 130.4,
+     "bun": 111.6,
+     "WhatsApp": 109.6,
+     "Application": 102.4,
+     "(python3.13)": 100.0,
+     "python": 99.1,
+     "Python": 98.9,
+     "WindowServer": 83.0
+    }
+   }
+  },
+  "grid_synth_dev": {
+   "file": "runs/v2a/grid_synth_dev.json",
+   "segmenter": "onnx:drishyam_dacl10k_v2a.onnx drishyam_dacl10k_v2a.onnx@95b503c2d205 drishyam_dacl10k_v2a.fp16.onnx@0f5fa16e9a65",
+   "micro_arm": "local-macos-x86-dacl10k_v2a",
+   "variants": {
+    "ref": {
+     "min_view": 0.3,
+     "absorb": false
+    },
+    "mv0": {
+     "min_view": 0.0,
+     "absorb": false
+    },
+    "mv15": {
+     "min_view": 0.15,
+     "absorb": false
+    },
+    "mv25": {
+     "min_view": 0.25,
+     "absorb": false
+    },
+    "mv30_abs": {
+     "min_view": 0.3,
+     "absorb": true
+    },
+    "old": {
+     "min_view": 0.0,
+     "absorb": true
+    }
+   },
+   "code": "8dad39ea40faf710384b07a021175a4c039fc726",
+   "code_end": null,
+   "dirty_files": 0,
+   "drishyam_evals_changed_since": [
+    "drishyam/agent.py"
+   ],
+   "workers": 4,
+   "load": {
+    "start": 11.08,
+    "end": 10.81,
+    "from": "2026-10-19T16:54:42Z",
+    "to": "2026-10-19T17:16:50Z",
+    "min": 10.94,
+    "median": 12.43,
+    "max": 18.09,
+    "samples": 22,
+    "other_top_processes_max_cpu_pct": {
+     "WhatsApp": 181.6,
+     "QuickLookUIService": 151.3,
+     "(2.1.283)": 109.6,
+     "WindowServer": 107.1
+    }
+   }
+  },
+  "grid_clean": {
+   "file": "runs/v2a/grid_clean.json",
+   "segmenter": "onnx:drishyam_dacl10k_v2a.onnx drishyam_dacl10k_v2a.onnx@95b503c2d205 drishyam_dacl10k_v2a.fp16.onnx@0f5fa16e9a65",
+   "micro_arm": "local-macos-x86-dacl10k_v2a",
+   "variants": {
+    "ref": {
+     "min_view": 0.3,
+     "absorb": false
+    },
+    "mv0": {
+     "min_view": 0.0,
+     "absorb": false
+    },
+    "mv15": {
+     "min_view": 0.15,
+     "absorb": false
+    },
+    "mv25": {
+     "min_view": 0.25,
+     "absorb": false
+    },
+    "mv30_abs": {
+     "min_view": 0.3,
+     "absorb": true
+    },
+    "old": {
+     "min_view": 0.0,
+     "absorb": true
+    }
+   },
+   "code": "8dad39ea40faf710384b07a021175a4c039fc726",
+   "code_end": null,
+   "dirty_files": 0,
+   "drishyam_evals_changed_since": [
+    "drishyam/agent.py"
+   ],
+   "workers": 4,
+   "load": {
+    "start": 7.47,
+    "end": 11.08,
+    "from": "2026-10-19T16:44:53Z",
+    "to": "2026-10-19T16:54:41Z",
+    "min": 12.04,
+    "median": 14.07,
+    "max": 18.29,
+    "samples": 9,
+    "other_top_processes_max_cpu_pct": {}
+   }
+  },
+  "grid_real": {
+   "file": "runs/v2a/grid_real.json",
+   "segmenter": "onnx:drishyam_dacl10k_v2a.onnx drishyam_dacl10k_v2a.onnx@95b503c2d205 drishyam_dacl10k_v2a.fp16.onnx@0f5fa16e9a65",
+   "micro_arm": "local-macos-x86-dacl10k_v2a",
+   "variants": {
+    "ref": {
+     "min_view": 0.3,
+     "absorb": false
+    },
+    "mv0": {
+     "min_view": 0.0,
+     "absorb": false
+    },
+    "mv15": {
+     "min_view": 0.15,
+     "absorb": false
+    },
+    "mv25": {
+     "min_view": 0.25,
+     "absorb": false
+    },
+    "mv30_abs": {
+     "min_view": 0.3,
+     "absorb": true
+    },
+    "old": {
+     "min_view": 0.0,
+     "absorb": true
+    }
+   },
+   "code": "8dad39ea40faf710384b07a021175a4c039fc726",
+   "code_end": null,
+   "dirty_files": 0,
+   "drishyam_evals_changed_since": [
+    "drishyam/agent.py"
+   ],
+   "workers": 4,
+   "load": {
+    "start": 10.81,
+    "end": 11.81,
+    "from": "2026-10-19T17:16:51Z",
+    "to": "2026-10-19T19:28:33Z",
+    "min": 6.98,
+    "median": 12.55,
+    "max": 42.69,
+    "samples": 132,
+    "other_top_processes_max_cpu_pct": {
+     "com.apple.Virtualization.VirtualMachine": 412.7,
+     "python": 330.8,
+     "Claude": 216.5,
+     "claude": 173.9,
+     "(2.1.283)": 152.4,
+     "WhatsApp": 143.0,
+     "QuickLookUIService": 128.9,
+     "Brave": 118.3,
+     "com.docker.backend": 116.0,
+     "WindowServer": 109.9,
+     "bun": 108.7,
+     "Python": 100.0,
+     "(bun)": 99.0,
+     "Application": 87.5
+    }
+   }
+  },
+  "v2a_head_synth_dev": {
+   "file": "runs/v2b/v2a_head_synth_dev.json",
+   "segmenter": "onnx:drishyam_dacl10k_v2a.onnx drishyam_dacl10k_v2a.onnx@95b503c2d205 drishyam_dacl10k_v2a.fp16.onnx@0f5fa16e9a65",
+   "micro_arm": "local-macos-x86-dacl10k_v2a",
+   "variants": {
+    "head": {}
+   },
+   "code": "0e9c63b47fe2b64a8bbfc13cf50aac81ab25b688",
+   "code_end": "0e9c63b47fe2b64a8bbfc13cf50aac81ab25b688",
+   "dirty_files": 0,
+   "drishyam_evals_changed_since": [],
+   "workers": 6,
+   "load": {
+    "start": 11.47,
+    "end": 9.61,
+    "from": "2026-10-20T00:59:00Z",
+    "to": "2026-10-20T01:00:21Z",
+    "min": 10.16,
+    "median": 10.705,
+    "max": 11.25,
+    "samples": 2,
+    "other_top_processes_max_cpu_pct": {
+     "com.apple.Virtualization.VirtualMachine": 182.6
+    }
+   }
+  },
+  "v2a_head_clean": {
+   "file": "runs/v2b/v2a_head_clean.json",
+   "segmenter": "onnx:drishyam_dacl10k_v2a.onnx drishyam_dacl10k_v2a.onnx@95b503c2d205 drishyam_dacl10k_v2a.fp16.onnx@0f5fa16e9a65",
+   "micro_arm": "local-macos-x86-dacl10k_v2a",
+   "variants": {
+    "head": {}
+   },
+   "code": "0e9c63b47fe2b64a8bbfc13cf50aac81ab25b688",
+   "code_end": "0e9c63b47fe2b64a8bbfc13cf50aac81ab25b688",
+   "dirty_files": 0,
+   "drishyam_evals_changed_since": [],
+   "workers": 6,
+   "load": {
+    "start": 12.17,
+    "end": 11.77,
+    "from": "2026-10-20T00:58:18Z",
+    "to": "2026-10-20T00:58:59Z",
+    "min": null,
+    "median": [],
+    "max": null,
+    "samples": 0,
+    "other_top_processes_max_cpu_pct": {}
+   }
+  },
+  "v2a_head_real": {
+   "file": "runs/v2b/v2a_head_real.json",
+   "segmenter": "onnx:drishyam_dacl10k_v2a.onnx drishyam_dacl10k_v2a.onnx@95b503c2d205 drishyam_dacl10k_v2a.fp16.onnx@0f5fa16e9a65",
+   "micro_arm": "local-macos-x86-dacl10k_v2a",
+   "variants": {
+    "head": {}
+   },
+   "code": "0e9c63b47fe2b64a8bbfc13cf50aac81ab25b688",
+   "code_end": "0e9c63b47fe2b64a8bbfc13cf50aac81ab25b688",
+   "dirty_files": 0,
+   "drishyam_evals_changed_since": [],
+   "workers": 6,
+   "load": {
+    "start": 9.61,
+    "end": 8.65,
+    "from": "2026-10-20T01:00:21Z",
+    "to": "2026-10-20T01:04:46Z",
+    "min": 9.29,
+    "median": 9.940000000000001,
+    "max": 10.95,
+    "samples": 4,
+    "other_top_processes_max_cpu_pct": {
+     "com.apple.Virtualization.VirtualMachine": 341.0
+    }
+   }
+  },
+  "v1_head_synth_dev": {
+   "file": "runs/v2a/v1_head_synth_dev.json",
+   "segmenter": "onnx:drishyam_dacl10k.onnx drishyam_dacl10k.onnx@c49416c10087 drishyam_dacl10k.fp16.onnx@f9b06fabbe47",
+   "micro_arm": "local-macos-x86-dacl10k-retime",
+   "variants": {
+    "head": {}
+   },
+   "code": "ad0c2173c7db23e17a11016de70bf267bec285bf",
+   "code_end": null,
+   "dirty_files": 0,
+   "drishyam_evals_changed_since": [
+    "drishyam/agent.py"
+   ],
+   "workers": 4,
+   "load": {
+    "start": 11.97,
+    "end": 8.77,
+    "from": "2026-10-19T19:59:57Z",
+    "to": "2026-10-19T20:10:23Z",
+    "min": 9.03,
+    "median": 11.254999999999999,
+    "max": 15.62,
+    "samples": 10,
+    "other_top_processes_max_cpu_pct": {
+     "python": 136.5,
+     "claude": 134.2,
+     "com.apple.Virtualization.VirtualMachine": 121.3
+    }
+   }
+  },
+  "v1_head_clean": {
+   "file": "runs/v2a/v1_head_clean.json",
+   "segmenter": "onnx:drishyam_dacl10k.onnx drishyam_dacl10k.onnx@c49416c10087 drishyam_dacl10k.fp16.onnx@f9b06fabbe47",
+   "micro_arm": "local-macos-x86-dacl10k-retime",
+   "variants": {
+    "head": {}
+   },
+   "code": "ad0c2173c7db23e17a11016de70bf267bec285bf",
+   "code_end": null,
+   "dirty_files": 0,
+   "drishyam_evals_changed_since": [
+    "drishyam/agent.py"
+   ],
+   "workers": 4,
+   "load": {
+    "start": 12.45,
+    "end": 11.97,
+    "from": "2026-10-19T19:52:29Z",
+    "to": "2026-10-19T19:59:56Z",
+    "min": 12.17,
+    "median": 16.29,
+    "max": 21.98,
+    "samples": 8,
+    "other_top_processes_max_cpu_pct": {
+     "com.apple.Virtualization.VirtualMachine": 476.3,
+     "python": 296.2,
+     "WhatsApp": 96.1,
+     "Brave": 95.5
+    }
+   }
+  },
+  "v1_head_real": {
+   "file": "runs/v2b/v1_head_real.json",
+   "segmenter": "onnx:drishyam_dacl10k.onnx drishyam_dacl10k.onnx@c49416c10087 drishyam_dacl10k.fp16.onnx@f9b06fabbe47",
+   "micro_arm": "local-macos-x86-dacl10k-retime",
+   "variants": {
+    "head": {}
+   },
+   "code": "7f37505c079ed9d4974ff3ec231b9c4f92fce5a1",
+   "code_end": "7f37505c079ed9d4974ff3ec231b9c4f92fce5a1",
+   "dirty_files": 0,
+   "drishyam_evals_changed_since": [
+    "drishyam/agent.py"
+   ],
+   "workers": 6,
+   "load": {
+    "start": 9.59,
+    "end": 8.32,
+    "from": "2026-10-19T23:41:20Z",
+    "to": "2026-10-20T00:33:09Z",
+    "min": 8.97,
+    "median": 13.3,
+    "max": 21.71,
+    "samples": 51,
+    "other_top_processes_max_cpu_pct": {
+     "com.apple.Virtualization.VirtualMachine": 571.7,
+     "next-server": 254.8,
+     "claude": 149.5,
+     "contactsd": 120.2,
+     "WhatsApp": 109.4,
+     "Brave": 104.5,
+     "bun": 99.5
+    }
+   }
+  },
+  "v2b_head_synth_dev": {
+   "file": "runs/v2b/v2b_head_synth_dev.json",
+   "segmenter": "onnx:drishyam_dacl10k_v2b.onnx drishyam_dacl10k_v2b.onnx@47e4b687d179 drishyam_dacl10k_v2b.fp16.onnx@3f8b8648ccfd",
+   "micro_arm": "local-macos-x86-dacl10k_v2b",
+   "variants": {
+    "head": {}
+   },
+   "code": "0e9c63b47fe2b64a8bbfc13cf50aac81ab25b688",
+   "code_end": "0e9c63b47fe2b64a8bbfc13cf50aac81ab25b688",
+   "dirty_files": 0,
+   "drishyam_evals_changed_since": [],
+   "workers": 6,
+   "load": {
+    "start": 8.64,
+    "end": 13.64,
+    "from": "2026-10-20T00:51:05Z",
+    "to": "2026-10-20T00:52:57Z",
+    "min": 8.19,
+    "median": 8.85,
+    "max": 9.51,
+    "samples": 2,
+    "other_top_processes_max_cpu_pct": {
+     "com.apple.Virtualization.VirtualMachine": 329.4
+    }
+   }
+  },
+  "v2b_head_clean": {
+   "file": "runs/v2b/v2b_head_clean.json",
+   "segmenter": "onnx:drishyam_dacl10k_v2b.onnx drishyam_dacl10k_v2b.onnx@47e4b687d179 drishyam_dacl10k_v2b.fp16.onnx@3f8b8648ccfd",
+   "micro_arm": "local-macos-x86-dacl10k_v2b",
+   "variants": {
+    "head": {}
+   },
+   "code": "0e9c63b47fe2b64a8bbfc13cf50aac81ab25b688",
+   "code_end": "0e9c63b47fe2b64a8bbfc13cf50aac81ab25b688",
+   "dirty_files": 0,
+   "drishyam_evals_changed_since": [],
+   "workers": 6,
+   "load": {
+    "start": 5.88,
+    "end": 8.64,
+    "from": "2026-10-20T00:50:10Z",
+    "to": "2026-10-20T00:51:04Z",
+    "min": null,
+    "median": [],
+    "max": null,
+    "samples": 0,
+    "other_top_processes_max_cpu_pct": {}
+   }
+  },
+  "v2b_head_real": {
+   "file": "runs/v2b/v2b_head_real.json",
+   "segmenter": "onnx:drishyam_dacl10k_v2b.onnx drishyam_dacl10k_v2b.onnx@47e4b687d179 drishyam_dacl10k_v2b.fp16.onnx@3f8b8648ccfd",
+   "micro_arm": "local-macos-x86-dacl10k_v2b",
+   "variants": {
+    "head": {}
+   },
+   "code": "0e9c63b47fe2b64a8bbfc13cf50aac81ab25b688",
+   "code_end": "0e9c63b47fe2b64a8bbfc13cf50aac81ab25b688",
+   "dirty_files": 0,
+   "drishyam_evals_changed_since": [],
+   "workers": 6,
+   "load": {
+    "start": 13.64,
+    "end": 12.17,
+    "from": "2026-10-20T00:52:57Z",
+    "to": "2026-10-20T00:58:17Z",
+    "min": 11.21,
+    "median": 12.83,
+    "max": 14.22,
+    "samples": 6,
+    "other_top_processes_max_cpu_pct": {
+     "com.apple.Virtualization.VirtualMachine": 394.6
+    }
+   }
+  }
+ },
+ "latency": {
+  "v2a beside v2b": {
+   "file": "runs/v2a/micro/local-macos-x86-dacl10k_v2a/micro.json",
+   "segmenter": "onnx:drishyam_dacl10k_v2a.onnx",
+   "timestamp": "2026-10-19T19:37:44Z",
+   "load_start": [
+    14.08,
+    11.18,
+    11.79
+   ],
+   "load_end": [
+    11.22,
+    11.82,
+    11.97
+   ],
+   "p50_p95_ms": {
+    "warp 1024x768": [
+     4.33,
+     5.369
+    ],
+    "quality 1024x768": [
+     3.644,
+     5.442
+    ],
+    "segment:accurate 1024x768": [
+     1398.851,
+     2067.954
+    ],
+    "segment:fast 1024x768": [
+     499.174,
+     726.247
+    ],
+    "warp 2048x1536": [
+     4.689,
+     5.611
+    ],
+    "quality 2048x1536": [
+     2.898,
+     4.107
+    ],
+    "segment:accurate 2048x1536": [
+     1412.06,
+     1871.75
+    ],
+    "segment:fast 2048x1536": [
+     442.641,
+     675.272
+    ],
+    "warp 4000x3000": [
+     3.661,
+     4.365
+    ],
+    "quality 4000x3000": [
+     2.812,
+     3.836
+    ],
+    "segment:accurate 4000x3000": [
+     1298.067,
+     1609.167
+    ],
+    "segment:fast 4000x3000": [
+     374.222,
+     453.77
+    ]
+   },
+   "per_look_p50_ms": {
+    "1024x768": 1406.8,
+    "2048x1536": 1419.6,
+    "4000x3000": 1304.5
+   }
+  },
+  "v2b": {
+   "file": "results/local-macos-x86-dacl10k_v2b/micro.json",
+   "segmenter": "onnx:drishyam_dacl10k_v2b.onnx",
+   "timestamp": "2026-10-19T19:28:59Z",
+   "load_start": [
+    10.64,
+    12.27,
+    12.91
+   ],
+   "load_end": [
+    14.52,
+    11.22,
+    11.81
+   ],
+   "p50_p95_ms": {
+    "warp 1024x768": [
+     2.455,
+     3.011
+    ],
+    "quality 1024x768": [
+     2.022,
+     3.864
+    ],
+    "segment:accurate 1024x768": [
+     1223.73,
+     1499.154
+    ],
+    "segment:fast 1024x768": [
+     423.55,
+     462.145
+    ],
+    "warp 2048x1536": [
+     2.982,
+     3.367
+    ],
+    "quality 2048x1536": [
+     2.393,
+     3.675
+    ],
+    "segment:accurate 2048x1536": [
+     1467.676,
+     2052.286
+    ],
+    "segment:fast 2048x1536": [
+     406.566,
+     498.127
+    ],
+    "warp 4000x3000": [
+     3.906,
+     4.489
+    ],
+    "quality 4000x3000": [
+     3.408,
+     4.912
+    ],
+    "segment:accurate 4000x3000": [
+     1319.505,
+     1398.9
+    ],
+    "segment:fast 4000x3000": [
+     380.73,
+     410.61
+    ]
+   },
+   "per_look_p50_ms": {
+    "1024x768": 1228.2,
+    "2048x1536": 1473.1,
+    "4000x3000": 1326.8
+   }
+  },
+  "v2a": {
+   "file": "results/local-macos-x86-dacl10k_v2a/micro.json",
+   "segmenter": "onnx:drishyam_dacl10k_v2a.onnx",
+   "timestamp": "2026-10-19T16:27:17Z",
+   "load_start": [
+    7.93,
+    6.31,
+    4.57
+   ],
+   "load_end": [
+    7.81,
+    7.08,
+    5.3
+   ],
+   "p50_p95_ms": {
+    "warp 1024x768": [
+     1.694,
+     2.078
+    ],
+    "quality 1024x768": [
+     1.359,
+     1.982
+    ],
+    "segment:accurate 1024x768": [
+     582.154,
+     751.756
+    ],
+    "segment:fast 1024x768": [
+     184.022,
+     211.803
+    ],
+    "warp 2048x1536": [
+     1.679,
+     1.882
+    ],
+    "quality 2048x1536": [
+     1.329,
+     2.552
+    ],
+    "segment:accurate 2048x1536": [
+     604.618,
+     809.213
+    ],
+    "segment:fast 2048x1536": [
+     191.992,
+     255.274
+    ],
+    "warp 4000x3000": [
+     1.658,
+     1.785
+    ],
+    "quality 4000x3000": [
+     1.182,
+     1.693
+    ],
+    "segment:accurate 4000x3000": [
+     523.703,
+     629.101
+    ],
+    "segment:fast 4000x3000": [
+     171.175,
+     192.473
+    ]
+   },
+   "per_look_p50_ms": {
+    "1024x768": 585.2,
+    "2048x1536": 607.6,
+    "4000x3000": 526.5
+   }
+  },
+  "v1": {
+   "file": "results/local-macos-x86-dacl10k-retime/micro.json",
+   "segmenter": "onnx:drishyam_dacl10k.onnx",
+   "timestamp": "2026-10-19T16:31:22Z",
+   "load_start": [
+    8.0,
+    7.17,
+    5.37
+   ],
+   "load_end": [
+    7.39,
+    7.11,
+    5.76
+   ],
+   "p50_p95_ms": {
+    "warp 1024x768": [
+     2.343,
+     3.729
+    ],
+    "quality 1024x768": [
+     2.136,
+     3.426
+    ],
+    "segment:accurate 1024x768": [
+     636.884,
+     822.701
+    ],
+    "segment:fast 1024x768": [
+     192.326,
+     216.621
+    ],
+    "warp 2048x1536": [
+     1.792,
+     1.882
+    ],
+    "quality 2048x1536": [
+     1.236,
+     1.467
+    ],
+    "segment:accurate 2048x1536": [
+     588.623,
+     774.361
+    ],
+    "segment:fast 2048x1536": [
+     185.329,
+     269.532
+    ],
+    "warp 4000x3000": [
+     1.673,
+     1.78
+    ],
+    "quality 4000x3000": [
+     1.806,
+     3.88
+    ],
+    "segment:accurate 4000x3000": [
+     564.628,
+     667.934
+    ],
+    "segment:fast 4000x3000": [
+     188.367,
+     199.79
+    ]
+   },
+   "per_look_p50_ms": {
+    "1024x768": 641.4,
+    "2048x1536": 591.7,
+    "4000x3000": 568.1
+   }
+  },
+  "classical-v1": {
+   "file": "results/local-macos-x86/micro.json",
+   "segmenter": "classical-v1",
+   "timestamp": "2026-10-17T20:19:11Z",
+   "load_start": [
+    23.82,
+    19.13,
+    15.69
+   ],
+   "load_end": null,
+   "p50_p95_ms": {
+    "warp 1024x768": [
+     1.679,
+     2.479
+    ],
+    "quality 1024x768": [
+     1.345,
+     3.451
+    ],
+    "segment:accurate 1024x768": [
+     99.529,
+     121.121
+    ],
+    "segment:fast 1024x768": [
+     51.214,
+     60.764
+    ],
+    "warp 2048x1536": [
+     1.757,
+     2.401
+    ],
+    "quality 2048x1536": [
+     3.043,
+     5.091
+    ],
+    "segment:accurate 2048x1536": [
+     104.05,
+     134.994
+    ],
+    "segment:fast 2048x1536": [
+     51.319,
+     62.674
+    ],
+    "warp 4000x3000": [
+     1.661,
+     2.541
+    ],
+    "quality 4000x3000": [
+     3.108,
+     5.017
+    ],
+    "segment:accurate 4000x3000": [
+     103.28,
+     209.503
+    ],
+    "segment:fast 4000x3000": [
+     67.099,
+     162.597
+    ]
+   },
+   "per_look_p50_ms": {
+    "1024x768": 102.6,
+    "2048x1536": 108.8,
+    "4000x3000": 108.0
+   }
+  }
+ },
+ "notes": [
+  "table.<split@cap>.<model>: the model's row at its profile on that split and cap. recall_ci, *_ci: 95 % bootstrap intervals over images (1000 resamples, seed 0, evals.harness.boot_ci); vs_tiling_L0, vs_downscale and ms_vs_*: against the baselines of the model's own run (the same segmenter and cost table)",
+  "pairs.<split@cap>: <a> / <b>: paired over the same images (the image ids of every run are asserted equal and every run's dataset sha256 equals results/dev/onnx_profile_sweep.json's): ratios of sums (recall, IoU-only, chance, boxes, critical, ms) and differences (boxes per photo, share of photos with any box), each [point, CI]; reading: higher / lower / more / fewer only when the CI excludes no change",
+  "verdicts: the criterion read from the pairs at the 30 % cap; best: the models that meet it",
+  "ms_per_job: modelled ms per job on the model's own cost table (the fixed table's virtual clock: what the job would cost on this Mac at the load the table was timed at). The four tables were timed at different loads (models.<m>.cost_table), so ms are comparable within a model (to its own baselines) but not between models; latency.\"v2a beside v2b\" is v2a re-timed in v2b's window, the same-window control",
+  "jobs_at_20s: jobs whose modelled time reached JobConfig.seconds_cap (20 s), the one cap a cost table can trip",
+  "v2a and v2b found the same number of CODEBRIM's ground-truth boxes at the 30 % cap (402 of 837), on different images (42 of 100 differ): equal totals, not one run read twice (each run's segmenter and weights are in files)",
+  "files: each run's code commit (and at its end), the drishyam/ and evals/ files that differ from the head of this branch, its workers and the machine load over it",
+  "boxes are per-component boxes (the harness's primary convention for every policy); critical counts boxes of a critical class and size (findings.is_critical), the ones the human gate would hold; on the clean split every box is a false alarm"
+ ],
+ "per_image": {
+  "v2b_grid_synth_dev:ref@0.3": {"counts":[[1,1,0,0,3],[3,1,0,0,4],[1,1,0,0,2],[2,2,0,0,3],[1,1,0,0,1],[3,3,0,0,5],[1,1,0,0,1],[1,1,0,0,2],[2,2,0,0,2],[2,2,0,0,4],[1,1,0,0,1],[2,2,0,0,2],[1,1,0,0,5],[4,3,0,0,6],[0,0,0,0,1],[2,2,0,0,4],[3,3,0,0,4],[4,4,1,0,6],[0,0,0,0,5],[2,2,0,0,5],[2,2,0,0,3],[1,1,0,0,3],[1,1,1,0,6],[1,1,0,0,2],[3,3,1,0,5],[2,2,0,0,3],[2,2,0,0,7],[2,2,0,0,6],[2,2,0,0,3],[1,1,0,0,1],[3,3,0,0,6],[5,4,0,0,5],[4,3,2,0,5],[1,1,0,0,1],[1,1,0,0,3],[3,3,0,0,5],[1,1,0,0,1],[4,4,0,0,4],[1,1,0,0,4],[2,2,0,0,3],[1,1,0,0,2],[1,1,0,0,6],[1,1,0,0,1],[1,1,0,0,2],[2,2,0,0,3],[5,5,0,0,5],[3,3,1,0,4],[2,2,1,1,2],[1,1,0,0,2],[3,2,2,1,4],[0,0,0,0,1],[2,2,1,0,7],[1,1,0,0,1],[1,1,0,0,1],[2,2,0,0,2],[4,2,3,0,4],[0,0,0,0,1],[2,2,0,0,3],[1,1,0,0,2],[2,2,0,0,5]],"boxes":[2,4,4,5,14,9,6,2,2,10,7,2,9,14,0,6,9,16,3,5,2,2,7,3,5,4,8,8,3,3,8,12,6,1,1,11,2,9,3,4,5,5,3,2,8,17,10,4,6,10,0,9,2,3,2,5,2,3,5,4],"critical":[0,0,1,2,0,4,0,1,0,0,0,1,0,2,0,0,0,0,0,1,1,0,2,0,0,1,2,2,0,1,2,0,0,0,1,0,0,0,0,1,0,0,0,1,1,0,3,0,1,0,0,4,0,0,0,0,0,1,0,2],"ms":[4441.5,2968.45,2968.45,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,2968.45,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,2968.45,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,2968.45,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,2968.45,4441.5,4441.5,4441.5,4441.5],"profiles":["classical-v1"]},
+  "grid_synth_dev:ref@0.3": {"counts":[[1,1,0,0,3],[0,0,0,0,4],[1,1,0,0,2],[2,2,0,0,3],[1,1,0,0,1],[3,3,0,0,5],[1,1,0,0,1],[1,1,0,0,2],[2,2,0,0,2],[3,3,1,1,4],[1,1,0,0,1],[2,2,0,0,2],[4,4,0,0,5],[5,5,0,0,6],[0,0,0,0,1],[3,3,0,0,4],[3,3,0,0,4],[4,4,2,1,6],[4,4,0,0,5],[2,2,0,0,5],[3,3,0,0,3],[1,1,0,0,3],[1,1,0,0,6],[1,1,0,0,2],[3,3,1,1,5],[2,2,0,0,3],[2,2,1,0,7],[3,2,0,0,6],[2,2,0,0,3],[1,1,0,0,1],[3,3,0,0,6],[5,5,0,0,5],[4,1,2,0,5],[1,1,0,0,1],[1,1,0,0,3],[4,4,0,0,5],[1,1,0,0,1],[3,3,0,0,4],[4,4,2,1,4],[2,2,0,0,3],[1,1,0,0,2],[1,0,0,0,6],[1,1,0,0,1],[1,1,0,0,2],[2,2,0,0,3],[5,5,0,0,5],[3,3,0,0,4],[2,2,0,0,2],[1,1,0,0,2],[3,3,2,2,4],[0,0,0,0,1],[2,2,1,1,7],[1,1,0,0,1],[1,1,0,0,1],[1,1,0,0,2],[4,2,3,0,4],[0,0,0,0,1],[1,1,0,0,3],[2,2,0,0,2],[4,3,0,0,5]],"boxes":[2,5,4,5,2,10,5,3,5,6,3,3,8,16,3,6,9,15,8,5,7,2,7,3,7,3,8,7,5,1,8,13,4,1,2,10,2,9,14,4,3,1,3,2,7,17,10,3,2,9,0,13,1,4,3,9,20,5,5,7],"critical":[0,0,1,3,0,4,0,1,0,1,0,2,2,1,0,0,0,0,2,2,1,0,2,0,4,1,2,2,0,1,2,0,0,0,2,0,0,0,3,2,0,0,0,0,2,0,3,0,1,0,0,4,0,0,0,0,0,2,0,2],"ms":[1835.31,1227.68,1835.31,1835.31,1835.31,1835.31,1835.31,1835.31,1835.31,1835.31,1835.31,1835.31,1835.31,1835.31,1835.31,1835.31,1227.68,1835.31,1835.31,1835.31,1835.31,1835.31,1835.31,1835.31,1835.31,1835.31,1227.68,1835.31,1835.31,1835.31,1835.31,1835.31,1835.31,1835.31,1835.31,1835.31,1835.31,1835.31,1835.31,1835.31,1835.31,1835.31,1835.31,1835.31,1835.31,1835.31,1835.31,1835.31,1835.31,1835.31,1835.31,1835.31,1835.31,1835.31,1835.31,1227.68,1835.31,1227.68,1835.31,1835.31],"profiles":["classical-v1"]},
+  "v1_head_synth_dev:head@0.3": {"counts":[[2,2,0,0,3],[2,2,0,0,4],[1,1,0,0,2],[2,2,0,0,3],[1,1,0,0,1],[3,3,1,0,5],[1,1,0,0,1],[1,1,0,0,2],[1,1,0,0,2],[2,2,0,0,4],[1,1,0,0,1],[2,2,0,0,2],[4,3,0,0,5],[3,3,0,0,6],[0,0,0,0,1],[3,3,0,0,4],[3,3,3,2,4],[4,4,1,0,6],[4,4,0,0,5],[2,2,0,0,5],[2,2,0,0,3],[1,1,0,0,3],[1,1,0,0,6],[1,1,0,0,2],[3,3,0,0,5],[2,2,0,0,3],[3,2,0,0,7],[2,2,0,0,6],[2,2,0,0,3],[1,1,0,0,1],[3,3,0,0,6],[5,5,0,0,5],[4,3,0,0,5],[1,1,0,0,1],[1,1,0,0,3],[3,3,0,0,5],[1,1,0,0,1],[3,3,0,0,4],[3,3,1,1,4],[2,2,0,0,3],[1,1,0,0,2],[0,0,0,0,6],[1,1,0,0,1],[1,1,0,0,2],[2,2,0,0,3],[5,5,0,0,5],[3,3,0,0,4],[2,2,0,0,2],[1,1,0,0,2],[3,3,0,0,4],[0,0,0,0,1],[4,4,0,0,7],[1,1,0,0,1],[1,1,0,0,1],[2,2,0,0,2],[4,2,3,0,4],[0,0,0,0,1],[2,2,0,0,3],[1,1,0,0,2],[3,3,1,0,5]],"boxes":[2,3,4,4,5,8,7,2,2,8,2,3,8,11,2,5,6,19,9,14,4,4,8,4,9,5,12,8,8,3,11,12,9,3,2,6,3,10,7,4,2,0,3,2,7,15,11,4,4,12,0,12,2,2,3,6,0,6,4,8],"critical":[0,0,1,3,0,4,0,2,0,0,0,2,2,1,0,0,0,3,1,2,2,0,1,0,0,2,2,1,0,0,2,0,0,0,2,0,0,0,3,1,0,0,0,0,1,0,3,0,0,0,0,4,0,0,0,0,0,2,0,2],"ms":[1788.7,1197.05,1197.05,1788.7,1788.7,1788.7,1788.7,1197.05,1788.7,1788.7,1788.7,1788.7,1788.7,1788.7,1788.7,1788.7,1197.05,1788.7,1788.7,1788.7,1788.7,1788.7,1788.7,1788.7,1788.7,1788.7,1197.05,1788.7,1788.7,1788.7,1788.7,1788.7,1788.7,1788.7,1788.7,1788.7,1788.7,1788.7,1788.7,1788.7,1788.7,1788.7,1788.7,1788.7,1197.05,1788.7,1788.7,1788.7,1197.05,1788.7,1788.7,1788.7,1788.7,1788.7,1788.7,1197.05,1788.7,1788.7,1788.7,1788.7],"profiles":["onnx:drishyam_dacl10k.onnx"]},
+  "classical_synth_dev:head@0.3": {"counts":[[2,2,1,0,3],[1,1,0,0,4],[1,1,0,0,2],[1,1,0,0,3],[0,0,0,0,1],[1,1,0,0,5],[0,0,0,0,1],[2,2,0,0,2],[1,1,0,0,2],[1,0,0,0,4],[1,1,0,0,1],[2,2,0,0,2],[4,3,1,1,5],[1,1,0,0,6],[1,1,0,0,1],[3,3,0,0,4],[3,2,0,0,4],[2,2,0,0,6],[2,1,0,0,5],[0,0,0,0,5],[3,3,0,0,3],[1,1,0,0,3],[2,1,0,0,6],[1,1,0,0,2],[4,4,0,0,5],[1,1,0,0,3],[3,2,0,0,7],[3,0,0,0,6],[1,1,0,0,3],[1,1,0,0,1],[1,1,0,0,6],[5,5,1,0,5],[3,3,0,0,5],[1,1,0,0,1],[1,1,0,0,3],[2,1,0,0,5],[1,1,0,0,1],[3,3,0,0,4],[2,2,0,0,4],[2,2,0,0,3],[0,0,0,0,2],[1,0,0,0,6],[1,1,0,0,1],[1,1,0,0,2],[1,0,0,0,3],[3,2,0,0,5],[3,3,0,0,4],[2,2,0,0,2],[1,0,0,0,2],[2,2,0,0,4],[1,1,0,0,1],[3,3,0,0,7],[1,1,0,0,1],[0,0,0,0,1],[1,1,0,0,2],[3,3,1,0,4],[0,0,0,0,1],[3,3,0,0,3],[0,0,0,0,2],[4,4,0,0,5]],"boxes":[13,9,4,37,0,29,10,12,15,14,6,3,36,27,3,27,25,17,65,17,35,29,31,10,18,20,32,31,13,6,14,35,15,1,12,30,2,23,29,8,9,8,9,17,9,23,23,4,20,36,2,61,2,15,12,17,0,7,15,22],"critical":[0,0,2,0,0,8,0,1,0,10,0,0,1,4,0,0,0,0,3,9,1,0,10,0,0,1,6,3,0,0,0,0,0,0,0,0,0,0,3,0,0,0,0,0,7,4,4,0,9,0,0,5,0,0,0,0,0,2,0,2],"ms":[342.97,342.97,342.97,342.97,342.97,342.97,342.97,342.97,234.12,342.97,342.97,342.97,342.97,342.97,342.97,342.97,234.12,342.97,342.97,342.97,342.97,342.97,342.97,342.97,342.97,342.97,234.12,342.97,342.97,342.97,342.97,342.97,342.97,342.97,342.97,342.97,342.97,342.97,342.97,342.97,342.97,342.97,342.97,342.97,342.97,342.97,342.97,342.97,342.97,342.97,342.97,342.97,342.97,342.97,342.97,234.12,342.97,342.97,342.97,342.97],"profiles":["classical-v1"]},
+  "v2b_grid_synth_dev:ref@1.0": {"counts":[[2,2,0,0,3],[3,1,0,0,4],[1,1,0,0,2],[2,2,0,0,3],[1,1,0,0,1],[3,3,0,0,5],[1,1,0,0,1],[1,1,0,0,2],[2,2,0,0,2],[3,3,0,0,4],[1,1,0,0,1],[2,2,0,0,2],[2,2,1,0,5],[4,3,0,0,6],[0,0,0,0,1],[3,3,0,0,4],[3,3,0,0,4],[4,4,1,0,6],[2,2,0,0,5],[2,2,0,0,5],[2,2,0,0,3],[1,1,0,0,3],[1,1,1,1,6],[1,1,0,0,2],[3,3,0,0,5],[2,2,1,1,3],[2,2,1,1,7],[2,2,0,0,6],[2,2,0,0,3],[1,1,0,0,1],[3,3,1,0,6],[5,4,0,0,5],[4,3,0,0,5],[1,1,0,0,1],[2,2,0,0,3],[3,3,0,0,5],[1,1,0,0,1],[4,4,1,1,4],[1,1,0,0,4],[2,2,0,0,3],[1,1,0,0,2],[1,1,0,0,6],[1,1,1,1,1],[1,1,0,0,2],[2,2,0,0,3],[5,5,2,1,5],[3,3,0,0,4],[2,2,0,0,2],[1,1,0,0,2],[3,2,1,0,4],[0,0,0,0,1],[2,2,1,0,7],[1,1,0,0,1],[1,1,0,0,1],[2,2,0,0,2],[4,2,3,0,4],[0,0,0,0,1],[2,2,0,0,3],[1,1,0,0,2],[2,2,0,0,5]],"boxes":[5,4,4,6,14,9,6,4,2,17,7,6,10,15,0,7,9,19,8,5,2,4,7,3,9,4,8,8,3,3,10,12,6,2,3,14,3,14,8,4,5,10,3,2,8,20,12,4,6,10,0,9,2,3,2,5,2,3,5,5],"critical":[0,0,1,3,0,4,0,1,0,0,0,1,1,2,0,0,0,0,0,1,1,0,2,0,0,1,2,2,0,1,2,0,0,0,1,0,0,0,0,1,0,0,0,1,1,0,4,0,1,0,0,4,0,0,0,0,0,1,0,3],"ms":[5914.56,2968.45,2968.45,5914.56,5914.56,4441.5,4441.5,5914.56,5914.56,5914.56,4441.5,7387.61,5914.56,5914.56,4441.5,5914.56,2968.45,5914.56,7387.61,4441.5,4441.5,5914.56,4441.5,5914.56,7387.61,4441.5,2968.45,4441.5,4441.5,4441.5,7387.61,4441.5,4441.5,5914.56,5914.56,5914.56,5914.56,7387.61,5914.56,4441.5,5914.56,5914.56,4441.5,5914.56,4441.5,5914.56,5914.56,4441.5,2968.45,4441.5,4441.5,4441.5,5914.56,5914.56,4441.5,2968.45,4441.5,4441.5,4441.5,5914.56],"profiles":["classical-v1"]},
+  "grid_synth_dev:ref@1.0": {"counts":[[2,2,0,0,3],[0,0,0,0,4],[1,1,0,0,2],[2,2,0,0,3],[1,1,0,0,1],[3,3,2,1,5],[1,1,0,0,1],[1,1,0,0,2],[2,2,0,0,2],[3,3,0,0,4],[1,1,0,0,1],[2,2,0,0,2],[4,4,1,1,5],[5,5,0,0,6],[0,0,0,0,1],[3,3,0,0,4],[3,3,1,1,4],[4,4,1,1,6],[4,4,3,3,5],[2,2,0,0,5],[3,3,1,0,3],[1,1,0,0,3],[1,1,0,0,6],[1,1,0,0,2],[4,4,0,0,5],[2,2,1,1,3],[2,2,1,0,7],[3,2,0,0,6],[2,2,0,0,3],[1,1,0,0,1],[4,4,0,0,6],[5,5,0,0,5],[4,1,0,0,5],[1,1,0,0,1],[1,1,0,0,3],[4,4,0,0,5],[1,1,0,0,1],[4,4,0,0,4],[4,4,0,0,4],[2,2,0,0,3],[1,1,0,0,2],[1,0,0,0,6],[1,1,0,0,1],[1,1,0,0,2],[2,2,0,0,3],[5,5,0,0,5],[3,3,0,0,4],[2,2,0,0,2],[1,1,0,0,2],[3,3,2,0,4],[0,0,0,0,1],[3,3,0,0,7],[1,1,0,0,1],[1,1,0,0,1],[1,1,0,0,2],[4,2,2,0,4],[0,0,0,0,1],[1,1,0,0,3],[2,2,1,1,2],[4,3,0,0,5]],"boxes":[4,5,4,8,2,10,5,4,5,9,3,3,8,18,3,12,9,19,14,5,7,3,7,3,12,4,8,7,5,1,13,13,4,2,2,14,2,13,14,4,3,1,3,3,7,17,12,3,2,9,0,15,1,4,3,9,20,5,5,8],"critical":[0,0,1,4,0,4,0,1,0,2,0,2,2,1,0,0,0,0,2,2,1,0,2,0,4,2,2,2,0,1,2,0,0,0,2,0,0,0,3,2,0,0,0,0,2,0,4,0,1,0,0,4,0,0,0,0,0,2,0,3],"ms":[2442.93,1227.68,1835.31,3050.56,1835.31,1835.31,1835.31,2442.93,1835.31,2442.93,1835.31,1835.31,1835.31,2442.93,1835.31,2442.93,1227.68,2442.93,2442.93,1835.31,1835.31,2442.93,1835.31,2442.93,2442.93,2442.93,1227.68,1835.31,1835.31,1835.31,3050.56,1835.31,1835.31,2442.93,1835.31,3050.56,2442.93,2442.93,1835.31,1835.31,1835.31,3050.56,1835.31,2442.93,1835.31,1835.31,2442.93,1835.31,2442.93,1835.31,1835.31,2442.93,2442.93,1835.31,1835.31,1227.68,1835.31,1227.68,1835.31,2442.93],"profiles":["classical-v1"]},
+  "v1_head_synth_dev:head@1.0": {"counts":[[2,2,0,0,3],[2,2,0,0,4],[1,1,1,0,2],[2,2,1,1,3],[1,1,0,0,1],[3,3,0,0,5],[1,1,0,0,1],[1,1,0,0,2],[1,1,0,0,2],[3,3,0,0,4],[1,1,0,0,1],[2,2,0,0,2],[4,3,0,0,5],[3,3,0,0,6],[0,0,0,0,1],[4,4,0,0,4],[3,3,0,0,4],[4,4,1,0,6],[4,4,1,1,5],[3,3,0,0,5],[2,2,0,0,3],[1,1,0,0,3],[1,1,0,0,6],[1,1,0,0,2],[5,5,0,0,5],[2,2,0,0,3],[3,2,0,0,7],[2,2,0,0,6],[2,2,0,0,3],[1,1,0,0,1],[4,4,0,0,6],[5,5,1,1,5],[4,3,2,0,5],[1,1,0,0,1],[1,1,0,0,3],[3,3,0,0,5],[1,1,0,0,1],[3,3,0,0,4],[3,3,0,0,4],[2,2,0,0,3],[1,1,0,0,2],[0,0,0,0,6],[1,1,0,0,1],[1,1,0,0,2],[2,2,0,0,3],[5,5,0,0,5],[3,3,1,1,4],[2,2,0,0,2],[1,1,0,0,2],[3,3,3,2,4],[0,0,0,0,1],[4,4,0,0,7],[1,1,0,0,1],[1,1,0,0,1],[2,2,0,0,2],[4,2,3,0,4],[0,0,0,0,1],[2,2,0,0,3],[1,1,0,0,2],[3,3,0,0,5]],"boxes":[2,3,4,7,5,8,7,2,2,12,2,3,8,13,2,15,6,27,12,15,4,4,8,4,12,5,12,8,10,3,17,12,9,3,2,10,3,13,7,4,2,0,3,2,7,23,14,4,4,12,0,12,2,2,3,6,0,6,4,9],"critical":[0,0,1,3,0,4,0,2,0,0,0,2,2,1,0,0,0,6,1,2,2,0,1,0,0,2,2,1,0,0,2,0,0,0,2,0,0,0,3,1,0,0,0,0,1,0,4,0,0,0,0,4,0,0,0,0,0,2,0,3],"ms":[1788.7,1197.05,1197.05,2972.0,1788.7,1788.7,1788.7,1197.05,2380.35,2380.35,1788.7,1788.7,1788.7,2380.35,1788.7,2972.0,1197.05,2380.35,2380.35,2380.35,1788.7,1788.7,1788.7,2380.35,2380.35,1788.7,1197.05,1788.7,2380.35,1788.7,2972.0,1788.7,1788.7,1788.7,1788.7,2972.0,1788.7,2380.35,1788.7,1788.7,2380.35,2972.0,2380.35,2380.35,1197.05,2380.35,2380.35,1788.7,1197.05,1788.7,1788.7,1788.7,2380.35,1788.7,1788.7,1197.05,1788.7,2380.35,1788.7,2380.35],"profiles":["onnx:drishyam_dacl10k.onnx"]},
+  "classical_synth_dev:head@1.0": {"counts":[[2,2,0,0,3],[1,1,1,0,4],[1,1,0,0,2],[1,1,0,0,3],[0,0,0,0,1],[2,1,0,0,5],[0,0,0,0,1],[2,2,0,0,2],[1,1,0,0,2],[1,0,0,0,4],[1,1,0,0,1],[2,2,0,0,2],[4,3,1,1,5],[1,1,0,0,6],[1,1,0,0,1],[4,4,0,0,4],[3,2,0,0,4],[2,2,1,0,6],[2,1,0,0,5],[1,1,0,0,5],[3,3,1,1,3],[1,1,0,0,3],[2,1,0,0,6],[1,1,0,0,2],[4,4,0,0,5],[1,1,0,0,3],[3,2,0,0,7],[3,0,0,0,6],[1,1,0,0,3],[1,1,0,0,1],[3,2,0,0,6],[5,5,0,0,5],[4,3,1,1,5],[1,1,0,0,1],[1,1,0,0,3],[2,1,0,0,5],[1,1,0,0,1],[3,3,0,0,4],[2,2,0,0,4],[2,2,0,0,3],[0,0,0,0,2],[1,0,0,0,6],[1,1,0,0,1],[1,1,0,0,2],[2,0,0,0,3],[3,2,1,1,5],[3,3,0,0,4],[2,2,0,0,2],[1,0,0,0,2],[2,2,0,0,4],[1,1,0,0,1],[4,4,0,0,7],[1,1,0,0,1],[0,0,0,0,1],[1,1,0,0,2],[3,3,1,0,4],[0,0,0,0,1],[3,3,1,0,3],[1,0,0,0,2],[5,5,1,1,5]],"boxes":[20,15,4,53,0,36,24,17,15,46,9,4,68,45,3,55,25,40,151,32,37,50,76,13,40,30,32,36,23,7,41,44,25,14,13,51,3,33,33,8,9,39,16,36,57,64,30,5,20,41,2,76,2,31,18,17,8,11,26,57],"critical":[0,0,2,0,0,8,0,1,0,28,0,0,19,6,0,0,0,11,5,12,1,0,16,0,0,1,6,3,2,0,1,0,0,0,0,0,0,0,3,0,0,0,0,0,23,4,6,0,9,0,0,9,0,0,0,0,0,3,0,3],"ms":[669.52,560.67,451.82,887.22,560.67,451.82,669.52,451.82,234.12,887.22,451.82,451.82,669.52,669.52,451.82,778.37,234.12,778.37,669.52,669.52,451.82,560.67,669.52,669.52,669.52,451.82,234.12,451.82,778.37,451.82,451.82,451.82,669.52,669.52,451.82,669.52,451.82,669.52,451.82,451.82,669.52,996.07,451.82,778.37,887.22,669.52,669.52,669.52,669.52,451.82,342.97,669.52,778.37,778.37,560.67,234.12,560.67,669.52,669.52,887.22],"profiles":["classical-v1"]},
+  "v2b_grid_clean:ref@0.3": {"counts":[[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]],"boxes":[2,0,0,2,5,0,0,2,0,1,0,4,2,8,0,0,6,0,0,2,0,1,0,2,0,0,0,0,0,1],"critical":[0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"ms":[4441.5,1495.4,2968.45,4441.5,4441.5,4441.5,2968.45,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,2968.45,4441.5,4441.5,4441.5,4441.5,2968.45,4441.5,4441.5,4441.5,1495.4,4441.5,4441.5,4441.5,4441.5,4441.5],"profiles":["classical-v1"]},
+  "grid_clean:ref@0.3": {"counts":[[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]],"boxes":[0,0,0,0,0,0,0,9,0,7,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,1],"critical":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"ms":[1227.68,620.06,1227.68,1835.31,1835.31,1835.31,1835.31,1835.31,1835.31,1835.31,1835.31,1835.31,1835.31,1227.68,1835.31,1227.68,1835.31,1835.31,1835.31,1835.31,1227.68,1227.68,1835.31,1835.31,620.06,1835.31,1835.31,1835.31,1835.31,1835.31],"profiles":["classical-v1"]},
+  "v1_head_clean:head@0.3": {"counts":[[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]],"boxes":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"critical":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"ms":[1197.05,605.39,1197.05,1788.7,1788.7,1788.7,1788.7,1788.7,1788.7,1788.7,1788.7,1788.7,1788.7,1197.05,1788.7,1788.7,1788.7,1788.7,1788.7,1788.7,1197.05,1788.7,1788.7,1788.7,605.39,1788.7,1788.7,1788.7,1788.7,1788.7],"profiles":["onnx:drishyam_dacl10k.onnx"]},
+  "classical_clean:head@0.3": {"counts":[[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]],"boxes":[28,20,7,0,8,13,42,0,12,0,1,0,32,24,3,9,0,10,0,17,62,15,1,0,2,2,0,55,1,0],"critical":[0,0,0,0,1,0,0,0,0,0,0,0,12,0,0,0,0,0,0,0,2,0,0,0,0,0,0,4,0,0],"ms":[342.97,234.12,342.97,342.97,342.97,342.97,342.97,342.97,342.97,342.97,342.97,342.97,342.97,342.97,342.97,234.12,342.97,342.97,342.97,342.97,342.97,234.12,342.97,342.97,234.12,342.97,342.97,342.97,342.97,342.97],"profiles":["classical-v1"]},
+  "v2b_grid_clean:ref@1.0": {"counts":[[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]],"boxes":[2,0,0,2,5,0,0,2,0,1,0,4,2,8,0,0,6,0,0,2,0,1,0,2,0,0,1,0,0,1],"critical":[0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"ms":[4441.5,1495.4,2968.45,4441.5,4441.5,5914.56,2968.45,4441.5,5914.56,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,2968.45,5914.56,4441.5,5914.56,4441.5,2968.45,4441.5,4441.5,5914.56,1495.4,4441.5,7387.61,4441.5,7387.61,4441.5],"profiles":["classical-v1"]},
+  "grid_clean:ref@1.0": {"counts":[[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]],"boxes":[0,0,0,4,0,0,0,9,0,7,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,2,0,1],"critical":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"ms":[1227.68,620.06,1227.68,2442.93,1835.31,2442.93,1835.31,2442.93,2442.93,2442.93,1835.31,1835.31,1835.31,1227.68,1835.31,1227.68,1835.31,1835.31,2442.93,1835.31,1227.68,1227.68,1835.31,2442.93,620.06,1835.31,3050.56,1835.31,3050.56,1835.31],"profiles":["classical-v1"]},
+  "v1_head_clean:head@1.0": {"counts":[[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]],"boxes":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"critical":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"ms":[1197.05,605.39,1197.05,2380.35,1788.7,2380.35,1788.7,1788.7,2380.35,1788.7,1788.7,1788.7,1788.7,1197.05,1788.7,1788.7,1788.7,1788.7,2380.35,1788.7,1197.05,1788.7,1788.7,2380.35,605.39,1788.7,2972.0,1788.7,2972.0,1788.7],"profiles":["onnx:drishyam_dacl10k.onnx"]},
+  "classical_clean:head@1.0": {"counts":[[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]],"boxes":[28,20,7,0,11,21,59,0,33,0,7,0,62,24,3,9,0,10,1,28,67,15,1,0,2,3,7,55,1,1],"critical":[0,0,0,0,1,0,0,0,0,0,0,0,21,0,0,0,0,0,0,0,4,0,0,0,0,0,0,4,0,0],"ms":[342.97,234.12,342.97,778.37,451.82,451.82,560.67,342.97,996.07,560.67,560.67,451.82,778.37,342.97,560.67,234.12,451.82,560.67,778.37,451.82,451.82,234.12,560.67,778.37,234.12,560.67,1213.77,342.97,887.22,560.67],"profiles":["classical-v1"]},
+  "v2b_grid_real:ref@0.3": {"counts":[[0,0,0,0,1],[0,0,0,0,2],[1,0,0,0,2],[1,1,0,0,2],[0,0,0,0,2],[0,0,0,0,2],[0,0,0,0,0],[0,0,0,0,2],[0,0,0,0,5],[6,5,7,1,12],[3,2,1,0,9],[4,1,3,1,5],[2,2,0,0,2],[2,2,1,1,4],[3,3,2,0,3],[4,2,3,2,5],[0,0,0,0,3],[0,0,0,0,2],[1,1,1,1,1],[0,0,0,0,1],[1,1,1,1,1],[0,0,0,0,1],[1,0,1,0,2],[2,2,0,0,12],[5,2,5,0,14],[1,1,1,0,3],[2,1,1,1,2],[3,2,0,0,3],[0,0,0,0,1],[0,0,0,0,4],[0,0,0,0,12],[3,1,1,1,9],[2,2,2,2,3],[2,2,0,0,7],[0,0,1,0,3],[1,1,0,0,24],[10,6,1,1,24],[0,0,0,0,1],[0,0,0,0,1],[6,2,2,0,6],[0,0,0,0,2],[14,4,3,0,47],[0,0,0,0,0],[0,0,0,0,3],[1,1,0,0,1],[1,0,0,0,4],[0,0,0,0,1],[4,2,3,1,11],[5,4,2,0,6],[5,4,1,1,6],[2,2,0,0,3],[9,4,3,2,12],[2,0,0,0,9],[1,1,0,0,4],[10,0,10,0,10],[6,5,1,0,15],[8,4,5,1,11],[17,7,8,3,31],[18,7,10,3,34],[1,0,0,0,1],[2,1,1,0,6],[2,2,1,1,3],[0,0,0,0,2],[2,2,0,0,4],[0,0,3,1,8],[1,1,1,1,1],[22,9,10,0,30],[3,1,0,0,7],[7,5,2,1,14],[17,6,14,1,30],[3,2,0,0,5],[11,10,3,2,17],[2,2,1,1,9],[3,1,2,0,3],[0,0,0,0,1],[2,2,1,1,4],[0,0,0,0,5],[14,1,10,0,31],[10,8,5,3,17],[5,5,1,0,8],[3,2,3,2,4],[11,4,8,3,15],[0,0,0,0,3],[3,2,4,1,5],[10,6,7,2,16],[12,7,3,1,21],[3,2,0,0,8],[0,0,0,0,9],[9,7,3,0,14],[15,6,12,1,21],[4,3,1,0,7],[0,0,0,0,6],[4,2,2,0,4],[14,7,3,2,23],[11,8,8,3,20],[0,0,0,0,5],[4,2,2,0,7],[14,7,8,1,24],[5,5,1,0,7],[4,4,1,1,4]],"boxes":[10,4,6,10,9,29,63,0,32,32,68,30,43,40,16,18,0,9,9,9,7,0,47,15,29,19,25,25,0,0,0,12,68,9,32,9,35,0,48,123,27,77,55,98,91,68,72,47,28,42,45,98,39,38,49,36,28,34,96,94,29,33,14,29,56,59,75,58,47,47,24,84,22,134,71,30,36,78,67,24,79,34,0,40,67,71,24,0,90,112,39,0,66,92,90,1,56,101,33,18],"critical":[0,0,0,0,0,0,7,0,6,0,3,10,9,0,0,0,0,0,0,0,0,0,0,0,0,5,1,8,0,0,0,2,7,2,6,2,4,0,0,14,0,6,3,2,2,6,0,11,8,1,5,7,0,4,4,7,1,8,17,14,1,6,0,2,0,10,6,2,8,5,1,7,5,9,9,9,3,5,9,5,9,0,0,3,7,16,1,0,7,6,7,0,5,8,13,0,10,7,1,0],"ms":[7403.89,5924.15,5924.15,7403.89,5923.49,8155.06,12135.51,13462.33,12135.51,9481.88,9481.88,10808.69,8089.74,8089.74,6762.92,8089.74,6762.92,6762.92,6762.92,8089.74,5919.71,5919.71,8880.56,5919.71,7401.06,8880.56,4441.5,5388.01,22.35,2959.74,2959.74,5919.71,5388.01,5919.71,5388.01,5919.71,7401.06,8124.77,12105.23,9451.59,9451.59,10778.41,9451.59,10778.41,10778.41,10778.41,10778.41,8089.74,9416.56,8089.74,8089.74,8089.74,8089.74,8089.74,6762.92,8089.74,5436.1,6762.92,8089.74,9416.56,9416.56,9416.56,12070.19,8089.74,10743.38,8089.74,8089.74,6762.92,9416.56,5436.1,8089.74,8089.74,6762.92,8089.74,8089.74,8089.74,8089.74,8089.74,8089.74,8089.74,8089.74,6762.92,12070.19,8089.74,8089.74,8089.74,9416.56,4109.28,8089.74,8089.74,8089.74,8089.74,8089.74,8089.74,8089.74,8089.74,8089.74,8089.74,8089.74,8089.74],"profiles":["classical-v1"]},
+  "grid_real:ref@0.3": {"counts":[[0,0,0,0,1],[0,0,0,0,2],[0,0,0,0,2],[1,0,1,0,2],[0,0,0,0,2],[0,0,0,0,2],[0,0,0,0,0],[0,0,0,0,2],[0,0,0,0,5],[4,2,4,0,12],[1,1,2,0,9],[3,2,1,0,5],[2,2,0,0,2],[2,1,1,1,4],[3,2,1,1,3],[4,2,3,2,5],[0,0,0,0,3],[0,0,0,0,2],[1,1,1,1,1],[0,0,0,0,1],[1,1,1,1,1],[0,0,0,0,1],[0,0,0,0,2],[3,2,0,0,12],[6,3,6,2,14],[1,0,0,0,3],[2,2,0,0,2],[3,2,2,0,3],[0,0,0,0,1],[0,0,0,0,4],[0,0,0,0,12],[2,1,0,0,9],[2,2,2,2,3],[2,2,0,0,7],[0,0,1,0,3],[2,1,1,1,24],[10,4,2,2,24],[0,0,0,0,1],[0,0,0,0,1],[5,3,0,0,6],[1,1,0,0,2],[9,2,7,0,47],[0,0,0,0,0],[2,1,0,0,3],[1,0,0,0,1],[1,0,0,0,4],[1,0,0,0,1],[3,1,3,1,11],[6,5,3,2,6],[4,4,2,1,6],[2,2,2,0,3],[9,6,4,3,12],[5,0,5,1,9],[1,1,1,0,4],[10,0,10,1,10],[6,4,1,0,15],[9,4,5,0,11],[17,7,12,5,31],[17,6,15,6,34],[1,0,1,0,1],[5,3,2,2,6],[3,3,0,0,3],[0,0,0,0,2],[3,2,1,1,4],[0,0,1,0,8],[0,0,1,0,1],[17,5,12,1,30],[3,3,2,1,7],[7,5,0,0,14],[18,5,14,1,30],[4,3,0,0,5],[10,7,0,0,17],[1,1,0,0,9],[3,2,1,1,3],[0,0,0,0,1],[3,2,2,1,4],[1,1,0,0,5],[14,1,8,0,31],[10,7,5,1,17],[2,2,0,0,8],[3,2,2,0,4],[12,3,7,2,15],[0,0,0,0,3],[5,3,3,0,5],[10,6,8,2,16],[15,10,8,2,21],[3,3,0,0,8],[0,0,0,0,9],[10,4,6,1,14],[16,6,13,3,21],[4,3,2,0,7],[0,0,0,0,6],[4,3,3,0,4],[16,7,5,0,23],[10,6,5,1,20],[0,0,0,0,5],[6,3,4,0,7],[12,6,6,3,24],[3,3,0,0,7],[4,3,2,1,4]],"boxes":[11,7,1,30,0,27,125,0,32,13,43,25,72,41,17,27,0,10,18,5,10,0,36,37,33,80,24,67,0,2,0,15,70,8,18,19,24,0,17,116,36,151,59,98,67,65,78,36,35,56,30,69,57,34,28,54,44,57,62,59,171,35,1,33,29,91,67,103,24,40,35,94,23,76,67,27,83,70,47,15,95,25,0,21,77,57,19,0,48,68,34,0,44,78,91,0,42,73,31,28],"critical":[0,0,0,0,0,0,6,0,4,0,3,7,10,2,0,0,0,0,1,0,0,0,1,0,0,2,2,9,0,0,0,3,10,2,4,1,3,0,1,8,2,18,4,8,8,4,4,11,8,2,2,10,7,3,5,9,4,14,15,5,5,3,0,1,0,9,7,8,5,6,0,10,3,3,13,7,7,5,7,7,10,0,0,3,5,14,3,0,4,7,7,0,8,6,13,0,4,8,2,0],"ms":[3059.62,2448.27,2448.27,3059.62,2447.9,3288.91,5395.08,5395.08,4868.54,3288.91,3815.46,4342.0,3245.29,3245.29,2718.75,3245.29,2718.75,2718.75,2718.75,3771.83,2445.8,2445.8,3669.25,2445.8,3058.04,3669.25,1835.31,2160.09,12.43,1222.84,1222.84,2445.8,2160.09,2445.8,2160.09,2445.8,3058.04,3268.69,4321.77,3795.23,3795.23,4321.77,3795.23,3795.23,4848.31,4848.31,4321.77,3245.29,3771.83,3245.29,3245.29,3245.29,3245.29,3245.29,2718.75,3245.29,2718.75,3245.29,3245.29,3245.29,4298.38,3771.83,3771.83,3771.83,3245.29,3245.29,3245.29,3245.29,3245.29,2192.2,3245.29,3245.29,2718.75,3245.29,3245.29,3245.29,3771.83,3245.29,3245.29,2718.75,3245.29,3245.29,4824.92,3245.29,2718.75,3245.29,3245.29,1665.66,2718.75,3245.29,3245.29,3245.29,3245.29,3245.29,3245.29,3245.29,3245.29,3245.29,3245.29,3245.29],"profiles":["classical-v1"]},
+  "v1_head_real:head@0.3": {"counts":[[0,0,0,0,1],[0,0,0,0,2],[0,0,0,0,2],[2,1,2,1,2],[0,0,0,0,2],[0,0,0,0,2],[0,0,0,0,0],[0,0,0,0,2],[0,0,0,0,5],[4,4,4,1,12],[1,0,0,0,9],[3,1,2,0,5],[2,2,0,0,2],[1,1,1,0,4],[3,3,1,1,3],[4,3,3,1,5],[0,0,0,0,3],[0,0,0,0,2],[1,1,1,1,1],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,2],[3,2,0,0,12],[6,3,5,0,14],[3,1,1,0,3],[2,2,0,0,2],[3,2,1,1,3],[0,0,0,0,1],[0,0,0,0,4],[0,0,0,0,12],[3,3,0,0,9],[2,2,2,2,3],[3,1,1,0,7],[0,0,0,0,3],[2,1,0,0,24],[6,3,0,0,24],[0,0,0,0,1],[0,0,0,0,1],[4,2,0,0,6],[0,0,0,0,2],[6,3,1,0,47],[0,0,0,0,0],[0,0,0,0,3],[0,0,0,0,1],[1,1,1,0,4],[1,0,0,0,1],[4,3,3,3,11],[5,3,2,1,6],[5,3,1,0,6],[2,2,1,1,3],[8,4,2,1,12],[2,0,1,1,9],[1,1,0,0,4],[10,2,10,3,10],[7,5,0,0,15],[7,4,5,2,11],[21,9,10,4,31],[18,7,11,1,34],[1,1,0,0,1],[1,1,0,0,6],[2,2,0,0,3],[0,0,0,0,2],[3,3,0,0,4],[2,1,1,0,8],[1,1,1,1,1],[17,9,7,1,30],[3,1,1,0,7],[9,5,1,1,14],[21,7,11,2,30],[3,2,1,0,5],[10,10,7,4,17],[3,2,1,1,9],[3,2,3,1,3],[1,1,0,0,1],[1,1,0,0,4],[0,0,0,0,5],[18,7,4,2,31],[10,7,7,3,17],[4,4,3,0,8],[3,2,3,2,4],[7,2,3,1,15],[0,0,0,0,3],[5,4,4,1,5],[10,6,8,3,16],[14,9,7,3,21],[4,2,1,1,8],[0,0,0,0,9],[9,5,5,0,14],[16,6,11,2,21],[4,1,2,0,7],[0,0,0,0,6],[4,3,2,0,4],[12,7,6,1,23],[14,9,8,4,20],[0,0,0,0,5],[6,3,2,0,7],[20,9,9,1,24],[1,1,1,0,7],[3,2,1,1,4]],"boxes":[8,6,13,22,1,12,18,1,8,16,41,9,33,23,11,16,0,4,12,6,4,0,19,27,33,45,27,30,0,1,0,22,123,18,15,17,21,0,16,100,14,93,88,43,23,32,26,67,45,45,52,82,49,46,23,40,30,106,84,46,12,27,4,21,10,33,141,68,38,99,29,115,31,56,22,17,28,90,82,29,184,18,0,34,102,120,25,0,21,106,39,0,33,57,236,0,36,106,14,17],"critical":[0,0,2,0,0,0,0,0,0,0,8,7,6,0,0,0,0,0,0,0,0,0,0,0,0,10,1,6,0,0,0,2,33,3,3,5,3,0,2,4,0,2,3,0,0,3,1,18,6,3,4,6,5,22,5,10,1,50,15,3,1,7,2,0,0,9,34,9,15,35,5,31,5,2,3,6,6,37,19,10,37,0,0,1,19,31,7,0,1,17,2,0,2,7,83,0,0,28,1,0],"ms":[2390.36,2386.25,2386.25,2982.01,2385.84,2940.88,5781.41,5781.41,5213.31,3508.98,4077.09,4077.09,3475.22,3475.22,2339.01,3475.22,2907.12,3475.22,2907.12,4043.33,2383.52,2383.52,3575.89,2383.52,2980.27,3575.89,1788.7,2314.16,13.74,1191.69,1191.69,2383.52,2314.16,2383.52,2882.26,2383.52,2980.27,3493.33,4629.54,5197.65,4629.54,4629.54,4061.44,3493.33,5765.76,4061.44,5765.76,3475.22,4043.33,3475.22,3475.22,3475.22,3475.22,2907.12,2907.12,4043.33,2907.12,3475.22,3475.22,3475.22,4043.33,4043.33,3475.22,3475.22,4043.33,3475.22,4043.33,2907.12,4043.33,2907.12,3475.22,3475.22,2907.12,3475.22,4043.33,2339.01,4043.33,3475.22,3475.22,3475.22,3475.22,2907.12,5179.55,3475.22,2907.12,3475.22,2907.12,1770.9,2907.12,3475.22,2907.12,3475.22,3475.22,3475.22,4043.33,3475.22,3475.22,3475.22,3475.22,2907.12],"profiles":["onnx:drishyam_dacl10k.onnx"]},
+  "classical_real:head@0.3": {"counts":[[0,0,0,0,1],[0,0,0,0,2],[0,0,0,0,2],[1,1,1,1,2],[0,0,0,0,2],[1,0,1,0,2],[0,0,0,0,0],[0,0,0,0,2],[0,0,0,0,5],[0,0,0,0,12],[6,4,4,3,9],[1,1,0,0,5],[2,0,2,0,2],[0,0,0,0,4],[0,0,2,0,3],[0,0,0,0,5],[1,1,0,0,3],[0,0,0,0,2],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,2],[1,1,0,0,12],[3,1,0,0,14],[3,1,1,0,3],[2,2,0,0,2],[3,2,1,0,3],[0,0,0,0,1],[0,0,0,0,4],[0,0,0,0,12],[1,0,0,0,9],[0,0,1,0,3],[1,1,1,1,7],[0,0,0,0,3],[3,0,0,0,24],[3,1,6,1,24],[0,0,0,0,1],[0,0,0,0,1],[1,0,0,0,6],[0,0,0,0,2],[11,4,9,0,47],[0,0,0,0,0],[1,0,1,0,3],[0,0,0,0,1],[3,0,1,0,4],[1,0,0,0,1],[3,3,2,2,11],[2,1,0,0,6],[1,1,0,0,6],[1,0,0,0,3],[4,4,0,0,12],[0,0,2,0,9],[0,0,0,0,4],[1,0,0,0,10],[2,1,0,0,15],[1,1,0,0,11],[9,6,3,1,31],[7,1,7,1,34],[0,0,0,0,1],[0,0,0,0,6],[0,0,0,0,3],[0,0,0,0,2],[2,2,0,0,4],[1,0,1,0,8],[0,0,0,0,1],[2,0,3,0,30],[0,0,0,0,7],[0,0,1,0,14],[8,2,8,0,30],[0,0,0,0,5],[0,0,0,0,17],[1,0,1,0,9],[0,0,0,0,3],[0,0,0,0,1],[0,0,1,0,4],[0,0,0,0,5],[4,0,4,0,31],[5,3,3,0,17],[0,0,0,0,8],[0,0,0,0,4],[1,1,0,0,15],[2,0,1,0,3],[4,3,1,1,5],[1,0,0,0,16],[4,2,1,0,21],[3,0,0,0,8],[1,0,1,0,9],[1,1,0,0,14],[0,0,0,0,21],[1,0,0,0,7],[0,0,0,0,6],[0,0,0,0,4],[1,1,0,0,23],[2,0,0,0,20],[1,0,0,0,5],[0,0,0,0,7],[1,0,0,0,24],[2,2,0,0,7],[0,0,0,0,4]],"boxes":[312,25,35,745,179,343,1472,3354,1709,112,3552,825,822,852,496,1303,493,377,803,846,64,36,54,268,239,343,149,552,0,58,108,325,1198,363,158,184,665,361,1774,1918,870,962,2455,1695,1607,1774,1611,1546,679,357,844,2175,381,1305,521,497,600,925,1545,749,2253,964,697,406,631,1447,885,768,1211,2219,260,787,352,206,746,908,328,1248,1387,403,2400,371,764,1542,925,844,512,158,720,717,508,251,485,755,1055,513,2008,997,1944,649],"critical":[2,11,2,4,0,0,8,0,2,6,8,9,5,3,0,0,1,1,0,0,0,0,0,0,0,2,0,16,0,0,3,1,0,0,0,0,6,2,9,0,0,0,1,0,0,1,0,0,0,0,0,0,0,1,0,9,0,0,3,0,0,13,0,0,0,0,3,0,0,15,0,0,3,0,0,0,0,0,0,0,0,0,4,0,0,0,11,0,1,0,1,0,0,0,7,0,4,0,0,0],"ms":[463.78,458.87,458.87,572.63,458.38,2923.87,2599.72,2923.87,2923.87,2923.87,2923.87,2599.72,1912.87,1912.87,1264.58,1912.87,1264.58,1912.87,1912.87,1912.87,455.61,455.61,684.14,455.61,570.55,684.14,342.97,1128.15,16.42,227.72,227.72,455.61,1128.15,455.61,1128.15,455.61,570.55,2365.75,2365.75,2365.75,2365.75,2365.75,2365.75,2365.75,2365.75,2365.75,2365.75,1912.87,1912.87,1912.87,1912.87,1912.87,1912.87,1912.87,1912.87,1912.87,1912.87,1912.87,1912.87,1912.87,1912.87,1912.87,1912.87,1912.87,1912.87,1912.87,1912.87,1912.87,1912.87,1912.87,1912.87,1912.87,1912.87,1912.87,1912.87,1912.87,1912.87,1912.87,1912.87,1912.87,1912.87,1696.78,1912.87,1912.87,1912.87,1912.87,1912.87,616.29,1912.87,1912.87,1912.87,1264.58,1912.87,1912.87,1912.87,1912.87,1912.87,1912.87,1912.87,1912.87],"profiles":["classical-v1"]},
+  "v2b_grid_real:ref@1.0": {"counts":[[0,0,0,0,1],[0,0,0,0,2],[1,0,0,0,2],[1,1,0,0,2],[0,0,0,0,2],[0,0,0,0,2],[0,0,0,0,0],[0,0,0,0,2],[0,0,0,0,5],[6,5,6,2,12],[3,2,0,0,9],[4,1,1,0,5],[2,2,0,0,2],[2,2,1,0,4],[3,3,2,2,3],[4,2,4,2,5],[0,0,0,0,3],[0,0,0,0,2],[1,1,1,1,1],[0,0,0,0,1],[1,1,1,1,1],[0,0,0,0,1],[1,0,0,0,2],[3,3,0,0,12],[5,3,5,0,14],[2,2,0,0,3],[2,2,0,0,2],[3,2,0,0,3],[0,0,0,0,1],[0,0,0,0,4],[0,0,0,0,12],[3,1,2,1,9],[2,2,2,2,3],[2,2,0,0,7],[0,0,0,0,3],[2,2,0,0,24],[10,6,3,0,24],[0,0,0,0,1],[0,0,0,0,1],[6,2,2,1,6],[0,0,0,0,2],[14,4,3,0,47],[0,0,0,0,0],[0,0,0,0,3],[1,1,0,0,1],[1,0,0,0,4],[0,0,0,0,1],[4,2,1,0,11],[5,4,4,4,6],[5,4,1,0,6],[2,2,1,1,3],[9,4,6,1,12],[2,0,3,1,9],[1,1,0,0,4],[10,0,10,1,10],[6,5,1,0,15],[8,4,5,2,11],[17,7,10,2,31],[18,7,15,6,34],[1,0,0,0,1],[2,1,1,0,6],[2,2,1,0,3],[0,0,0,0,2],[2,2,0,0,4],[0,0,5,1,8],[1,1,1,1,1],[22,9,11,1,30],[3,1,1,0,7],[7,5,1,0,14],[17,6,12,1,30],[3,2,0,0,5],[11,10,6,3,17],[2,2,2,2,9],[3,1,1,0,3],[0,0,0,0,1],[2,2,1,1,4],[0,0,0,0,5],[14,1,8,0,31],[10,8,9,3,17],[5,5,0,0,8],[3,2,3,2,4],[11,4,8,0,15],[0,0,0,0,3],[3,2,3,1,5],[10,6,6,4,16],[12,7,2,1,21],[3,2,0,0,8],[0,0,0,0,9],[9,7,6,2,14],[15,6,12,2,21],[4,3,1,1,7],[0,0,0,0,6],[4,2,4,1,4],[14,7,5,1,23],[11,8,7,0,20],[0,0,0,0,5],[4,2,0,0,7],[14,7,6,2,24],[5,5,1,1,7],[4,4,1,1,4]],"boxes":[10,8,13,42,13,29,63,0,32,32,68,30,43,40,16,18,0,9,9,9,18,0,76,42,44,49,57,25,0,3,13,29,68,17,32,28,44,0,48,123,27,77,55,98,91,68,72,47,28,42,45,98,39,38,49,36,28,34,96,94,29,33,14,29,56,59,75,58,47,47,24,84,22,134,71,30,36,78,67,24,79,34,0,40,67,71,24,0,90,112,39,0,66,92,90,1,56,101,33,18],"critical":[0,0,0,0,0,0,7,0,6,0,3,10,9,0,0,0,0,0,0,0,0,0,0,0,0,9,4,8,0,0,0,3,7,5,6,2,6,0,0,14,0,6,3,2,2,6,0,11,8,1,5,7,0,4,4,7,1,8,17,14,1,6,0,2,0,10,6,2,8,5,1,7,5,9,9,9,3,5,9,5,9,0,0,3,7,16,1,0,7,6,7,0,5,8,13,0,10,7,1,0],"ms":[7403.89,8870.25,10343.3,14769.15,8869.59,8155.06,12135.51,13462.33,12135.51,9481.88,9481.88,10808.69,8089.74,8089.74,6762.92,8089.74,6762.92,6762.92,6762.92,8089.74,10338.86,5919.71,14772.77,10338.86,10347.16,14772.77,7387.61,5388.01,22.35,5905.85,5905.85,10338.86,5388.01,10338.86,5388.01,8865.81,10347.16,8124.77,12105.23,9451.59,9451.59,10778.41,9451.59,10778.41,10778.41,10778.41,10778.41,8089.74,9416.56,8089.74,8089.74,8089.74,8089.74,8089.74,6762.92,8089.74,5436.1,6762.92,8089.74,9416.56,9416.56,9416.56,12070.19,8089.74,10743.38,8089.74,8089.74,6762.92,9416.56,5436.1,8089.74,8089.74,6762.92,8089.74,8089.74,8089.74,8089.74,8089.74,8089.74,8089.74,8089.74,6762.92,12070.19,8089.74,8089.74,8089.74,9416.56,4109.28,8089.74,8089.74,8089.74,8089.74,8089.74,8089.74,8089.74,8089.74,8089.74,8089.74,8089.74,8089.74],"profiles":["classical-v1"]},
+  "grid_real:ref@1.0": {"counts":[[0,0,0,0,1],[0,0,0,0,2],[1,0,0,0,2],[1,0,0,0,2],[0,0,0,0,2],[0,0,0,0,2],[0,0,0,0,0],[0,0,0,0,2],[0,0,0,0,5],[4,2,5,2,12],[1,1,0,0,9],[3,2,0,0,5],[2,2,1,1,2],[2,1,0,0,4],[3,2,1,1,3],[4,2,4,1,5],[0,0,0,0,3],[0,0,0,0,2],[1,1,1,1,1],[0,0,0,0,1],[1,1,1,1,1],[0,0,0,0,1],[0,0,0,0,2],[3,2,1,0,12],[6,4,5,0,14],[1,1,1,1,3],[2,2,0,0,2],[3,2,2,0,3],[0,0,0,0,1],[0,0,0,0,4],[0,0,0,0,12],[2,1,0,0,9],[2,2,2,2,3],[2,2,2,1,7],[0,0,0,0,3],[3,2,0,0,24],[10,5,7,1,24],[0,0,0,0,1],[0,0,0,0,1],[5,3,2,0,6],[1,1,0,0,2],[9,2,3,0,47],[0,0,0,0,0],[2,1,0,0,3],[1,0,1,0,1],[1,0,0,0,4],[1,0,0,0,1],[3,1,3,2,11],[6,5,2,1,6],[4,4,2,1,6],[2,2,1,0,3],[9,6,7,3,12],[5,0,3,0,9],[1,1,1,0,4],[10,0,10,1,10],[6,4,2,0,15],[9,4,3,1,11],[17,7,9,1,31],[17,6,12,2,34],[1,0,1,0,1],[5,3,2,0,6],[3,3,0,0,3],[0,0,0,0,2],[3,2,0,0,4],[0,0,0,0,8],[0,0,1,0,1],[17,5,13,0,30],[3,3,1,0,7],[7,5,1,0,14],[18,5,15,2,30],[4,3,0,0,5],[10,7,3,2,17],[1,1,0,0,9],[3,2,2,0,3],[0,0,0,0,1],[3,2,2,0,4],[1,1,1,0,5],[14,1,10,0,31],[10,7,5,2,17],[2,2,0,0,8],[3,2,2,1,4],[12,3,9,1,15],[0,0,0,0,3],[5,3,3,0,5],[10,6,7,3,16],[15,10,4,2,21],[3,3,0,0,8],[0,0,0,0,9],[10,4,7,0,14],[16,6,11,1,21],[4,3,3,0,7],[0,0,0,0,6],[4,3,4,0,4],[16,7,6,0,23],[10,6,9,3,20],[0,0,0,0,5],[6,3,2,0,7],[12,6,5,1,24],[3,3,0,0,7],[4,3,3,2,4]],"boxes":[11,8,5,53,7,27,125,0,32,13,43,25,72,41,17,27,0,10,18,5,13,0,86,88,60,182,60,67,0,5,8,34,70,13,18,51,32,0,17,116,36,151,59,98,67,65,78,36,35,56,30,69,57,34,28,54,44,57,62,59,171,35,1,33,29,91,67,103,24,40,35,94,23,76,67,27,83,70,47,15,95,25,0,21,77,57,19,0,48,68,34,0,44,78,91,0,42,73,31,28],"critical":[0,0,0,0,0,0,6,0,4,0,3,7,10,2,0,0,0,0,1,0,0,0,3,0,0,5,4,9,0,0,0,4,10,4,4,2,4,0,1,8,2,18,4,8,8,4,4,11,8,2,2,10,7,3,5,9,4,14,15,5,5,3,0,1,0,9,7,8,5,6,0,10,3,3,13,7,7,5,7,7,10,0,0,3,5,14,3,0,4,7,7,0,8,6,13,0,4,8,2,0],"ms":[3059.62,3055.9,4878.77,4882.49,4878.41,3288.91,5395.08,5395.08,4868.54,3288.91,3815.46,4342.0,3245.29,3245.29,2718.75,3245.29,2718.75,2718.75,2718.75,3771.83,3661.05,2445.8,6099.76,4876.3,5488.54,6099.76,3050.56,2160.09,12.43,1830.46,2438.09,4268.68,2160.09,3661.05,2160.09,3661.05,4273.29,3268.69,4321.77,3795.23,3795.23,4321.77,3795.23,3795.23,4848.31,4848.31,4321.77,3245.29,3771.83,3245.29,3245.29,3245.29,3245.29,3245.29,2718.75,3245.29,2718.75,3245.29,3245.29,3245.29,4298.38,3771.83,3771.83,3771.83,3245.29,3245.29,3245.29,3245.29,3245.29,2192.2,3245.29,3245.29,2718.75,3245.29,3245.29,3245.29,3771.83,3245.29,3245.29,2718.75,3245.29,3245.29,4824.92,3245.29,2718.75,3245.29,3245.29,1665.66,2718.75,3245.29,3245.29,3245.29,3245.29,3245.29,3245.29,3245.29,3245.29,3245.29,3245.29,3245.29],"profiles":["classical-v1"]},
+  "v1_head_real:head@1.0": {"counts":[[0,0,0,0,1],[0,0,0,0,2],[0,0,0,0,2],[2,1,0,0,2],[0,0,0,0,2],[0,0,0,0,2],[0,0,0,0,0],[0,0,0,0,2],[0,0,0,0,5],[4,4,4,1,12],[1,0,0,0,9],[3,1,0,0,5],[2,2,1,0,2],[1,1,0,0,4],[3,3,2,1,3],[4,3,4,2,5],[0,0,0,0,3],[0,0,0,0,2],[1,1,1,1,1],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,2],[3,2,1,1,12],[6,4,5,0,14],[3,1,2,1,3],[2,2,0,0,2],[3,2,0,0,3],[0,0,0,0,1],[0,0,0,0,4],[0,0,1,1,12],[4,3,2,1,9],[2,2,2,2,3],[4,3,0,0,7],[0,0,0,0,3],[2,1,1,0,24],[9,6,0,0,24],[0,0,0,0,1],[0,0,0,0,1],[4,2,0,0,6],[0,0,0,0,2],[6,3,1,0,47],[0,0,0,0,0],[0,0,0,0,3],[0,0,0,0,1],[1,1,0,0,4],[1,0,0,0,1],[4,3,4,3,11],[5,3,1,0,6],[5,3,0,0,6],[2,2,2,1,3],[8,4,2,2,12],[2,0,1,0,9],[1,1,1,0,4],[10,2,10,1,10],[7,5,0,0,15],[7,4,5,2,11],[21,9,12,3,31],[18,7,16,5,34],[1,1,0,0,1],[1,1,0,0,6],[2,2,0,0,3],[0,0,0,0,2],[3,3,0,0,4],[2,1,1,0,8],[1,1,1,1,1],[17,9,6,0,30],[3,1,2,1,7],[9,5,4,1,14],[21,7,12,2,30],[3,2,0,0,5],[10,10,5,3,17],[3,2,4,0,9],[3,2,0,0,3],[1,1,0,0,1],[1,1,0,0,4],[0,0,0,0,5],[18,7,1,0,31],[10,7,4,2,17],[4,4,2,0,8],[3,2,2,1,4],[7,2,3,1,15],[0,0,0,0,3],[5,4,4,0,5],[10,6,7,2,16],[14,9,7,2,21],[4,2,0,0,8],[0,0,0,0,9],[9,5,6,2,14],[16,6,10,1,21],[4,1,1,0,7],[0,0,0,0,6],[4,3,2,0,4],[12,7,1,0,23],[14,9,8,1,20],[0,0,0,0,5],[6,3,1,0,7],[20,9,7,1,24],[1,1,0,0,7],[3,2,2,1,4]],"boxes":[8,19,15,44,4,12,18,1,8,16,41,9,33,23,11,16,0,4,12,6,8,0,21,46,43,72,43,30,0,4,8,61,123,37,15,37,26,0,16,100,14,93,88,43,23,32,26,67,45,45,52,82,49,46,23,40,30,106,84,46,12,27,4,21,10,33,141,68,38,99,29,115,31,56,22,17,28,90,82,29,184,18,0,34,102,120,25,0,21,106,39,0,33,57,236,0,36,106,14,17],"critical":[0,0,2,0,0,0,0,0,0,0,8,7,6,0,0,0,0,0,0,0,0,0,0,0,0,13,1,6,0,0,0,4,33,9,3,9,6,0,2,4,0,2,3,0,0,3,1,18,6,3,4,6,5,22,5,10,1,50,15,3,1,7,2,0,0,9,34,9,15,35,5,31,5,2,3,6,6,37,19,10,37,0,0,1,19,31,7,0,1,17,2,0,2,7,83,0,0,28,1,0],"ms":[2390.36,4161.2,4161.2,5348.62,3569.14,2940.88,5781.41,5781.41,5213.31,3508.98,4077.09,4077.09,3475.22,3475.22,2339.01,3475.22,2907.12,3475.22,2907.12,4043.33,4158.47,2383.52,4167.54,3566.82,4163.57,5350.84,2380.35,2314.16,13.74,1783.34,2374.99,4158.47,2314.16,3566.82,2882.26,4158.47,3571.92,3493.33,4629.54,5197.65,4629.54,4629.54,4061.44,3493.33,5765.76,4061.44,5765.76,3475.22,4043.33,3475.22,3475.22,3475.22,3475.22,2907.12,2907.12,4043.33,2907.12,3475.22,3475.22,3475.22,4043.33,4043.33,3475.22,3475.22,4043.33,3475.22,4043.33,2907.12,4043.33,2907.12,3475.22,3475.22,2907.12,3475.22,4043.33,2339.01,4043.33,3475.22,3475.22,3475.22,3475.22,2907.12,5179.55,3475.22,2907.12,3475.22,2907.12,1770.9,2907.12,3475.22,2907.12,3475.22,3475.22,3475.22,4043.33,3475.22,3475.22,3475.22,3475.22,2907.12],"profiles":["onnx:drishyam_dacl10k.onnx"]},
+  "classical_real:head@1.0": {"counts":[[0,0,0,0,1],[0,0,0,0,2],[0,0,0,0,2],[1,1,0,0,2],[0,0,0,0,2],[1,0,1,0,2],[0,0,0,0,0],[0,0,0,0,2],[0,0,0,0,5],[0,0,1,0,12],[6,4,4,2,9],[1,1,0,0,5],[2,0,2,0,2],[0,0,0,0,4],[0,0,0,0,3],[0,0,0,0,5],[1,1,0,0,3],[0,0,0,0,2],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,2],[2,1,0,0,12],[3,2,1,1,14],[3,1,1,1,3],[2,2,1,0,2],[3,2,2,2,3],[0,0,0,0,1],[0,0,0,0,4],[0,0,0,0,12],[1,1,0,0,9],[0,0,1,0,3],[2,1,3,2,7],[0,0,0,0,3],[9,5,1,0,24],[4,2,6,1,24],[0,0,0,0,1],[0,0,0,0,1],[3,0,0,0,6],[0,0,0,0,2],[13,5,6,1,47],[0,0,0,0,0],[1,0,0,0,3],[0,0,0,0,1],[3,0,3,1,4],[1,0,0,0,1],[3,3,3,1,11],[2,1,1,0,6],[1,1,0,0,6],[1,0,1,0,3],[4,4,1,0,12],[0,0,1,0,9],[0,0,0,0,4],[1,0,0,0,10],[2,1,0,0,15],[1,1,0,0,11],[9,6,5,2,31],[7,2,6,4,34],[0,0,0,0,1],[0,0,0,0,6],[0,0,0,0,3],[0,0,0,0,2],[2,2,1,1,4],[1,0,0,0,8],[0,0,0,0,1],[2,0,0,0,30],[1,1,1,0,7],[0,0,1,0,14],[8,2,8,3,30],[0,0,0,0,5],[0,0,0,0,17],[1,0,1,0,9],[0,0,0,0,3],[0,0,0,0,1],[0,0,0,0,4],[0,0,0,0,5],[5,1,4,0,31],[5,3,2,2,17],[0,0,0,0,8],[0,0,0,0,4],[1,1,0,0,15],[2,0,0,0,3],[4,3,2,1,5],[1,0,0,0,16],[7,5,2,1,21],[3,0,0,0,8],[1,0,0,0,9],[2,2,3,0,14],[0,0,1,0,21],[1,0,0,0,7],[0,0,0,0,6],[0,0,0,0,4],[5,4,5,1,23],[2,0,0,0,20],[1,0,0,0,5],[0,0,0,0,7],[1,0,1,0,24],[2,2,1,0,7],[0,0,0,0,4]],"boxes":[312,149,146,1405,379,364,1472,3943,2117,149,4520,825,1352,1857,496,2089,493,712,1402,1151,195,110,285,670,814,841,210,1305,0,104,108,862,2370,1241,550,1015,1096,661,2559,3187,1063,1220,3202,2081,2206,2881,2468,2701,1149,527,1698,4286,669,2442,943,1186,1133,2189,3189,1926,4643,2293,1120,727,774,3212,1485,2191,1755,3349,671,1133,882,647,1519,1382,946,2613,2813,688,3904,371,884,2126,1500,1405,1069,158,1740,1438,775,251,1148,1392,2052,574,4489,1533,3872,1062],"critical":[2,26,6,4,2,0,8,0,2,6,8,9,7,3,0,0,1,1,0,0,0,0,0,0,0,2,0,16,0,0,3,1,0,12,0,0,7,2,9,0,1,0,1,0,0,1,0,0,0,0,0,0,0,1,0,13,0,3,3,0,0,13,0,0,0,0,3,0,0,15,0,1,3,0,0,0,0,6,2,3,13,0,4,0,0,0,26,0,3,0,2,0,0,3,26,0,4,0,0,0],"ms":[463.78,1111.97,1329.67,1552.28,1329.18,3788.26,2599.72,3788.26,3896.31,4220.46,4220.46,2599.72,3425.56,3533.61,1264.58,3749.71,1264.58,2993.36,3101.41,2777.27,1326.41,782.16,2425.74,891.01,1985.6,1554.94,451.82,2856.93,16.42,445.42,336.57,1108.71,2532.78,1326.41,3073.03,1326.41,1114.8,3230.14,3554.29,3662.34,3338.19,3554.29,2905.99,3014.04,3446.24,3554.29,3770.39,3749.71,3317.51,3317.51,3749.71,3533.61,3749.71,3317.51,3965.8,3533.61,3317.51,3965.8,3965.8,4398.0,3857.76,3749.71,3965.8,3749.71,2453.12,3749.71,3533.61,3749.71,2993.36,3965.8,4181.9,3749.71,3749.71,3965.8,3533.61,3101.41,3533.61,3965.8,3749.71,3857.76,3209.46,1696.78,2345.07,2669.22,3425.56,3533.61,3965.8,616.29,3965.8,4073.85,3317.51,1264.58,3965.8,3965.8,3749.71,2128.97,4181.9,3749.71,3749.71,3749.71],"profiles":["classical-v1"]},
+  "v2b_grid_synth_dev:tiling@L0": {"counts":[[2,2,0,0,3],[4,4,0,0,4],[1,1,0,0,2],[2,2,0,0,3],[1,1,0,0,1],[4,4,0,0,5],[1,1,0,0,1],[2,2,0,0,2],[2,2,0,0,2],[3,3,0,0,4],[1,1,0,0,1],[2,2,0,0,2],[4,4,0,0,5],[5,5,1,1,6],[1,1,0,0,1],[4,4,0,0,4],[3,3,0,0,4],[4,4,2,0,6],[2,2,0,0,5],[4,4,0,0,5],[3,3,0,0,3],[1,1,0,0,3],[4,4,0,0,6],[1,1,0,0,2],[5,5,0,0,5],[2,2,0,0,3],[2,2,0,0,7],[3,2,0,0,6],[2,2,1,1,3],[1,1,0,0,1],[5,3,0,0,6],[5,5,0,0,5],[4,4,0,0,5],[1,1,0,0,1],[2,1,0,0,3],[3,3,1,0,5],[1,1,0,0,1],[4,4,0,0,4],[4,4,0,0,4],[3,3,0,0,3],[1,1,0,0,2],[3,3,0,0,6],[1,1,0,0,1],[1,1,0,0,2],[2,2,0,0,3],[5,5,1,0,5],[3,3,1,1,4],[2,2,1,1,2],[1,1,0,0,2],[3,3,0,0,4],[1,1,0,0,1],[4,4,1,1,7],[1,1,0,0,1],[1,1,0,0,1],[2,2,0,0,2],[4,4,0,0,4],[1,1,0,0,1],[2,2,1,1,3],[2,1,0,0,2],[4,4,0,0,5]],"boxes":[4,11,2,6,2,9,2,4,4,11,1,4,15,11,2,6,11,7,13,7,16,4,28,12,10,3,12,11,8,6,16,5,9,1,2,9,1,12,19,3,4,10,4,1,7,16,7,7,5,12,3,6,1,1,3,5,1,9,5,8],"critical":[0,0,0,1,0,1,0,1,0,0,0,1,2,0,0,0,0,1,0,0,1,0,0,0,0,1,1,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,2,0,0,0,0,1,0,0,0,0,0,1,0,1],"ms":[29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52],"profiles":[]},
+  "v2b_grid_synth_dev:downscale": {"counts":[[0,0,0,0,3],[3,1,0,0,4],[0,0,0,0,2],[2,2,0,0,3],[1,1,0,0,1],[3,3,0,0,5],[1,1,0,0,1],[1,1,0,0,2],[1,1,0,0,2],[1,1,0,0,4],[1,1,0,0,1],[0,0,0,0,2],[0,0,0,0,5],[5,5,0,0,6],[0,0,0,0,1],[2,2,1,0,4],[3,3,0,0,4],[3,3,0,0,6],[1,1,0,0,5],[1,1,0,0,5],[1,1,0,0,3],[1,1,0,0,3],[1,1,0,0,6],[1,1,0,0,2],[3,3,0,0,5],[1,1,0,0,3],[2,2,1,1,7],[2,2,0,0,6],[1,1,0,0,3],[1,1,0,0,1],[3,3,0,0,6],[3,2,0,0,5],[4,1,0,0,5],[1,1,0,0,1],[1,1,0,0,3],[2,2,0,0,5],[1,1,0,0,1],[3,2,0,0,4],[1,1,0,0,4],[2,2,0,0,3],[1,1,0,0,2],[0,0,0,0,6],[0,0,0,0,1],[0,0,0,0,2],[2,2,0,0,3],[4,4,1,0,5],[3,3,0,0,4],[2,2,0,0,2],[1,1,0,0,2],[3,3,2,2,4],[1,1,0,0,1],[2,2,0,0,7],[1,0,0,0,1],[1,1,0,0,1],[1,1,0,0,2],[4,2,0,0,4],[0,0,0,0,1],[2,2,0,0,3],[1,1,0,0,2],[4,4,0,0,5]],"boxes":[3,5,2,2,2,4,2,1,2,5,1,2,3,6,0,2,4,7,2,9,2,2,2,1,3,3,5,6,2,1,4,5,3,1,2,3,1,3,3,3,2,0,1,0,5,4,6,2,1,3,1,4,3,1,1,2,0,3,1,4],"critical":[0,0,0,1,0,2,0,0,0,0,0,0,0,1,0,0,0,0,1,0,1,0,1,0,0,1,1,1,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,2,0,1,0,0,2,0,0,0,0,0,1,0,1],"ms":[1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77],"profiles":[]},
+  "grid_synth_dev:tiling@L0": {"counts":[[2,2,0,0,3],[4,3,0,0,4],[1,1,0,0,2],[2,2,0,0,3],[1,1,1,1,1],[4,4,0,0,5],[1,1,1,1,1],[2,2,0,0,2],[2,2,0,0,2],[3,3,0,0,4],[1,1,0,0,1],[2,2,0,0,2],[4,4,0,0,5],[5,5,1,0,6],[1,1,0,0,1],[4,4,0,0,4],[3,3,0,0,4],[4,4,0,0,6],[3,3,0,0,5],[4,4,0,0,5],[3,3,0,0,3],[2,2,0,0,3],[4,4,0,0,6],[2,2,0,0,2],[5,5,1,0,5],[2,2,0,0,3],[3,2,1,1,7],[4,4,0,0,6],[2,2,0,0,3],[1,1,0,0,1],[4,4,0,0,6],[5,5,0,0,5],[4,3,0,0,5],[1,1,0,0,1],[2,1,0,0,3],[3,3,0,0,5],[1,1,0,0,1],[4,4,0,0,4],[4,4,0,0,4],[3,2,0,0,3],[1,1,0,0,2],[1,1,0,0,6],[1,1,0,0,1],[1,1,0,0,2],[2,2,0,0,3],[5,5,0,0,5],[3,3,0,0,4],[2,2,0,0,2],[1,1,0,0,2],[3,3,1,1,4],[1,1,0,0,1],[3,3,0,0,7],[1,1,0,0,1],[1,1,0,0,1],[2,2,0,0,2],[4,3,0,0,4],[0,0,0,0,1],[2,2,0,0,3],[1,1,0,0,2],[4,4,0,0,5]],"boxes":[5,10,2,4,2,7,1,7,3,10,2,2,15,9,3,6,5,11,7,7,10,4,19,5,8,5,7,10,5,1,9,6,7,1,3,12,2,7,9,5,2,2,3,2,6,8,7,2,3,11,2,9,1,2,3,4,1,5,4,8],"critical":[0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,1,1,1,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,1,0,1],"ms":[12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36],"profiles":[]},
+  "grid_synth_dev:downscale": {"counts":[[0,0,0,0,3],[3,3,0,0,4],[0,0,0,0,2],[2,2,0,0,3],[1,1,0,0,1],[3,3,0,0,5],[1,1,0,0,1],[1,1,0,0,2],[2,2,0,0,2],[1,1,0,0,4],[1,1,0,0,1],[2,2,0,0,2],[3,3,2,1,5],[5,5,0,0,6],[0,0,0,0,1],[1,1,0,0,4],[3,3,0,0,4],[2,2,0,0,6],[2,2,0,0,5],[1,1,0,0,5],[3,3,0,0,3],[0,0,0,0,3],[1,1,0,0,6],[1,1,0,0,2],[3,3,0,0,5],[2,2,0,0,3],[1,1,0,0,7],[2,2,0,0,6],[1,1,0,0,3],[0,0,0,0,1],[2,2,0,0,6],[4,4,0,0,5],[4,1,1,0,5],[0,0,0,0,1],[1,1,0,0,3],[2,2,0,0,5],[0,0,0,0,1],[2,2,0,0,4],[4,4,0,0,4],[2,2,1,1,3],[1,1,0,0,2],[0,0,0,0,6],[1,1,0,0,1],[0,0,0,0,2],[2,2,0,0,3],[3,3,0,0,5],[3,3,0,0,4],[1,1,0,0,2],[0,0,0,0,2],[3,3,1,1,4],[0,0,0,0,1],[2,2,0,0,7],[0,0,0,0,1],[1,1,0,0,1],[0,0,0,0,2],[4,2,0,0,4],[0,0,0,0,1],[1,1,0,0,3],[1,1,0,0,2],[3,3,1,0,5]],"boxes":[1,7,1,2,1,4,1,1,2,6,1,2,4,7,0,1,5,6,4,2,4,0,2,1,3,2,8,4,2,0,3,4,3,0,1,2,1,2,5,2,1,1,1,2,3,4,4,1,2,4,2,3,1,1,0,2,2,3,1,3],"critical":[0,0,0,1,0,2,0,0,0,0,0,1,1,1,0,0,0,1,0,1,1,0,1,0,1,1,1,1,0,0,1,0,0,0,1,0,0,0,1,1,0,0,0,0,1,0,2,0,0,0,0,2,0,0,0,0,0,1,0,1],"ms":[606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66],"profiles":[]},
+  "v1_head_synth_dev:tiling@L0": {"counts":[[2,2,1,0,3],[3,3,1,0,4],[1,1,0,0,2],[2,2,0,0,3],[1,1,0,0,1],[4,4,0,0,5],[1,1,0,0,1],[2,2,0,0,2],[1,1,0,0,2],[3,3,0,0,4],[1,1,0,0,1],[2,2,0,0,2],[4,4,0,0,5],[5,5,1,0,6],[1,1,0,0,1],[4,4,0,0,4],[3,3,1,1,4],[3,3,0,0,6],[3,3,0,0,5],[4,4,0,0,5],[3,3,0,0,3],[1,1,0,0,3],[3,3,0,0,6],[2,2,0,0,2],[5,5,0,0,5],[2,2,0,0,3],[2,1,0,0,7],[2,2,0,0,6],[2,2,0,0,3],[1,1,0,0,1],[4,3,0,0,6],[5,5,0,0,5],[4,4,0,0,5],[1,1,0,0,1],[1,1,0,0,3],[3,3,0,0,5],[1,1,0,0,1],[4,4,0,0,4],[4,4,1,0,4],[2,2,0,0,3],[1,1,0,0,2],[0,0,0,0,6],[1,1,0,0,1],[1,1,0,0,2],[1,1,0,0,3],[5,5,1,0,5],[3,3,1,1,4],[2,2,0,0,2],[0,0,0,0,2],[3,3,0,0,4],[1,1,0,0,1],[4,4,1,1,7],[1,1,0,0,1],[1,1,0,0,1],[2,2,0,0,2],[4,3,1,0,4],[0,0,0,0,1],[2,2,0,0,3],[1,1,0,0,2],[4,4,1,1,5]],"boxes":[7,11,4,5,2,13,2,4,2,7,1,1,8,10,5,5,5,20,16,13,11,3,8,2,11,3,12,8,4,2,12,7,6,1,1,8,1,7,7,3,1,7,3,1,6,14,7,2,4,9,1,11,1,2,3,10,0,3,3,8],"critical":[0,0,0,0,0,6,0,0,0,0,0,1,2,0,0,0,0,9,0,0,1,0,0,0,0,1,1,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,3,0,0,0,0,2,0,0,0,0,0,1,0,1],"ms":[11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46],"profiles":[]},
+  "v1_head_synth_dev:downscale": {"counts":[[1,1,0,0,3],[3,2,0,0,4],[1,1,0,0,2],[2,2,0,0,3],[1,1,0,0,1],[3,3,1,1,5],[1,1,1,1,1],[1,1,0,0,2],[1,1,0,0,2],[1,1,0,0,4],[1,1,0,0,1],[2,2,0,0,2],[4,4,0,0,5],[5,5,0,0,6],[1,1,0,0,1],[3,3,0,0,4],[3,3,0,0,4],[3,3,0,0,6],[3,3,0,0,5],[2,2,1,0,5],[2,2,0,0,3],[1,1,0,0,3],[3,3,0,0,6],[1,1,0,0,2],[3,3,0,0,5],[2,2,0,0,3],[2,2,0,0,7],[2,2,0,0,6],[2,2,0,0,3],[1,1,0,0,1],[3,3,0,0,6],[5,5,0,0,5],[4,3,0,0,5],[1,1,0,0,1],[1,1,0,0,3],[2,2,0,0,5],[1,1,0,0,1],[3,3,0,0,4],[3,3,0,0,4],[2,2,0,0,3],[1,1,0,0,2],[0,0,0,0,6],[1,1,0,0,1],[1,1,0,0,2],[2,2,0,0,3],[5,5,0,0,5],[3,3,0,0,4],[2,2,0,0,2],[1,1,0,0,2],[3,3,1,1,4],[1,1,0,0,1],[3,3,3,1,7],[1,1,0,0,1],[1,1,1,1,1],[1,1,0,0,2],[4,2,2,0,4],[0,0,0,0,1],[2,2,0,0,3],[1,1,1,1,2],[3,3,0,0,5]],"boxes":[3,4,2,2,4,5,1,1,2,6,1,1,4,9,3,7,3,6,4,4,3,2,4,1,6,2,6,3,2,1,6,4,3,1,1,5,1,4,5,2,2,0,1,1,3,5,4,2,2,4,1,4,1,1,2,2,0,3,1,3],"critical":[0,0,1,1,0,2,0,1,0,0,0,1,1,1,0,0,0,0,0,1,1,0,1,0,2,1,1,1,0,1,1,0,0,0,1,0,0,0,1,1,0,0,0,0,1,0,2,0,1,0,0,2,0,0,0,0,0,1,0,1],"ms":[589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74],"profiles":[]},
+  "classical_synth_dev:tiling@L0": {"counts":[[2,0,0,0,3],[2,1,1,0,4],[2,2,0,0,2],[1,1,0,0,3],[1,1,1,0,1],[3,2,1,1,5],[0,0,0,0,1],[2,2,0,0,2],[1,1,0,0,2],[2,1,0,0,4],[1,1,0,0,1],[2,2,0,0,2],[2,1,0,0,5],[2,2,0,0,6],[1,1,0,0,1],[3,3,0,0,4],[3,2,0,0,4],[2,2,1,0,6],[2,0,0,0,5],[2,1,0,0,5],[2,2,0,0,3],[1,1,0,0,3],[1,1,0,0,6],[1,1,0,0,2],[4,4,1,0,5],[1,1,0,0,3],[1,0,0,0,7],[2,2,0,0,6],[1,0,0,0,3],[1,1,0,0,1],[4,4,0,0,6],[3,3,0,0,5],[3,2,0,0,5],[1,1,0,0,1],[1,1,0,0,3],[3,2,0,0,5],[1,1,0,0,1],[3,3,0,0,4],[2,1,0,0,4],[2,2,0,0,3],[0,0,0,0,2],[1,0,0,0,6],[0,0,0,0,1],[1,1,0,0,2],[1,0,0,0,3],[3,2,0,0,5],[3,3,1,1,4],[2,2,0,0,2],[0,0,0,0,2],[2,0,0,0,4],[1,1,0,0,1],[3,2,0,0,7],[1,1,0,0,1],[0,0,1,0,1],[2,2,0,0,2],[2,2,0,0,4],[0,0,0,0,1],[3,3,0,0,3],[1,0,0,0,2],[4,4,0,0,5]],"boxes":[23,35,77,73,26,248,28,62,39,122,23,73,148,144,34,50,71,195,144,90,97,53,151,28,96,64,217,140,33,64,93,59,50,50,74,59,41,51,120,77,38,79,37,48,143,70,124,41,101,69,16,292,27,42,40,35,30,96,21,133],"critical":[0,0,2,0,0,4,0,0,0,7,0,0,8,4,0,0,0,6,4,3,0,0,2,0,0,0,3,5,0,0,3,0,0,0,0,0,0,0,9,0,1,0,0,0,3,0,3,0,2,0,0,1,0,1,0,0,0,1,0,0],"ms":[2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0],"profiles":[]},
+  "classical_synth_dev:downscale": {"counts":[[2,2,0,0,3],[1,1,0,0,4],[1,1,0,0,2],[1,1,0,0,3],[0,0,0,0,1],[1,1,0,0,5],[0,0,0,0,1],[1,1,0,0,2],[1,1,0,0,2],[1,0,0,0,4],[1,1,0,0,1],[2,2,0,0,2],[4,3,0,0,5],[2,2,0,0,6],[1,1,0,0,1],[3,3,0,0,4],[2,2,0,0,4],[1,0,0,0,6],[2,1,0,0,5],[2,2,0,0,5],[3,3,0,0,3],[1,1,1,1,3],[2,1,0,0,6],[1,1,0,0,2],[4,4,0,0,5],[1,1,0,0,3],[2,2,0,0,7],[3,0,0,0,6],[1,1,1,0,3],[1,1,0,0,1],[3,3,0,0,6],[3,3,0,0,5],[3,2,0,0,5],[1,1,0,0,1],[1,1,0,0,3],[2,1,0,0,5],[1,1,0,0,1],[2,2,0,0,4],[2,2,0,0,4],[1,1,0,0,3],[0,0,0,0,2],[0,0,0,0,6],[0,0,0,0,1],[1,1,0,0,2],[2,0,0,0,3],[4,3,0,0,5],[3,3,0,0,4],[2,2,0,0,2],[1,0,0,0,2],[2,1,0,0,4],[1,1,0,0,1],[4,4,0,0,7],[0,0,0,0,1],[0,0,0,0,1],[1,1,0,0,2],[4,3,0,0,4],[0,0,0,0,1],[2,2,0,0,3],[0,0,0,0,2],[5,5,0,0,5]],"boxes":[6,4,12,19,0,31,3,8,10,18,2,8,19,28,1,8,19,33,32,12,12,8,34,6,14,11,36,30,6,8,23,15,8,4,7,19,5,12,22,11,9,21,3,8,37,16,20,6,26,16,1,26,2,7,5,7,3,16,8,23],"critical":[0,0,2,0,0,4,0,0,0,0,0,0,1,2,0,0,0,3,3,0,0,0,5,0,0,0,2,3,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,5,0,2,0,3,0,0,2,0,0,0,0,0,1,0,1],"ms":[313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67],"profiles":[]},
+  "v2b_grid_clean:tiling@L0": {"counts":[[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]],"boxes":[4,1,5,0,15,3,3,0,22,1,0,0,6,20,0,6,3,0,0,5,0,0,2,1,0,4,2,15,0,0],"critical":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"ms":[29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52,29353.52],"profiles":[]},
+  "v2b_grid_clean:downscale": {"counts":[[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]],"boxes":[1,0,0,0,3,0,1,2,0,1,0,11,1,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"critical":[0,0,0,0,1,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"ms":[1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77,1469.77],"profiles":[]},
+  "grid_clean:tiling@L0": {"counts":[[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]],"boxes":[1,1,2,0,1,0,0,0,1,0,0,0,2,0,0,2,0,2,0,0,1,1,0,0,0,0,0,20,0,0],"critical":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"ms":[12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36,12092.36],"profiles":[]},
+  "grid_clean:downscale": {"counts":[[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]],"boxes":[0,0,0,0,0,0,0,0,0,5,0,0,0,0,0,0,0,0,0,0,1,0,0,8,0,0,0,2,0,4],"critical":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"ms":[606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66,606.66],"profiles":[]},
+  "v1_head_clean:tiling@L0": {"counts":[[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]],"boxes":[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,0,0,0,0,1,1,0,0,0,0,0,1,0,0],"critical":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"ms":[11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46,11772.46],"profiles":[]},
+  "v1_head_clean:downscale": {"counts":[[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]],"boxes":[0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,9,0,0,0,0],"critical":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"ms":[589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74,589.74],"profiles":[]},
+  "classical_clean:tiling@L0": {"counts":[[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]],"boxes":[49,59,55,23,32,21,60,19,43,24,29,23,71,66,28,47,24,83,24,39,51,42,25,28,31,34,31,60,27,21],"critical":[0,0,0,0,0,0,0,0,0,0,0,0,13,0,0,0,0,0,0,0,2,0,0,0,0,0,0,2,0,0],"ms":[2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0,2081.0],"profiles":[]},
+  "classical_clean:downscale": {"counts":[[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]],"boxes":[2,5,5,0,8,3,14,0,14,0,2,0,10,10,1,4,0,5,1,4,20,6,1,0,1,1,2,34,1,4],"critical":[0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"ms":[313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67,313.67],"profiles":[]},
+  "v2b_grid_real:tiling@L0": {"counts":[[0,0,0,0,1],[1,0,0,0,2],[2,0,0,0,2],[1,0,0,0,2],[0,0,0,0,2],[0,0,0,0,2],[0,0,0,0,0],[0,0,0,0,2],[0,0,0,0,5],[11,6,4,2,12],[3,1,1,0,9],[4,1,1,0,5],[1,1,0,0,2],[0,0,0,0,4],[0,0,1,0,3],[2,1,0,0,5],[2,2,0,0,3],[0,0,0,0,2],[0,0,0,0,1],[1,1,0,0,1],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,2],[5,3,0,0,12],[6,4,3,2,14],[3,1,0,0,3],[2,2,0,0,2],[3,2,0,0,3],[0,0,0,0,1],[0,0,0,0,4],[0,0,0,0,12],[4,2,3,1,9],[2,0,2,0,3],[2,1,0,0,7],[1,1,0,0,3],[11,9,0,0,24],[9,6,1,0,24],[0,0,0,0,1],[0,0,0,0,1],[5,3,3,2,6],[1,1,0,0,2],[46,28,9,4,47],[0,0,0,0,0],[2,2,0,0,3],[1,1,0,0,1],[1,0,0,0,4],[1,1,0,0,1],[6,3,2,0,11],[5,0,1,0,6],[3,1,0,0,6],[0,0,0,0,3],[8,3,0,0,12],[0,0,0,0,9],[2,0,0,0,4],[7,4,1,0,10],[7,5,1,1,15],[6,4,1,0,11],[19,9,9,3,31],[15,4,7,1,34],[1,1,0,0,1],[5,3,3,1,6],[3,1,2,0,3],[0,0,0,0,2],[2,0,0,0,4],[3,0,2,0,8],[1,0,1,0,1],[15,8,6,4,30],[3,2,1,1,7],[7,3,3,0,14],[17,10,9,1,30],[3,2,0,0,5],[6,1,4,0,17],[4,1,2,1,9],[0,0,0,0,3],[0,0,0,0,1],[1,0,0,0,4],[1,1,1,0,5],[15,7,3,1,31],[12,1,5,0,17],[3,1,1,0,8],[2,0,1,0,4],[4,1,1,0,15],[3,2,0,0,3],[4,0,0,0,5],[10,9,3,1,16],[13,6,2,0,21],[4,3,0,0,8],[9,4,0,0,9],[6,0,4,1,14],[8,1,2,1,21],[3,0,2,1,7],[2,2,0,0,6],[2,0,1,0,4],[11,6,1,0,23],[12,6,5,1,20],[3,0,2,2,5],[3,0,0,0,7],[13,7,6,2,24],[4,3,0,0,7],[3,0,0,0,4]],"boxes":[93,50,63,161,29,283,121,95,140,161,671,234,162,88,87,111,34,34,134,84,20,6,219,92,112,232,128,356,5,11,19,32,340,29,249,171,58,92,256,1031,184,720,522,787,959,356,703,416,295,531,999,638,170,179,363,474,578,355,333,610,397,378,55,432,224,337,397,462,291,307,469,327,191,545,803,497,441,215,457,740,313,138,36,232,307,352,233,81,377,360,381,28,680,450,241,92,337,500,233,328],"critical":[0,0,0,0,0,0,0,0,0,0,14,17,13,0,0,0,2,0,0,1,0,0,5,0,2,12,3,7,0,0,0,6,38,5,11,2,4,0,0,11,1,2,25,5,4,4,3,45,41,39,24,35,3,10,23,38,26,35,81,43,71,34,0,22,2,62,64,32,23,32,11,70,10,33,27,31,63,12,65,30,31,1,0,0,40,53,7,0,49,72,58,0,47,51,29,0,29,43,3,13],"ms":[51368.66,41094.93,41094.93,51368.66,41094.93,197925.75,197925.75,197925.75,197925.75,197925.75,197925.75,197925.75,130631.0,130631.0,130631.0,130631.0,130631.0,130631.0,130631.0,130631.0,35224.22,35224.22,51368.66,35224.22,51368.66,51368.66,29353.52,83128.82,29353.52,17612.11,17612.11,35224.22,83128.82,35224.22,83128.82,35224.22,51368.66,158340.6,158340.6,158340.6,158340.6,158340.6,158340.6,158340.6,158340.6,158340.6,158340.6,130631.0,130631.0,130631.0,130631.0,130631.0,130631.0,130631.0,130631.0,130631.0,130631.0,130631.0,130631.0,130631.0,130631.0,130631.0,130631.0,130631.0,130631.0,130631.0,130631.0,130631.0,130631.0,130631.0,130631.0,130631.0,130631.0,130631.0,130631.0,130631.0,130631.0,130631.0,130631.0,130631.0,130631.0,130631.0,130631.0,130631.0,130631.0,130631.0,130631.0,130631.0,130631.0,130631.0,130631.0,130631.0,130631.0,130631.0,130631.0,130631.0,130631.0,130631.0,130631.0,130631.0],"profiles":[]},
+  "v2b_grid_real:downscale": {"counts":[[0,0,0,0,1],[0,0,0,0,2],[1,0,0,0,2],[1,1,0,0,2],[0,0,0,0,2],[0,0,0,0,2],[0,0,0,0,0],[0,0,0,0,2],[0,0,0,0,5],[4,1,3,1,12],[3,3,1,0,9],[3,1,2,0,5],[2,0,1,0,2],[2,2,0,0,4],[3,3,1,1,3],[4,0,3,0,5],[1,1,0,0,3],[0,0,0,0,2],[1,1,1,1,1],[0,0,0,0,1],[1,1,1,1,1],[0,0,0,0,1],[1,1,0,0,2],[2,2,0,0,12],[5,0,5,0,14],[3,2,2,1,3],[2,2,1,0,2],[3,2,3,0,3],[1,1,0,0,1],[0,0,0,0,4],[0,0,0,0,12],[0,0,0,0,9],[2,2,2,2,3],[0,0,0,0,7],[0,0,0,0,3],[2,1,0,0,24],[6,2,0,0,24],[0,0,0,0,1],[0,0,0,0,1],[2,0,2,0,6],[0,0,0,0,2],[8,0,4,0,47],[0,0,0,0,0],[0,0,0,0,3],[1,0,1,0,1],[0,0,0,0,4],[1,1,0,0,1],[7,6,2,1,11],[4,2,0,0,6],[5,4,2,2,6],[1,1,0,0,3],[9,2,5,2,12],[2,0,1,0,9],[0,0,0,0,4],[10,0,10,0,10],[5,4,1,0,15],[7,2,5,0,11],[17,8,3,1,31],[18,4,16,2,34],[1,1,0,0,1],[4,2,0,0,6],[1,1,0,0,3],[0,0,0,0,2],[2,2,0,0,4],[3,2,0,0,8],[1,1,1,1,1],[21,4,5,1,30],[2,2,0,0,7],[6,3,0,0,14],[17,7,10,1,30],[3,2,0,0,5],[9,8,2,2,17],[2,2,0,0,9],[1,0,0,0,3],[0,0,0,0,1],[1,0,1,0,4],[1,0,0,0,5],[10,5,6,1,31],[8,5,6,1,17],[3,3,0,0,8],[2,2,1,1,4],[11,3,5,0,15],[0,0,0,0,3],[4,4,0,0,5],[10,5,1,1,16],[7,3,3,1,21],[3,1,0,0,8],[6,2,1,0,9],[9,3,3,0,14],[12,1,11,0,21],[2,0,2,1,7],[1,1,0,0,6],[4,0,3,0,4],[10,5,3,1,23],[8,3,7,0,20],[4,0,3,0,5],[5,1,2,0,7],[13,6,2,0,24],[3,3,0,0,7],[4,3,2,1,4]],"boxes":[6,5,6,5,0,2,3,0,2,5,26,5,2,5,17,6,8,2,2,0,3,0,2,11,11,15,10,17,3,2,3,1,13,1,7,7,9,0,11,5,1,14,8,11,13,2,17,14,8,13,7,21,5,3,2,15,8,14,25,9,35,4,1,4,5,6,26,17,8,15,8,36,5,19,3,4,10,18,9,9,7,10,11,9,9,6,10,8,18,20,11,2,7,33,24,23,15,16,10,4],"critical":[0,1,0,0,0,0,0,0,1,0,5,2,1,0,1,0,1,0,0,0,0,0,0,0,0,3,2,6,0,1,1,0,1,1,2,1,2,0,1,2,0,4,1,3,2,0,3,4,2,0,3,1,0,0,0,4,1,2,4,1,4,1,0,0,0,2,5,2,2,1,1,8,2,3,0,1,2,3,3,2,1,0,1,2,1,2,2,0,3,3,2,0,0,0,4,0,4,3,2,0],"ms":[1471.3,1470.67,1470.67,1471.3,1470.61,1436.76,1436.76,1436.76,1436.76,1436.76,1436.76,1436.76,1397.31,1397.31,1397.31,1397.31,1397.31,1397.31,1397.31,1397.31,1470.26,1470.26,1471.64,1470.26,1471.03,1471.64,1469.77,1368.27,1469.77,1468.96,1468.96,1470.26,1368.27,1470.26,1368.27,1470.26,1471.03,1418.47,1418.47,1418.47,1418.47,1418.47,1418.47,1418.47,1418.47,1418.47,1418.47,1397.31,1397.31,1397.31,1397.31,1397.31,1397.31,1397.31,1397.31,1397.31,1397.31,1397.31,1397.31,1397.31,1397.31,1397.31,1397.31,1397.31,1397.31,1397.31,1397.31,1397.31,1397.31,1397.31,1397.31,1397.31,1397.31,1397.31,1397.31,1397.31,1397.31,1397.31,1397.31,1397.31,1397.31,1397.31,1397.31,1397.31,1397.31,1397.31,1397.31,1397.31,1397.31,1397.31,1397.31,1397.31,1397.31,1397.31,1397.31,1397.31,1397.31,1397.31,1397.31,1397.31],"profiles":[]},
+  "grid_real:tiling@L0": {"counts":[[0,0,0,0,1],[0,0,0,0,2],[2,0,0,0,2],[1,0,0,0,2],[0,0,0,0,2],[0,0,0,0,2],[0,0,0,0,0],[0,0,0,0,2],[0,0,0,0,5],[12,5,6,2,12],[5,2,1,0,9],[3,1,1,0,5],[1,1,0,0,2],[0,0,0,0,4],[1,0,1,0,3],[2,1,0,0,5],[2,2,0,0,3],[0,0,0,0,2],[1,0,1,0,1],[1,1,0,0,1],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,2],[4,3,1,1,12],[7,6,2,2,14],[3,1,0,0,3],[2,2,1,1,2],[2,1,0,0,3],[0,0,0,0,1],[0,0,0,0,4],[0,0,0,0,12],[3,2,1,0,9],[2,0,1,0,3],[1,1,0,0,7],[0,0,2,1,3],[9,8,0,0,24],[11,8,1,0,24],[0,0,0,0,1],[0,0,0,0,1],[5,3,1,0,6],[1,1,0,0,2],[47,25,7,2,47],[0,0,0,0,0],[2,2,0,0,3],[1,1,0,0,1],[1,0,1,0,4],[1,0,0,0,1],[4,2,2,0,11],[5,0,2,0,6],[2,1,0,0,6],[0,0,0,0,3],[9,3,3,0,12],[0,0,0,0,9],[2,0,1,0,4],[7,4,0,0,10],[6,5,4,0,15],[5,4,2,0,11],[18,7,9,1,31],[15,4,11,2,34],[1,0,1,0,1],[5,2,5,3,6],[3,1,0,0,3],[0,0,0,0,2],[2,1,0,0,4],[5,3,3,0,8],[1,0,1,0,1],[12,8,5,1,30],[3,2,3,1,7],[7,3,0,0,14],[15,10,12,6,30],[3,0,0,0,5],[6,2,4,0,17],[4,0,1,0,9],[0,0,0,0,3],[0,0,0,0,1],[2,1,1,0,4],[2,1,0,0,5],[15,6,4,3,31],[10,0,4,1,17],[4,2,3,2,8],[2,0,1,0,4],[6,2,0,0,15],[2,1,0,0,3],[5,1,1,0,5],[10,8,5,3,16],[11,6,5,1,21],[4,2,0,0,8],[8,3,4,2,9],[7,1,1,0,14],[7,2,7,2,21],[3,0,2,0,7],[0,0,0,0,6],[2,0,0,0,4],[13,6,3,1,23],[12,4,6,1,20],[2,0,1,0,5],[4,1,3,0,7],[13,7,4,2,24],[3,1,1,0,7],[3,0,0,0,4]],"boxes":[112,42,49,177,10,237,109,123,239,209,531,191,121,80,149,174,23,26,186,49,20,1,101,91,109,352,147,431,9,8,10,37,223,37,222,194,66,57,198,1146,119,862,725,707,368,309,598,424,308,621,937,498,114,190,390,450,607,304,314,552,106,399,64,275,141,271,343,489,262,350,378,271,190,542,540,407,712,185,395,649,276,62,39,141,408,516,101,63,431,254,305,26,661,329,240,102,339,419,245,287],"critical":[0,0,0,0,0,0,0,0,0,0,16,14,18,0,0,4,2,0,2,0,0,0,0,1,1,3,2,14,0,0,0,6,40,4,12,4,4,0,0,14,1,9,12,6,0,4,1,41,45,37,28,26,6,7,17,33,14,41,79,35,88,37,0,21,0,64,75,40,14,40,5,80,11,42,47,30,46,7,74,27,31,0,0,0,41,44,0,0,44,78,54,0,41,56,31,0,5,41,4,18],"ms":[21161.63,16929.3,16929.3,21161.63,16929.3,78555.45,78555.45,78555.45,78555.45,78555.45,78555.45,78555.45,51846.6,51846.6,51846.6,51846.6,51846.6,51846.6,51846.6,51846.6,14510.83,14510.83,21161.63,14510.83,21161.63,21161.63,12092.36,32993.29,12092.36,7255.42,7255.42,14510.83,32993.29,14510.83,32993.29,14510.83,21161.63,62844.36,62844.36,62844.36,62844.36,62844.36,62844.36,62844.36,62844.36,62844.36,62844.36,51846.6,51846.6,51846.6,51846.6,51846.6,51846.6,51846.6,51846.6,51846.6,51846.6,51846.6,51846.6,51846.6,51846.6,51846.6,51846.6,51846.6,51846.6,51846.6,51846.6,51846.6,51846.6,51846.6,51846.6,51846.6,51846.6,51846.6,51846.6,51846.6,51846.6,51846.6,51846.6,51846.6,51846.6,51846.6,51846.6,51846.6,51846.6,51846.6,51846.6,51846.6,51846.6,51846.6,51846.6,51846.6,51846.6,51846.6,51846.6,51846.6,51846.6,51846.6,51846.6,51846.6],"profiles":[]},
+  "grid_real:downscale": {"counts":[[0,0,0,0,1],[0,0,0,0,2],[1,1,0,0,2],[1,0,0,0,2],[0,0,0,0,2],[0,0,0,0,2],[0,0,0,0,0],[0,0,0,0,2],[0,0,0,0,5],[3,1,2,0,12],[2,2,0,0,9],[3,2,0,0,5],[2,2,0,0,2],[1,1,0,0,4],[2,2,1,1,3],[4,0,4,0,5],[2,2,0,0,3],[0,0,0,0,2],[1,1,1,1,1],[0,0,0,0,1],[0,0,1,0,1],[0,0,0,0,1],[1,1,1,0,2],[2,1,0,0,12],[4,1,2,0,14],[2,1,1,0,3],[2,2,1,1,2],[3,2,1,1,3],[1,1,0,0,1],[0,0,0,0,4],[0,0,0,0,12],[1,1,1,0,9],[2,2,2,2,3],[0,0,1,0,7],[0,0,0,0,3],[5,1,0,0,24],[6,4,2,0,24],[0,0,0,0,1],[0,0,0,0,1],[2,0,2,0,6],[0,0,0,0,2],[8,1,2,0,47],[0,0,0,0,0],[0,0,0,0,3],[0,0,0,0,1],[0,0,0,0,4],[1,0,0,0,1],[6,5,3,2,11],[4,2,2,0,6],[5,4,2,1,6],[2,1,0,0,3],[10,4,0,0,12],[2,0,1,0,9],[0,0,0,0,4],[10,0,10,0,10],[6,5,0,0,15],[8,2,5,0,11],[16,6,7,2,31],[18,3,14,2,34],[1,0,0,0,1],[4,3,1,0,6],[1,1,0,0,3],[0,0,0,0,2],[2,1,0,0,4],[3,1,0,0,8],[1,1,1,1,1],[13,6,6,0,30],[3,1,0,0,7],[6,2,2,0,14],[17,5,14,3,30],[4,1,1,0,5],[10,7,4,2,17],[2,2,3,0,9],[3,0,3,0,3],[1,0,0,0,1],[1,1,0,0,4],[1,0,1,0,5],[8,2,5,1,31],[8,5,4,2,17],[4,4,2,1,8],[2,2,2,2,4],[10,4,5,0,15],[1,1,0,0,3],[4,4,0,0,5],[9,4,7,2,16],[8,5,4,2,21],[3,2,0,0,8],[8,5,1,1,9],[9,2,5,0,14],[14,2,11,0,21],[4,1,1,0,7],[0,0,0,0,6],[4,0,2,0,4],[15,3,9,2,23],[6,0,5,0,20],[2,1,0,0,5],[4,1,1,0,7],[13,6,2,0,24],[3,3,1,0,7],[4,1,2,0,4]],"boxes":[1,1,2,4,0,0,0,0,0,3,4,4,7,10,9,2,3,3,2,0,4,1,5,15,5,16,16,6,3,2,3,9,9,4,7,9,6,0,0,5,3,18,5,2,5,4,7,8,7,9,8,11,17,0,4,13,8,10,16,7,19,13,1,13,9,5,18,14,4,9,11,19,4,18,8,4,13,10,20,5,5,10,13,10,14,11,4,10,11,8,9,0,5,26,14,10,9,18,8,8],"critical":[0,0,0,0,0,0,0,0,0,0,1,4,1,1,0,0,0,0,0,0,0,0,0,0,0,3,3,0,0,2,1,1,2,1,2,1,2,0,0,2,0,4,1,0,2,0,3,3,2,0,1,2,0,0,0,7,1,2,1,2,3,2,0,0,0,1,3,3,2,1,1,6,2,2,2,2,5,2,6,3,1,0,4,1,1,2,2,0,3,1,4,0,1,5,3,0,1,2,1,0],"ms":[608.15,607.54,607.54,608.15,607.47,593.68,593.68,593.68,593.68,593.68,593.68,593.68,570.14,570.14,570.14,570.14,570.14,570.14,570.14,570.14,607.13,607.13,608.48,607.13,607.89,608.48,606.66,552.8,606.66,605.86,605.86,607.13,552.8,607.13,552.8,607.13,607.89,582.76,582.76,582.76,582.76,582.76,582.76,582.76,582.76,582.76,582.76,570.14,570.14,570.14,570.14,570.14,570.14,570.14,570.14,570.14,570.14,570.14,570.14,570.14,570.14,570.14,570.14,570.14,570.14,570.14,570.14,570.14,570.14,570.14,570.14,570.14,570.14,570.14,570.14,570.14,570.14,570.14,570.14,570.14,570.14,570.14,570.14,570.14,570.14,570.14,570.14,570.14,570.14,570.14,570.14,570.14,570.14,570.14,570.14,570.14,570.14,570.14,570.14,570.14],"profiles":[]},
+  "v1_head_real:tiling@L0": {"counts":[[0,0,0,0,1],[0,0,0,0,2],[2,0,0,0,2],[1,0,0,0,2],[0,0,0,0,2],[0,0,0,0,2],[0,0,0,0,0],[0,0,0,0,2],[0,0,0,0,5],[11,4,5,0,12],[2,0,1,0,9],[3,1,1,0,5],[1,1,0,0,2],[0,0,0,0,4],[0,0,1,0,3],[3,1,2,0,5],[2,2,0,0,3],[0,0,0,0,2],[0,0,0,0,1],[1,1,0,0,1],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,2],[4,2,1,0,12],[5,3,0,0,14],[2,1,0,0,3],[2,2,0,0,2],[2,1,1,0,3],[0,0,0,0,1],[0,0,0,0,4],[0,0,0,0,12],[4,2,3,0,9],[0,0,0,0,3],[2,1,2,0,7],[0,0,0,0,3],[11,7,2,2,24],[10,7,0,0,24],[0,0,0,0,1],[0,0,0,0,1],[5,4,0,0,6],[1,1,0,0,2],[38,27,3,0,47],[0,0,0,0,0],[2,2,0,0,3],[1,1,0,0,1],[3,3,0,0,4],[0,0,0,0,1],[0,0,0,0,11],[3,0,0,0,6],[2,1,0,0,6],[0,0,0,0,3],[7,2,1,0,12],[0,0,0,0,9],[2,0,0,0,4],[2,0,0,0,10],[2,1,0,0,15],[6,3,0,0,11],[2,0,0,0,31],[14,3,5,0,34],[1,0,0,0,1],[2,1,1,0,6],[2,1,1,0,3],[0,0,0,0,2],[0,0,0,0,4],[3,0,3,2,8],[1,0,0,0,1],[11,3,1,1,30],[2,1,1,0,7],[6,4,0,0,14],[10,5,3,1,30],[3,2,0,0,5],[4,2,4,0,17],[1,0,0,0,9],[0,0,0,0,3],[0,0,0,0,1],[1,0,0,0,4],[1,1,0,0,5],[13,5,3,0,31],[6,0,3,0,17],[0,0,0,0,8],[1,0,3,0,4],[4,1,3,0,15],[1,0,0,0,3],[4,0,1,0,5],[8,3,1,1,16],[5,3,2,0,21],[3,1,0,0,8],[6,4,0,0,9],[8,2,0,0,14],[6,0,3,0,21],[1,0,0,0,7],[1,0,0,0,6],[1,0,0,0,4],[12,4,4,1,23],[12,4,2,0,20],[3,0,0,0,5],[1,0,0,0,7],[12,9,4,0,24],[3,2,0,0,7],[3,0,0,0,4]],"boxes":[35,68,80,97,6,165,126,139,110,403,507,216,81,61,107,105,30,34,141,51,6,2,268,92,83,227,134,318,10,13,12,60,236,42,38,117,66,17,156,816,134,860,559,617,468,300,480,133,190,100,698,406,60,235,136,289,215,109,538,120,431,215,18,74,72,358,251,386,124,275,62,608,144,163,120,419,462,196,423,119,284,33,21,103,358,171,54,95,356,725,317,21,175,441,372,38,156,336,45,259],"critical":[0,1,0,0,0,1,0,0,2,0,27,17,23,0,0,0,6,0,0,0,0,0,0,2,2,10,1,8,0,0,0,5,1,14,0,8,25,0,0,10,2,1,9,4,1,9,1,0,8,1,1,11,0,37,1,1,0,1,29,1,46,6,0,0,0,30,12,20,10,11,1,49,0,0,2,6,1,41,34,4,45,0,0,0,28,0,3,0,16,30,5,0,0,30,142,0,1,22,1,0],"ms":[20601.81,16481.44,16481.44,20601.81,16481.44,84694.2,84694.2,84694.2,84694.2,84694.2,84694.2,84694.2,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,14126.95,14126.95,20601.81,14126.95,20601.81,20601.81,11772.46,35571.56,11772.46,7063.48,7063.48,14126.95,35571.56,14126.95,35571.56,14126.95,20601.81,67755.36,67755.36,67755.36,67755.36,67755.36,67755.36,67755.36,67755.36,67755.36,67755.36,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17],"profiles":[]},
+  "v1_head_real:downscale": {"counts":[[0,0,0,0,1],[0,0,0,0,2],[0,0,0,0,2],[0,0,0,0,2],[0,0,0,0,2],[0,0,0,0,2],[0,0,0,0,0],[0,0,0,0,2],[0,0,0,0,5],[1,1,0,0,12],[0,0,0,0,9],[3,0,2,0,5],[1,1,0,0,2],[0,0,0,0,4],[1,1,1,1,3],[4,1,4,1,5],[2,2,0,0,3],[0,0,0,0,2],[1,1,1,1,1],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,2],[3,2,1,0,12],[3,2,2,2,14],[3,2,1,0,3],[2,2,1,0,2],[3,3,1,1,3],[1,1,0,0,1],[0,0,0,0,4],[0,0,0,0,12],[3,1,1,0,9],[2,2,2,2,3],[2,2,3,1,7],[0,0,1,0,3],[2,1,0,0,24],[7,4,0,0,24],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,6],[0,0,1,1,2],[8,0,2,0,47],[0,0,0,0,0],[0,0,0,0,3],[1,1,0,0,1],[1,1,0,0,4],[0,0,0,0,1],[5,4,2,2,11],[4,3,3,2,6],[3,3,0,0,6],[1,1,1,0,3],[9,3,2,2,12],[0,0,1,1,9],[0,0,0,0,4],[10,0,10,0,10],[2,2,0,0,15],[8,3,4,0,11],[18,6,6,1,31],[19,4,13,1,34],[1,0,1,0,1],[1,1,0,0,6],[1,1,0,0,3],[0,0,0,0,2],[2,1,0,0,4],[3,2,0,0,8],[0,0,0,0,1],[12,1,5,0,30],[3,2,1,0,7],[7,2,0,0,14],[20,3,7,0,30],[1,1,0,0,5],[9,7,3,0,17],[3,1,0,0,9],[3,0,3,0,3],[0,0,0,0,1],[1,1,0,0,4],[0,0,0,0,5],[13,3,1,0,31],[6,4,6,3,17],[4,4,0,0,8],[3,2,2,1,4],[9,2,6,0,15],[1,1,0,0,3],[4,4,1,1,5],[10,5,6,1,16],[9,5,1,1,21],[3,1,0,0,8],[8,5,0,0,9],[9,3,1,0,14],[15,6,10,0,21],[1,1,0,0,7],[0,0,0,0,6],[4,0,2,0,4],[5,2,2,0,23],[11,2,4,0,20],[2,0,0,0,5],[4,1,1,0,7],[14,6,3,0,24],[3,3,0,0,7],[2,1,1,0,4]],"boxes":[1,8,7,0,3,1,0,0,2,9,6,2,4,6,5,1,4,6,1,0,5,0,5,14,6,12,22,16,2,3,5,12,26,9,4,9,8,0,0,0,6,8,12,8,2,2,8,12,11,11,6,9,12,1,4,6,10,19,15,4,8,3,1,4,7,1,18,20,7,22,3,18,5,12,3,2,2,18,17,6,23,12,2,5,18,11,7,7,12,15,1,0,2,15,34,8,17,24,3,6],"critical":[0,1,1,0,0,0,0,0,0,0,2,2,1,1,0,0,0,1,0,0,0,0,0,0,0,2,2,4,0,0,0,1,3,2,2,1,3,0,0,0,0,1,0,0,1,0,0,4,3,1,1,2,0,0,0,1,1,10,1,0,1,1,0,0,0,1,6,2,5,8,1,5,2,1,0,1,1,4,1,3,5,0,0,0,1,3,3,0,2,2,0,0,1,3,14,0,6,4,2,0],"ms":[590.56,590.22,590.22,590.56,590.19,639.87,639.87,639.87,639.87,639.87,639.87,639.87,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,590.0,590.0,590.74,590.0,590.41,590.74,589.74,595.92,589.74,589.31,589.31,590.0,595.92,590.0,595.92,590.0,590.41,628.14,628.14,628.14,628.14,628.14,628.14,628.14,628.14,628.14,628.14,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56],"profiles":[]},
+  "classical_real:tiling@L0": {"counts":[[0,0,1,0,1],[0,0,0,0,2],[0,0,0,0,2],[1,0,1,0,2],[0,0,0,0,2],[1,0,1,0,2],[0,0,0,0,0],[0,0,0,0,2],[0,0,0,0,5],[0,0,0,0,12],[3,0,1,0,9],[0,0,0,0,5],[1,1,0,0,2],[0,0,0,0,4],[0,0,0,0,3],[0,0,0,0,5],[1,1,0,0,3],[0,0,0,0,2],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,2],[1,0,2,0,12],[2,1,1,0,14],[3,2,1,1,3],[2,1,0,0,2],[2,2,1,0,3],[1,0,0,0,1],[0,0,0,0,4],[0,0,0,0,12],[1,1,0,0,9],[0,0,0,0,3],[2,2,0,0,7],[0,0,0,0,3],[9,3,2,1,24],[3,1,2,1,24],[0,0,0,0,1],[0,0,0,0,1],[3,0,1,0,6],[0,0,0,0,2],[31,9,3,1,47],[0,0,0,0,0],[1,0,0,0,3],[0,0,0,0,1],[2,0,2,1,4],[0,0,1,0,1],[3,1,2,0,11],[0,0,0,0,6],[1,1,0,0,6],[0,0,1,0,3],[7,2,2,0,12],[0,0,1,0,9],[0,0,0,0,4],[0,0,0,0,10],[1,1,0,0,15],[2,1,0,0,11],[9,6,3,2,31],[7,1,6,1,34],[0,0,0,0,1],[0,0,0,0,6],[0,0,0,0,3],[0,0,0,0,2],[2,1,0,0,4],[1,0,0,0,8],[0,0,0,0,1],[3,0,2,0,30],[1,0,2,0,7],[1,0,0,0,14],[3,3,6,4,30],[0,0,0,0,5],[1,0,0,0,17],[1,1,0,0,9],[0,0,0,0,3],[0,0,0,0,1],[0,0,0,0,4],[1,0,0,0,5],[4,2,2,0,31],[4,0,0,0,17],[1,0,1,0,8],[0,0,0,0,4],[2,0,0,0,15],[2,0,0,0,3],[3,0,0,0,5],[1,0,0,0,16],[8,3,1,1,21],[2,0,1,0,8],[6,0,1,0,9],[3,1,0,0,14],[3,0,0,0,21],[2,0,0,0,7],[0,0,1,0,6],[1,0,0,0,4],[10,5,0,0,23],[3,0,0,0,20],[1,0,0,0,5],[0,0,0,0,7],[2,0,0,0,24],[2,2,0,0,7],[2,0,0,0,4]],"boxes":[1903,755,715,2011,632,1464,6702,7093,5325,2279,8324,6940,2038,3189,3843,2735,1052,2318,2195,1873,127,81,865,822,1443,1328,522,1672,79,216,299,1168,2957,1393,901,1264,1613,2298,6175,9113,1699,4968,7194,8134,7112,6816,7069,3609,2657,1673,6234,8222,1261,3416,2853,2611,3429,2545,2609,4374,9908,2984,1024,1629,1608,6901,2794,4781,3115,4172,1815,3561,1067,2565,4413,3728,3411,1446,5811,1853,6922,693,1220,6346,4319,2301,2002,1320,2913,4100,2719,707,3843,2486,3355,971,3524,2788,7854,2446],"critical":[12,17,7,25,0,0,16,26,62,5,8,5,6,11,2,1,1,7,0,0,0,0,0,0,0,2,0,15,0,0,4,0,0,19,0,1,17,1,77,3,0,2,10,3,1,5,0,0,4,1,4,1,1,31,0,9,0,14,1,1,0,1,9,0,0,1,5,3,5,9,0,4,14,0,0,0,1,14,2,5,61,0,3,0,6,7,19,0,10,13,3,1,11,7,56,0,0,7,0,0],"ms":[3641.75,2913.4,2913.4,3641.75,2913.4,15492.0,15492.0,15492.0,15492.0,15492.0,15492.0,15492.0,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,2497.2,2497.2,3641.75,2497.2,3641.75,3641.75,2081.0,6506.64,2081.0,1248.6,1248.6,2497.2,6506.64,2497.2,6506.64,2497.2,3641.75,12393.6,12393.6,12393.6,12393.6,12393.6,12393.6,12393.6,12393.6,12393.6,12393.6,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72],"profiles":[]},
+  "classical_real:downscale": {"counts":[[0,0,0,0,1],[0,0,0,0,2],[0,0,0,0,2],[1,1,0,0,2],[0,0,0,0,2],[1,0,1,0,2],[0,0,0,0,0],[0,0,0,0,2],[0,0,0,0,5],[0,0,2,0,12],[4,2,3,2,9],[0,0,1,0,5],[2,0,2,0,2],[0,0,0,0,4],[0,0,0,0,3],[0,0,0,0,5],[0,0,0,0,3],[0,0,0,0,2],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,2],[1,0,0,0,12],[0,0,1,0,14],[3,3,2,0,3],[2,2,0,0,2],[3,3,1,0,3],[1,1,0,0,1],[0,0,0,0,4],[0,0,0,0,12],[1,1,1,0,9],[0,0,0,0,3],[2,0,0,0,7],[0,0,0,0,3],[7,5,2,0,24],[1,0,6,2,24],[0,0,0,0,1],[0,0,0,0,1],[1,0,0,0,6],[0,0,0,0,2],[7,0,4,1,47],[0,0,0,0,0],[0,0,0,0,3],[0,0,0,0,1],[3,0,3,0,4],[0,0,0,0,1],[3,3,1,1,11],[1,1,1,0,6],[1,1,0,0,6],[2,0,0,0,3],[2,1,0,0,12],[0,0,1,0,9],[0,0,0,0,4],[1,0,0,0,10],[1,1,0,0,15],[3,2,0,0,11],[10,6,3,0,31],[7,1,5,1,34],[0,0,0,0,1],[0,0,0,0,6],[0,0,0,0,3],[0,0,0,0,2],[2,2,1,1,4],[0,0,0,0,8],[0,0,0,0,1],[0,0,1,0,30],[1,1,0,0,7],[0,0,0,0,14],[7,1,5,0,30],[0,0,0,0,5],[1,1,1,0,17],[1,0,1,0,9],[0,0,0,0,3],[0,0,0,0,1],[0,0,0,0,4],[1,0,0,0,5],[4,0,5,0,31],[3,2,0,0,17],[0,0,0,0,8],[1,0,0,0,4],[1,1,0,0,15],[3,2,2,0,3],[4,4,1,0,5],[1,0,0,0,16],[6,4,0,0,21],[1,0,0,0,8],[7,4,0,0,9],[4,1,0,0,14],[0,0,1,0,21],[0,0,0,0,7],[0,0,0,0,6],[1,0,0,0,4],[9,5,0,0,23],[2,0,0,0,20],[1,0,0,0,5],[0,0,0,0,7],[2,0,0,0,24],[2,2,0,0,7],[1,0,0,0,4]],"boxes":[96,49,59,285,46,26,330,170,145,34,362,323,189,251,89,263,304,30,112,78,65,62,29,211,202,158,133,161,52,132,170,194,275,281,100,274,241,104,138,139,85,129,140,140,75,266,64,287,146,29,87,91,36,187,124,70,119,248,308,153,741,130,94,70,85,152,117,249,101,332,37,248,76,26,167,139,68,257,441,42,394,29,132,180,213,207,90,106,166,212,87,81,71,183,95,108,324,190,189,74],"critical":[3,12,6,8,0,0,0,0,5,0,0,2,0,0,0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,3,0,0,0,0,0,2,1,8,0,1,0,1,0,0,0,0,0,0,0,0,15,0,0,0,4,0,0,0,0,0,0,0,0,0,0,8,0,0,0,0,0,0,0,0,0,0,0,0,0,57,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,13,0,0],"ms":[280.23,279.77,279.77,280.23,279.32,361.37,361.37,361.37,361.37,361.37,361.37,361.37,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,314.02,314.02,315.02,314.02,314.58,315.02,313.67,345.53,313.67,313.08,313.08,314.02,345.53,314.02,345.53,314.02,314.58,304.82,304.82,304.82,304.82,304.82,304.82,304.82,304.82,304.82,304.82,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79],"profiles":[]}
+ }
 }

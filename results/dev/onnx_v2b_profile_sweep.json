@@ -299,7 +299,9 @@
    "code": "7f37505c079ed9d4974ff3ec231b9c4f92fce5a1",
    "code_end": "7f37505c079ed9d4974ff3ec231b9c4f92fce5a1",
    "dirty_files": 0,
-   "drishyam_evals_changed_since": [],
+   "drishyam_evals_changed_since": [
+    "drishyam/agent.py"
+   ],
    "workers": 6,
    "load": {
     "start": 22.34,
@@ -351,7 +353,9 @@
    "code": "ad0c2173c7db23e17a11016de70bf267bec285bf",
    "code_end": "7f37505c079ed9d4974ff3ec231b9c4f92fce5a1",
    "dirty_files": 0,
-   "drishyam_evals_changed_since": [],
+   "drishyam_evals_changed_since": [
+    "drishyam/agent.py"
+   ],
    "workers": 6,
    "load": {
     "start": 7.58,
@@ -406,7 +410,9 @@
    "code": "7f37505c079ed9d4974ff3ec231b9c4f92fce5a1",
    "code_end": "7f37505c079ed9d4974ff3ec231b9c4f92fce5a1",
    "dirty_files": 0,
-   "drishyam_evals_changed_since": [],
+   "drishyam_evals_changed_since": [
+    "drishyam/agent.py"
+   ],
    "workers": 6,
    "load": {
     "start": 12.39,
@@ -431,6 +437,82 @@
      "python": 99.1,
      "Python": 98.9,
      "WindowServer": 83.0
+    }
+   }
+  },
+  "v2b_head_synth_dev": {
+   "file": "runs/v2b/v2b_head_synth_dev.json",
+   "segmenter": "onnx:drishyam_dacl10k_v2b.onnx drishyam_dacl10k_v2b.onnx@47e4b687d179 drishyam_dacl10k_v2b.fp16.onnx@3f8b8648ccfd",
+   "micro_arm": "local-macos-x86-dacl10k_v2b",
+   "variants": {
+    "head": {}
+   },
+   "code": "0e9c63b47fe2b64a8bbfc13cf50aac81ab25b688",
+   "code_end": "0e9c63b47fe2b64a8bbfc13cf50aac81ab25b688",
+   "dirty_files": 0,
+   "drishyam_evals_changed_since": [],
+   "workers": 6,
+   "load": {
+    "start": 8.64,
+    "end": 13.64,
+    "from": "2026-10-20T00:51:05Z",
+    "to": "2026-10-20T00:52:57Z",
+    "min": 8.19,
+    "median": 8.85,
+    "max": 9.51,
+    "samples": 2,
+    "other_top_processes_max_cpu_pct": {
+     "com.apple.Virtualization.VirtualMachine": 329.4
+    }
+   }
+  },
+  "v2b_head_clean": {
+   "file": "runs/v2b/v2b_head_clean.json",
+   "segmenter": "onnx:drishyam_dacl10k_v2b.onnx drishyam_dacl10k_v2b.onnx@47e4b687d179 drishyam_dacl10k_v2b.fp16.onnx@3f8b8648ccfd",
+   "micro_arm": "local-macos-x86-dacl10k_v2b",
+   "variants": {
+    "head": {}
+   },
+   "code": "0e9c63b47fe2b64a8bbfc13cf50aac81ab25b688",
+   "code_end": "0e9c63b47fe2b64a8bbfc13cf50aac81ab25b688",
+   "dirty_files": 0,
+   "drishyam_evals_changed_since": [],
+   "workers": 6,
+   "load": {
+    "start": 5.88,
+    "end": 8.64,
+    "from": "2026-10-20T00:50:10Z",
+    "to": "2026-10-20T00:51:04Z",
+    "min": null,
+    "median": [],
+    "max": null,
+    "samples": 0,
+    "other_top_processes_max_cpu_pct": {}
+   }
+  },
+  "v2b_head_real": {
+   "file": "runs/v2b/v2b_head_real.json",
+   "segmenter": "onnx:drishyam_dacl10k_v2b.onnx drishyam_dacl10k_v2b.onnx@47e4b687d179 drishyam_dacl10k_v2b.fp16.onnx@3f8b8648ccfd",
+   "micro_arm": "local-macos-x86-dacl10k_v2b",
+   "variants": {
+    "head": {}
+   },
+   "code": "0e9c63b47fe2b64a8bbfc13cf50aac81ab25b688",
+   "code_end": "0e9c63b47fe2b64a8bbfc13cf50aac81ab25b688",
+   "dirty_files": 0,
+   "drishyam_evals_changed_since": [],
+   "workers": 6,
+   "load": {
+    "start": 13.64,
+    "end": 12.17,
+    "from": "2026-10-20T00:52:57Z",
+    "to": "2026-10-20T00:58:17Z",
+    "min": 11.21,
+    "median": 12.83,
+    "max": 14.22,
+    "samples": 6,
+    "other_top_processes_max_cpu_pct": {
+     "com.apple.Virtualization.VirtualMachine": 394.6
     }
    }
   }
@@ -761,7 +843,94 @@
   "real:old@0.3": 74,
   "real:old@1.0": 80
  },
- "head_check": {},
+ "longest_job_s": {
+  "synth_dev:ref@0.3": 4.44,
+  "synth_dev:ref@1.0": 7.39,
+  "synth_dev:mv0@0.3": 4.44,
+  "synth_dev:mv0@1.0": 13.28,
+  "synth_dev:mv15@0.3": 4.44,
+  "synth_dev:mv15@1.0": 13.28,
+  "synth_dev:mv25@0.3": 4.44,
+  "synth_dev:mv25@1.0": 13.28,
+  "synth_dev:mv30_abs@0.3": 4.44,
+  "synth_dev:mv30_abs@1.0": 7.39,
+  "synth_dev:old@0.3": 4.44,
+  "synth_dev:old@1.0": 13.28,
+  "clean:ref@0.3": 4.44,
+  "clean:ref@1.0": 7.39,
+  "clean:mv0@0.3": 4.44,
+  "clean:mv0@1.0": 10.33,
+  "clean:mv15@0.3": 4.44,
+  "clean:mv15@1.0": 10.33,
+  "clean:mv25@0.3": 4.44,
+  "clean:mv25@1.0": 10.33,
+  "clean:mv30_abs@0.3": 4.44,
+  "clean:mv30_abs@1.0": 7.39,
+  "clean:old@0.3": 4.44,
+  "clean:old@1.0": 10.33,
+  "real:ref@0.3": 13.46,
+  "real:ref@1.0": 14.77,
+  "real:mv0@0.3": 20.1,
+  "real:mv0@1.0": 21.31,
+  "real:mv15@0.3": 20.1,
+  "real:mv15@1.0": 20.66,
+  "real:mv25@0.3": 13.46,
+  "real:mv25@1.0": 18.66,
+  "real:mv30_abs@0.3": 13.46,
+  "real:mv30_abs@1.0": 14.77,
+  "real:old@0.3": 20.1,
+  "real:old@1.0": 21.31
+ },
+ "head_check": {
+  "synth_dev@0.3": {
+   "profiles": [
+    "onnx:drishyam_dacl10k_v2b.onnx"
+   ],
+   "boxes_identical": true,
+   "found_identical": true,
+   "ms_identical": true
+  },
+  "synth_dev@1.0": {
+   "profiles": [
+    "onnx:drishyam_dacl10k_v2b.onnx"
+   ],
+   "boxes_identical": true,
+   "found_identical": true,
+   "ms_identical": true
+  },
+  "clean@0.3": {
+   "profiles": [
+    "onnx:drishyam_dacl10k_v2b.onnx"
+   ],
+   "boxes_identical": true,
+   "found_identical": true,
+   "ms_identical": true
+  },
+  "clean@1.0": {
+   "profiles": [
+    "onnx:drishyam_dacl10k_v2b.onnx"
+   ],
+   "boxes_identical": true,
+   "found_identical": true,
+   "ms_identical": true
+  },
+  "real@0.3": {
+   "profiles": [
+    "onnx:drishyam_dacl10k_v2b.onnx"
+   ],
+   "boxes_identical": true,
+   "found_identical": true,
+   "ms_identical": true
+  },
+  "real@1.0": {
+   "profiles": [
+    "onnx:drishyam_dacl10k_v2b.onnx"
+   ],
+   "boxes_identical": true,
+   "found_identical": true,
+   "ms_identical": true
+  }
+ },
  "splits": {
   "synth_dev": {
    "n": 60,
@@ -1820,6 +1989,127 @@
       "escalate": 46,
       "verify": 98
      }
+    },
+    "v2b_head:downscale": {
+     "recall": 0.485,
+     "recall_ci": [
+      0.4112,
+      0.5639
+     ],
+     "recall_iou_only": 0.435,
+     "chance_recall": 0.025,
+     "chance_recall_iou_only": 0.015,
+     "precision": 0.5644,
+     "fp_per_image": 1.1833,
+     "boxes_per_image": 2.7167,
+     "pixels_frac": 0.25,
+     "net_pixels_frac": 0.0833,
+     "images_with_any": 0.9333,
+     "critical_per_image": 0.3333,
+     "findings_per_image": 1.6333,
+     "per_class": {
+      "crack": 0.377,
+      "spalling": 0.7736,
+      "efflorescence": 0.0,
+      "exposed_rebar": 0.0,
+      "corrosion": 0.9429
+     }
+    },
+    "v2b_head:head@0.3": {
+     "recall": 0.565,
+     "recall_ci": [
+      0.4928,
+      0.6464
+     ],
+     "recall_iou_only": 0.525,
+     "chance_recall": 0.07,
+     "chance_recall_iou_only": 0.03,
+     "precision": 0.3274,
+     "fp_per_image": 3.7667,
+     "boxes_per_image": 5.6,
+     "pixels_frac": 0.2573,
+     "net_pixels_frac": 0.2417,
+     "images_with_any": 0.9667,
+     "critical_per_image": 0.6333,
+     "findings_per_image": 2.1167,
+     "per_class": {
+      "crack": 0.4754,
+      "spalling": 0.9057,
+      "efflorescence": 0.0882,
+      "exposed_rebar": 0.0,
+      "corrosion": 0.9429
+     },
+     "vs_downscale": 1.1649,
+     "vs_downscale_ci": [
+      1.0532,
+      1.2989
+     ],
+     "vs_downscale_iou_only_ci": [
+      1.0495,
+      1.3816
+     ],
+     "halt": {
+      "cap-hit": 54,
+      "stop-rule": 6
+     },
+     "looks_mean": 2.9,
+     "looks_by_level": {
+      "L1": 114,
+      "L2": 60
+     },
+     "looks_by_action": {
+      "gaze": 119,
+      "escalate": 16,
+      "verify": 39
+     }
+    },
+    "v2b_head:head@1.0": {
+     "recall": 0.6,
+     "recall_ci": [
+      0.5307,
+      0.6726
+     ],
+     "recall_iou_only": 0.56,
+     "chance_recall": 0.08,
+     "chance_recall_iou_only": 0.04,
+     "precision": 0.2925,
+     "fp_per_image": 4.7167,
+     "boxes_per_image": 6.6667,
+     "pixels_frac": 0.3059,
+     "net_pixels_frac": 0.2903,
+     "images_with_any": 0.9667,
+     "critical_per_image": 0.7,
+     "findings_per_image": 2.5333,
+     "per_class": {
+      "crack": 0.5246,
+      "spalling": 0.9434,
+      "efflorescence": 0.1176,
+      "exposed_rebar": 0.0,
+      "corrosion": 0.9714
+     },
+     "vs_downscale": 1.2371,
+     "vs_downscale_ci": [
+      1.1089,
+      1.3979
+     ],
+     "vs_downscale_iou_only_ci": [
+      1.1134,
+      1.4933
+     ],
+     "halt": {
+      "exhausted": 4,
+      "stop-rule": 56
+     },
+     "looks_mean": 3.4833,
+     "looks_by_level": {
+      "L1": 149,
+      "L2": 60
+     },
+     "looks_by_action": {
+      "gaze": 154,
+      "escalate": 16,
+      "verify": 39
+     }
     }
    }
   },
@@ -2496,6 +2786,108 @@
       "gaze": 86,
       "escalate": 29,
       "verify": 1
+     }
+    },
+    "v2b_head:downscale": {
+     "recall": null,
+     "recall_ci": [
+      null,
+      null
+     ],
+     "recall_iou_only": null,
+     "chance_recall": null,
+     "chance_recall_iou_only": null,
+     "precision": 0.0,
+     "fp_per_image": 0.8333,
+     "boxes_per_image": 0.8333,
+     "pixels_frac": 0.25,
+     "net_pixels_frac": 0.0833,
+     "images_with_any": 0.2667,
+     "critical_per_image": 0.1,
+     "findings_per_image": 0.2667,
+     "per_class": {
+      "crack": null,
+      "spalling": null,
+      "efflorescence": null,
+      "exposed_rebar": null,
+      "corrosion": null
+     }
+    },
+    "v2b_head:head@0.3": {
+     "recall": null,
+     "recall_ci": [
+      null,
+      null
+     ],
+     "recall_iou_only": null,
+     "chance_recall": null,
+     "chance_recall_iou_only": null,
+     "precision": 0.0,
+     "fp_per_image": 1.2667,
+     "boxes_per_image": 1.2667,
+     "pixels_frac": 0.2434,
+     "net_pixels_frac": 0.2278,
+     "images_with_any": 0.4333,
+     "critical_per_image": 0.0333,
+     "findings_per_image": 0.5,
+     "per_class": {
+      "crack": null,
+      "spalling": null,
+      "efflorescence": null,
+      "exposed_rebar": null,
+      "corrosion": null
+     },
+     "halt": {
+      "cap-hit": 24,
+      "exhausted": 2,
+      "stop-rule": 4
+     },
+     "looks_mean": 2.7333,
+     "looks_by_level": {
+      "L1": 54,
+      "L2": 28
+     },
+     "looks_by_action": {
+      "gaze": 76,
+      "escalate": 6
+     }
+    },
+    "v2b_head:head@1.0": {
+     "recall": null,
+     "recall_ci": [
+      null,
+      null
+     ],
+     "recall_iou_only": null,
+     "chance_recall": null,
+     "chance_recall_iou_only": null,
+     "precision": 0.0,
+     "fp_per_image": 1.3,
+     "boxes_per_image": 1.3,
+     "pixels_frac": 0.2684,
+     "net_pixels_frac": 0.2528,
+     "images_with_any": 0.4667,
+     "critical_per_image": 0.0333,
+     "findings_per_image": 0.5333,
+     "per_class": {
+      "crack": null,
+      "spalling": null,
+      "efflorescence": null,
+      "exposed_rebar": null,
+      "corrosion": null
+     },
+     "halt": {
+      "stop-rule": 22,
+      "exhausted": 8
+     },
+     "looks_mean": 3.0333,
+     "looks_by_level": {
+      "L1": 63,
+      "L2": 28
+     },
+     "looks_by_action": {
+      "gaze": 85,
+      "escalate": 6
      }
     }
    }
@@ -3580,6 +3972,131 @@
       "escalate": 509,
       "verify": 151
      }
+    },
+    "v2b_head:downscale": {
+     "recall": 0.4349,
+     "recall_ci": [
+      0.3753,
+      0.4911
+     ],
+     "recall_iou_only": 0.19,
+     "chance_recall": 0.1888,
+     "chance_recall_iou_only": 0.0335,
+     "precision": 0.2078,
+     "fp_per_image": 7.47,
+     "boxes_per_image": 9.43,
+     "pixels_frac": 0.0759,
+     "net_pixels_frac": 0.026,
+     "images_with_any": 0.95,
+     "critical_per_image": 1.42,
+     "findings_per_image": 1.98,
+     "per_class": {
+      "crack": 0.3953,
+      "spalling": 0.7204,
+      "efflorescence": 0.5,
+      "exposed_rebar": 0.0,
+      "corrosion": 0.5426
+     }
+    },
+    "v2b_head:head@0.3": {
+     "recall": 0.4803,
+     "recall_ci": [
+      0.4232,
+      0.532
+     ],
+     "recall_iou_only": 0.2616,
+     "chance_recall": 0.2485,
+     "chance_recall_iou_only": 0.0597,
+     "precision": 0.0774,
+     "fp_per_image": 38.12,
+     "boxes_per_image": 41.32,
+     "pixels_frac": 0.1412,
+     "net_pixels_frac": 0.1256,
+     "images_with_any": 0.9,
+     "critical_per_image": 3.94,
+     "findings_per_image": 6.37,
+     "per_class": {
+      "crack": 0.4485,
+      "spalling": 0.8065,
+      "efflorescence": 0.5488,
+      "exposed_rebar": 0.0,
+      "corrosion": 0.5581
+     },
+     "vs_downscale": 1.1044,
+     "vs_downscale_ci": [
+      1.0195,
+      1.1908
+     ],
+     "vs_downscale_iou_only_ci": [
+      1.1676,
+      1.6304
+     ],
+     "halt": {
+      "cap-hit": 18,
+      "stop-rule": 76,
+      "exhausted": 6
+     },
+     "looks_mean": 5.83,
+     "looks_by_level": {
+      "L1": 45,
+      "L2": 443,
+      "L3": 95
+     },
+     "looks_by_action": {
+      "gaze": 484,
+      "escalate": 71,
+      "verify": 28
+     }
+    },
+    "v2b_head:head@1.0": {
+     "recall": 0.4839,
+     "recall_ci": [
+      0.4263,
+      0.5342
+     ],
+     "recall_iou_only": 0.2676,
+     "chance_recall": 0.2497,
+     "chance_recall_iou_only": 0.0585,
+     "precision": 0.074,
+     "fp_per_image": 40.67,
+     "boxes_per_image": 43.92,
+     "pixels_frac": 0.17,
+     "net_pixels_frac": 0.1543,
+     "images_with_any": 0.92,
+     "critical_per_image": 4.07,
+     "findings_per_image": 6.82,
+     "per_class": {
+      "crack": 0.4551,
+      "spalling": 0.8065,
+      "efflorescence": 0.561,
+      "exposed_rebar": 0.0,
+      "corrosion": 0.5581
+     },
+     "vs_downscale": 1.1126,
+     "vs_downscale_ci": [
+      1.0279,
+      1.1968
+     ],
+     "vs_downscale_iou_only_ci": [
+      1.2,
+      1.6667
+     ],
+     "halt": {
+      "stop-rule": 92,
+      "exhausted": 8
+     },
+     "looks_mean": 6.27,
+     "looks_by_level": {
+      "L0": 2,
+      "L1": 87,
+      "L2": 443,
+      "L3": 95
+     },
+     "looks_by_action": {
+      "gaze": 526,
+      "escalate": 73,
+      "verify": 28
+     }
     }
    }
   }
@@ -3591,7 +4108,7 @@
   "the rule is applied symmetrically: a gain (vs_ref_ci wholly above 1), a loss (wholly below 1) and a clean harm (difference CI wholly above 0) each count only when the CI excludes no change; verdict lists all of them",
   "clean false alarms: on the clean split every box is a false alarm; the rule reads the boxes-per-photo difference (defined when ref has no box, unlike a ratio) and the share of photos with any box",
   "machine load: files.<run>.load (the 1-min load at the run's start and end, and its min / median / max over one sample a minute, and the other processes that were among the three busiest, with their peak CPU %: a virtual machine and browsers ran beside this work for part of it); this work ran at most 6 worker processes. The fixed cost table makes the rows independent of the load; only the micro timings depend on it (latency: v2b's table was timed at a higher load than v2a's, and v2a re-timed in v2b's window costs about what v2b does)",
-  "jobs_at_20s: jobs whose modelled time reached JobConfig.seconds_cap (20 s). On CODEBRIM, mv0, mv15 and old reached it on most jobs at both caps (v2b's table was timed at a 1-min load of 10.6 to 14.5, v2a's at 7.9, and the v2a grid's mv0 and old reached it on 11 jobs at the 1.0 cap only), so their CODEBRIM rows partly measure that cap. The decision does not rest on them: the rule needs a measurable synth_dev gain, no candidate had one, and no synth_dev job reached the cap",
+  "jobs_at_20s: jobs whose modelled time reached JobConfig.seconds_cap (20 s); longest_job_s: the longest modelled job of each row. On CODEBRIM, mv0, mv15 and old reached it on most jobs at both caps (v2b's table was timed at a 1-min load of 10.6 to 14.5, v2a's at 7.9, and the v2a grid's mv0 and old reached it on 11 jobs at the 1.0 cap only), so their CODEBRIM rows partly measure that cap. The decision does not rest on them: the rule needs a measurable synth_dev gain, no candidate had one, and no synth_dev job reached the cap",
   "boxes are per-component boxes (the harness's primary convention for every policy); critical counts boxes of a critical class and size (findings.is_critical), the ones the human gate would hold; per_image.ms is the modelled ms per job (the fixed table's virtual clock)"
  ],
  "per_image": {
