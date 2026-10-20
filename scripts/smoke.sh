@@ -70,13 +70,17 @@ fi
 
 # KILL: start a paced job (pace_ms is ignored by a server without it), wait for step 2, send the kill token.
 post "/api/jobs?pixel_cap=0.3&pace_ms=1000" image/jpeg "$IMG" -N --max-time 90 -o "$TMP/kill.ndjson" &
-job_pid=$!
+job_pid=$! warm_pid=""
 for _ in $(seq 600); do
+  if [ -z "$warm_pid" ] && [ -s "$TMP/kill.ndjson" ]; then  # the job is streaming: warm the environment KILL will use,
+    curl -sS --max-time 60 -o /dev/null "$URL/api/health" & warm_pid=$!  # as public/js/api.js does at every job start
+  fi
   n=$(grep -c '"type":"step"' "$TMP/kill.ndjson" 2>/dev/null) || true
   [ "${n:-0}" -ge 2 ] && break
   kill -0 "$job_pid" 2>/dev/null || break
   sleep 0.1
 done
+[ -z "$warm_pid" ] || wait "$warm_pid" || true
 head -n 1 "$TMP/kill.ndjson" | jq -c '{job, kill_token}' >"$TMP/kill.json" 2>/dev/null || echo '{}' >"$TMP/kill.json"
 kill_code=$(post /api/kill application/json "$TMP/kill.json" -o /dev/null -w '%{http_code}' --max-time 30) || true
 wait "$job_pid" || true

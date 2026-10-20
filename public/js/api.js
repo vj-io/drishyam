@@ -69,6 +69,9 @@ export async function* streamJob({ blob, params, replay, signal, trace }) {
     throw Object.assign(new Error(res.status === 429 ? throttled(body, JOB_LIMIT) : `${res.status}: ${body.error ?? 'the server refused the job'}`),
       { status: res.status });
   }
+  // This job now holds one Lambda environment until it ends, so KILL lands in another. Start that one now: a cold start
+  // (about 3 s) after KILL can let a short job finish before the kill flag is read (docs/aws.md, Smoke, check 3).
+  fetch('/api/health', { cache: 'no-store' }).catch(() => {});
   yield* ndjson(res.body);
 }
 

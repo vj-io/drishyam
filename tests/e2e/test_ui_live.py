@@ -127,6 +127,8 @@ def run(base, server_log=None):
         expect(page.locator("#narrator")).to_contain_text("Sending the photo", timeout=2000)  # the page answers the click at once
         expect(page.locator("#trace .trace__line[data-step='1']")).to_be_visible(timeout=30000)
         assert any("pace_ms=1000" in u for u in p.requests if "/api/jobs" in u), p.requests
+        j = next(i for i, u in enumerate(p.requests) if "/api/jobs" in u)
+        assert any("/api/health" in u for u in p.requests[j + 1:]), "a job start warms a 2nd environment for KILL (api.js)"
         assert p.viewer_in_view(), "the viewer must stay on screen during the guided run"
         expect(page.locator("#narrator")).not_to_be_empty()
         expect(page.locator("#trace .trace__line[data-step='1'] .trace__why")).to_be_visible()
