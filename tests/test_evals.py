@@ -611,6 +611,48 @@ def test_model_eval_refuses_a_mislabelled_confounded_or_other_data_arm(tmp_path)
         model_eval.main(["--onnx", str(onnx), "--codebrim", str(cb), "--publish"])
 
 
+def test_model_eval_costs_charges_the_committed_table_and_scores_classical_once(tmp_path, monkeypatch):
+    """--costs ARM times nothing (the committed table is not overwritten) and charges ARM; the classical side runs on
+    this machine's classical table once, and the next model reuses it; another machine's or another net's table is refused."""
+    from evals import model_eval
+
+    data = {"dataset_gt_sha256": "a" * 64, "dataset_images_sha256": "b" * 64}
+    for m, t in (("dacl10k", "mac-dacl10k-retime"), ("dacl10k_v2a", "mac-dacl10k_v2a")):
+        (tmp_path / "models" / f"drishyam_{m}.onnx").parent.mkdir(exist_ok=True)
+        (tmp_path / "models" / f"drishyam_{m}.onnx").write_bytes(b"")
+        (tmp_path / "results" / t).mkdir(parents=True)
+        (tmp_path / "results" / t / "micro.json").write_text(
+            json.dumps({"job_ops": {"segmenter": f"onnx:drishyam_{m}.onnx"}}))
+    (tmp_path / "public" / "results").mkdir(parents=True)  # the published classical run was charged the arm64 table
+    pub = {"segmenter": "classical-v1", "n_images": 3, "cost_model": {"kind": "fixed", "source": "results/linux-aarch64/micro.json"}}
+    (tmp_path / "public" / "results" / "summary.json").write_text(json.dumps(pub))
+    calls = []
+
+    def run(cmd, env, cwd, check):
+        calls.append(cmd)
+        arm, out = cmd[cmd.index("--micro-arm") + 1], Path(cmd[cmd.index("--out") + 1])
+        out.mkdir(parents=True, exist_ok=True)
+        seg = f"onnx:{Path(env['DRISHYAM_ONNX']).name}" if "DRISHYAM_ONNX" in env else "classical-v1"
+        (out / "summary.json").write_text(json.dumps({
+            "segmenter": seg, "n_images": 3, "provenance": data, "agent_config": {"governor": False},
+            "cost_model": {"kind": "fixed", "source": f"results/{arm}/micro.json job_ops (p50 ms per call)"}}))
+
+    monkeypatch.setattr(model_eval, "REPO", tmp_path)
+    monkeypatch.setattr(model_eval.subprocess, "run", run)
+    monkeypatch.setattr(model_eval, "table", lambda *a: None)
+    argv = ["--codebrim", str(tmp_path / "none"), "--n", "3", "--micro-arm", "mac", "--workers", "6"]
+    model_eval.main(["--onnx", "models/drishyam_dacl10k.onnx", "--costs", "mac-dacl10k-retime", *argv])
+    model_eval.main(["--onnx", "models/drishyam_dacl10k_v2a.onnx", "--costs", "mac-dacl10k_v2a", *argv])
+    assert not any("bench.micro" in c for c in calls)
+    assert [(Path(c[c.index("--out") + 1]).name, c[c.index("--micro-arm") + 1]) for c in calls] == [
+        ("onnx-synth", "mac-dacl10k-retime"), ("classical-synth", "mac"), ("onnx-v2a-synth", "mac-dacl10k_v2a")]
+    with pytest.raises(SystemExit, match="must be a mac table that timed onnx:drishyam_dacl10k_v2a.onnx"):  # another net's
+        model_eval.main(["--onnx", "models/drishyam_dacl10k_v2a.onnx", "--costs", "mac-dacl10k-retime", *argv])
+    with pytest.raises(SystemExit, match="must be a linux table"):  # the classical side would be charged another machine
+        model_eval.main(["--onnx", "models/drishyam_dacl10k.onnx", "--costs", "mac-dacl10k-retime", *argv[:4], "--micro-arm", "linux"])
+    assert len(calls) == 3
+
+
 # ---------------------------------------------------------------- parity
 def test_parity_compare_saved_files(tmp_path):
     a = np.zeros((2, 8, 8), np.uint8)
