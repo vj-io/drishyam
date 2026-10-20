@@ -15,9 +15,10 @@ brag-output/drishyam-short.mp4.
 The live footage is recorded once by video/record.py (brag-output/work/rec/, git-ignored) and walk.py
 (brag-output/work/walkrec/); re-recording is a separate step because the live site's WAF allows 10 job starts
 per IP per 120 s. The trained segmenter is "results pending" until public/results/codebrim_dacl10k/summary.json
-exists; then the line states its recall against the classical engine charged the same cost table, with the
-governor off, where tiling still finds more, its chance recall and the leakage count, and the build stops if
-any of those checks fails. `--check-template` tries that line on a stand-in summary without touching the film.
+exists; then the line states its held-out recall against the classical engine on the same photos (results/
+heldout_models.json: each charged its own cost table, timed on one machine, governor off), its chance recall and its
+critical boxes, and the build stops if any of those checks fails. `--check-template` measures the whole film with every
+piece on and checks that a summary charged another machine's costs is refused, without touching the film.
 """
 import argparse, bisect, glob, gzip, json, math, os, pathlib, re, shutil, subprocess, sys
 
@@ -55,12 +56,6 @@ def load(rel):
     return json.loads((ROOT / rel).read_text())
 
 
-def main_checkout():
-    """runs/ is git-ignored, so the smoke log lives in the main checkout; find it through git's common dir."""
-    common = subprocess.run(["git", "rev-parse", "--git-common-dir"], cwd=ROOT, capture_output=True, text=True).stdout.strip()
-    return (ROOT / common).resolve().parent if common else ROOT
-
-
 def pts(lst):
     return sorted([p for p in lst if p.get("recall") is not None], key=lambda p: p["pixels_frac"])
 
@@ -91,8 +86,26 @@ def overlaps(a, b):
 
 # ---------------------------------------------------------------------------------------------- data
 def arm_of(summary):
-    """'results/linux-aarch64/micro.json job_ops ...' -> 'linux-aarch64' (an ONNX run's '-dacl10k' table is the same machine)"""
-    return re.match(r"results/([^/ ]+?)(?:-dacl10k)?/", summary["cost_model"]["source"])[1]
+    """The machine a summary's cost table was timed on: 'results/linux-aarch64/micro.json job_ops ...' -> 'linux-aarch64'
+    (an ONNX model's table, 'local-macos-x86-dacl10k-retime' or '-dacl10k_v2a', is that machine's too)"""
+    return machine(summary["cost_model"]["source"])
+
+
+def machine(source):
+    return re.match(r"results/([^/ ]+?)(?:-dacl10k[^/ ]*)?/", source)[1]
+
+
+def smoke_runs(text):
+    """Each smoke run in an aws-smoke.log: its /api/health, step p95 and steps; a run's lines end with its 'smoke <time> ...' line."""
+    runs, cur = [], {}
+    for l in text.splitlines():
+        if l.startswith("PASS health: "):
+            cur["health"] = json.loads(re.match(r"PASS health: (\{.*?\}), ttfb", l)[1])
+        elif m := re.match(r"INFO latency: p95 ([\d.]+) ms per step over (\d+) steps", l):
+            cur["p95"], cur["steps"] = float(m[1]), int(m[2])
+        elif l.startswith("smoke "):
+            runs.append({**cur, "at": l.split()[1], "result": l.rsplit("result=", 1)[1]}); cur = {}
+    return runs
 
 
 def half(n):
@@ -108,7 +121,10 @@ def in_text(rel, *phrases):
     return phrases[0] if len(phrases) == 1 else list(phrases)
 
 
-def data(model=MODEL, real=VIDEO / "live"):
+REALS = [VIDEO / "live", *sorted((VIDEO / "live/variants").glob("*"))]   # the team's wall photos: video/live/real.*, then each variant
+
+
+def data(model=MODEL, reals=REALS):
     D = {}
     f = "public/results/summary.json"; s = load(f); hs = s["headline_stats"]; h = head(s["policies"])
     assert hs["budget"] == 0.3, "head() and the narration say a 30 % cap"
@@ -291,13 +307,16 @@ def data(model=MODEL, real=VIDEO / "live"):
     f = "public/docs/aws-simple.svg"; svg = (ROOT / f).read_text()
     m = re.search(r"WAF rate limit \((\d+) job starts per (\d+) s per IP\)", svg)
     D["aws"] = {"waf_n": src("WAF: job starts", int(m[1]), f, "<desc> 'WAF rate limit (10 job starts per 120 s per IP)'"), "waf_s": int(m[2])}
-    smoke = main_checkout() / "runs/aws-smoke.log"
-    lat = [re.search(r"p95 ([\d.]+) ms per step over (\d+) steps", l) for l in smoke.read_text().splitlines() if l.startswith("INFO latency: p95")]
-    runs = [l.split()[1] for l in smoke.read_text().splitlines() if l.startswith("smoke ")]
-    p95 = sorted(float(m[1]) for m in lat)
-    D["aws"]["p95"] = src("Lambda step p95 (ms), every smoke run (min, max)", [p95[0], p95[-1]], "runs/aws-smoke.log (main checkout)", f"'INFO latency' lines, runs {', '.join(runs)}")
-    D["aws"]["smoke_runs"] = src("smoke runs", len(lat), "runs/aws-smoke.log (main checkout)", "count of 'INFO latency' lines")
-    D["aws"]["smoke_steps"] = src("steps per smoke run", sorted({int(m[2]) for m in lat}), "runs/aws-smoke.log (main checkout)", "'over N steps'")
+    # every scripts/aws.sh smoke run against the live site, as runs/aws-smoke.log logged it (copied verbatim into git)
+    f = "video/live/aws-smoke.log"; runs = smoke_runs((ROOT / f).read_text())
+    for seg, key in (("classical-v1", "p95"), (runs[-1]["health"]["segmenter"], "p95_v1")):
+        rs = [r for r in runs if r["health"]["segmenter"] == seg and "p95" in r]
+        p95 = sorted(r["p95"] for r in rs)
+        D["aws"][key] = src(f"Lambda step p95 (ms), every smoke run with {seg} (min, max)", [p95[0], p95[-1]], f, f"'INFO latency' lines of the runs whose health says {seg}: {', '.join(r['at'] for r in rs)}")
+        D["aws"][key + "_runs"] = src(f"smoke runs with {seg}", len(rs), f, "count of those runs")
+        D["aws"][key + "_steps"] = src(f"steps per smoke run with {seg}", sorted({r["steps"] for r in rs}), f, "'over N steps'")
+    D["aws"]["smoke_runs"], D["aws"]["smoke_steps"] = D["aws"]["p95_runs"], D["aws"]["p95_steps"]
+    D["aws"]["now"] = src("the live site now: segmenter, commit (the last smoke run's /api/health)", {k: runs[-1]["health"][k] for k in ("segmenter", "commit")}, f, f"PASS health of the run {runs[-1]['at']}")
     assert "HMAC-SHA256 signed" in (ROOT / "docs/security.md").read_text(), "the tamper inset says HMAC-SHA256"
     D["aws"]["hmac"] = src("work-order signature", "HMAC-SHA256", "docs/security.md", "'Tampered or replayed work order' row")
     f = "results/linux-aarch64/micro.json"; mi = load(f)
@@ -315,35 +334,49 @@ def data(model=MODEL, real=VIDEO / "live"):
     assert int(D["impact"]["photos"].replace(",", "")) > int(m[2]), "the narration calls this inspection the largest"
 
     # the trained segmenter: quoted once evals/model_eval.py --publish has written its summary, and only against the
-    # classical engine charged the same machine's cost table (the published classical CODEBRIM summary, or the classical
-    # re-run model_eval.py makes when that one was charged another machine's costs), with the governor off on both
+    # classical engine on the same photos, each charged a cost table timed on the same machine, with the governor off
     f = str(model.relative_to(ROOT)) if model.is_relative_to(ROOT) else str(model)
     if model.exists():
-        s = json.loads(model.read_text()); p = head(s["policies"]); lk = s["leakage"]   # model_eval.py writes the leakage count beside the number
+        s = json.loads(model.read_text()); lk = s["leakage"]   # model_eval.py writes the leakage count beside the number
+        # its 30 % cap point: one point per cap, in by_budget's order (head() would take the uncapped run, which reads under 30 %)
+        p = s["policies"]["drishyam"][list(s["agent_metrics"]["by_budget"]).index("0.3")]
         assert s["segmenter"].startswith("onnx:") and not s["agent_config"]["governor"], (s["segmenter"], s["agent_config"])
         am = s.get("agent_metrics", {})
         assert not am.get("governor_activity_in_eval", {}).get("p95>SLA") and all(set(u) <= {"accurate"} for u in am.get("model_usage", {}).values()), "a confounded run"
-        same = lambda c: (c["segmenter"] == "classical-v1" and not c["agent_config"]["governor"] and arm_of(c) == arm_of(s) and c["n_images"] == s["n_images"]
-                          and all(c["provenance"].get(k) == s["provenance"].get(k) is not None for k in ("dataset_gt_sha256", "dataset_images_sha256")))
-        cands = [ROOT / "public/results/codebrim/summary.json", main_checkout() / "runs/model-eval/classical-codebrim/summary.json"]
-        base = next((c for c in cands if c.exists() and same(json.loads(c.read_text()))), None)
-        if base is None:
-            sys.exit(f"{f}: no classical CODEBRIM summary charged the same cost table ({arm_of(s)}) on the same data, governor off; looked at "
-                     + ", ".join(map(str, cands)) + ". The film compares the two only like for like.")
-        cp = head(json.loads(base.read_text())["policies"])
-        wins = [f"L{lvl}" for lvl, t in zip((2, 1, 0), pts(s["policies"]["tiling"])) if t["recall"] > p["recall"]]   # policies.tiling is L2, L1, L0 by pixels
-        D["model"] = {"recall": src("trained segmenter: CODEBRIM recall (30 % cap)", p["recall"], f, "policies.drishyam[pixels_frac <= 0.3][-1].recall"),
-                      "ci": src("its 95 % CI", p["recall_ci"], f, "policies.drishyam[head].recall_ci"),
-                      "chance": src("its boxes at random", p["chance_recall"], f, "policies.drishyam[head].chance_recall"),
-                      "classical": src("classical engine, same cost table and data", cp["recall"], str(base), f"policies.drishyam[head].recall (cost table {arm_of(s)})"),
-                      "arm": arm_of(s),
-                      "tiling_wins": src("tiling levels that still find more than the trained segmenter's agent", wins, f, "policies.tiling[].recall > policies.drishyam[head].recall"),
+        # the classical engine it is compared with: the held-out table (results/heldout_models.json), which scored both on
+        # this data, each charged its own cost table timed on one machine, with the governor's overrides off (evals/model_eval.py)
+        hf = "results/heldout_models.json"; H = load(hf); in_text("evals/model_eval.py", "with the governor's overrides off")
+        name = next(k for k, v in H["models"].items() if v["profile"] == s["segmenter"])   # 'v1'
+        T = H["table"]["codebrim@0.3"]; row, cr = T[name], T["classical-v1"]
+        assert [row[k] for k in ("recall", "pixels_frac", "chance_recall")] == [p[k] for k in ("recall", "pixels_frac", "chance_recall")], f"{hf} {name} is not {f}"
+        assert all(H["datasets"]["codebrim"][k] == s["provenance"][k] for k in ("dataset_gt_sha256", "dataset_images_sha256")), "not the same CODEBRIM photos"
+        machines = {arm_of(s), *(machine(H["cost_tables"][k]["file"]) for k in (name, "classical-v1"))}
+        if len(machines) != 1:
+            sys.exit(f"{f}: the trained segmenter and the classical engine were charged cost tables timed on different machines ({machines}). "
+                     "The film compares the two only like for like.")
+        pr = H["pairs"][f"codebrim@0.3: {name} / classical-v1"]
+        wins = [f"L{lvl}" for lvl, t in zip((2, 1, 0), pts(s["policies"]["tiling"])) if t["recall"] >= p["recall"]]   # policies.tiling is L2, L1, L0 by pixels
+        cl = H["table"]["clean@0.3"]
+        D["model_segmenter"] = s["segmenter"]
+        D["model"] = {"name": name, "recall": src("trained segmenter: CODEBRIM recall (30 % cap)", p["recall"], f, "policies.drishyam[cap 0.3].recall"),
+                      "pixels_frac": src("its share of the pixels", p["pixels_frac"], f, "policies.drishyam[cap 0.3].pixels_frac"),
+                      "ci": src("its 95 % CI", p["recall_ci"], f, "policies.drishyam[cap 0.3].recall_ci"),
+                      "chance": src("its boxes at random", p["chance_recall"], f, "policies.drishyam[cap 0.3].chance_recall"),
+                      "classical": src("classical engine on the same photos (held out)", cr["recall"], hf, "table['codebrim@0.3']['classical-v1'].recall"),
+                      "ratio": src("trained / classical recall, paired 95 % CI", pr["recall"], hf, f"pairs['codebrim@0.3: {name} / classical-v1'].recall"),
+                      "crit": src("critical boxes per photo: trained, classical", [row["critical_per_image"], cr["critical_per_image"]], hf, "table['codebrim@0.3'][*].critical_per_image"),
+                      "crit_ratio": src("trained / classical critical boxes per photo, paired 95 % CI", pr["critical"], hf, f"pairs['codebrim@0.3: {name} / classical-v1'].critical"),
+                      "clean_any": src("synthetic photos with no damage given any box: trained, classical", [cl[name]["images_with_any"], cl["classical-v1"]["images_with_any"]], hf,
+                                       "table['clean@0.3'][*].images_with_any"),
+                      "machine": machines.pop(),
+                      "tiling": src("tiling with the trained segmenter, L2/L1/L0: pixels, recall", [[t["pixels_frac"], t["recall"]] for t in pts(s["policies"]["tiling"])], f, "policies.tiling"),
+                      "tiling_wins": src("tiling levels that find as much as the trained segmenter's agent, or more", wins, f, "policies.tiling[].recall >= policies.drishyam[cap 0.3].recall"),
                       "near_dups": src("CODEBRIM photos with a near-duplicate in dacl10k", lk["near_duplicates"], f, "leakage.near_duplicates")}
     else:
         src("trained segmenter", "results pending", f, "absent at build time")
 
     D["team"] = team_private()   # None: name cards
-    D["real"] = real_run(real)   # None: no real-photo chapter
+    D["real"] = [r for r in map(real_run, reals) if r]   # []: no real-photo chapter
 
     # words and figures typed into the scene text, each checked against the file it comes from
     D["lit"] = {
@@ -437,25 +470,31 @@ def real_run(base):
     assert ("dacl10k" in arm) == (kind == "onnx"), f"real.json says {meta['engine']}, but the trace was charged {arm or 'live'} costs"
     found = [{"id": x["id"], "cls": x["cls"], "box": x["box"], "conf": x["confidence"], "state": x["state"], "critical": x["critical"]} for x in fin.values()]
     seen = meta.get("seen")
-    hit, wrong = [], [x["id"] for x in found]
-    if seen:   # by eye, not ground truth: a finding of a class the team sees counts as found where its box touches the team's line
-        pts = [(a[0] + (b[0] - a[0]) * u / 20, a[1] + (b[1] - a[1]) * u / 20) for q in seen.get("paths", []) for a, b in zip(q, q[1:]) for u in range(21)]
-        on = lambda x: not pts or any(x["box"][0] <= px <= x["box"][0] + x["box"][2] and x["box"][1] <= py <= x["box"][1] + x["box"][3] for px, py in pts)
-        hit = [x["id"] for x in found if x["cls"] in seen["classes"] and on(x)]
+    hit, wrong, paths_hit = [], [x["id"] for x in found], []
+    if seen:   # by eye, not ground truth: a finding of a class the team sees counts as found where its box touches a line they traced
+        Q = seen.get("paths", [])
+        dense = lambda q: [(a[0] + (b[0] - a[0]) * u / 20, a[1] + (b[1] - a[1]) * u / 20) for a, b in zip(q, q[1:]) for u in range(21)]
+        touch = lambda q, x: any(x["box"][0] <= px <= x["box"][0] + x["box"][2] and x["box"][1] <= py <= x["box"][1] + x["box"][3] for px, py in dense(q))
+        hit = [x["id"] for x in found if x["cls"] in seen["classes"] and (not Q or any(touch(q, x) for q in Q))]
         wrong = [x["id"] for x in found if x["id"] not in hit]
+        paths_hit = [any(x["id"] in hit and touch(q, x) for x in found) for q in Q]   # each traced line, in real.json's order
     R = {"image": meta["image"], "photo": photo.resolve().as_uri(), "w": job["width"], "h": job["height"], "job": job["job"], "trace": f,
-         "engine": src("real photo: engine", meta["engine"], str(meta_p.relative_to(ROOT)) if meta_p.is_relative_to(ROOT) else str(meta_p), "engine"),
-         "kind": kind, "profile": src("real photo: profile", meta.get("profile", ""), "real.json", "profile"),
-         "cost": arm, "ov_level": lv, "candidates": src("real photo: candidate regions in the overview", len(ov["candidates"]), f, "overview.candidates"),
+         "engine": src(f"real photo {meta['image']}: engine", meta["engine"], str(meta_p.relative_to(ROOT)) if meta_p.is_relative_to(ROOT) else str(meta_p), "engine"),
+         "kind": kind, "profile": src(f"real photo {meta['image']}: profile", meta.get("profile", ""), "real.json", "profile"),
+         "cost": arm, "ov_level": lv, "candidates": src(f"real photo {meta['image']}: candidate regions in the overview", len(ov["candidates"]), f, "overview.candidates"),
          "cands": [c["box"] for c in ov["candidates"]], "looks": looks,
-         "n_looks": src("real photo: looks", len(looks), f, "done.summary.steps"),
-         "pixels_frac": src("real photo: share of pixels read", S["pixels_frac"], f, "done.summary.pixels_frac"),
-         "found": found, "n_found": src("real photo: findings", len(found), f, "done.summary.findings (last state of each finding event)"),
-         "cause": src("real photo: why it stopped", f"{halt['cause']}: {halt['rationale']}", f, "step[action=halt].cause, rationale"),
-         "unvisited": done.get("unvisited", []), "seen": seen, "hit": hit, "wrong": wrong}
+         "n_looks": src(f"real photo {meta['image']}: looks", len(looks), f, "done.summary.steps"),
+         "pixels_frac": src(f"real photo {meta['image']}: share of pixels read", S["pixels_frac"], f, "done.summary.pixels_frac"),
+         "found": found, "n_found": src(f"real photo {meta['image']}: findings", len(found), f, "done.summary.findings (last state of each finding event)"),
+         "cause": src(f"real photo {meta['image']}: why it stopped", f"{halt['cause']}: {halt['rationale']}", f, "step[action=halt].cause, rationale"),
+         "coverage": src(f"real photo {meta['image']}: coverage (share of the overview's saliency that a look saw)", done["coverage"], f, "done.coverage"),
+         "unvisited": done.get("unvisited", []), "seen": seen, "hit": hit, "wrong": wrong, "paths_hit": paths_hit,
+         # each traced line, top to bottom of the photo, by its mean height: 'upper', 'lower' when there are two
+         "path_y": [sum(y for _, y in q) / len(q) for q in (seen or {}).get("paths", [])]}
     if seen:
-        src("real photo: what the team sees, by eye (not ground truth)", f"{seen['say']} ({', '.join(seen['classes'])})", "real.json", "seen")
-        src("real photo: findings on it / not on it (by eye)", [hit, wrong], f, "finding boxes touching seen.path")
+        src(f"real photo {meta['image']}: what the team sees, by eye (not ground truth)", f"{seen['say']} ({', '.join(seen['classes'])})", "real.json", "seen")
+        src(f"real photo {meta['image']}: findings on it / not on it (by eye)", [hit, wrong], f, "finding boxes touching seen.path")
+        src(f"real photo {meta['image']}: each traced line touched by a finding (by eye)", paths_hit, f, "seen.paths[i] inside a finding box of a seen class")
     return R
 
 
@@ -479,19 +518,19 @@ def narrate(script, out, timings):
 
 # scene specs: lead before the first line, gap between lines, tail after the last, min seconds
 SCENES = [
-    ("open", "Cold open", dict(lead=1.7, gap=0.3, tail=0.5)),
-    ("team", "Team", dict(lead=0.5, gap=0.35, tail=0.5)),
-    ("problem", "Problem and user", dict(lead=0.5, gap=0.3, tail=0.45)),
-    ("live", "Live demo", dict(lead=0.5, gap=0.3, tail=0.5)),
-    ("break", "Failure drills", dict(lead=0.4, gap=0.35, tail=0.5)),   # the footage warp needs 0.35 between b2 and b3
-    ("mcp", "An LLM over MCP", dict(lead=0.5, gap=0.3, tail=0.5)),
-    ("arch", "Architecture", dict(lead=0.5, gap=0.3, tail=0.45)),
-    ("results", "Results", dict(lead=0.5, gap=0.3, tail=0.45)),
-    ("real", "Real photo (ours)", dict(lead=0.5, gap=0.3, tail=0.8)),   # only when video/live/real.* and the photo exist
-    ("failures", "Failure cases", dict(lead=0.5, gap=0.3, tail=0.45)),
-    ("limits", "Limits", dict(lead=0.5, gap=0.3, tail=1.5)),   # the fourth limit is read, not said
-    ("repro", "Reproduce", dict(lead=0.5, gap=0.3, tail=0.5)),
-    ("end", "End", dict(lead=0.4, gap=0.4, tail=0.2, hold=3.0)),
+    ("open", "Cold open", dict(lead=1.5, gap=0.3, tail=0.4)),
+    ("team", "Team", dict(lead=0.5, gap=0.35, tail=0.35)),
+    ("problem", "Problem and user", dict(lead=0.5, gap=0.3, tail=0.4)),
+    ("live", "Live demo", dict(lead=0.5, gap=0.25, tail=0.4)),
+    ("break", "Failure drills", dict(lead=0.4, gap=0.35, tail=0.4)),   # the footage warp needs 0.35 between b2 and b3
+    ("mcp", "An LLM over MCP", dict(lead=0.5, gap=0.3, tail=0.4)),
+    ("arch", "Architecture", dict(lead=0.5, gap=0.25, tail=0.4)),
+    ("results", "Results", dict(lead=0.5, gap=0.25, tail=0.4)),
+    ("real", "Real photos (ours)", dict(lead=0.5, gap=1.1, tail=0.7)),   # only when video/live/real.* and the photo exist; the gap is the glide to the second photo
+    ("failures", "Failure cases", dict(lead=0.5, gap=0.3, tail=0.4)),
+    ("limits", "Limits", dict(lead=0.5, gap=0.3, tail=1.0)),   # the fourth limit is read, not said
+    ("repro", "Reproduce", dict(lead=0.5, gap=0.3, tail=0.4)),
+    ("end", "End", dict(lead=0.4, gap=0.4, tail=0.2, hold=2.2)),
 ]
 
 
@@ -552,7 +591,7 @@ def footage_warp(placed, scenes, ev):
         [at["l5"] - 0.25, ev["step:3"]],
         [at["l6"] - 0.25, ev["step:4"]],
         [at["l7"] - 0.25, ev["step:5"]],
-        [at["l8"] - 0.4, ev["done:guided"] + 0.3],
+        [at["l7"] + du["l7"] + 0.1, ev["done:guided"] + 0.3],   # l9 waits (its pause) for the cut to the sign-off
         ["cut", ev["done:guided"] + 2.6, ev["click:Sign them off"] - 1.4],
         [at["l9"] - 0.2, ev["click:Sign them off"]],
         [at["l11"] - 0.3, ev["approved:2"] + 0.9],
@@ -661,7 +700,7 @@ REQS = [   # competition requirement -> where the film covers it (scene ids or n
     ("The team: Vaibhav Jangid, Bhavya Dhoot. Each real photo, then the window's looks turn it into OpenCV line art (Canny, findContours, approxPolyDP); name cards without the private inputs", ["team"]),
     ("Problem and user, with sources on screen", ["problem"]),
     ("/api/health on the live site: opencv 5.0.0, aarch64, aws-lambda", ["l1"]),
-    ("The application working: the guided run on bridge_03 ('Watch it inspect a bridge'), recorded live, with what it missed", ["l2", "l3", "l4", "l5", "l6", "l7", "l8"]),
+    ("The application working: the guided run on bridge_03 ('Watch it inspect a bridge'), recorded live, with what it missed", ["l2", "l3", "l4", "l5", "l6", "l7"]),
     ("Plain-words trace (the NOTE and 'What it decided and why' panels)", ["l3", "l4", "l5", "l6", "l7"]),
     ("Human sign-off: reviewer name, Approve, APPROVED stamp, work order signed", ["l9"]),
     ("Human control: a tampered work-order token refused (403)", ["l11"]),
@@ -670,13 +709,13 @@ REQS = [   # competition requirement -> where the film covers it (scene ids or n
     ("Honesty: no LLM runs in the live demo; the drill planners are scripted", ["b4"]),
     ("An LLM driving the OpenCV tools over MCP: IoU 0.00 at call 6 -> human; IoU 0.72 at call 18 -> confirmed; call 20 budget", ["mcp"]),
     ("Architecture: docs/agent-loop.svg, public/docs/aws-simple.svg, docs/architecture.png (AWS path and OpenCV layer)", ["arch"]),
+    ("The recording ran the classical engine; the live site now runs the trained segmenter v1 on OpenCV 5 DNN ENGINE_NEW, and its Lambda step p95 (video/live/aws-smoke.log)", ["a4", "a5"]),
     ("Principal results: recall vs pixels, with one downscale, the tiling family and chance", ["r1", "r3"]),
-    ("Larger photos (4608 px): beats one downscale (which reads far fewer pixels), L2 tiling matches it with fewer pixels", ["r4"]),
     ("Ablations (public/results/ablations.json)", ["r5"]),
     ("Real photos (CODEBRIM), said plainly weak; no CODEBRIM image shown", ["r6"]),
     ("False alarms on synthetic photos with no damage (public/results/clean/summary.json)", ["r7"]),
-    ("Trained segmenter: 'results pending' until public/results/codebrim_dacl10k/summary.json exists", ["r8"]),
-    ("A real photo of our own (painted plaster wall, no ground truth): the looks, the findings, what it missed or got wrong (video/live/real.*)", ["real"]),
+    ("Trained segmenter v1, held out (results/heldout_models.json): CODEBRIM recall against the classical engine, its chance recall, critical boxes, the clean set", ["r8", "r7"]),
+    ("Two real photos of our own (painted walls, no ground truth): the looks, the findings, what it missed (video/live/real.*, video/live/variants/IMG_2330/real.*)", ["real"]),
     ("Failure cases: failures.json plates and their rules; one CODEBRIM case in words only", ["failures"]),
     ("Limits and responsible use", ["limits"]),
     ("Reproduce: make test, make eval, scripts/aws.sh", ["repro"]),
@@ -737,16 +776,6 @@ def measure(L):
     return layout(L, {l["id"]: by_text[l["say"]] for l in L})
 
 
-def standin_summary(path):
-    """The trained-segmenter stand-in: the classical CODEBRIM summary relabelled as an ONNX run on the same machine's
-    '-dacl10k' cost table, so every check data() makes on the real one runs on it."""
-    c = load("public/results/codebrim/summary.json")
-    fake = {**c, "segmenter": "onnx:stand-in.onnx", "leakage": {"near_duplicates": 0},
-            "cost_model": {**c["cost_model"], "source": c["cost_model"]["source"].replace("/micro.json", "-dacl10k/micro.json", 1)}}
-    path.parent.mkdir(parents=True, exist_ok=True); path.write_text(json.dumps(fake))
-    return fake
-
-
 # what the team sees in each stand-in photo, by eye (not ground truth): the crack lines in L0 px, traced on the photo
 STANDIN_RUNS = {
     "IMG_2332": {"say": "the hairline crack", "classes": ["crack"],
@@ -774,27 +803,21 @@ def make_standin():
 
 
 def check_template(narration_lines):
-    """Every pending piece switched on at its full length: the trained-segmenter line on a stand-in summary (the classical
-    CODEBRIM numbers relabelled as an ONNX run), and the real-photo chapter on each stand-in trace (or the owner's
-    video/live/real.* and video/live/variants/*/real.*). The line must switch on and pass every check, the film must fit the 5-minute cap with the
-    longest of them, and a summary charged another machine's costs must be refused."""
-    tmp = WORK / "template-check"
-    fake = standin_summary(tmp / "summary.json")
-    reals = ([VIDEO / "live", *sorted((VIDEO / "live/variants").glob("*"))] if (VIDEO / "live/real.json").exists()
-             else [STANDIN, *sorted((STANDIN / "variants").glob("*"))])
-    worst = None
-    for base in reals:
-        D = data(tmp / "summary.json", real=base)
-        L = narration_lines(D)
-        r8 = next(l for l in L if l["id"] == "r8")
-        assert "pending" not in r8["say"] and "governor off" in r8["say"].lower() and "same cost table" in r8["say"], r8
-        q = [l for l in L if l["scene"] == "real"]
-        _, _, total = measure(L)
-        print(f"real-photo run {base.relative_to(ROOT) if base.is_relative_to(ROOT) else base}: {'; '.join(l['say'] for l in q) or 'absent (no trace or no photo): not measured'}")
-        print(f"  the film runs {total:.1f} s (cap 300)")
-        worst = max(worst or 0, total)
-    print("r8 say:", r8["say"], "\nr8 cap:", r8["cap"])
-    (tmp / "summary.json").write_text(json.dumps({**fake, "cost_model": {**fake["cost_model"], "source": "results/some-other-machine/micro.json"}}))
+    """The film with every piece on, at full length: the trained segmenter's published summary and every real-photo run
+    (the owner's video/live/real.* and video/live/variants/*/real.*). The r8 line must switch on and pass every check, the
+    film must fit the 5-minute cap, and a summary charged a cost table timed on another machine must be refused."""
+    tmp = WORK / "template-check"; tmp.mkdir(parents=True, exist_ok=True)
+    D = data()
+    L = narration_lines(D)
+    r8 = next(l for l in L if l["id"] == "r8")
+    assert "pending" not in r8["say"] and D.get("model"), r8
+    _, _, total = measure(L)
+    for l in L:
+        if l["scene"] in ("real", "results"):
+            print(f"{l['id']}: {l['say']}")
+    print(f"the film runs {total:.1f} s (cap 300)")
+    s = json.loads(MODEL.read_text())
+    (tmp / "summary.json").write_text(json.dumps({**s, "cost_model": {**s["cost_model"], "source": "results/some-other-machine/micro.json"}}))
     try:
         data(tmp / "summary.json")
     except SystemExit as e:
@@ -802,9 +825,8 @@ def check_template(narration_lines):
     else:
         sys.exit("a summary charged another machine's cost table was accepted")
     shutil.rmtree(tmp)
-    print(f"with every pending piece on, the longest film runs {worst:.1f} s (cap 300)")
-    if worst > 300:
-        sys.exit("the pending pieces would take the film over 5 minutes: shorten the narration")
+    if total > 300:
+        sys.exit("the film would run over 5 minutes: shorten the narration")
 
 
 def main():
@@ -828,8 +850,7 @@ def main():
         return check_template(narration_lines)
     out = STANDIN / "film" if a.standin else PUB   # where the MP4, captions and poster go
     if a.standin:
-        standin_summary(STANDIN / "summary.json")
-        D = data(STANDIN / "summary.json", real=STANDIN)
+        D = data(reals=[STANDIN, *sorted((STANDIN / "variants").glob("*"))])
         D["standin"] = STANDIN_MARK
     else:
         D = data()
