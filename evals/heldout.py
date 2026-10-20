@@ -26,7 +26,8 @@ from evals import dev_sweep, harness
 REPO = harness.REPO
 RUNS = REPO / "runs" / "model-eval"
 MODELS = {"v1": ("onnx", "dacl10k"), "v2a": ("onnx-v2a", "dacl10k_v2a"), "v2b": ("onnx-v2b", "dacl10k_v2b"),
-          "classical-v1": ("classical", "dacl10k")}  # run folder prefix; the run_model.sh call that ran it
+          "v2c": ("onnx-v2c", "dacl10k_v2c"), "classical-v1": ("classical", "dacl10k")}  # run folder prefix; the
+# run_model.sh call that ran it
 SETS = {"codebrim": ("data/codebrim", 200, 7), "synth": ("data/synth200", 200, 7), "clean": ("data/synth_clean", 51, 11),
         "large": ("data/synth_large", 100, 7)}
 DEV_SETS = ("codebrim", "synth", "clean")  # held-out counterparts of the dev splits (real, synth_dev, clean) the choice read
@@ -34,6 +35,8 @@ KEYS, CAPS = ("downscale", "tiling@L0", "drishyam@0.3", "drishyam@1.0"), ("drish
 COMMANDS = [("runs/heldout/run_model.sh dacl10k local-macos-x86-dacl10k-retime (v1; also the classical clean and "
              "synth_large runs and v1 on synth_large)"), "runs/heldout/run_model.sh dacl10k_v2a local-macos-x86-dacl10k_v2a",
             "runs/heldout/run_model.sh dacl10k_v2b local-macos-x86-dacl10k_v2b",
+            ("runs/heldout/run_model.sh dacl10k_v2c local-macos-x86-dacl10k_v2c (later, after v2c's dev calibration, from "
+             "another worktree with the other models' run folders copied in unchanged)"),
             ("each: python -m evals.model_eval --publish --onnx models/drishyam_<tag>.onnx --costs <arm> --dacl10k <kagglehub "
             "dacl10k folder> --codebrim data/codebrim --workers 6, then python -m evals.harness --cost-model fixed --workers 6 "
             "--micro-arm <arm> --data data/synth_clean --n 51 --seed 11 --chaos 0,0,0 (as make eval-clean) with "
@@ -42,7 +45,9 @@ PRIOR = ("v1 had been scored on two of these sets before, once each, on 2026-10-
          "(run started 14:07Z) and synth200 (00:52Z), with the agent of that day, before its dev profile, on its first cost "
          "table (results/local-macos-x86-dacl10k). The runs are in the main checkout's ignored runs/model-eval/. So for v1 "
          "these are second scorings; v2a and v2b had never been scored on any held-out set (no other run under runs/ or a "
-         "worktree carries these sets' sha256s with an ONNX segmenter).")
+         "worktree carries these sets' sha256s with an ONNX segmenter). Nor had v2c before its run here: its only "
+         "earlier jobs were the install's smoke jobs on three of the demo's bridge photos (the main checkout's "
+         "runs/model-smoke/), and no run folder under runs/ or a worktree names it.")
 NAMES = {"codebrim": "CODEBRIM eval200", "synth": "synth200", "large": "synth_large, 4608×3456", "clean": "clean"}
 r4 = lambda x: round(float(x), 4) if isinstance(x, (float, np.floating)) else x
 
@@ -222,9 +227,10 @@ def main(argv=None) -> dict:
     if missing := [f"{m} {s}" for m in MODELS for s in DEV_SETS if f"{m} {s}" not in runs]:
         statement = f"Incomplete, no verdict on the dev choice yet: not run yet: {', '.join(missing)}."
     out = {
-        "what": ("The one held-out evaluation of the trained segmenters (dacl10k v1, v2a, v2b) and the classical engine, each "
-                 "at its profile (drishyam.agent.PROFILES, unchanged) and charged the cost table the dev comparison charged "
-                 "it, each held-out set scored once per model. Nothing was tuned on these numbers."),
+        "what": ("The one held-out evaluation of the trained segmenters (dacl10k v1, v2a, v2b, v2c) and the classical engine, "
+                 "each at its profile (drishyam.agent.PROFILES, unchanged) and charged the cost table the dev comparison "
+                 "charged it, each held-out set scored once per model. Nothing was tuned on these numbers. v2c was "
+                 "scored later than the others, after its own dev calibration; the others' runs were not repeated."),
         "criterion": ("The dev comparison's criterion (results/dev/model_choice_dev.json), unchanged, on the held-out "
                       "counterparts of its splits: recall at the 30 % cap on CODEBRIM eval200 (for dev100) and synth200 (for "
                       "synth_dev), and false alarms at the 30 % cap on the clean set synth_clean (for the clean dev split). "

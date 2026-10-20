@@ -694,6 +694,18 @@ def test_heldout_docs_quote_the_json():
     assert all(f"({crit[0]:.2f} against {crit[1]:.2f} and {crit[2]:.2f}" in d for d in (report, readme))
     assert clean == {"v1": 0, "v2a": 9, "v2b": 9} and "a box on 9 of the 51 clean photos" in report
     assert leak["candidates"] == 0 and f"0 candidates of {leak['eval_images']} against {leak['train_images']:,}" in readme
+    # v2c, scored last: its losses are quoted as plainly as v1's gains
+    c, cl = t["codebrim@0.3"]["v2c"], t["clean@0.3"]["v2c"]
+    sv = lambda m: p[f"synth@0.3: {m} / v2c"]["recall"]
+    d, crit_v1 = p["clean@0.3: v1 / v2c"]["boxes_per_photo_diff"], p["codebrim@0.3: v1 / v2c"]["critical"]
+    assert round(cl["images_with_any"] * 51) == 22 and all("a box on 22 of the 51" in x for x in (report, readme))
+    assert (f"({t['synth@0.3']['v2c']['recall']:.3f}; v1 ÷ v2c {sv('v1')[0]:.2f}×, {ci(sv('v1')[1])}; v2a ÷ v2c "
+            f"{sv('v2a')[0]:.2f}×, {ci(sv('v2a')[1])};") in report
+    assert f"v1 is {sv('v1')[0]:.2f}× it" in readme and f"{cl['boxes_per_image']:.2f} per photo" in readme
+    assert f"(v2c − v1 {-d[0]:+.2f}, CI {-d[1][1]:+.2f} to" in report and f"{-d[1][0]:+.2f}), though fewer" in report
+    assert f"{c['critical_per_image']:.2f} critical boxes per CODEBRIM photo" in report and f"({c['critical_per_image']:.2f} per CODEBRIM photo)" in readme
+    assert f"(v1 sends {crit_v1[0]:.2f}× as many, CI {ci(crit_v1[1])})" in report
+    assert out["verdicts"]["v1 vs v2c"] == {"codebrim": "same", "synth": "better", "clean_harm": False}
 
 
 # ---------------------------------------------------------------- parity
