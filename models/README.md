@@ -87,7 +87,7 @@ ImageNet starting point (timm `efficientnet_b2`) is Apache 2.0.
 
 ## Trained segmenter: `drishyam_dacl10k_v2c`
 
-Fine-tuned on dacl10k with `training/drishyam_dacl10k_kaggle_v2c.ipynb` (recipe v2, variant v2c: unet, timm `mobilenetv3_large_100` encoder) and installed
+Fine-tuned on dacl10k with `training/drishyam_dacl10k_colab_v2c.ipynb` (recipe v2, variant v2c: unet, timm `mobilenetv3_large_100` encoder) and installed
 2026-10-20 by `scripts/install_model.sh`. Input `(1, 3, H, W)` ImageNet-normalised RGB, output `(1, 6, H, W)`
 logits in `drishyam.segment.CLASSES` order (the 19 -> 6 merge is in the graph); `DRISHYAM_ONNX` / `DRISHYAM_ONNX_FP16`
 select it (`training/README.md`).

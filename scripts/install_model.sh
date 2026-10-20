@@ -176,6 +176,8 @@ enc = flags.get("encoder", "tu-mobilenetv3_large_100").removeprefix("tu-")
 if flags.get("recipe") == "v2":
     variant = flags.get("variant") or "v2"
     nb = "drishyam_dacl10k_kaggle.ipynb" if variant in ("v2", "v2a") else f"drishyam_dacl10k_kaggle_{variant}.ipynb"
+    if flags.get("out", "").startswith("/content/"):  # a Colab run (its Drive mount)
+        nb = f"drishyam_dacl10k_colab_{variant}.ipynb"
     made = (f"Fine-tuned on dacl10k with `training/{nb}` (recipe v2, variant {variant}: {flags['arch']}, timm `{enc}` "
             "encoder)")
 else:
