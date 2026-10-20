@@ -1390,9 +1390,15 @@ def test_contract_fields_in_words(browser, base):
         'class change: spalling at L1, corrosion at L0 (same place, iou 0.62)', 'ambiguous: crack 5232 px (>= A_min 64) is mostly inside spalling f2; recorded as spalling only']
         .map((reason) => m.reviewKind({ reason }));
       const unseen = m.brief({ step: 2, cause: 'best-score', rationale: 'argmax score 4.1e-03: prior 0.81, severity 1 (not seen yet), uncertainty 0.00, unseen 1.00, t_hat 61 ms; lambda 3.0e-03' });
-      return { kinds, unseen }; }""")
+      const finest = ['entropy 0.62 > 0.5, crack, exposed_rebar drafted here', 'exposed_rebar area 40 px < A_min 64, exposed_rebar not drafted']
+        .map((saw) => m.brief({ step: 3, cause: 'best-score', rationale: `new crack mask at L1; L1 is the finest level for onnx:drishyam_dacl10k.onnx (min_view 0.3): ${saw}; no finer look` }));
+      return { kinds, unseen, finest }; }""")
     assert said["kinds"] == ["critical", "disagree", "unconfirmed", "class-change", "ambiguous"], said["kinds"]  # a trace recorded before `kind`
     assert "severity 1 (the default: no look has shown it yet)" in said["unseen"], said["unseen"]
+    for f in said["finest"]:  # the v1 engine's held verify (agent.py), in words: no profile name, no min_view
+        assert "is the finest this engine looks (every look spans at least 30" in f and not re.search(r"\b\w+_\w+\b", f), f
+    assert "unsure what it saw (0.62, over 0.5), it drafts crack, exposed rebar here" in said["finest"][0], said["finest"][0]
+    assert "the exposed rebar is tiny (40 px, under 64 px), the exposed rebar is not drafted" in said["finest"][1], said["finest"][1]
     s.to(".win--findings")
     s.shot("desktop-contract-findings.png")
     s.check_clean()

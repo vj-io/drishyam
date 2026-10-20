@@ -147,6 +147,15 @@ const CLAUSES = [
   [/^confirming at L(\d)$/, (m) => `so it double-checks at ${scale(m[1])}`],
   [/^new (\w+) mask not verified: L(\d) is the finest level for \S+ \(min_view ([\d.]+)\), no finer look$/, (m) => `a new ${words(m[1])}, `
     + `not double-checked: ${size(+m[2])} is the finest this engine looks (every look spans at least ${pct(m[3])} of the photo’s long side), so there is no finer look to confirm it`],
+  [/^L(\d) is the finest level for \S+ \(min_view ([\d.]+)\): ([^,]+), (.+)$/, (m) => {  // agent.py: a verify the finest level rules out
+    let x;
+    const saw = (x = m[3].match(/^entropy ([\d.]+) > ([\d.]+)$/)) ? `it was unsure what it saw (${x[1]}, over ${x[2]})`
+      : (x = m[3].match(/^(\w+) area (\d+) px < A_min (\d+)$/)) ? `the ${words(x[1])} is tiny (${x[2]} px, under ${x[3]} px)` : m[3];
+    const kept = (x = m[4].match(/^(.+) drafted here$/)) ? `it drafts ${words(x[1])} here`
+      : (x = m[4].match(/^(\w+) not drafted$/)) ? `the ${words(x[1])} is not drafted` : m[4] === 'no class' ? 'nothing is drafted' : m[4];
+    return `${size(+m[1])} is the finest this engine looks (every look spans at least ${pct(m[2])} of the photo’s long side): ${saw}, ${kept}`;
+  }],
+  [/^no finer look$/, () => 'and there is no finer look to confirm it'],
   [/^p95\(segment\) (\d+) ms > SLA (\d+) ms$/, (m) => `the segmenter got slow (${m[1]} ms, limit ${m[2]} ms)`],
   [/^model -> (\w+)$/, (m) => `so it switches to the ${m[1]} model`],
   [/^one level coarser/, () => 'so it looks one level coarser'],
