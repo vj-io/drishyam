@@ -192,7 +192,8 @@ def main(argv=None) -> dict:
                 raise SystemExit(f"{m} on {s} ran profiles {profiles}, not {dev['models'][m]['profile']}")
             prov = r["summary"]["provenance"]
             runs[f"{m} {s}"] = {"folder": f"runs/model-eval/{MODELS[m][0]}-{s}", "code_commit": starts.get(MODELS[m][1]),
-                                **{k: prov.get(k) for k in ("timestamp", "load_avg_start", "load_avg_end", "machine")}}
+                                "finished": prov["timestamp"],  # the harness takes its provenance at the end of a run
+                                **{k: prov.get(k) for k in ("load_avg_start", "load_avg_end", "machine")}}
         scored = {m: {k: harness.score_config(k, records, r["results"]) for k in KEYS} for m, r in got.items()}
         x = {m: {k: per_image(records, r["results"], k) for k in CAPS} for m, r in got.items()}
         for k in CAPS:
