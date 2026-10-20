@@ -78,15 +78,28 @@ V0 = 2.0
 # matching no ground truth), put 8 more boxes on 2 clean photos of 30 (12.40 per photo against 12.13), and any value in
 # [0.692, 0.703) gives the same dev rows, the upper edge a clean dev survey's entropy. Lower values lost recall (0.3:
 # x0.94 on synth_dev, CI 0.88-0.99); above 0.7 no dev recall moved and more clean photos held a box.
+# The retrained v2a model (drishyam_dacl10k_v2a.onnx) keeps v1's values: no candidate passed the rule stated before its
+# sweep (results/dev/onnx_v2a_profile_sweep.json: a recall gain over them at the 30 % cap on synth_dev and on CODEBRIM
+# dev100, each paired 95 % CI above 1, with no more clean false alarms by the same standard). Against them, any level
+# (min_view 0) found x1.01 on synth_dev (CI 0.97-1.05) and x0.79 on CODEBRIM (0.70-0.88); 0.15 x1.01 and x1.02
+# (0.95-1.10) at 2.2x the boxes on CODEBRIM; absorption on x0.98 (0.94-1.00) and x0.89 (0.82-0.95).
+# The v2b model (drishyam_dacl10k_v2b.onnx, an EfficientNet-B2 UNet) keeps them too, under the same rule stated before
+# its sweep (results/dev/onnx_v2b_profile_sweep.json): no candidate found more on synth_dev (x1.00, CI 0.97-1.03 or
+# narrower). On CODEBRIM any level found x0.66 (0.56-0.77), absorption on x0.84 (0.75-0.91), 0.15 x0.98 (0.90-1.06) at
+# 2.4x the boxes.
 PROFILES = {
     "classical-v1": {"min_view": 0.0, "absorb": True},
     "onnx:drishyam_dacl10k.onnx": {"min_view": 0.3, "absorb": False},
+    "onnx:drishyam_dacl10k_v2a.onnx": {"min_view": 0.3, "absorb": False},
+    "onnx:drishyam_dacl10k_v2b.onnx": {"min_view": 0.3, "absorb": False},
 }
 
 
 # The weights each ONNX profile was chosen with (the file's sha256): the same file name with other weights (a retrained
 # model installed as models/drishyam_dacl10k.onnx) was not measured, so it gets classical-v1.
-WEIGHTS = {"onnx:drishyam_dacl10k.onnx": "c49416c10087f3c1baa8443b53fc839a3d8eb227ff27a1b4f7be1da964d6ed4a"}
+WEIGHTS = {"onnx:drishyam_dacl10k.onnx": "c49416c10087f3c1baa8443b53fc839a3d8eb227ff27a1b4f7be1da964d6ed4a",
+           "onnx:drishyam_dacl10k_v2a.onnx": "95b503c2d205567c09b19154ff77a5117889b7aba0b19733ed1c178dc4ab1ad1",
+           "onnx:drishyam_dacl10k_v2b.onnx": "47e4b687d179efc9d221ef05eca441d24b0f025f9ab252c0a60c64455ff99207"}
 
 
 def profile_for(segmenter) -> str:

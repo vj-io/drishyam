@@ -290,6 +290,37 @@ governor's `warp-spike` override shrank (512, 384, 288, then 256 px) does not mo
 3000-px photo an L1 look at 384 px spans 0.256 of the side. The dev runs had neither (no replay, governor off).
 The ONNX values were chosen on the dev splits only (`results/dev/onnx_profile_sweep.json`).
 
+`onnx:drishyam_dacl10k_v2a.onnx`, the retrained v2a model (sha256 `95b503c2...`), keeps v1's values (`min_view` 0.3,
+absorption off), so its finest levels are v1's. The rule written down before its dev sweep asked for higher recall
+than v1's values at the 30 % cap on both synth_dev and CODEBRIM dev100 (each paired 95 % CI above 1), with no more
+false alarms on the clean dev split by the same standard; none of the five candidates met it
+(`results/dev/onnx_v2a_profile_sweep.json`). Any level (`min_view` 0) and absorption on each lost recall on CODEBRIM
+(x0.79, CI 0.70-0.88; x0.89, 0.82-0.95), and 0.15 found x1.02 (0.95-1.10) with 2.2 times the boxes.
+
+`onnx:drishyam_dacl10k_v2b.onnx`, the retrained v2b model (an EfficientNet-B2 UNet, sha256 `47e4b687...`), keeps
+v1's values too, under the same rule, also written down before its sweep (`results/dev/onnx_v2b_profile_sweep.json`).
+No candidate found more than v1's values on synth_dev (each x1.00, CI 0.97-1.03 or narrower), so none could pass.
+On CODEBRIM dev100 any level lost recall (x0.66, CI 0.56-0.77), as did absorption on (x0.84, 0.75-0.91), and 0.15
+found x0.98 (0.90-1.06) with 2.4 times the boxes. Any level, 0.15 and 0.25 put a box on fewer clean photos (5 of
+30 against 13, difference CI -0.43 to -0.10), which the rule reports but does not count. Any level and 0.15 also ran
+into the 20 s time cap on 66 to 80 of the 100 CODEBRIM jobs, because v2b's cost table was timed at a higher machine
+load than v2a's; on synth_dev, which settled the decision, no job went past 13.3 s.
+
+Which model the live engine should run was compared on the same dev splits, each model at its own profile and on
+its own cost table (`results/dev/model_choice_dev.json`, its criterion committed before any v2b row existed). No
+model is best by that criterion. At the 30 % cap the three ONNX models find the same share of CODEBRIM dev100's
+defects (v2b 0.480, v2a 0.480, v1 0.479; every pairwise CI spans 1, e.g. v2b against v1 x1.00, 0.93-1.09), where the
+same number of boxes at random positions finds 0.24, 0.27 and 0.23 (IoU-only 0.26, 0.24 and 0.27 against 0.06,
+0.07 and 0.07). On synth_dev no pair differs measurably (0.565, 0.630, 0.615). Each finds about three times what the
+classical engine finds on CODEBRIM (0.153; v1 x3.13, CI 2.37-4.31). They differ in false alarms on the 30 clean
+photos: v1 put a box on 1, v2a on 5, v2b on 13, and v2a and v2b each put measurably more boxes on them than v1
+(+0.67 and +1.23 per photo). v1 sends more critical boxes to the human gate on CODEBRIM (7.24 per photo against
+4.22 and 3.94), and its modelled ms per CODEBRIM job are 1.05 times v2a's (CI 1.03-1.08; both tables were timed in
+one window). On dev only, the recommendation is v1 for the live engine, which runs the classical engine today: it
+is the one model with no measurable loss against any other, at 2.00 times the classical engine's modelled ms per
+CODEBRIM job on this Mac (CI 1.89-2.11). v2b's ms there are about 2.5 times v2a's, but timed in one window a v2b
+look costs 0.87 to 1.04 times a v2a look: its table was timed at a higher machine load. No held-out set was run.
+
 Three `JobConfig` knobs from the tuning dev sweep (`results/dev/tune_sweep.json`) are off by default: measured, not
 adopted. `tau_scout`, when set, is the entropy threshold of a look at L2 or coarser; `tau` (0.5) stays that of every
 finer look, and an `entropy>tau` rationale names the threshold that applied (`"entropy 0.74 > 0.7 at L2"`). Unset
