@@ -729,8 +729,12 @@ input:checked + .switch__ui::after { transform: translateX(22px); background: va
 .loop__hint { display: none; }  /* phones only: the drawing is too dense to read at 375 px, so it opens full size */
 .aws__img { display: block; width: 100%; max-width: 360px; height: auto; margin-inline: auto; }
 .guards__llm { margin-top: 18px; }
-.video { margin: 0; }
+.video { display: grid; gap: 10px; margin: 0; }
+.video__cap { font: 500 13px/1.6 var(--f-mono); color: var(--line-2); }
+.video__cap b { color: var(--line); }
+.video__cap .win__fig { margin-right: 6px; }
 .video video { display: block; width: 100%; height: auto; border: 2.5px solid var(--line); background: var(--deep); }
+.video video:focus-within { outline: 2.5px solid var(--amber); outline-offset: 3px; }  /* Tab also stops on its own controls (shadow DOM), where neither :focus nor :focus-visible matches the element */
 
 /* ---------- footer ---------- */
 .footer { max-width: var(--max); margin: 0 auto; padding: 18px var(--gutter) 72px; }

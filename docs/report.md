@@ -83,8 +83,12 @@ the triage of a backlog may cost. **Judges** need a trace in which an OpenCV out
 failure drills they can trigger, a live endpoint and honest failure cases. The **operator** who pays for the AWS
 account needs caps, a budget alert and one command that stops all spending.
 
+The narrated submission film (4 minutes, captions on) has its player on the site's Docs and links sheet (the MP4
+goes to the site bucket at deploy, not into git); `video/plan.md` says how it is built and where each number in it
+comes from.
+
 Not built yet: approval from an SNS email link (approval is the web review or `drishyam review`); the COOL
-benchmark (section 6); the 5-minute video; delivery of alarms and budget alerts (the SNS topic's one email
+benchmark (section 6); delivery of alarms and budget alerts (the SNS topic's one email
 subscription awaits confirmation, section 5); a budget stop action or auto-stop schedule (the stop is `scripts/aws.sh stop`); a live LLM planner (the
 drills use scripted planners, section 3). Dropped: the Hugging Face Space mirror; the demo runs only on AWS.
 

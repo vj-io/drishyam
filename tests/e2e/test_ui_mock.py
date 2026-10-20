@@ -21,11 +21,12 @@ Scenarios (a real Chromium, the document served with the production CSP header):
      the recap in view, hand-off to the reviewer, and Try KILL (planner_timeout, shown live) halted by KILL.
   4. photo, NOTE and newest trace line on one screen (1440x900; 375x812 with the crop, never over the photo, and the replay label),
   5. keyboard only, 6. KILL after the job had finished, 7. mobile 375 px, 8. prefers-reduced-motion,
-  9. heading names, 10. pending states (no video, no results), 11. halt governor note, 12. planner_status chip,
+  9. heading names, 10. pending states (no results), 11. halt governor note, 12. planner_status chip,
   13. KILL before the first record (live, the operator switch before any look, recorded), 14. KILL the server never
   confirms, 15. the shared contract in words (review kinds, a class change, verify classes, seeded candidates and the
   severity they set, a floor-bound stop), 16. focus, contrast and repeats at 1440 and 375 px, 17. the phone tool row
-  at 320/360/375 px (no overlap, no shift when the crop shows).
+  at 320/360/375 px (no overlap, no shift when the crop shows), 18. the film's player: poster, captions loaded and on,
+  nothing of the MP4 fetched before Play, the hero link, and inside 375 px.
 Any CSP violation, console error or page error fails the run. wait_for_function is avoided on purpose
 (it is blocked by a strict CSP): every wait uses locators or polls page.evaluate.
 """
@@ -464,7 +465,11 @@ def test_static_csp_hygiene():
     assert 'id="stat-real"' in html, "WS3 fills the #stat-real hero slot"
     assert html.count('property="og:image"') == 1 and '<meta name="twitter:card" content="summary_large_image">' in html, "one share card"
     assert all(f'property="og:{k}"' in html for k in ("title", "type", "url", "image:width", "image:height", "image:alt")), "the Open Graph basics"
-    assert ".mp4" not in html, "no video link until the commit that ships video/drishyam.mp4 adds the player as static markup"
+    vids = re.findall(r"<video\b[^>]*>.*?</video>", html, re.DOTALL)   # the film: static markup, nothing fetched before Play
+    assert len(vids) == 1 and re.search(r'<video controls preload="none" poster="video/poster.jpg"', vids[0]), vids
+    assert '<source src="video/drishyam.mp4" type="video/mp4">' in vids[0], vids[0]
+    assert '<track kind="captions" src="video/drishyam.vtt" srclang="en" label="English" default>' in vids[0], vids[0]
+    assert (PUBLIC / "video/drishyam.vtt").read_text().startswith("WEBVTT") and (PUBLIC / "video/poster.jpg").stat().st_size, "captions and poster are in git"
     print("ok  static CSP hygiene")
 
 
@@ -517,8 +522,8 @@ def test_desktop_mock(browser, base):
     expect(p.locator("#t-bench-cool")).to_have_text("COOL on Graviton: not run")  # FIG. 4.3 and the banner say why, nothing pending
     expect(p.locator("#bench-cool")).to_contain_text("The COOL Marketplace AMI could not be subscribed")
     expect(p.locator("#cool-status")).to_contain_text("COOL on Graviton: not run, because its Marketplace AMI could not be subscribed")
-    expect(p.locator("#video")).to_be_hidden()                    # no video shipped yet: no player, no link
-    expect(p.locator("#video-link")).to_be_hidden()
+    expect(p.locator("#video video")).to_be_attached()            # the film's player (static markup; test_video_player)
+    expect(p.locator("#video-link")).to_be_visible()
     p.keyboard.press("Tab")
     outline = p.evaluate("(() => { const s = getComputedStyle(document.activeElement); return s.outlineStyle + ' ' + s.outlineWidth; })()")
     assert outline.startswith("solid"), f"no visible keyboard focus: {outline}"
@@ -1079,8 +1084,8 @@ def test_pending_states(browser, base):
     expect(p.locator("#t-bench-cool")).to_have_text("COOL on Graviton: not run")   # static: it does not wait for a file
     expect(p.locator("#bench-cool")).to_contain_text("The COOL Marketplace AMI could not be subscribed")
     expect(p.locator("#cool-status")).to_contain_text("COOL on Graviton: not run, because its Marketplace AMI could not be subscribed")
-    expect(p.locator("#video")).to_be_hidden()                    # no video shipped yet: no player, no link
-    expect(p.locator("#video-link")).to_be_hidden()
+    expect(p.locator("#video video")).to_be_attached()            # static: the film does not wait for a data file
+    expect(p.locator("#video-link")).to_be_visible()
     expect(p.locator("#gallery-empty")).to_be_visible()
     expect(p.locator("#say-1")).to_contain_text("Drop your own JPEG or PNG")
     expect(p.locator("#state-1")).to_have_text("Waiting")
@@ -1093,6 +1098,40 @@ def test_pending_states(browser, base):
     s.check_clean()
     s.context.close()
     print("ok  pending states: friendly empty states, no errors")
+
+
+def test_video_player(browser, base):
+    """The film in the footer: its poster, the English captions loaded and showing (every cue of
+    public/video/drishyam.vtt), no request for the MP4 before Play (preload="none"), the hero link going to it, and the
+    player inside the page at 375 px with no horizontal scroll."""
+    vtt = (PUBLIC / "video/drishyam.vtt").read_text()
+    n_cues, first = vtt.count(" --> "), vtt.split(" --> ", 1)[1].split("\n", 2)[1]
+    for size, phone in (({"width": 1440, "height": 900}, False), ({"width": 375, "height": 812}, True)):
+        check_player(browser, base, size, phone, n_cues, first)
+    print(f"ok  film player: poster, {n_cues} English caption cues showing, no MP4 request before Play, hero link, inside 375 px")
+
+
+def check_player(browser, base, size, phone, n_cues, first):
+    s = Session(browser, f"video-{size['width']}", viewport=size, is_mobile=phone, has_touch=phone)
+    p = s.page
+    media = []
+    p.on("request", lambda r: r.url.endswith(".mp4") and media.append(r.url))
+    p.goto(f"{base}/")
+    p.locator("#video-link").click()
+    until(lambda: p.evaluate("Math.abs(document.getElementById('video').getBoundingClientRect().top) < innerHeight"), "the hero link to reach the film")
+    v = p.locator("#video video")
+    expect(v).to_be_visible()
+    until(lambda: v.evaluate("v => v.poster.endsWith('video/poster.jpg')"), "the poster")
+    until(lambda: v.evaluate("v => v.textTracks.length === 1 && (v.textTracks[0].cues?.length || 0)") == n_cues, f"{n_cues} caption cues", page=p)
+    track = v.evaluate("v => { const t = v.textTracks[0]; return [t.kind, t.language, t.label, t.mode, t.cues[0].text]; }")
+    assert track == ["captions", "en", "English", "showing", first], track
+    assert v.evaluate("v => v.preload") == "none" and not media, f"the MP4 was fetched before Play: {media}"
+    box, sw = v.bounding_box(), p.evaluate("document.documentElement.scrollWidth")
+    assert box["x"] >= 0 and box["x"] + box["width"] <= size["width"] and sw <= size["width"], f"player outside the page at {size}: {box}, scrollWidth {sw}"
+    assert abs(box["width"] / box["height"] - 16 / 9) < 0.03, f"the player is not 16:9: {box}"
+    s.shot(f"video-{size['width']}.png")
+    s.check_clean()
+    s.context.close()
 
 
 def test_halt_governor_note_and_critical_trigger(browser, base):
@@ -1465,6 +1504,7 @@ if __name__ == "__main__":
             test_reduced_motion(browser, base)
             test_heading_names(browser, base)
             test_pending_states(browser, base)
+            test_video_player(browser, base)
             test_halt_governor_note_and_critical_trigger(browser, base)
             test_planner_status_shows_the_fallback_chip(browser, base)
             test_kill_before_the_first_record(browser, base)

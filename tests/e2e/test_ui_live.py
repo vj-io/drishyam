@@ -58,6 +58,8 @@ class Page:
         self.page.on("console", lambda m: m.type == "error" and self.errors.append(m.text))
         self.page.on("pageerror", lambda e: self.errors.append(str(e)))
         self.page.on("request", lambda r: "/api/" in r.url and self.requests.append(r.url))
+        self.media = []
+        self.page.on("request", lambda r: r.url.endswith(".mp4") and self.media.append(r.url))
         self.missing = []
         self.page.on("response", lambda r: r.status in (403, 404) and self.missing.append(r.url))  # S3 behind OAC answers a missing file with 403
         self.page.goto(base + "/")
@@ -290,6 +292,22 @@ def run(base, server_log=None):
         assert sum("/api/jobs" in u for u in p.requests) == jobs
         p.clean()
         print("ok  real photos: the v1 runs replayed from their recordings (no server job), labelled, recap says what it flagged")
+
+        # 3c. The film: its poster and English captions load from this origin under the production CSP (every cue of
+        #     public/video/drishyam.vtt, showing); the MP4 is not fetched before Play (preload="none").
+        page.reload()
+        page.locator("#video-link").click()
+        v = page.locator("#video video")
+        expect(v).to_be_visible(timeout=15000)
+        n = (ROOT / "public/video/drishyam.vtt").read_text().count(" --> ")
+        for _ in range(100):
+            if v.evaluate("v => (v.textTracks[0] && v.textTracks[0].cues && v.textTracks[0].cues.length) || 0") == n:
+                break
+            page.wait_for_timeout(100)
+        assert v.evaluate("v => [v.textTracks[0].cues.length, v.textTracks[0].mode, v.poster.endsWith('video/poster.jpg')]") == [n, "showing", True]
+        assert not p.media, f"the MP4 was fetched before Play: {p.media}"
+        p.clean()
+        print(f"ok  film player: poster and {n} English caption cues under the CSP, no MP4 request before Play")
 
         # 4. Phone width: no horizontal scroll after a run.
         m = Page(browser, base, viewport={"width": 375, "height": 812}, is_mobile=True, has_touch=True)

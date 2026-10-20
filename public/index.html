@@ -74,7 +74,7 @@
         <button class="btn btn--amber btn--xl" id="guided" type="button"><span>Watch it inspect a bridge <span class="cta__time">(under 40 s)</span></span></button>
         <button class="btn btn--amber btn--xl" id="guided-real" type="button" hidden><span>Watch it on a real wall <span class="cta__time">(our own photo, recorded)</span></span></button>
         <a class="btn" id="own" href="#step-photo">Try your own photo</a>
-        <a class="cta__link" id="video-link" href="#video" hidden>Watch the video</a>
+        <a class="cta__link" id="video-link" href="#video">Watch the 4-minute film</a>
       </div>
       <p class="stakes">The US has 624,939 bridges (FHWA, 2026), and the rule is a routine inspection at intervals of up to 24 months (23 CFR 650.311). One drone inspection of a single bridge produced 2,536 photos. Someone has to look at every one. <a href="https://github.com/vj-io/drishyam/blob/main/docs/impact-sources.md" rel="noopener noreferrer">Sources</a></p>
       <ol class="claims" aria-label="How to use it">
@@ -642,7 +642,13 @@
   <div class="win">
     <div class="win__bar"><span class="win__fig" aria-hidden="true">END</span><h2 class="win__title" id="h-docs">Docs and links</h2></div>
     <div class="win__body stack">
-      <figure class="video" id="video" hidden></figure>
+      <figure class="video" id="video">
+        <figcaption class="video__cap"><span class="win__fig">FILM</span> <b>The submission film, 4 min, captions on.</b> The live demo on AWS, the failure drills and KILL, Claude driving the same tools over MCP, the results (held out for the trained segmenter), and two of our own wall photos: on one it missed the crack, on the other it found one of two. Narrated by an offline AI voice.</figcaption>
+        <video controls preload="none" poster="video/poster.jpg" width="1920" height="1080">
+          <source src="video/drishyam.mp4" type="video/mp4">
+          <track kind="captions" src="video/drishyam.vtt" srclang="en" label="English" default>
+        </video>
+      </figure>
       <p class="banner banner--honest"><b id="live-where">Live demo: stock OpenCV 5 on AWS Lambda (arm64) &mdash; not COOL.</b> <span id="cool-status">COOL on Graviton: not run, because its Marketplace AMI could not be subscribed from our AWS account (FIG. 4.3).</span></p>
       <nav aria-label="Project links">
         <ul class="links">
