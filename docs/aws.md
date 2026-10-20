@@ -207,7 +207,7 @@ A packaged model is used only when the deploy names it: `ONNX=models/drishyam_da
 deploy` (add `ONNX_FP16=models/drishyam_dacl10k.fp16.onnx` for the fast path) passes CDK context `onnx`
 (`onnx_fp16`), which sets the function's `DRISHYAM_ONNX` (`DRISHYAM_ONNX_FP16`) to that file under
 `/var/task`; `infra/app.py` refuses a path that is not in `build/lambda`. A deploy without `ONNX` runs the
-classical engine. Making the CC BY-NC 4.0 dacl10k model the live segmenter is an owner decision.
+classical engine. Since 2026-10-21 the live segmenter is v1, the CC BY-NC 4.0 dacl10k model (the owner's decision).
 
 ## Smoke
 

@@ -26,9 +26,9 @@ the share of labelled defects found at the 30 % pixel cap, with paired 95 % boot
   Of five segmenters compared on the dev splits only (four dacl10k-trained models and the classical engine), none
   was better than all the others and v1 was the only one with no measurable loss against any other
   ([results/dev/model_choice_dev.json](results/dev/model_choice_dev.json)). Scored once on the held-out sets, it is
-  again the only one ([results/heldout_models.json](results/heldout_models.json)). The deployed demo still runs the
-  classical engine: v1 goes live with one deploy (`ONNX=models/drishyam_dacl10k.onnx scripts/aws.sh deploy`), an
-  owner decision because its weights are CC BY-NC 4.0 ([docs/aws.md](docs/aws.md)).
+  again the only one ([results/heldout_models.json](results/heldout_models.json)). The deployed demo runs v1 since 2026-10-21
+  (commit 38fcaee, smoke-tested: [docs/aws.md](docs/aws.md)); its CC BY-NC 4.0 weights ship in the Lambda package,
+  not in git.
 - **What v1 gains, held out.** On 200 real CODEBRIM bridge photos it finds 0.49 of the defects (0.44–0.54) against
   the classical engine's 0.19, 2.54× (2.16–3.01). On 200 synthetic photos it finds 0.64 (0.61–0.67) against 0.48,
   1.34× (1.24–1.45). On 51 synthetic photos with no damage it puts no box anywhere, where the classical engine puts
@@ -42,7 +42,7 @@ the share of labelled defects found at the 30 % pixel cap, with paired 95 % boot
   classical engine finds 0.16 and 0.57. It had been scored once before on CODEBRIM and the synthetic set
   (unpublished), so these are second scorings. On one of our own wall photos it flagged nothing although a hairline
   crack is visible by eye ([report, section 9](docs/report.md#9-failures)).
-- **The classical engine** (no weights; the deployed demo and every policy comparison) does not let the agent beat
+- **The classical engine** (no weights; the deployed demo until 2026-10-21, and every policy comparison) does not let the agent beat
   the simple baselines. On the 200 synthetic photos at the 30 % cap the agent is 0.87× exhaustive tiling (0.81–0.93)
   at 0.16× its pixels, so the PRD hypothesis (at least 0.9× tiling's recall at no more than 0.3× its pixels) is not
   met, and 0.96× one 1024-px downscale (0.91–1.02). On the real photos it finds 0.19 of CODEBRIM's defects, 0.98×
@@ -152,9 +152,9 @@ COOL on Graviton was not run: the Marketplace AMI could not be subscribed from o
 
 | Built and tested here | Deployed on AWS (us-east-1) and smoke-tested | Not done |
 | --- | --- | --- |
-| Agent loop, governor, planner fallback, findings and human approval, privacy blur, MCP server, CLI, web API + UI, evaluation harness, benchmark scripts, dacl10k training notebook and ONNX export, CI on x86 and Arm | CDK stack: CloudFront + OAC + WAF, Lambda arm64 (Function URL, AWS_IAM), DynamoDB kill flags, Secrets Manager HMAC key, CloudWatch (EMF, 4 alarms, dashboard), X-Ray, Budget. The alarms and the budget publish to an SNS topic whose one email subscription awaits confirmation ([docs/aws.md](docs/aws.md)) | COOL three-arm benchmark (AMI subscription blocked); approval store (not built: the web demo is stateless and the signed `work_order.json` is the audit trail); v1, the dacl10k-trained segmenter chosen for the live engine (scored held out, not deployed: an owner decision, as its weights are CC BY-NC 4.0) |
+| Agent loop, governor, planner fallback, findings and human approval, privacy blur, MCP server, CLI, web API + UI, evaluation harness, benchmark scripts, dacl10k training notebook and ONNX export, CI on x86 and Arm | CDK stack: CloudFront + OAC + WAF, Lambda arm64 (Function URL, AWS_IAM), DynamoDB kill flags, Secrets Manager HMAC key, CloudWatch (EMF, 4 alarms, dashboard), X-Ray, Budget. The live segmenter is v1 (`onnx:drishyam_dacl10k.onnx`, since 2026-10-21). The alarms and the budget publish to an SNS topic whose one email subscription awaits confirmation ([docs/aws.md](docs/aws.md)) | COOL three-arm benchmark (AMI subscription blocked); approval store (not built: the web demo is stateless and the signed `work_order.json` is the audit trail) |
 
-- The live demo runs the classical evidence-map engine (`classical-v1`, no weights), so it needs no downloads. A dacl10k-trained ONNX model ([models/README.md](models/README.md)) runs on OpenCV 5 DNN `ENGINE_NEW` with `DRISHYAM_ONNX=/path/model.onnx` (see [training/](training/README.md); `ENGINE_CLASSIC` cannot import it, and a DeepLabV3+ export that failed parity on OpenCV 5.0.0 was dropped: [report, section 6](docs/report.md#6-opencv-5-implementation)); it is **not the live segmenter** (its held-out results are under Results), and its CC BY-NC 4.0 weights are not committed. So the live demo uses no OpenCV-5-only API.
+- The live demo runs v1, a dacl10k-trained ONNX model ([models/README.md](models/README.md)), on OpenCV 5 DNN `ENGINE_NEW` with `DRISHYAM_ONNX=/path/model.onnx` (see [training/](training/README.md); `ENGINE_CLASSIC` cannot import it, and a DeepLabV3+ export that failed parity on OpenCV 5.0.0 was dropped: [report, section 6](docs/report.md#6-opencv-5-implementation)). Its held-out results are under Results; its CC BY-NC 4.0 weights ship in the Lambda package and are not committed. Without `DRISHYAM_ONNX` the classical evidence-map engine (`classical-v1`, no weights) runs and needs no downloads.
 - Two samples are our own photos of a painted plaster wall (`public/samples/real_01.jpg`, `real_02.jpg`: labelled "REAL PHOTO (ours), painted plaster wall, no ground truth", no EXIF or GPS), and the site's **Watch it on a real wall** replays the v1 segmenter's recorded run on each (`real_0N.ndjson`, fixed costs from `results/local-macos-x86-dacl10k-retime/`). With no ground truth nothing is scored: on `real_02` it took one look and flagged one crack (a draft, not critical); on `real_01` it saw no region worth a look and flagged nothing, so it missed the hairline crack we see by eye: the overview proposed no candidate, so the segmenter never ran ([report, section 9](docs/report.md#9-failures)).
 - Measurements are image pixels. There are no millimetres and no safety ratings.
 - The web demo is stateless: the signed `work_order.json` is the audit trail. There is no approval database: the PRD's DynamoDB/SNS approval store was not built ([docs/security.md](docs/security.md), "Known limits").

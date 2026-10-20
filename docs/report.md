@@ -17,9 +17,8 @@ photos (section 8).
   segmenters were compared on the dev splits only: four dacl10k-trained models (v1, v2a, v2b, v2c) and the classical
   engine. None was better than all the others, and v1 was the only one with no measurable loss against any other
   (`results/dev/model_choice_dev.json`). Each was then scored once on the held-out sets, and held-out confirms the
-  dev choice (`results/heldout_models.json`). The deployed demo still runs the classical engine: v1 goes live with
-  one deploy (`ONNX=models/drishyam_dacl10k.onnx scripts/aws.sh deploy`), an owner decision because its weights are
-  CC BY-NC 4.0 ([aws.md](aws.md)).
+  dev choice (`results/heldout_models.json`). The deployed demo runs v1 since 2026-10-21 (commit 38fcaee,
+  smoke-tested: [aws.md](aws.md)); its CC BY-NC 4.0 weights ship in the Lambda package, not in git.
 - **What v1 gains, held out.** On 200 real CODEBRIM bridge photos it finds 0.49 of the defects (0.44–0.54) against
   the classical engine's 0.19, 2.54× (2.16–3.01). On 200 synthetic photos it finds 0.64 (0.61–0.67) against 0.48,
   1.34× (1.24–1.45). On 51 synthetic photos with no damage it puts no box anywhere, where the classical engine puts
@@ -33,7 +32,7 @@ photos (section 8).
   classical engine finds 0.16 and 0.57. It had been scored once before on CODEBRIM and the synthetic set
   (unpublished), so its held-out numbers are second scorings. On one of our own wall photos it flagged nothing
   although a hairline crack is visible by eye (section 9).
-- **The classical engine** (no weights; the deployed demo and every policy comparison below) does not let the agent
+- **The classical engine** (no weights; the deployed demo until 2026-10-21, and every policy comparison below) does not let the agent
   beat the simple baselines. On the 200 synthetic photos at the 30 % cap the agent is 0.87× exhaustive tiling
   (0.81–0.93) at 0.16× its pixels, so the PRD hypothesis (at least 0.9× tiling's recall at no more than 0.3× its
   pixels) is not met, and 0.96× one 1024-px downscale (0.91–1.02). On the real photos it finds 0.19 of CODEBRIM's
@@ -187,8 +186,8 @@ limits and the cost table, is [aws.md](aws.md).
 | Measure and verify | `morphologyEx` (hit-or-miss thinning), `findContours`, `minAreaRect`, `arcLength`, `approxPolyDP`; cross-level mask IoU through `warpPerspective` and `dilate` | `measure.py`, `agent.py` |
 
 Only one call is specific to OpenCV 5: the `engine=cv2.dnn.ENGINE_NEW` argument (`OnnxSegmenter._load` in `segment.py`), on the opt-in
-ONNX path, which `tests/test_segment.py` exercises with a tiny ONNX model. The live demo runs the classical engine,
-so it uses no OpenCV-5-only API; it runs on the stock OpenCV 5.0.0 wheel.
+ONNX path, which `tests/test_segment.py` exercises with a tiny ONNX model. The live demo runs v1 on that path (since
+2026-10-21), so it uses this one OpenCV-5-only API; it runs on the stock OpenCV 5.0.0 wheel.
 
 **What OpenCV 5's DNN module loaded, and what it did not.** The v1 model loads only on `ENGINE_NEW`:
 `ENGINE_CLASSIC` stops at the decoder's `Shape` node (`Assertion failed: !isDynamicShape in function 'parseShape'`)
@@ -478,7 +477,7 @@ boxes and exhaustive tiling 53.
 These numbers call for a trained segmenter. Four dacl10k-trained UNets exist ([training/](../training/README.md),
 [models/README.md](../models/README.md)): v1 (MobileNetV3-Large encoder), v2a (the same encoder, training recipe v2),
 v2b (EfficientNet-B2 encoder, recipe v2) and v2c (v2a's encoder and recipe with the rare classes weighted harder in
-the loss). None is the live segmenter. Which one the live engine should run was decided on the dev splits only
+the loss). Which one the live engine should run was decided on the dev splits only
 (`results/dev/model_choice_dev.json`, [API contract](api-contract.md)): v1, the one model with no measurable loss
 against any other. Each was then scored **once** on the held-out sets, at its dev-chosen profile
 (`drishyam.agent.PROFILES`, unchanged) and charged the cost table the dev comparison charged it (v1
@@ -704,7 +703,7 @@ notes the large spall it missed.
 - The classical engine's probabilities are a softmax over hand-built evidence scores; its confidence and entropy
   are not calibrated.
 - The policy comparison holds on synthetic images, but on 200 real CODEBRIM photos the **classical** segmenter caps
-  every policy at about 0.2 recall. The dacl10k models are trained but not deployed. Held out, v1 (the dev choice)
+  every policy at about 0.2 recall. Of the dacl10k models, v1 (the dev choice) is deployed since 2026-10-21. Held out, it
   finds 0.49 of CODEBRIM's defects at the 30 % cap against the classical engine's 0.19, with twice the critical boxes
   of the retrained models for the human gate, and its ms are modelled from x86 tables only (section 8).
 - The ablations show that at the 30 % cap the uncertainty term, the seeding and the governor change nothing
