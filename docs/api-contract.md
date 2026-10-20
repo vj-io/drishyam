@@ -327,7 +327,13 @@ photos: v1 put a box on 1, v2a on 5, v2b on 13, and v2a and v2b each put measura
 one window). On dev only, the recommendation is v1 for the live engine, which runs the classical engine today: it
 is the one model with no measurable loss against any other, at 2.00 times the classical engine's modelled ms per
 CODEBRIM job on this Mac (CI 1.89-2.11). v2b's ms there are about 2.5 times v2a's, but timed in one window a v2b
-look costs 0.87 to 1.04 times a v2a look: its table was timed at a higher machine load. No held-out set was run for
+look costs 0.87 to 1.04 times a v2a look: its table was timed at a higher machine load. v2c, compared later under the
+same criterion (five models; the reading of "each of the others" and v2c's own rule were committed before any v2c
+row), changes none of this. It finds no measurably different share on either split (CODEBRIM 0.462, synth_dev
+0.600; against v1 x0.97, CI 0.88-1.06, and x0.98, 0.90-1.04), puts a box on 12 of the 30 clean photos, measurably
+more boxes than v1 and v2a (+2.60 and +1.93 per photo), and has lower IoU-only recall than v1 on CODEBRIM (x0.85,
+0.72-0.99); it sends 3.83 critical boxes per CODEBRIM photo to the gate. Its ms on its own table are 1.36 times
+v2a's, but timed in one window a v2c look costs 0.99 times a v2a look. No held-out set was run for
 this choice; the one held-out evaluation that followed, which changed nothing here, is in
 `results/heldout_models.json` (report, section 8).
 
