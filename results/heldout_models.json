@@ -1,0 +1,3126 @@
+{
+ "what": "The one held-out evaluation of the trained segmenters (dacl10k v1, v2a, v2b) and the classical engine, each at its profile (drishyam.agent.PROFILES, unchanged) and charged the cost table the dev comparison charged it, each held-out set scored once per model. Nothing was tuned on these numbers.",
+ "criterion": "The dev comparison's criterion (results/dev/model_choice_dev.json), unchanged, on the held-out counterparts of its splits: recall at the 30 % cap on CODEBRIM eval200 (for dev100) and synth200 (for synth_dev), and false alarms at the 30 % cap on the clean set synth_clean (for the clean dev split). A is better than B on a set when the paired 95 % bootstrap CI of A's recall ratio to B lies wholly above 1, worse when wholly below; A harms against B on the clean set when the CI of its boxes-per-photo difference or of its difference in the share of photos with any box lies wholly above 0. The dev choice of v1 rested on v1 being the only model with no measurable loss against any other (where_each_loses), so that is what this checks.",
+ "dev_choice": {
+  "dev": "v1",
+  "best_held_out": [
+   "v1"
+  ],
+  "no_measurable_loss": [
+   "v1"
+  ],
+  "confirms": null,
+  "statement": "Incomplete, no verdict on the dev choice yet: not run yet: v2a codebrim, v2a synth, v2a clean, v2b codebrim, v2b synth, v2b clean."
+ },
+ "verdicts": {
+  "v1 vs classical-v1": {
+   "codebrim": "better",
+   "synth": "better",
+   "clean_harm": false
+  },
+  "classical-v1 vs v1": {
+   "codebrim": "worse",
+   "synth": "worse",
+   "clean_harm": true
+  }
+ },
+ "where_each_loses": {
+  "v1": [],
+  "v2a": [],
+  "v2b": [],
+  "classical-v1": [
+   "codebrim@0.3 recall x0.394 (CI 0.33-0.46) against v1",
+   "codebrim@0.3 IoU-only recall x0.315 (CI 0.24-0.40) against v1",
+   "codebrim@1.0 recall x0.444 (CI 0.38-0.52) against v1",
+   "codebrim@1.0 IoU-only recall x0.389 (CI 0.30-0.48) against v1",
+   "synth@0.3 recall x0.748 (CI 0.69-0.81) against v1",
+   "synth@0.3 IoU-only recall x0.682 (CI 0.62-0.75) against v1",
+   "synth@1.0 recall x0.856 (CI 0.80-0.91) against v1",
+   "synth@1.0 IoU-only recall x0.767 (CI 0.71-0.83) against v1",
+   "clean@0.3 +7.078 boxes per clean photo (CI +4.628 to +9.589) against v1",
+   "clean@0.3 +0.667 share of clean photos with a box (CI +0.529 to +0.784) against v1",
+   "clean@1.0 +10.902 boxes per clean photo (CI +7.019 to +14.902) against v1",
+   "clean@1.0 +0.706 share of clean photos with a box (CI +0.569 to +0.824) against v1"
+  ]
+ },
+ "other_measurable_costs": {
+  "v1": [
+   "codebrim@0.3 critical boxes per photo x5.549 (CI 3.57-8.82) against classical-v1",
+   "codebrim@0.3 modelled ms per job x1.990 (CI 1.92-2.06) against classical-v1",
+   "codebrim@1.0 critical boxes per photo x4.096 (CI 2.73-6.20) against classical-v1",
+   "codebrim@1.0 modelled ms per job x1.226 (CI 1.17-1.29) against classical-v1",
+   "synth@0.3 modelled ms per job x5.097 (CI 5.02-5.17) against classical-v1",
+   "synth@1.0 modelled ms per job x3.358 (CI 3.23-3.48) against classical-v1",
+   "clean@0.3 modelled ms per job x4.713 (CI 4.38-4.99) against classical-v1",
+   "clean@1.0 modelled ms per job x3.353 (CI 3.14-3.58) against classical-v1"
+  ],
+  "v2a": [],
+  "v2b": [],
+  "classical-v1": [
+   "synth@0.3 critical boxes per photo x1.981 (CI 1.52-2.57) against v1",
+   "synth@1.0 critical boxes per photo x2.939 (CI 2.24-3.84) against v1"
+  ]
+ },
+ "synth_large": {
+  "where_each_loses": {
+   "v1": [],
+   "v2a": [],
+   "v2b": [],
+   "classical-v1": [
+    "large@0.3 recall x0.774 (CI 0.70-0.85) against v1",
+    "large@0.3 IoU-only recall x0.691 (CI 0.63-0.77) against v1",
+    "large@1.0 recall x0.788 (CI 0.72-0.87) against v1",
+    "large@1.0 IoU-only recall x0.705 (CI 0.64-0.77) against v1"
+   ]
+  },
+  "other_measurable_costs": {
+   "v1": [
+    "large@0.3 modelled ms per job x1.430 (CI 1.36-1.50) against classical-v1"
+   ],
+   "v2a": [],
+   "v2b": [],
+   "classical-v1": [
+    "large@0.3 critical boxes per photo x1.272 (CI 1.03-1.61) against v1",
+    "large@1.0 critical boxes per photo x1.332 (CI 1.08-1.68) against v1",
+    "large@1.0 modelled ms per job x1.237 (CI 1.17-1.31) against v1"
+   ]
+  },
+  "note": "v1 and the classical engine only; not a counterpart of a dev split, so not in the verdicts"
+ },
+ "cost_tables": {
+  "v1": {
+   "file": "results/local-macos-x86-dacl10k-retime/micro.json",
+   "timestamp": "2026-10-19T16:31:22Z",
+   "load_start": [
+    8.0,
+    7.17,
+    5.37
+   ],
+   "load_end": [
+    7.39,
+    7.11,
+    5.76
+   ],
+   "per_look_p50_ms": {
+    "1024x768": 641.4,
+    "2048x1536": 591.7,
+    "4000x3000": 568.1
+   },
+   "sha256": "cc4d1a14326da4cfdf05f60f62df03059fb2c02ad6d98e6027655b87e1e2f4c8"
+  },
+  "v2a": {
+   "file": "results/local-macos-x86-dacl10k_v2a/micro.json",
+   "timestamp": "2026-10-19T16:27:17Z",
+   "load_start": [
+    7.93,
+    6.31,
+    4.57
+   ],
+   "load_end": [
+    7.81,
+    7.08,
+    5.3
+   ],
+   "per_look_p50_ms": {
+    "1024x768": 585.2,
+    "2048x1536": 607.6,
+    "4000x3000": 526.5
+   },
+   "sha256": "e4ed308121e6b99e868cd87df282667b0c14151ca37fce7a9412ebc4cf38c395"
+  },
+  "v2b": {
+   "file": "results/local-macos-x86-dacl10k_v2b/micro.json",
+   "timestamp": "2026-10-19T19:28:59Z",
+   "load_start": [
+    10.64,
+    12.27,
+    12.91
+   ],
+   "load_end": [
+    14.52,
+    11.22,
+    11.81
+   ],
+   "per_look_p50_ms": {
+    "1024x768": 1228.2,
+    "2048x1536": 1473.1,
+    "4000x3000": 1326.8
+   },
+   "sha256": "6bedab6cf5718c8c4a5f87e26ba6b55edf204b53578e9387c1adfb7583e6e94c"
+  },
+  "classical-v1": {
+   "file": "results/local-macos-x86/micro.json",
+   "timestamp": "2026-10-17T20:19:11Z",
+   "load_start": [
+    23.82,
+    19.13,
+    15.69
+   ],
+   "load_end": null,
+   "per_look_p50_ms": {
+    "1024x768": 102.6,
+    "2048x1536": 108.8,
+    "4000x3000": 108.0
+   },
+   "sha256": "d7a6966b6a19f6429ce40aead747fd2f506ab9d6e02f3f084cbc6f3fac192e40"
+  }
+ },
+ "cost_note": "Each model is charged its own table, timed on this Mac (x86, 1 cv2 thread per worker): v2b results/local-macos-x86-dacl10k_v2b/micro.json (2026-10-19T19:28Z, 1-min load 10.64 at start, 14.52 at end), v2a results/local-macos-x86-dacl10k_v2a/micro.json (2026-10-19T16:27Z, 1-min load 7.93 at start, 7.81 at end), v1 results/local-macos-x86-dacl10k-retime/micro.json (2026-10-19T16:31Z, 1-min load 8.0 at start, 7.39 at end), the classical engine results/local-macos-x86/micro.json (2026-10-17T20:19Z, 1-min load 23.82 at start, none recorded at end). One look at 4000x3000 (warp, quality and segment:accurate, p50) costs 1326.8 ms on v2b's table, 526.5 on v2a's, 568.1 on v1's and 108.0 on the classical engine's. v2a re-timed in v2b's window (runs/v2a/micro/local-macos-x86-dacl10k_v2a/micro.json, load 14.08 to 11.22) costs 1304.5: per look v2b costs 0.87 to 1.04 times v2a in one window across the three timed sizes, against 2.10 to 2.52 between their own tables, so the ms gap between v2b and v2a below is the machine load at timing, not the model. v1 and v2a were timed in one window (0.97 to 1.10 per look). The classical table's high load overstates its ms, so the ONNX models' ratios to it understate their extra cost at equal load.",
+ "models": {
+  "v1": {
+   "segmenter": "onnx:drishyam_dacl10k.onnx drishyam_dacl10k.onnx@c49416c10087 drishyam_dacl10k.fp16.onnx@f9b06fabbe47",
+   "profile": "onnx:drishyam_dacl10k.onnx",
+   "profile_values": {
+    "min_view": 0.3,
+    "absorb": false
+   }
+  },
+  "v2a": {
+   "segmenter": "onnx:drishyam_dacl10k_v2a.onnx drishyam_dacl10k_v2a.onnx@95b503c2d205 drishyam_dacl10k_v2a.fp16.onnx@0f5fa16e9a65",
+   "profile": "onnx:drishyam_dacl10k_v2a.onnx",
+   "profile_values": {
+    "min_view": 0.3,
+    "absorb": false
+   }
+  },
+  "v2b": {
+   "segmenter": "onnx:drishyam_dacl10k_v2b.onnx drishyam_dacl10k_v2b.onnx@47e4b687d179 drishyam_dacl10k_v2b.fp16.onnx@3f8b8648ccfd",
+   "profile": "onnx:drishyam_dacl10k_v2b.onnx",
+   "profile_values": {
+    "min_view": 0.3,
+    "absorb": false
+   }
+  },
+  "classical-v1": {
+   "segmenter": "classical-v1",
+   "profile": "classical-v1",
+   "profile_values": {
+    "min_view": 0.0,
+    "absorb": true
+   }
+  }
+ },
+ "datasets": {
+  "codebrim": {
+   "n": 200,
+   "dataset_gt_sha256": "c9af626ec9be981956b6eb1b14b4bc79d611119e60f421e9a2d5d8059d0a3b4a",
+   "dataset_images_sha256": "db9329d026f48bdbd16ebd281c3ced9c4b9378d41c25bd6e32882fdb7577addc"
+  },
+  "synth": {
+   "n": 200,
+   "dataset_gt_sha256": "a06f5c40620efc1f37e3f247be35e84790d3ed82e385f1cb1122eb30b0528b7f",
+   "dataset_images_sha256": "8cfbe42f03b89e6ad8851666db2869deb3745b575d5235d356a028945667a95a"
+  },
+  "clean": {
+   "n": 51,
+   "dataset_gt_sha256": "fe0c373a8234d10c5a7b24f1dddfca19dc3f507aadcfc420dc1388f58de9d8e7",
+   "dataset_images_sha256": "30d76c2d1bc7ae5d4ae4432e7b3c9abe08cd1b6798b8a2969735c76e35323a65"
+  },
+  "large": {
+   "n": 100,
+   "dataset_gt_sha256": "5c1550bb26caa75cba933bac2d6ee30a0b4ea4b503e6f48a8de30c95739dfcee",
+   "dataset_images_sha256": "549e79f351ec9d934f21ec051a267235f6fcd4bceab95bdfac89ef4123c30697"
+  }
+ },
+ "runs": {
+  "v1 codebrim": {
+   "folder": "runs/model-eval/onnx-codebrim",
+   "code_commit": "3e54409",
+   "timestamp": "2026-10-20T02:44:21Z",
+   "load_avg_start": [
+    5.57,
+    5.04,
+    5.62
+   ],
+   "load_avg_end": [
+    5.85,
+    6.93,
+    7.47
+   ],
+   "machine": "Darwin 25.6.0 x86_64, 16 logical CPUs; eval ran 6 worker(s) x 1 cv2 thread(s); micro arm local-macos-x86-dacl10k-retime"
+  },
+  "classical-v1 codebrim": {
+   "folder": "runs/model-eval/classical-codebrim",
+   "code_commit": "3e54409",
+   "timestamp": "2026-10-20T03:00:58Z",
+   "load_avg_start": [
+    5.85,
+    6.93,
+    7.47
+   ],
+   "load_avg_end": [
+    5.46,
+    6.36,
+    6.92
+   ],
+   "machine": "Darwin 25.6.0 x86_64, 16 logical CPUs; eval ran 6 worker(s) x 1 cv2 thread(s); micro arm local-macos-x86"
+  },
+  "v1 synth": {
+   "folder": "runs/model-eval/onnx-synth",
+   "code_commit": "3e54409",
+   "timestamp": "2026-10-20T03:25:21Z",
+   "load_avg_start": [
+    5.09,
+    6.25,
+    6.88
+   ],
+   "load_avg_end": [
+    12.98,
+    23.87,
+    18.79
+   ],
+   "machine": "Darwin 25.6.0 x86_64, 16 logical CPUs; eval ran 6 worker(s) x 1 cv2 thread(s); micro arm local-macos-x86-dacl10k-retime"
+  },
+  "classical-v1 synth": {
+   "folder": "runs/model-eval/classical-synth",
+   "code_commit": "3e54409",
+   "timestamp": "2026-10-20T03:29:24Z",
+   "load_avg_start": [
+    13.06,
+    23.71,
+    18.77
+   ],
+   "load_avg_end": [
+    11.94,
+    17.34,
+    17.15
+   ],
+   "machine": "Darwin 25.6.0 x86_64, 16 logical CPUs; eval ran 6 worker(s) x 1 cv2 thread(s); micro arm local-macos-x86"
+  },
+  "v1 clean": {
+   "folder": "runs/model-eval/onnx-clean",
+   "code_commit": "3e54409",
+   "timestamp": "2026-10-20T03:35:13Z",
+   "load_avg_start": [
+    11.94,
+    17.34,
+    17.15
+   ],
+   "load_avg_end": [
+    7.12,
+    12.78,
+    15.25
+   ],
+   "machine": "Darwin 25.6.0 x86_64, 16 logical CPUs; eval ran 6 worker(s) x 1 cv2 thread(s); micro arm local-macos-x86-dacl10k-retime"
+  },
+  "classical-v1 clean": {
+   "folder": "runs/model-eval/classical-clean",
+   "code_commit": "3e54409",
+   "timestamp": "2026-10-20T03:36:06Z",
+   "load_avg_start": [
+    7.12,
+    12.78,
+    15.25
+   ],
+   "load_avg_end": [
+    7.66,
+    12.09,
+    14.85
+   ],
+   "machine": "Darwin 25.6.0 x86_64, 16 logical CPUs; eval ran 6 worker(s) x 1 cv2 thread(s); micro arm local-macos-x86"
+  },
+  "v1 large": {
+   "folder": "runs/model-eval/onnx-large",
+   "code_commit": "3e54409",
+   "timestamp": "2026-10-20T04:20:54Z",
+   "load_avg_start": [
+    7.36,
+    11.96,
+    14.79
+   ],
+   "load_avg_end": [
+    9.52,
+    11.42,
+    12.72
+   ],
+   "machine": "Darwin 25.6.0 x86_64, 16 logical CPUs; eval ran 6 worker(s) x 1 cv2 thread(s); micro arm local-macos-x86-dacl10k-retime"
+  },
+  "classical-v1 large": {
+   "folder": "runs/model-eval/classical-large",
+   "code_commit": "3e54409",
+   "timestamp": "2026-10-20T04:30:20Z",
+   "load_avg_start": [
+    9.52,
+    11.42,
+    12.72
+   ],
+   "load_avg_end": [
+    12.17,
+    11.63,
+    12.23
+   ],
+   "machine": "Darwin 25.6.0 x86_64, 16 logical CPUs; eval ran 6 worker(s) x 1 cv2 thread(s); micro arm local-macos-x86"
+  }
+ },
+ "commands": [
+  "runs/heldout/run_model.sh dacl10k local-macos-x86-dacl10k-retime (v1; also the classical clean and synth_large runs and v1 on synth_large)",
+  "runs/heldout/run_model.sh dacl10k_v2a local-macos-x86-dacl10k_v2a",
+  "runs/heldout/run_model.sh dacl10k_v2b local-macos-x86-dacl10k_v2b",
+  "each: python -m evals.model_eval --publish --onnx models/drishyam_<tag>.onnx --costs <arm> --dacl10k <kagglehub dacl10k folder> --codebrim data/codebrim --workers 6, then python -m evals.harness --cost-model fixed --workers 6 --micro-arm <arm> --data data/synth_clean --n 51 --seed 11 --chaos 0,0,0 (as make eval-clean) with DRISHYAM_ONNX set; synth_large as make eval-large (--n 100 --seed 7 --size 4608x3456)"
+ ],
+ "prior_exposure": "v1 had been scored on two of these sets before, once each, on 2026-10-18 and never published: CODEBRIM eval200 (run started 14:07Z) and synth200 (00:52Z), with the agent of that day, before its dev profile, on its first cost table (results/local-macos-x86-dacl10k). The runs are in the main checkout's ignored runs/model-eval/. So for v1 these are second scorings; v2a and v2b had never been scored on any held-out set (no other run under runs/ or a worktree carries these sets' sha256s with an ONNX segmenter).",
+ "leakage": {
+  "calibration": {
+   "copies": {
+    "brightness": {
+     "found": 50,
+     "max_dist": 6,
+     "min_ncc": 0.992
+    },
+    "crop95": {
+     "found": 0,
+     "max_dist": 72,
+     "min_ncc": 0.141
+    },
+    "jpeg50": {
+     "found": 50,
+     "max_dist": 8,
+     "min_ncc": 0.985
+    },
+    "n": 50,
+    "resize0.25": {
+     "found": 50,
+     "max_dist": 10,
+     "min_ncc": 0.93
+    },
+    "resize0.5+rot90": {
+     "found": 50,
+     "max_dist": 6,
+     "min_ncc": 0.993
+    }
+   },
+   "not_found": "crops dropping 5 % or more of the frame (crop95), and other shots of the same structure",
+   "other_photos": {
+    "at_or_below_max_dist": 0,
+    "confirmed": 0,
+    "max_ncc": 0.432,
+    "min_dist": 56,
+    "n": 200,
+    "pool": 852
+   },
+   "separated": true
+  },
+  "candidates": 0,
+  "eval_images": 200,
+  "hash_at_or_below": {
+   "16": 0,
+   "32": 0,
+   "48": 0,
+   "64": 0,
+   "8": 0
+  },
+  "max_dist": 32,
+  "min_ncc": 0.8,
+  "near_duplicates": 0,
+  "train_images": 8922
+ },
+ "published": [
+  "public/results/codebrim_dacl10k/summary.json",
+  "public/results/synth_dacl10k/summary.json"
+ ],
+ "table": {
+  "codebrim@0.3": {
+   "v1": {
+    "recall": 0.4926,
+    "recall_ci": [
+     0.4427,
+     0.54
+    ],
+    "recall_iou_only": 0.2528,
+    "chance_recall": 0.2991,
+    "chance_recall_iou_only": 0.0825,
+    "precision": 0.0772,
+    "fp_per_image": 42.29,
+    "boxes_per_image": 45.83,
+    "pixels_frac": 0.1422,
+    "net_pixels_frac": 0.1265,
+    "images_with_any": 0.965,
+    "critical_per_image": 9.6,
+    "findings_per_image": 6.885,
+    "per_class": {
+     "crack": 0.4811,
+     "spalling": 0.6868,
+     "efflorescence": 0.4286,
+     "exposed_rebar": 0.1577,
+     "corrosion": 0.638
+    },
+    "ms_per_job": 3434.0756,
+    "recall_per_s": 0.1434,
+    "vs_downscale": 1.179,
+    "vs_downscale_ci": [
+     1.1054,
+     1.2757
+    ],
+    "vs_downscale_iou_only_ci": [
+     1.3432,
+     1.6917
+    ],
+    "vs_tiling_L0": 1.3856,
+    "vs_tiling_L0_ci": [
+     1.2544,
+     1.5206
+    ],
+    "vs_tiling_L0_iou_only_ci": [
+     1.4581,
+     2.2612
+    ],
+    "pixels_vs_tiling_L0": 0.0876,
+    "halt": {
+     "cap-hit": 33,
+     "exhausted": 11,
+     "stop-rule": 156
+    },
+    "looks_mean": 5.905,
+    "looks_by_level": {
+     "L1": 99,
+     "L2": 889,
+     "L3": 193
+    },
+    "looks_by_action": {
+     "gaze": 1000,
+     "verify": 111,
+     "escalate": 70
+    },
+    "segmenter": "onnx:drishyam_dacl10k.onnx",
+    "confirm": null,
+    "profile": "onnx:drishyam_dacl10k.onnx",
+    "boxes_per_image_ci": [
+     39.3641,
+     51.9068
+    ],
+    "images_with_any_ci": [
+     0.935,
+     0.99
+    ],
+    "critical_per_image_ci": [
+     7.0293,
+     12.3658
+    ],
+    "ms_per_job_ci": [
+     3323.866,
+     3554.8047
+    ],
+    "ms_vs_downscale": 5.6094,
+    "ms_vs_downscale_ci": [
+     5.439,
+     5.7972
+    ],
+    "ms_vs_tiling_L0": 0.0675,
+    "ms_vs_tiling_L0_ci": [
+     0.0651,
+     0.0698
+    ]
+   },
+   "classical-v1": {
+    "recall": 0.1941,
+    "recall_ci": [
+     0.1636,
+     0.2251
+    ],
+    "recall_iou_only": 0.0795,
+    "chance_recall": 0.1223,
+    "chance_recall_iou_only": 0.0255,
+    "precision": 0.0017,
+    "fp_per_image": 919.445,
+    "boxes_per_image": 921.0,
+    "pixels_frac": 0.2901,
+    "net_pixels_frac": 0.2745,
+    "images_with_any": 1.0,
+    "critical_per_image": 1.73,
+    "findings_per_image": 16.655,
+    "per_class": {
+     "crack": 0.2983,
+     "spalling": 0.0,
+     "efflorescence": 0.0457,
+     "exposed_rebar": 0.0095,
+     "corrosion": 0.5163
+    },
+    "ms_per_job": 1725.7053,
+    "recall_per_s": 0.1125,
+    "vs_downscale": 0.979,
+    "vs_downscale_ci": [
+     0.8986,
+     1.0606
+    ],
+    "vs_downscale_iou_only_ci": [
+     0.8944,
+     1.2258
+    ],
+    "vs_tiling_L0": 0.9424,
+    "vs_tiling_L0_ci": [
+     0.8518,
+     1.0435
+    ],
+    "vs_tiling_L0_iou_only_ci": [
+     1.1,
+     1.7945
+    ],
+    "pixels_vs_tiling_L0": 0.1788,
+    "halt": {
+     "cap-hit": 194,
+     "stop-rule": 5,
+     "exhausted": 1
+    },
+    "looks_mean": 15.32,
+    "looks_by_level": {
+     "L0": 1220,
+     "L1": 1454,
+     "L2": 197,
+     "L3": 193
+    },
+    "looks_by_action": {
+     "gaze": 1550,
+     "escalate": 452,
+     "verify": 1062
+    },
+    "segmenter": "classical-v1",
+    "confirm": null,
+    "profile": "classical-v1",
+    "boxes_per_image_ci": [
+     844.412,
+     1012.839
+    ],
+    "images_with_any_ci": [
+     1.0,
+     1.0
+    ],
+    "critical_per_image_ci": [
+     1.195,
+     2.2501
+    ],
+    "ms_per_job_ci": [
+     1642.3906,
+     1816.8176
+    ],
+    "ms_vs_downscale": 4.9445,
+    "ms_vs_downscale_ci": [
+     4.7209,
+     5.1819
+    ],
+    "ms_vs_tiling_L0": 0.1858,
+    "ms_vs_tiling_L0_ci": [
+     0.1845,
+     0.1868
+    ]
+   }
+  },
+  "codebrim@1.0": {
+   "v1": {
+    "recall": 0.4997,
+    "recall_ci": [
+     0.4512,
+     0.5453
+    ],
+    "recall_iou_only": 0.2593,
+    "chance_recall": 0.3045,
+    "chance_recall_iou_only": 0.0843,
+    "precision": 0.0728,
+    "fp_per_image": 46.32,
+    "boxes_per_image": 49.955,
+    "pixels_frac": 0.1668,
+    "net_pixels_frac": 0.1511,
+    "images_with_any": 0.965,
+    "critical_per_image": 10.24,
+    "findings_per_image": 7.405,
+    "per_class": {
+     "crack": 0.4958,
+     "spalling": 0.6921,
+     "efflorescence": 0.44,
+     "exposed_rebar": 0.1577,
+     "corrosion": 0.6409
+    },
+    "ms_per_job": 3658.903,
+    "recall_per_s": 0.1366,
+    "vs_downscale": 1.196,
+    "vs_downscale_ci": [
+     1.1193,
+     1.2958
+    ],
+    "vs_downscale_iou_only_ci": [
+     1.3762,
+     1.729
+    ],
+    "vs_tiling_L0": 1.4057,
+    "vs_tiling_L0_ci": [
+     1.2775,
+     1.5376
+    ],
+    "vs_tiling_L0_iou_only_ci": [
+     1.5059,
+     2.3164
+    ],
+    "pixels_vs_tiling_L0": 0.1028,
+    "halt": {
+     "stop-rule": 189,
+     "exhausted": 11
+    },
+    "looks_mean": 6.285,
+    "looks_by_level": {
+     "L0": 5,
+     "L1": 170,
+     "L2": 889,
+     "L3": 193
+    },
+    "looks_by_action": {
+     "gaze": 1071,
+     "verify": 113,
+     "escalate": 73
+    },
+    "segmenter": "onnx:drishyam_dacl10k.onnx",
+    "confirm": null,
+    "profile": "onnx:drishyam_dacl10k.onnx",
+    "boxes_per_image_ci": [
+     43.1286,
+     56.0609
+    ],
+    "images_with_any_ci": [
+     0.935,
+     0.99
+    ],
+    "critical_per_image_ci": [
+     7.5829,
+     12.9751
+    ],
+    "ms_per_job_ci": [
+     3552.5862,
+     3779.2173
+    ],
+    "ms_vs_downscale": 5.9766,
+    "ms_vs_downscale_ci": [
+     5.8091,
+     6.1615
+    ],
+    "ms_vs_tiling_L0": 0.0719,
+    "ms_vs_tiling_L0_ci": [
+     0.0685,
+     0.0757
+    ]
+   },
+   "classical-v1": {
+    "recall": 0.222,
+    "recall_ci": [
+     0.192,
+     0.2539
+    ],
+    "recall_iou_only": 0.1009,
+    "chance_recall": 0.1418,
+    "chance_recall_iou_only": 0.0404,
+    "precision": 0.0011,
+    "fp_per_image": 1627.325,
+    "boxes_per_image": 1629.165,
+    "pixels_frac": 0.5261,
+    "net_pixels_frac": 0.5105,
+    "images_with_any": 1.0,
+    "critical_per_image": 2.5,
+    "findings_per_image": 29.475,
+    "per_class": {
+     "crack": 0.3592,
+     "spalling": 0.0026,
+     "efflorescence": 0.0457,
+     "exposed_rebar": 0.0095,
+     "corrosion": 0.5668
+    },
+    "ms_per_job": 2984.817,
+    "recall_per_s": 0.0744,
+    "vs_downscale": 1.1198,
+    "vs_downscale_ci": [
+     1.0347,
+     1.2075
+    ],
+    "vs_downscale_iou_only_ci": [
+     1.1666,
+     1.5089
+    ],
+    "vs_tiling_L0": 1.0778,
+    "vs_tiling_L0_ci": [
+     0.9845,
+     1.1761
+    ],
+    "vs_tiling_L0_iou_only_ci": [
+     1.4414,
+     2.2001
+    ],
+    "pixels_vs_tiling_L0": 0.3242,
+    "halt": {
+     "exhausted": 6,
+     "stop-rule": 193,
+     "cap-hit": 1
+    },
+    "looks_mean": 26.965,
+    "looks_by_level": {
+     "L0": 2422,
+     "L1": 2581,
+     "L2": 197,
+     "L3": 193
+    },
+    "looks_by_action": {
+     "gaze": 2677,
+     "escalate": 834,
+     "verify": 1882
+    },
+    "segmenter": "classical-v1",
+    "confirm": null,
+    "profile": "classical-v1",
+    "boxes_per_image_ci": [
+     1505.9749,
+     1760.9866
+    ],
+    "images_with_any_ci": [
+     1.0,
+     1.0
+    ],
+    "critical_per_image_ci": [
+     1.7899,
+     3.1603
+    ],
+    "ms_per_job_ci": [
+     2852.7593,
+     3125.2442
+    ],
+    "ms_vs_downscale": 8.5521,
+    "ms_vs_downscale_ci": [
+     8.2111,
+     8.9036
+    ],
+    "ms_vs_tiling_L0": 0.3214,
+    "ms_vs_tiling_L0_ci": [
+     0.3113,
+     0.3311
+    ]
+   }
+  },
+  "codebrim:downscale": {
+   "v1": {
+    "recall": 0.4178,
+    "recall_ci": [
+     0.3643,
+     0.4643
+    ],
+    "recall_iou_only": 0.1691,
+    "chance_recall": 0.2297,
+    "chance_recall_iou_only": 0.0475,
+    "precision": 0.2213,
+    "fp_per_image": 6.895,
+    "boxes_per_image": 8.855,
+    "pixels_frac": 0.0726,
+    "net_pixels_frac": 0.0248,
+    "images_with_any": 0.885,
+    "critical_per_image": 1.99,
+    "findings_per_image": 2.04,
+    "per_class": {
+     "crack": 0.3761,
+     "spalling": 0.6316,
+     "efflorescence": 0.3486,
+     "exposed_rebar": 0.0789,
+     "corrosion": 0.5905
+    },
+    "ms_per_job": 612.2022,
+    "recall_per_s": 0.6825,
+    "vs_tiling_L0": 1.1753,
+    "vs_tiling_L0_ci": [
+     1.0289,
+     1.3299
+    ],
+    "vs_tiling_L0_iou_only_ci": [
+     0.9341,
+     1.5234
+    ],
+    "pixels_vs_tiling_L0": 0.0448,
+    "boxes_per_image_ci": [
+     7.58,
+     10.0751
+    ],
+    "images_with_any_ci": [
+     0.835,
+     0.93
+    ],
+    "critical_per_image_ci": [
+     1.4049,
+     2.6401
+    ],
+    "ms_per_job_ci": [
+     610.4899,
+     614.0927
+    ],
+    "ms_vs_tiling_L0": 0.012,
+    "ms_vs_tiling_L0_ci": [
+     0.0115,
+     0.0126
+    ]
+   },
+   "classical-v1": {
+    "recall": 0.1982,
+    "recall_ci": [
+     0.1715,
+     0.2265
+    ],
+    "recall_iou_only": 0.076,
+    "chance_recall": 0.1027,
+    "chance_recall_iou_only": 0.019,
+    "precision": 0.0074,
+    "fp_per_image": 182.78,
+    "boxes_per_image": 184.14,
+    "pixels_frac": 0.0726,
+    "net_pixels_frac": 0.0726,
+    "images_with_any": 1.0,
+    "critical_per_image": 1.3,
+    "findings_per_image": 2.855,
+    "per_class": {
+     "crack": 0.2857,
+     "spalling": 0.0053,
+     "efflorescence": 0.0571,
+     "exposed_rebar": 0.0,
+     "corrosion": 0.5519
+    },
+    "ms_per_job": 349.014,
+    "recall_per_s": 0.5679,
+    "vs_tiling_L0": 0.9625,
+    "vs_tiling_L0_ci": [
+     0.8571,
+     1.08
+    ],
+    "vs_tiling_L0_iou_only_ci": [
+     1.0666,
+     1.7079
+    ],
+    "pixels_vs_tiling_L0": 0.0448,
+    "boxes_per_image_ci": [
+     166.6007,
+     203.2524
+    ],
+    "images_with_any_ci": [
+     1.0,
+     1.0
+    ],
+    "critical_per_image_ci": [
+     0.6298,
+     2.2107
+    ],
+    "ms_per_job_ci": [
+     345.3353,
+     352.6718
+    ],
+    "ms_vs_tiling_L0": 0.0376,
+    "ms_vs_tiling_L0_ci": [
+     0.0359,
+     0.0392
+    ]
+   }
+  },
+  "codebrim:tiling@L0": {
+   "v1": {
+    "recall": 0.3555,
+    "recall_ci": [
+     0.3161,
+     0.3911
+    ],
+    "recall_iou_only": 0.1407,
+    "chance_recall": 0.108,
+    "chance_recall_iou_only": 0.0267,
+    "precision": 0.0139,
+    "fp_per_image": 204.99,
+    "boxes_per_image": 207.89,
+    "pixels_frac": 1.6229,
+    "net_pixels_frac": 1.6229,
+    "images_with_any": 1.0,
+    "critical_per_image": 9.02,
+    "findings_per_image": 65.185,
+    "per_class": {
+     "crack": 0.3845,
+     "spalling": 0.4447,
+     "efflorescence": 0.2286,
+     "exposed_rebar": 0.0221,
+     "corrosion": 0.5935
+    },
+    "ms_per_job": 50873.8498,
+    "recall_per_s": 0.007,
+    "vs_downscale": 0.8509,
+    "vs_downscale_ci": [
+     0.7519,
+     0.9719
+    ],
+    "vs_downscale_iou_only_ci": [
+     0.6564,
+     1.0706
+    ],
+    "boxes_per_image_ci": [
+     183.639,
+     232.4783
+    ],
+    "images_with_any_ci": [
+     1.0,
+     1.0
+    ],
+    "critical_per_image_ci": [
+     6.9399,
+     11.2874
+    ],
+    "ms_per_job_ci": [
+     48585.5376,
+     53401.6651
+    ],
+    "ms_vs_downscale": 83.0998,
+    "ms_vs_downscale_ci": [
+     79.5727,
+     86.9512
+    ]
+   },
+   "classical-v1": {
+    "recall": 0.2059,
+    "recall_ci": [
+     0.1748,
+     0.2387
+    ],
+    "recall_iou_only": 0.057,
+    "chance_recall": 0.0825,
+    "chance_recall_iou_only": 0.0131,
+    "precision": 0.0005,
+    "fp_per_image": 3142.665,
+    "boxes_per_image": 3144.38,
+    "pixels_frac": 1.6229,
+    "net_pixels_frac": 1.6229,
+    "images_with_any": 1.0,
+    "critical_per_image": 7.48,
+    "findings_per_image": 150.66,
+    "per_class": {
+     "crack": 0.3088,
+     "spalling": 0.0053,
+     "efflorescence": 0.0171,
+     "exposed_rebar": 0.0,
+     "corrosion": 0.5786
+    },
+    "ms_per_job": 9288.0978,
+    "recall_per_s": 0.0222,
+    "vs_downscale": 1.0389,
+    "vs_downscale_ci": [
+     0.9259,
+     1.1667
+    ],
+    "vs_downscale_iou_only_ci": [
+     0.5855,
+     0.9376
+    ],
+    "boxes_per_image_ci": [
+     2902.8022,
+     3431.5428
+    ],
+    "images_with_any_ci": [
+     1.0,
+     1.0
+    ],
+    "critical_per_image_ci": [
+     5.5496,
+     9.2855
+    ],
+    "ms_per_job_ci": [
+     8864.2206,
+     9753.8568
+    ],
+    "ms_vs_downscale": 26.6124,
+    "ms_vs_downscale_ci": [
+     25.4814,
+     27.8856
+    ]
+   }
+  },
+  "synth@0.3": {
+   "v1": {
+    "recall": 0.6391,
+    "recall_ci": [
+     0.6069,
+     0.6721
+    ],
+    "recall_iou_only": 0.6228,
+    "chance_recall": 0.0636,
+    "chance_recall_iou_only": 0.037,
+    "precision": 0.3355,
+    "fp_per_image": 4.18,
+    "boxes_per_image": 6.29,
+    "pixels_frac": 0.2556,
+    "net_pixels_frac": 0.24,
+    "images_with_any": 0.92,
+    "critical_per_image": 0.81,
+    "findings_per_image": 2.205,
+    "per_class": {
+     "crack": 0.6388,
+     "spalling": 0.9822,
+     "efflorescence": 0.0,
+     "exposed_rebar": 0.0164,
+     "corrosion": 1.0
+    },
+    "ms_per_job": 1717.6979,
+    "recall_per_s": 0.372,
+    "vs_downscale": 1.0485,
+    "vs_downscale_ci": [
+     1.0025,
+     1.095
+    ],
+    "vs_downscale_iou_only_ci": [
+     1.0157,
+     1.1109
+    ],
+    "vs_tiling_L0": 0.9371,
+    "vs_tiling_L0_ci": [
+     0.9011,
+     0.9732
+    ],
+    "vs_tiling_L0_iou_only_ci": [
+     0.8942,
+     0.9651
+    ],
+    "pixels_vs_tiling_L0": 0.1534,
+    "halt": {
+     "cap-hit": 180,
+     "stop-rule": 16,
+     "exhausted": 4
+    },
+    "looks_mean": 2.88,
+    "looks_by_level": {
+     "L1": 380,
+     "L2": 196
+    },
+    "looks_by_action": {
+     "gaze": 397,
+     "verify": 159,
+     "escalate": 20
+    },
+    "segmenter": "onnx:drishyam_dacl10k.onnx",
+    "confirm": null,
+    "profile": "onnx:drishyam_dacl10k.onnx",
+    "boxes_per_image_ci": [
+     5.6649,
+     6.98
+    ],
+    "images_with_any_ci": [
+     0.88,
+     0.955
+    ],
+    "critical_per_image_ci": [
+     0.64,
+     1.01
+    ],
+    "ms_per_job_ci": [
+     1685.1571,
+     1747.2804
+    ],
+    "ms_vs_downscale": 2.9126,
+    "ms_vs_downscale_ci": [
+     2.8575,
+     2.9628
+    ],
+    "ms_vs_tiling_L0": 0.1459,
+    "ms_vs_tiling_L0_ci": [
+     0.1431,
+     0.1484
+    ]
+   },
+   "classical-v1": {
+    "recall": 0.4778,
+    "recall_ci": [
+     0.4397,
+     0.5182
+    ],
+    "recall_iou_only": 0.4246,
+    "chance_recall": 0.0281,
+    "chance_recall_iou_only": 0.0133,
+    "precision": 0.0838,
+    "fp_per_image": 17.545,
+    "boxes_per_image": 19.15,
+    "pixels_frac": 0.261,
+    "net_pixels_frac": 0.2454,
+    "images_with_any": 0.965,
+    "critical_per_image": 1.605,
+    "findings_per_image": 2.95,
+    "per_class": {
+     "crack": 0.4493,
+     "spalling": 0.6213,
+     "efflorescence": 0.1616,
+     "exposed_rebar": 0.5738,
+     "corrosion": 0.5417
+    },
+    "ms_per_job": 336.9823,
+    "recall_per_s": 1.4179,
+    "vs_downscale": 0.9642,
+    "vs_downscale_ci": [
+     0.9097,
+     1.0248
+    ],
+    "vs_downscale_iou_only_ci": [
+     0.9233,
+     1.055
+    ],
+    "vs_tiling_L0": 0.8706,
+    "vs_tiling_L0_ci": [
+     0.8109,
+     0.9284
+    ],
+    "vs_tiling_L0_iou_only_ci": [
+     0.8437,
+     0.988
+    ],
+    "pixels_vs_tiling_L0": 0.1566,
+    "halt": {
+     "cap-hit": 189,
+     "stop-rule": 7,
+     "exhausted": 4
+    },
+    "looks_mean": 2.945,
+    "looks_by_level": {
+     "L0": 53,
+     "L1": 340,
+     "L2": 196
+    },
+    "looks_by_action": {
+     "gaze": 344,
+     "escalate": 99,
+     "verify": 146
+    },
+    "segmenter": "classical-v1",
+    "confirm": null,
+    "profile": "classical-v1",
+    "boxes_per_image_ci": [
+     16.8799,
+     21.5956
+    ],
+    "images_with_any_ci": [
+     0.94,
+     0.99
+    ],
+    "critical_per_image_ci": [
+     1.2749,
+     1.9804
+    ],
+    "ms_per_job_ci": [
+     333.7168,
+     340.2477
+    ],
+    "ms_vs_downscale": 1.0743,
+    "ms_vs_downscale_ci": [
+     1.0639,
+     1.0847
+    ],
+    "ms_vs_tiling_L0": 0.1619,
+    "ms_vs_tiling_L0_ci": [
+     0.1604,
+     0.1635
+    ]
+   }
+  },
+  "synth@1.0": {
+   "v1": {
+    "recall": 0.6553,
+    "recall_ci": [
+     0.6229,
+     0.689
+    ],
+    "recall_iou_only": 0.642,
+    "chance_recall": 0.0503,
+    "chance_recall_iou_only": 0.0311,
+    "precision": 0.3045,
+    "fp_per_image": 4.98,
+    "boxes_per_image": 7.16,
+    "pixels_frac": 0.2915,
+    "net_pixels_frac": 0.2758,
+    "images_with_any": 0.92,
+    "critical_per_image": 0.91,
+    "findings_per_image": 2.44,
+    "per_class": {
+     "crack": 0.6828,
+     "spalling": 0.9882,
+     "efflorescence": 0.0,
+     "exposed_rebar": 0.0164,
+     "corrosion": 1.0
+    },
+    "ms_per_job": 1972.1078,
+    "recall_per_s": 0.3323,
+    "vs_downscale": 1.0752,
+    "vs_downscale_ci": [
+     1.0309,
+     1.1156
+    ],
+    "vs_downscale_iou_only_ci": [
+     1.048,
+     1.1459
+    ],
+    "vs_tiling_L0": 0.961,
+    "vs_tiling_L0_ci": [
+     0.9268,
+     0.9955
+    ],
+    "vs_tiling_L0_iou_only_ci": [
+     0.9231,
+     0.991
+    ],
+    "pixels_vs_tiling_L0": 0.1749,
+    "halt": {
+     "stop-rule": 180,
+     "exhausted": 20
+    },
+    "looks_mean": 3.31,
+    "looks_by_level": {
+     "L1": 466,
+     "L2": 196
+    },
+    "looks_by_action": {
+     "gaze": 483,
+     "verify": 159,
+     "escalate": 20
+    },
+    "segmenter": "onnx:drishyam_dacl10k.onnx",
+    "confirm": null,
+    "profile": "onnx:drishyam_dacl10k.onnx",
+    "boxes_per_image_ci": [
+     6.42,
+     7.9202
+    ],
+    "images_with_any_ci": [
+     0.88,
+     0.955
+    ],
+    "critical_per_image_ci": [
+     0.715,
+     1.14
+    ],
+    "ms_per_job_ci": [
+     1904.0679,
+     2034.2312
+    ],
+    "ms_vs_downscale": 3.344,
+    "ms_vs_downscale_ci": [
+     3.2287,
+     3.4494
+    ],
+    "ms_vs_tiling_L0": 0.1675,
+    "ms_vs_tiling_L0_ci": [
+     0.1617,
+     0.1728
+    ]
+   },
+   "classical-v1": {
+    "recall": 0.5607,
+    "recall_ci": [
+     0.5269,
+     0.5967
+    ],
+    "recall_iou_only": 0.4926,
+    "chance_recall": 0.034,
+    "chance_recall_iou_only": 0.0089,
+    "precision": 0.0572,
+    "fp_per_image": 31.18,
+    "boxes_per_image": 33.07,
+    "pixels_frac": 0.4527,
+    "net_pixels_frac": 0.4371,
+    "images_with_any": 0.97,
+    "critical_per_image": 2.675,
+    "findings_per_image": 3.965,
+    "per_class": {
+     "crack": 0.5022,
+     "spalling": 0.6805,
+     "efflorescence": 0.2323,
+     "exposed_rebar": 0.6885,
+     "corrosion": 0.7083
+    },
+    "ms_per_job": 587.3373,
+    "recall_per_s": 0.9546,
+    "vs_downscale": 1.1313,
+    "vs_downscale_ci": [
+     1.08,
+     1.1912
+    ],
+    "vs_downscale_iou_only_ci": [
+     1.089,
+     1.2063
+    ],
+    "vs_tiling_L0": 1.0216,
+    "vs_tiling_L0_ci": [
+     0.9735,
+     1.0696
+    ],
+    "vs_tiling_L0_iou_only_ci": [
+     1.0032,
+     1.1166
+    ],
+    "pixels_vs_tiling_L0": 0.2716,
+    "halt": {
+     "stop-rule": 185,
+     "exhausted": 15
+    },
+    "looks_mean": 5.245,
+    "looks_by_level": {
+     "L0": 348,
+     "L1": 505,
+     "L2": 196
+    },
+    "looks_by_action": {
+     "gaze": 509,
+     "escalate": 206,
+     "verify": 334
+    },
+    "segmenter": "classical-v1",
+    "confirm": null,
+    "profile": "classical-v1",
+    "boxes_per_image_ci": [
+     28.954,
+     37.7225
+    ],
+    "images_with_any_ci": [
+     0.945,
+     0.99
+    ],
+    "critical_per_image_ci": [
+     2.1,
+     3.2704
+    ],
+    "ms_per_job_ci": [
+     564.4651,
+     612.917
+    ],
+    "ms_vs_downscale": 1.8725,
+    "ms_vs_downscale_ci": [
+     1.7996,
+     1.954
+    ],
+    "ms_vs_tiling_L0": 0.2822,
+    "ms_vs_tiling_L0_ci": [
+     0.2712,
+     0.2945
+    ]
+   }
+  },
+  "synth:downscale": {
+   "v1": {
+    "recall": 0.6095,
+    "recall_ci": [
+     0.5757,
+     0.6447
+    ],
+    "recall_iou_only": 0.5858,
+    "chance_recall": 0.0414,
+    "chance_recall_iou_only": 0.0251,
+    "precision": 0.6889,
+    "fp_per_image": 0.885,
+    "boxes_per_image": 2.845,
+    "pixels_frac": 0.25,
+    "net_pixels_frac": 0.0833,
+    "images_with_any": 0.925,
+    "critical_per_image": 0.57,
+    "findings_per_image": 1.76,
+    "per_class": {
+     "crack": 0.5947,
+     "spalling": 0.9172,
+     "efflorescence": 0.0,
+     "exposed_rebar": 0.0328,
+     "corrosion": 1.0
+    },
+    "ms_per_job": 589.741,
+    "recall_per_s": 1.0334,
+    "vs_tiling_L0": 0.8937,
+    "vs_tiling_L0_ci": [
+     0.8559,
+     0.9329
+    ],
+    "vs_tiling_L0_iou_only_ci": [
+     0.8319,
+     0.9176
+    ],
+    "pixels_vs_tiling_L0": 0.15,
+    "boxes_per_image_ci": [
+     2.6199,
+     3.105
+    ],
+    "images_with_any_ci": [
+     0.89,
+     0.96
+    ],
+    "critical_per_image_ci": [
+     0.465,
+     0.6851
+    ],
+    "ms_per_job_ci": [
+     589.741,
+     589.741
+    ],
+    "ms_vs_tiling_L0": 0.0501,
+    "ms_vs_tiling_L0_ci": [
+     0.0501,
+     0.0501
+    ]
+   },
+   "classical-v1": {
+    "recall": 0.4956,
+    "recall_ci": [
+     0.4586,
+     0.5365
+    ],
+    "recall_iou_only": 0.4305,
+    "chance_recall": 0.0237,
+    "chance_recall_iou_only": 0.0148,
+    "precision": 0.1195,
+    "fp_per_image": 12.155,
+    "boxes_per_image": 13.805,
+    "pixels_frac": 0.25,
+    "net_pixels_frac": 0.25,
+    "images_with_any": 0.99,
+    "critical_per_image": 0.675,
+    "findings_per_image": 2.65,
+    "per_class": {
+     "crack": 0.4846,
+     "spalling": 0.574,
+     "efflorescence": 0.2222,
+     "exposed_rebar": 0.4426,
+     "corrosion": 0.6583
+    },
+    "ms_per_job": 313.668,
+    "recall_per_s": 1.5799,
+    "vs_tiling_L0": 0.903,
+    "vs_tiling_L0_ci": [
+     0.8492,
+     0.9631
+    ],
+    "vs_tiling_L0_iou_only_ci": [
+     0.866,
+     0.9857
+    ],
+    "pixels_vs_tiling_L0": 0.15,
+    "boxes_per_image_ci": [
+     12.4448,
+     15.3306
+    ],
+    "images_with_any_ci": [
+     0.975,
+     1.0
+    ],
+    "critical_per_image_ci": [
+     0.485,
+     0.89
+    ],
+    "ms_per_job_ci": [
+     313.668,
+     313.668
+    ],
+    "ms_vs_tiling_L0": 0.1507,
+    "ms_vs_tiling_L0_ci": [
+     0.1507,
+     0.1507
+    ]
+   }
+  },
+  "synth:tiling@L0": {
+   "v1": {
+    "recall": 0.682,
+    "recall_ci": [
+     0.649,
+     0.7187
+    ],
+    "recall_iou_only": 0.6701,
+    "chance_recall": 0.0429,
+    "chance_recall_iou_only": 0.0178,
+    "precision": 0.402,
+    "fp_per_image": 3.37,
+    "boxes_per_image": 5.635,
+    "pixels_frac": 1.6667,
+    "net_pixels_frac": 1.6667,
+    "images_with_any": 0.945,
+    "critical_per_image": 0.465,
+    "findings_per_image": 3.995,
+    "per_class": {
+     "crack": 0.8238,
+     "spalling": 0.8994,
+     "efflorescence": 0.0101,
+     "exposed_rebar": 0.0164,
+     "corrosion": 1.0
+    },
+    "ms_per_job": 11772.46,
+    "recall_per_s": 0.0579,
+    "vs_downscale": 1.1189,
+    "vs_downscale_ci": [
+     1.0719,
+     1.1683
+    ],
+    "vs_downscale_iou_only_ci": [
+     1.0898,
+     1.202
+    ],
+    "boxes_per_image_ci": [
+     5.1149,
+     6.21
+    ],
+    "images_with_any_ci": [
+     0.915,
+     0.975
+    ],
+    "critical_per_image_ci": [
+     0.34,
+     0.6
+    ],
+    "ms_per_job_ci": [
+     11772.46,
+     11772.46
+    ],
+    "ms_vs_downscale": 19.9621,
+    "ms_vs_downscale_ci": [
+     19.9621,
+     19.9621
+    ]
+   },
+   "classical-v1": {
+    "recall": 0.5488,
+    "recall_ci": [
+     0.5085,
+     0.5927
+    ],
+    "recall_iou_only": 0.466,
+    "chance_recall": 0.0296,
+    "chance_recall_iou_only": 0.0118,
+    "precision": 0.0213,
+    "fp_per_image": 83.44,
+    "boxes_per_image": 85.255,
+    "pixels_frac": 1.6667,
+    "net_pixels_frac": 1.6667,
+    "images_with_any": 1.0,
+    "critical_per_image": 0.96,
+    "findings_per_image": 15.585,
+    "per_class": {
+     "crack": 0.467,
+     "spalling": 0.6982,
+     "efflorescence": 0.2525,
+     "exposed_rebar": 0.5246,
+     "corrosion": 0.75
+    },
+    "ms_per_job": 2081.0,
+    "recall_per_s": 0.2637,
+    "vs_downscale": 1.1075,
+    "vs_downscale_ci": [
+     1.0383,
+     1.1776
+    ],
+    "vs_downscale_iou_only_ci": [
+     1.0145,
+     1.1547
+    ],
+    "boxes_per_image_ci": [
+     76.9449,
+     93.9518
+    ],
+    "images_with_any_ci": [
+     1.0,
+     1.0
+    ],
+    "critical_per_image_ci": [
+     0.7499,
+     1.18
+    ],
+    "ms_per_job_ci": [
+     2081.0,
+     2081.0
+    ],
+    "ms_vs_downscale": 6.6344,
+    "ms_vs_downscale_ci": [
+     6.6344,
+     6.6344
+    ]
+   }
+  },
+  "clean@0.3": {
+   "v1": {
+    "recall": null,
+    "recall_ci": [
+     null,
+     null
+    ],
+    "recall_iou_only": null,
+    "chance_recall": null,
+    "chance_recall_iou_only": null,
+    "precision": null,
+    "fp_per_image": 0.0,
+    "boxes_per_image": 0.0,
+    "pixels_frac": 0.232,
+    "net_pixels_frac": 0.2163,
+    "images_with_any": 0.0,
+    "critical_per_image": 0.0,
+    "findings_per_image": 0.0,
+    "per_class": {
+     "crack": null,
+     "spalling": null,
+     "efflorescence": null,
+     "exposed_rebar": null,
+     "corrosion": null
+    },
+    "ms_per_job": 1567.1759,
+    "recall_per_s": null,
+    "halt": {
+     "cap-hit": 38,
+     "stop-rule": 6,
+     "exhausted": 7
+    },
+    "looks_mean": 2.6275,
+    "looks_by_level": {
+     "L1": 90,
+     "L2": 44
+    },
+    "looks_by_action": {
+     "gaze": 134
+    },
+    "segmenter": "onnx:drishyam_dacl10k.onnx",
+    "confirm": null,
+    "profile": "onnx:drishyam_dacl10k.onnx",
+    "boxes_per_image_ci": [
+     0.0,
+     0.0
+    ],
+    "images_with_any_ci": [
+     0.0,
+     0.0
+    ],
+    "critical_per_image_ci": [
+     0.0,
+     0.0
+    ],
+    "ms_per_job_ci": [
+     1451.1109,
+     1671.6125
+    ],
+    "ms_vs_downscale": 2.6577,
+    "ms_vs_downscale_ci": [
+     2.4609,
+     2.8348
+    ],
+    "ms_vs_tiling_L0": 0.1298,
+    "ms_vs_tiling_L0_ci": [
+     0.1191,
+     0.1401
+    ]
+   },
+   "classical-v1": {
+    "recall": null,
+    "recall_ci": [
+     null,
+     null
+    ],
+    "recall_iou_only": null,
+    "chance_recall": null,
+    "chance_recall_iou_only": null,
+    "precision": 0.0,
+    "fp_per_image": 7.0784,
+    "boxes_per_image": 7.0784,
+    "pixels_frac": 0.2513,
+    "net_pixels_frac": 0.2357,
+    "images_with_any": 0.6667,
+    "critical_per_image": 0.0196,
+    "findings_per_image": 1.0784,
+    "per_class": {
+     "crack": null,
+     "spalling": null,
+     "efflorescence": null,
+     "exposed_rebar": null,
+     "corrosion": null
+    },
+    "ms_per_job": 332.4975,
+    "recall_per_s": null,
+    "halt": {
+     "cap-hit": 42,
+     "exhausted": 7,
+     "stop-rule": 2
+    },
+    "looks_mean": 2.902,
+    "looks_by_level": {
+     "L0": 39,
+     "L1": 65,
+     "L2": 44
+    },
+    "looks_by_action": {
+     "gaze": 71,
+     "verify": 30,
+     "escalate": 47
+    },
+    "segmenter": "classical-v1",
+    "confirm": null,
+    "profile": "classical-v1",
+    "boxes_per_image_ci": [
+     4.6275,
+     9.5887
+    ],
+    "images_with_any_ci": [
+     0.5294,
+     0.7843
+    ],
+    "critical_per_image_ci": [
+     0.0,
+     0.0588
+    ],
+    "ms_per_job_ci": [
+     315.1696,
+     356.18
+    ],
+    "ms_vs_downscale": 1.0587,
+    "ms_vs_downscale_ci": [
+     1.0048,
+     1.1311
+    ],
+    "ms_vs_tiling_L0": 0.1556,
+    "ms_vs_tiling_L0_ci": [
+     0.1497,
+     0.1606
+    ]
+   }
+  },
+  "clean@1.0": {
+   "v1": {
+    "recall": null,
+    "recall_ci": [
+     null,
+     null
+    ],
+    "recall_iou_only": null,
+    "chance_recall": null,
+    "chance_recall_iou_only": null,
+    "precision": null,
+    "fp_per_image": 0.0,
+    "boxes_per_image": 0.0,
+    "pixels_frac": 0.263,
+    "net_pixels_frac": 0.2474,
+    "images_with_any": 0.0,
+    "critical_per_image": 0.0,
+    "findings_per_image": 0.0,
+    "per_class": {
+     "crack": null,
+     "spalling": null,
+     "efflorescence": null,
+     "exposed_rebar": null,
+     "corrosion": null
+    },
+    "ms_per_job": 1787.5949,
+    "recall_per_s": null,
+    "halt": {
+     "stop-rule": 27,
+     "exhausted": 24
+    },
+    "looks_mean": 3.0,
+    "looks_by_level": {
+     "L1": 109,
+     "L2": 44
+    },
+    "looks_by_action": {
+     "gaze": 153
+    },
+    "segmenter": "onnx:drishyam_dacl10k.onnx",
+    "confirm": null,
+    "profile": "onnx:drishyam_dacl10k.onnx",
+    "boxes_per_image_ci": [
+     0.0,
+     0.0
+    ],
+    "images_with_any_ci": [
+     0.0,
+     0.0
+    ],
+    "critical_per_image_ci": [
+     0.0,
+     0.0
+    ],
+    "ms_per_job_ci": [
+     1613.5799,
+     1950.0089
+    ],
+    "ms_vs_downscale": 3.0316,
+    "ms_vs_downscale_ci": [
+     2.7364,
+     3.307
+    ],
+    "ms_vs_tiling_L0": 0.1481,
+    "ms_vs_tiling_L0_ci": [
+     0.1327,
+     0.1628
+    ]
+   },
+   "classical-v1": {
+    "recall": null,
+    "recall_ci": [
+     null,
+     null
+    ],
+    "recall_iou_only": null,
+    "chance_recall": null,
+    "chance_recall_iou_only": null,
+    "precision": 0.0,
+    "fp_per_image": 10.902,
+    "boxes_per_image": 10.902,
+    "pixels_frac": 0.405,
+    "net_pixels_frac": 0.3893,
+    "images_with_any": 0.7059,
+    "critical_per_image": 0.0196,
+    "findings_per_image": 1.4706,
+    "per_class": {
+     "crack": null,
+     "spalling": null,
+     "efflorescence": null,
+     "exposed_rebar": null,
+     "corrosion": null
+    },
+    "ms_per_job": 533.123,
+    "recall_per_s": null,
+    "halt": {
+     "stop-rule": 41,
+     "exhausted": 10
+    },
+    "looks_mean": 4.7451,
+    "looks_by_level": {
+     "L0": 89,
+     "L1": 109,
+     "L2": 44
+    },
+    "looks_by_action": {
+     "gaze": 115,
+     "verify": 41,
+     "escalate": 86
+    },
+    "segmenter": "classical-v1",
+    "confirm": null,
+    "profile": "classical-v1",
+    "boxes_per_image_ci": [
+     7.0191,
+     14.9025
+    ],
+    "images_with_any_ci": [
+     0.5686,
+     0.8235
+    ],
+    "critical_per_image_ci": [
+     0.0,
+     0.0588
+    ],
+    "ms_per_job_ci": [
+     475.2965,
+     592.6837
+    ],
+    "ms_vs_downscale": 1.6975,
+    "ms_vs_downscale_ci": [
+     1.514,
+     1.8843
+    ],
+    "ms_vs_tiling_L0": 0.2494,
+    "ms_vs_tiling_L0_ci": [
+     0.2236,
+     0.2776
+    ]
+   }
+  },
+  "clean:downscale": {
+   "v1": {
+    "recall": null,
+    "recall_ci": [
+     null,
+     null
+    ],
+    "recall_iou_only": null,
+    "chance_recall": null,
+    "chance_recall_iou_only": null,
+    "precision": 0.0,
+    "fp_per_image": 0.0392,
+    "boxes_per_image": 0.0392,
+    "pixels_frac": 0.2474,
+    "net_pixels_frac": 0.0825,
+    "images_with_any": 0.0392,
+    "critical_per_image": 0.0,
+    "findings_per_image": 0.0392,
+    "per_class": {
+     "crack": null,
+     "spalling": null,
+     "efflorescence": null,
+     "exposed_rebar": null,
+     "corrosion": null
+    },
+    "ms_per_job": 589.6635,
+    "recall_per_s": null,
+    "boxes_per_image_ci": [
+     0.0,
+     0.098
+    ],
+    "images_with_any_ci": [
+     0.0,
+     0.098
+    ],
+    "critical_per_image_ci": [
+     0.0,
+     0.0
+    ],
+    "ms_per_job_ci": [
+     589.5086,
+     589.741
+    ],
+    "ms_vs_tiling_L0": 0.0488,
+    "ms_vs_tiling_L0_ci": [
+     0.0465,
+     0.0501
+    ]
+   },
+   "classical-v1": {
+    "recall": null,
+    "recall_ci": [
+     null,
+     null
+    ],
+    "recall_iou_only": null,
+    "chance_recall": null,
+    "chance_recall_iou_only": null,
+    "precision": 0.0,
+    "fp_per_image": 3.0,
+    "boxes_per_image": 3.0,
+    "pixels_frac": 0.2474,
+    "net_pixels_frac": 0.2474,
+    "images_with_any": 0.8824,
+    "critical_per_image": 0.0,
+    "findings_per_image": 1.1569,
+    "per_class": {
+     "crack": null,
+     "spalling": null,
+     "efflorescence": null,
+     "exposed_rebar": null,
+     "corrosion": null
+    },
+    "ms_per_job": 314.0662,
+    "recall_per_s": null,
+    "boxes_per_image_ci": [
+     2.1961,
+     3.9608
+    ],
+    "images_with_any_ci": [
+     0.7843,
+     0.9608
+    ],
+    "critical_per_image_ci": [
+     0.0,
+     0.0
+    ],
+    "ms_per_job_ci": [
+     313.668,
+     314.8627
+    ],
+    "ms_vs_tiling_L0": 0.1469,
+    "ms_vs_tiling_L0_ci": [
+     0.1399,
+     0.1507
+    ]
+   }
+  },
+  "clean:tiling@L0": {
+   "v1": {
+    "recall": null,
+    "recall_ci": [
+     null,
+     null
+    ],
+    "recall_iou_only": null,
+    "chance_recall": null,
+    "chance_recall_iou_only": null,
+    "precision": 0.0,
+    "fp_per_image": 0.0196,
+    "boxes_per_image": 0.0196,
+    "pixels_frac": 1.6705,
+    "net_pixels_frac": 1.6705,
+    "images_with_any": 0.0196,
+    "critical_per_image": 0.0,
+    "findings_per_image": 0.0196,
+    "per_class": {
+     "crack": null,
+     "spalling": null,
+     "efflorescence": null,
+     "exposed_rebar": null,
+     "corrosion": null
+    },
+    "ms_per_job": 12073.042,
+    "recall_per_s": null,
+    "boxes_per_image_ci": [
+     0.0,
+     0.0588
+    ],
+    "images_with_any_ci": [
+     0.0,
+     0.0588
+    ],
+    "critical_per_image_ci": [
+     0.0,
+     0.0
+    ],
+    "ms_per_job_ci": [
+     11772.46,
+     12674.2061
+    ],
+    "ms_vs_downscale": 20.4745,
+    "ms_vs_downscale_ci": [
+     19.9621,
+     21.4996
+    ]
+   },
+   "classical-v1": {
+    "recall": null,
+    "recall_ci": [
+     null,
+     null
+    ],
+    "recall_iou_only": null,
+    "chance_recall": null,
+    "chance_recall_iou_only": null,
+    "precision": 0.0,
+    "fp_per_image": 36.8039,
+    "boxes_per_image": 36.8039,
+    "pixels_frac": 1.6705,
+    "net_pixels_frac": 1.6705,
+    "images_with_any": 1.0,
+    "critical_per_image": 0.0392,
+    "findings_per_image": 12.6863,
+    "per_class": {
+     "crack": null,
+     "spalling": null,
+     "efflorescence": null,
+     "exposed_rebar": null,
+     "corrosion": null
+    },
+    "ms_per_job": 2137.4008,
+    "recall_per_s": null,
+    "boxes_per_image_ci": [
+     32.7833,
+     41.9029
+    ],
+    "images_with_any_ci": [
+     1.0,
+     1.0
+    ],
+    "critical_per_image_ci": [
+     0.0,
+     0.098
+    ],
+    "ms_per_job_ci": [
+     2081.0,
+     2250.2024
+    ],
+    "ms_vs_downscale": 6.8056,
+    "ms_vs_downscale_ci": [
+     6.6344,
+     7.1466
+    ]
+   }
+  },
+  "large@0.3": {
+   "v1": {
+    "recall": 0.6686,
+    "recall_ci": [
+     0.6223,
+     0.7152
+    ],
+    "recall_iou_only": 0.642,
+    "chance_recall": 0.0858,
+    "chance_recall_iou_only": 0.0533,
+    "precision": 0.2572,
+    "fp_per_image": 6.44,
+    "boxes_per_image": 8.67,
+    "pixels_frac": 0.091,
+    "net_pixels_frac": 0.0754,
+    "images_with_any": 0.93,
+    "critical_per_image": 2.68,
+    "findings_per_image": 3.24,
+    "per_class": {
+     "crack": 0.625,
+     "spalling": 0.9884,
+     "efflorescence": 0.0612,
+     "exposed_rebar": 0.1875,
+     "corrosion": 1.0
+    },
+    "ms_per_job": 2668.5122,
+    "recall_per_s": 0.2506,
+    "vs_downscale": 1.1958,
+    "vs_downscale_ci": [
+     1.1298,
+     1.2707
+    ],
+    "vs_downscale_iou_only_ci": [
+     1.1269,
+     1.2805
+    ],
+    "vs_tiling_L0": 1.314,
+    "vs_tiling_L0_ci": [
+     1.1818,
+     1.4806
+    ],
+    "vs_tiling_L0_iou_only_ci": [
+     1.254,
+     1.5985
+    ],
+    "pixels_vs_tiling_L0": 0.0559,
+    "halt": {
+     "stop-rule": 100
+    },
+    "looks_mean": 4.58,
+    "looks_by_level": {
+     "L2": 358,
+     "L3": 100
+    },
+    "looks_by_action": {
+     "gaze": 369,
+     "verify": 79,
+     "escalate": 10
+    },
+    "segmenter": "onnx:drishyam_dacl10k.onnx",
+    "confirm": null,
+    "profile": "onnx:drishyam_dacl10k.onnx",
+    "boxes_per_image_ci": [
+     7.49,
+     10.0402
+    ],
+    "images_with_any_ci": [
+     0.88,
+     0.97
+    ],
+    "critical_per_image_ci": [
+     2.0,
+     3.41
+    ],
+    "ms_per_job_ci": [
+     2537.8476,
+     2799.3188
+    ],
+    "ms_vs_downscale": 4.3422,
+    "ms_vs_downscale_ci": [
+     4.1296,
+     4.555
+    ],
+    "ms_vs_tiling_L0": 0.0477,
+    "ms_vs_tiling_L0_ci": [
+     0.0454,
+     0.0501
+    ]
+   },
+   "classical-v1": {
+    "recall": 0.5178,
+    "recall_ci": [
+     0.4642,
+     0.5767
+    ],
+    "recall_iou_only": 0.4438,
+    "chance_recall": 0.0444,
+    "chance_recall_iou_only": 0.0178,
+    "precision": 0.0147,
+    "fp_per_image": 116.53,
+    "boxes_per_image": 118.27,
+    "pixels_frac": 0.2884,
+    "net_pixels_frac": 0.2728,
+    "images_with_any": 0.98,
+    "critical_per_image": 3.41,
+    "findings_per_image": 6.68,
+    "per_class": {
+     "crack": 0.4135,
+     "spalling": 0.6512,
+     "efflorescence": 0.1429,
+     "exposed_rebar": 0.5,
+     "corrosion": 0.791
+    },
+    "ms_per_job": 1866.4123,
+    "recall_per_s": 0.2774,
+    "vs_downscale": 1.1438,
+    "vs_downscale_ci": [
+     1.0414,
+     1.2538
+    ],
+    "vs_downscale_iou_only_ci": [
+     1.0144,
+     1.2451
+    ],
+    "vs_tiling_L0": 1.6355,
+    "vs_tiling_L0_ci": [
+     1.4358,
+     1.9001
+    ],
+    "vs_tiling_L0_iou_only_ci": [
+     1.8107,
+     2.6834
+    ],
+    "pixels_vs_tiling_L0": 0.177,
+    "halt": {
+     "cap-hit": 92,
+     "exhausted": 6,
+     "stop-rule": 2
+    },
+    "looks_mean": 16.57,
+    "looks_by_level": {
+     "L0": 681,
+     "L1": 776,
+     "L2": 100,
+     "L3": 100
+    },
+    "looks_by_action": {
+     "gaze": 832,
+     "escalate": 522,
+     "verify": 303
+    },
+    "segmenter": "classical-v1",
+    "confirm": null,
+    "profile": "classical-v1",
+    "boxes_per_image_ci": [
+     101.197,
+     138.1265
+    ],
+    "images_with_any_ci": [
+     0.95,
+     1.0
+    ],
+    "critical_per_image_ci": [
+     2.55,
+     4.41
+    ],
+    "ms_per_job_ci": [
+     1826.4342,
+     1894.5051
+    ],
+    "ms_vs_downscale": 5.0885,
+    "ms_vs_downscale_ci": [
+     4.9795,
+     5.1651
+    ],
+    "ms_vs_tiling_L0": 0.1825,
+    "ms_vs_tiling_L0_ci": [
+     0.1786,
+     0.1853
+    ]
+   }
+  },
+  "large@1.0": {
+   "v1": {
+    "recall": 0.6686,
+    "recall_ci": [
+     0.6223,
+     0.7152
+    ],
+    "recall_iou_only": 0.642,
+    "chance_recall": 0.0769,
+    "chance_recall_iou_only": 0.0444,
+    "precision": 0.2572,
+    "fp_per_image": 6.44,
+    "boxes_per_image": 8.67,
+    "pixels_frac": 0.091,
+    "net_pixels_frac": 0.0754,
+    "images_with_any": 0.93,
+    "critical_per_image": 2.68,
+    "findings_per_image": 3.24,
+    "per_class": {
+     "crack": 0.625,
+     "spalling": 0.9884,
+     "efflorescence": 0.0612,
+     "exposed_rebar": 0.1875,
+     "corrosion": 1.0
+    },
+    "ms_per_job": 2668.5122,
+    "recall_per_s": 0.2506,
+    "vs_downscale": 1.1958,
+    "vs_downscale_ci": [
+     1.1298,
+     1.2707
+    ],
+    "vs_downscale_iou_only_ci": [
+     1.1269,
+     1.2805
+    ],
+    "vs_tiling_L0": 1.314,
+    "vs_tiling_L0_ci": [
+     1.1818,
+     1.4806
+    ],
+    "vs_tiling_L0_iou_only_ci": [
+     1.254,
+     1.5985
+    ],
+    "pixels_vs_tiling_L0": 0.0559,
+    "halt": {
+     "stop-rule": 100
+    },
+    "looks_mean": 4.58,
+    "looks_by_level": {
+     "L2": 358,
+     "L3": 100
+    },
+    "looks_by_action": {
+     "gaze": 369,
+     "verify": 79,
+     "escalate": 10
+    },
+    "segmenter": "onnx:drishyam_dacl10k.onnx",
+    "confirm": null,
+    "profile": "onnx:drishyam_dacl10k.onnx",
+    "boxes_per_image_ci": [
+     7.49,
+     10.0402
+    ],
+    "images_with_any_ci": [
+     0.88,
+     0.97
+    ],
+    "critical_per_image_ci": [
+     2.0,
+     3.41
+    ],
+    "ms_per_job_ci": [
+     2537.8476,
+     2799.3188
+    ],
+    "ms_vs_downscale": 4.3422,
+    "ms_vs_downscale_ci": [
+     4.1296,
+     4.555
+    ],
+    "ms_vs_tiling_L0": 0.0477,
+    "ms_vs_tiling_L0_ci": [
+     0.0454,
+     0.0501
+    ]
+   },
+   "classical-v1": {
+    "recall": 0.5266,
+    "recall_ci": [
+     0.4711,
+     0.5845
+    ],
+    "recall_iou_only": 0.4527,
+    "chance_recall": 0.0355,
+    "chance_recall_iou_only": 0.0178,
+    "precision": 0.0123,
+    "fp_per_image": 142.03,
+    "boxes_per_image": 143.8,
+    "pixels_frac": 0.507,
+    "net_pixels_frac": 0.4914,
+    "images_with_any": 0.99,
+    "critical_per_image": 3.57,
+    "findings_per_image": 8.28,
+    "per_class": {
+     "crack": 0.4327,
+     "spalling": 0.6512,
+     "efflorescence": 0.1429,
+     "exposed_rebar": 0.5312,
+     "corrosion": 0.791
+    },
+    "ms_per_job": 3301.3031,
+    "recall_per_s": 0.1595,
+    "vs_downscale": 1.1634,
+    "vs_downscale_ci": [
+     1.0608,
+     1.2815
+    ],
+    "vs_downscale_iou_only_ci": [
+     1.0375,
+     1.2692
+    ],
+    "vs_tiling_L0": 1.6636,
+    "vs_tiling_L0_ci": [
+     1.4583,
+     1.9375
+    ],
+    "vs_tiling_L0_iou_only_ci": [
+     1.8428,
+     2.7336
+    ],
+    "pixels_vs_tiling_L0": 0.3111,
+    "halt": {
+     "exhausted": 18,
+     "stop-rule": 82
+    },
+    "looks_mean": 29.85,
+    "looks_by_level": {
+     "L0": 1383,
+     "L1": 1402,
+     "L2": 100,
+     "L3": 100
+    },
+    "looks_by_action": {
+     "gaze": 1458,
+     "escalate": 1145,
+     "verify": 382
+    },
+    "segmenter": "classical-v1",
+    "confirm": null,
+    "profile": "classical-v1",
+    "boxes_per_image_ci": [
+     125.1272,
+     164.5797
+    ],
+    "images_with_any_ci": [
+     0.97,
+     1.0
+    ],
+    "critical_per_image_ci": [
+     2.68,
+     4.5702
+    ],
+    "ms_per_job_ci": [
+     3126.2637,
+     3462.2961
+    ],
+    "ms_vs_downscale": 9.0006,
+    "ms_vs_downscale_ci": [
+     8.5233,
+     9.4395
+    ],
+    "ms_vs_tiling_L0": 0.3229,
+    "ms_vs_tiling_L0_ci": [
+     0.3058,
+     0.3386
+    ]
+   }
+  },
+  "large:downscale": {
+   "v1": {
+    "recall": 0.5592,
+    "recall_ci": [
+     0.503,
+     0.6098
+    ],
+    "recall_iou_only": 0.5355,
+    "chance_recall": 0.0296,
+    "chance_recall_iou_only": 0.0178,
+    "precision": 0.6897,
+    "fp_per_image": 0.81,
+    "boxes_per_image": 2.61,
+    "pixels_frac": 0.0494,
+    "net_pixels_frac": 0.0165,
+    "images_with_any": 0.91,
+    "critical_per_image": 0.79,
+    "findings_per_image": 1.67,
+    "per_class": {
+     "crack": 0.3942,
+     "spalling": 0.9186,
+     "efflorescence": 0.0,
+     "exposed_rebar": 0.0625,
+     "corrosion": 1.0
+    },
+    "ms_per_job": 614.5576,
+    "recall_per_s": 0.9099,
+    "vs_tiling_L0": 1.0988,
+    "vs_tiling_L0_ci": [
+     0.9698,
+     1.2618
+    ],
+    "vs_tiling_L0_iou_only_ci": [
+     1.0328,
+     1.3508
+    ],
+    "pixels_vs_tiling_L0": 0.0303,
+    "boxes_per_image_ci": [
+     2.25,
+     2.9903
+    ],
+    "images_with_any_ci": [
+     0.85,
+     0.96
+    ],
+    "critical_per_image_ci": [
+     0.62,
+     0.99
+    ],
+    "ms_per_job_ci": [
+     614.5576,
+     614.5576
+    ],
+    "ms_vs_tiling_L0": 0.011,
+    "ms_vs_tiling_L0_ci": [
+     0.011,
+     0.011
+    ]
+   },
+   "classical-v1": {
+    "recall": 0.4527,
+    "recall_ci": [
+     0.3949,
+     0.5141
+    ],
+    "recall_iou_only": 0.3964,
+    "chance_recall": 0.0207,
+    "chance_recall_iou_only": 0.0089,
+    "precision": 0.085,
+    "fp_per_image": 16.03,
+    "boxes_per_image": 17.52,
+    "pixels_frac": 0.0494,
+    "net_pixels_frac": 0.0494,
+    "images_with_any": 1.0,
+    "critical_per_image": 0.99,
+    "findings_per_image": 2.62,
+    "per_class": {
+     "crack": 0.4038,
+     "spalling": 0.5349,
+     "efflorescence": 0.1837,
+     "exposed_rebar": 0.2812,
+     "corrosion": 0.7015
+    },
+    "ms_per_job": 366.7887,
+    "recall_per_s": 1.2341,
+    "vs_tiling_L0": 1.4299,
+    "vs_tiling_L0_ci": [
+     1.2276,
+     1.7208
+    ],
+    "vs_tiling_L0_iou_only_ci": [
+     1.6315,
+     2.4286
+    ],
+    "pixels_vs_tiling_L0": 0.0303,
+    "boxes_per_image_ci": [
+     15.5995,
+     19.53
+    ],
+    "images_with_any_ci": [
+     1.0,
+     1.0
+    ],
+    "critical_per_image_ci": [
+     0.69,
+     1.35
+    ],
+    "ms_per_job_ci": [
+     366.7887,
+     366.7887
+    ],
+    "ms_vs_tiling_L0": 0.0359,
+    "ms_vs_tiling_L0_ci": [
+     0.0359,
+     0.0359
+    ]
+   }
+  },
+  "large:tiling@L0": {
+   "v1": {
+    "recall": 0.5089,
+    "recall_ci": [
+     0.4418,
+     0.578
+    ],
+    "recall_iou_only": 0.4556,
+    "chance_recall": 0.0266,
+    "chance_recall_iou_only": 0.0178,
+    "precision": 0.1197,
+    "fp_per_image": 12.65,
+    "boxes_per_image": 14.37,
+    "pixels_frac": 1.6296,
+    "net_pixels_frac": 1.6296,
+    "images_with_any": 0.97,
+    "critical_per_image": 0.45,
+    "findings_per_image": 9.26,
+    "per_class": {
+     "crack": 0.6731,
+     "spalling": 0.3953,
+     "efflorescence": 0.0204,
+     "exposed_rebar": 0.0,
+     "corrosion": 1.0
+    },
+    "ms_per_job": 55898.172,
+    "recall_per_s": 0.0091,
+    "vs_downscale": 0.9101,
+    "vs_downscale_ci": [
+     0.7925,
+     1.0311
+    ],
+    "vs_downscale_iou_only_ci": [
+     0.7403,
+     0.9682
+    ],
+    "boxes_per_image_ci": [
+     12.57,
+     16.35
+    ],
+    "images_with_any_ci": [
+     0.93,
+     1.0
+    ],
+    "critical_per_image_ci": [
+     0.31,
+     0.61
+    ],
+    "ms_per_job_ci": [
+     55898.172,
+     55898.172
+    ],
+    "ms_vs_downscale": 90.9568,
+    "ms_vs_downscale_ci": [
+     90.9568,
+     90.9568
+    ]
+   },
+   "classical-v1": {
+    "recall": 0.3166,
+    "recall_ci": [
+     0.2612,
+     0.3801
+    ],
+    "recall_iou_only": 0.2041,
+    "chance_recall": 0.0118,
+    "chance_recall_iou_only": 0.0,
+    "precision": 0.0049,
+    "fp_per_image": 215.48,
+    "boxes_per_image": 216.54,
+    "pixels_frac": 1.6296,
+    "net_pixels_frac": 1.6296,
+    "images_with_any": 1.0,
+    "critical_per_image": 1.59,
+    "findings_per_image": 34.76,
+    "per_class": {
+     "crack": 0.3365,
+     "spalling": 0.1628,
+     "efflorescence": 0.1429,
+     "exposed_rebar": 0.0,
+     "corrosion": 0.7612
+    },
+    "ms_per_job": 10224.72,
+    "recall_per_s": 0.031,
+    "vs_downscale": 0.6993,
+    "vs_downscale_ci": [
+     0.5811,
+     0.8146
+    ],
+    "vs_downscale_iou_only_ci": [
+     0.4118,
+     0.6129
+    ],
+    "boxes_per_image_ci": [
+     180.4567,
+     253.0837
+    ],
+    "images_with_any_ci": [
+     1.0,
+     1.0
+    ],
+    "critical_per_image_ci": [
+     1.0297,
+     2.2102
+    ],
+    "ms_per_job_ci": [
+     10224.72,
+     10224.72
+    ],
+    "ms_vs_downscale": 27.8763,
+    "ms_vs_downscale_ci": [
+     27.8763,
+     27.8763
+    ]
+   }
+  }
+ },
+ "pairs": {
+  "codebrim@0.3: v1 / classical-v1": {
+   "boxes": [
+    0.0498,
+    [
+     0.0422,
+     0.0569
+    ]
+   ],
+   "critical": [
+    5.5491,
+    [
+     3.5656,
+     8.8241
+    ]
+   ],
+   "ms": [
+    1.99,
+    [
+     1.9176,
+     2.0594
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    -875.17,
+    [
+     -963.7834,
+     -800.5888
+    ]
+   ],
+   "any_box_share_diff": [
+    -0.035,
+    [
+     -0.065,
+     -0.01
+    ]
+   ],
+   "recall": [
+    2.5382,
+    [
+     2.1562,
+     3.014
+    ]
+   ],
+   "iou_only": [
+    3.1791,
+    [
+     2.5028,
+     4.1044
+    ]
+   ],
+   "chance": [
+    2.4466,
+    [
+     1.899,
+     3.2286
+    ]
+   ]
+  },
+  "codebrim@1.0: v1 / classical-v1": {
+   "boxes": [
+    0.0307,
+    [
+     0.0264,
+     0.0348
+    ]
+   ],
+   "critical": [
+    4.096,
+    [
+     2.7269,
+     6.2024
+    ]
+   ],
+   "ms": [
+    1.2258,
+    [
+     1.1683,
+     1.2921
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    -1579.21,
+    [
+     -1713.2954,
+     -1459.4371
+    ]
+   ],
+   "any_box_share_diff": [
+    -0.035,
+    [
+     -0.065,
+     -0.01
+    ]
+   ],
+   "recall": [
+    2.2513,
+    [
+     1.9402,
+     2.6324
+    ]
+   ],
+   "iou_only": [
+    2.5706,
+    [
+     2.0671,
+     3.2821
+    ]
+   ],
+   "chance": [
+    2.1464,
+    [
+     1.7068,
+     2.7248
+    ]
+   ]
+  },
+  "synth@0.3: v1 / classical-v1": {
+   "boxes": [
+    0.3285,
+    [
+     0.2959,
+     0.3658
+    ]
+   ],
+   "critical": [
+    0.5047,
+    [
+     0.3887,
+     0.6569
+    ]
+   ],
+   "ms": [
+    5.0973,
+    [
+     5.0176,
+     5.1658
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    -12.86,
+    [
+     -14.9801,
+     -10.8898
+    ]
+   ],
+   "any_box_share_diff": [
+    -0.045,
+    [
+     -0.08,
+     -0.01
+    ]
+   ],
+   "recall": [
+    1.3375,
+    [
+     1.2384,
+     1.4507
+    ]
+   ],
+   "iou_only": [
+    1.4669,
+    [
+     1.3403,
+     1.6256
+    ]
+   ],
+   "chance": [
+    2.2632,
+    [
+     1.4072,
+     3.935
+    ]
+   ]
+  },
+  "synth@1.0: v1 / classical-v1": {
+   "boxes": [
+    0.2165,
+    [
+     0.1943,
+     0.2411
+    ]
+   ],
+   "critical": [
+    0.3402,
+    [
+     0.2604,
+     0.4469
+    ]
+   ],
+   "ms": [
+    3.3577,
+    [
+     3.2328,
+     3.4764
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    -25.91,
+    [
+     -30.1814,
+     -22.1745
+    ]
+   ],
+   "any_box_share_diff": [
+    -0.05,
+    [
+     -0.085,
+     -0.015
+    ]
+   ],
+   "recall": [
+    1.1689,
+    [
+     1.0983,
+     1.2442
+    ]
+   ],
+   "iou_only": [
+    1.3033,
+    [
+     1.212,
+     1.4096
+    ]
+   ],
+   "chance": [
+    1.4783,
+    [
+     0.9565,
+     2.5006
+    ]
+   ]
+  },
+  "clean@0.3: v1 / classical-v1": {
+   "boxes": [
+    0.0,
+    [
+     0.0,
+     0.0
+    ]
+   ],
+   "critical": [
+    0.0,
+    [
+     0.0,
+     0.0
+    ]
+   ],
+   "ms": [
+    4.7133,
+    [
+     4.3786,
+     4.9903
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    -7.0784,
+    [
+     -9.5887,
+     -4.6275
+    ]
+   ],
+   "any_box_share_diff": [
+    -0.6667,
+    [
+     -0.7843,
+     -0.5294
+    ]
+   ]
+  },
+  "clean@1.0: v1 / classical-v1": {
+   "boxes": [
+    0.0,
+    [
+     0.0,
+     0.0
+    ]
+   ],
+   "critical": [
+    0.0,
+    [
+     0.0,
+     0.0
+    ]
+   ],
+   "ms": [
+    3.3531,
+    [
+     3.1389,
+     3.5831
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    -10.902,
+    [
+     -14.9025,
+     -7.0191
+    ]
+   ],
+   "any_box_share_diff": [
+    -0.7059,
+    [
+     -0.8235,
+     -0.5686
+    ]
+   ]
+  },
+  "large@0.3: v1 / classical-v1": {
+   "boxes": [
+    0.0733,
+    [
+     0.0629,
+     0.0861
+    ]
+   ],
+   "critical": [
+    0.7859,
+    [
+     0.6209,
+     0.9685
+    ]
+   ],
+   "ms": [
+    1.4298,
+    [
+     1.3608,
+     1.4976
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    -109.6,
+    [
+     -128.9283,
+     -93.1287
+    ]
+   ],
+   "any_box_share_diff": [
+    -0.05,
+    [
+     -0.1,
+     -0.01
+    ]
+   ],
+   "recall": [
+    1.2914,
+    [
+     1.1752,
+     1.4192
+    ]
+   ],
+   "iou_only": [
+    1.4467,
+    [
+     1.3066,
+     1.5969
+    ]
+   ],
+   "chance": [
+    1.9333,
+    [
+     1.1762,
+     3.4625
+    ]
+   ]
+  },
+  "large@1.0: v1 / classical-v1": {
+   "boxes": [
+    0.0603,
+    [
+     0.0519,
+     0.0703
+    ]
+   ],
+   "critical": [
+    0.7507,
+    [
+     0.5948,
+     0.9288
+    ]
+   ],
+   "ms": [
+    0.8083,
+    [
+     0.7608,
+     0.854
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    -135.13,
+    [
+     -155.5738,
+     -117.1585
+    ]
+   ],
+   "any_box_share_diff": [
+    -0.06,
+    [
+     -0.11,
+     -0.02
+    ]
+   ],
+   "recall": [
+    1.2697,
+    [
+     1.1523,
+     1.3939
+    ]
+   ],
+   "iou_only": [
+    1.4183,
+    [
+     1.2907,
+     1.563
+    ]
+   ],
+   "chance": [
+    2.1667,
+    [
+     1.25,
+     4.0
+    ]
+   ]
+  }
+ }
+}

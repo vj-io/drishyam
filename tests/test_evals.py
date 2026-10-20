@@ -653,6 +653,25 @@ def test_model_eval_costs_charges_the_committed_table_and_scores_classical_once(
     assert len(calls) == 3
 
 
+def test_heldout_reads_each_pair_in_both_directions_by_the_dev_criterion():
+    """A ratio CI wholly below 1 is A's loss, wholly above B's (inverted); on the clean set a difference CI wholly above
+    0 is A's harm; critical boxes and ms are costs where higher is worse; a CI that touches the null is no verdict."""
+    from evals import heldout
+
+    pairs = {"codebrim@0.3: v1 / v2a": {"recall": [1.2, [1.1, 1.3]], "iou_only": [1.0, [0.9, 1.1]],
+                                        "critical": [1.5, [1.2, 1.8]], "ms": [0.9, [0.8, 0.95]]},
+             "synth@0.3: v1 / v2a": {"recall": [0.95, [0.9, 1.0]], "iou_only": [1.0, [0.9, 1.1]]},
+             "clean@0.3: v1 / v2a": {"boxes_per_photo_diff": [-0.5, [-0.9, -0.1]], "any_box_share_diff": [0.0, [-0.1, 0.1]],
+                                     "critical": [9.0, [2.0, 20.0]], "ms": [1.0, [0.9, 1.1]]}}
+    assert heldout.verdicts(pairs) == {"v1 vs v2a": {"codebrim": "better", "synth": "same", "clean_harm": False},
+                                       "v2a vs v1": {"codebrim": "worse", "synth": "same", "clean_harm": True}}
+    crit, other = heldout.losses(pairs)
+    assert crit["v1"] == [] and crit["v2a"] == ["codebrim@0.3 recall x0.833 (CI 0.77-0.91) against v1",
+                                                "clean@0.3 +0.500 boxes per clean photo (CI +0.100 to +0.900) against v1"]
+    assert other["v1"] == ["codebrim@0.3 critical boxes per photo x1.500 (CI 1.20-1.80) against v2a"]  # not on the clean set
+    assert other["v2a"] == ["codebrim@0.3 modelled ms per job x1.111 (CI 1.05-1.25) against v1"]
+
+
 # ---------------------------------------------------------------- parity
 def test_parity_compare_saved_files(tmp_path):
     a = np.zeros((2, 8, 8), np.uint8)
