@@ -87,11 +87,17 @@ V0 = 2.0
 # its sweep (results/dev/onnx_v2b_profile_sweep.json): no candidate found more on synth_dev (x1.00, CI 0.97-1.03 or
 # narrower). On CODEBRIM any level found x0.66 (0.56-0.77), absorption on x0.84 (0.75-0.91), 0.15 x0.98 (0.90-1.06) at
 # 2.4x the boxes.
+# The v2c model (drishyam_dacl10k_v2c.onnx, v2a's MobileNetV3-Large UNet trained with rare classes weighted harder)
+# keeps them too, under the same rule stated before its sweep (results/dev/onnx_v2c_profile_sweep.json): no candidate
+# found more on synth_dev (x0.98, CI 0.95-1.02; absorption on 0.95-1.00; old 0.92-1.01). On CODEBRIM 0.15 found x1.09
+# (1.01-1.20) at 2.3x the boxes, a gain on that split alone, which the rule does not take; any level lost recall
+# (x0.92, 0.85-0.99), as did absorption on (x0.88, 0.82-0.93).
 PROFILES = {
     "classical-v1": {"min_view": 0.0, "absorb": True},
     "onnx:drishyam_dacl10k.onnx": {"min_view": 0.3, "absorb": False},
     "onnx:drishyam_dacl10k_v2a.onnx": {"min_view": 0.3, "absorb": False},
     "onnx:drishyam_dacl10k_v2b.onnx": {"min_view": 0.3, "absorb": False},
+    "onnx:drishyam_dacl10k_v2c.onnx": {"min_view": 0.3, "absorb": False},
 }
 
 
@@ -99,7 +105,8 @@ PROFILES = {
 # model installed as models/drishyam_dacl10k.onnx) was not measured, so it gets classical-v1.
 WEIGHTS = {"onnx:drishyam_dacl10k.onnx": "c49416c10087f3c1baa8443b53fc839a3d8eb227ff27a1b4f7be1da964d6ed4a",
            "onnx:drishyam_dacl10k_v2a.onnx": "95b503c2d205567c09b19154ff77a5117889b7aba0b19733ed1c178dc4ab1ad1",
-           "onnx:drishyam_dacl10k_v2b.onnx": "47e4b687d179efc9d221ef05eca441d24b0f025f9ab252c0a60c64455ff99207"}
+           "onnx:drishyam_dacl10k_v2b.onnx": "47e4b687d179efc9d221ef05eca441d24b0f025f9ab252c0a60c64455ff99207",
+           "onnx:drishyam_dacl10k_v2c.onnx": "24b4d561fb012cb525131e16fa211b528a2e30c90fd9b9e76d98e29edbf18d21"}
 
 
 def profile_for(segmenter) -> str:

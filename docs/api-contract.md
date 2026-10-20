@@ -306,6 +306,14 @@ found x0.98 (0.90-1.06) with 2.4 times the boxes. Any level, 0.15 and 0.25 put a
 into the 20 s time cap on 66 to 80 of the 100 CODEBRIM jobs, because v2b's cost table was timed at a higher machine
 load than v2a's; on synth_dev, which settled the decision, no job went past 13.3 s.
 
+`onnx:drishyam_dacl10k_v2c.onnx`, the retrained v2c model (v2a's MobileNetV3-Large UNet with rare classes weighted
+harder in training, sha256 `24b4d561...`), keeps v1's values too, under the same rule, written down before its sweep
+(`results/dev/onnx_v2c_profile_sweep.json`). No candidate found more than v1's values on synth_dev (x0.98 or x0.97,
+every CI reaching 1.00 or above), so none could pass. On CODEBRIM dev100 0.15 found more (x1.09, CI 1.01-1.20) with
+2.3 times the boxes, a gain on one split, which the rule does not take; any level lost recall (x0.92, 0.85-0.99), as
+did absorption on (x0.88, 0.82-0.93). Any level, 0.15 and 0.25 put a box on fewer clean photos (7 of 30 against 12,
+difference CI -0.30 to -0.03), which the rule reports but does not count.
+
 Which model the live engine should run was compared on the same dev splits, each model at its own profile and on
 its own cost table (`results/dev/model_choice_dev.json`, its criterion committed before any v2b row existed). No
 model is best by that criterion. At the 30 % cap the three ONNX models find the same share of CODEBRIM dev100's
