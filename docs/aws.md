@@ -224,8 +224,9 @@ classical engine. Making the CC BY-NC 4.0 dacl10k model the live segmenter is an
    `halted` with cause `kill-switch`. The job holds its Lambda environment while it streams, so the kill lands in
    another one; if that one starts cold (about 3 s with v1), a short job can finish first, as on the first smoke
    after the v1 deploy (2026-10-20). So the browser (`public/js/api.js`) sends `GET /api/health` as soon as a job
-   starts streaming, which starts a second environment, and this check sends the same request and waits for it before
-   the kill.
+   starts streaming, which starts a second environment for a later KILL, and this script does the same during both
+   jobs and waits for that request before the kill. A KILL pressed during the very first job on a cold function can
+   still arrive after a short job has finished.
 4. Behind CloudFront only: a `POST` without `x-amz-content-sha256` gets 403.
 5. With `FUNCTION_URL` set (`scripts/aws.sh smoke` sets it): the raw Function URL gets 403.
 6. With `E2E=1`: `tests/e2e/test_ui_live.py <url>`, the browser flows (needs Playwright in `.venv`, see
