@@ -306,6 +306,14 @@ found x0.98 (0.90-1.06) with 2.4 times the boxes. Any level, 0.15 and 0.25 put a
 into the 20 s time cap on 66 to 80 of the 100 CODEBRIM jobs, because v2b's cost table was timed at a higher machine
 load than v2a's; on synth_dev, which settled the decision, no job went past 13.3 s.
 
+`onnx:drishyam_dacl10k_v2c.onnx`, the retrained v2c model (v2a's MobileNetV3-Large UNet with rare classes weighted
+harder in training, sha256 `24b4d561...`), keeps v1's values too, under the same rule, written down before its sweep
+(`results/dev/onnx_v2c_profile_sweep.json`). No candidate found more than v1's values on synth_dev (x0.98 or x0.97,
+every CI reaching 1.00 or above), so none could pass. On CODEBRIM dev100 0.15 found more (x1.09, CI 1.01-1.20) with
+2.3 times the boxes, a gain on one split, which the rule does not take; any level lost recall (x0.92, 0.85-0.99), as
+did absorption on (x0.88, 0.82-0.93). Any level, 0.15 and 0.25 put a box on fewer clean photos (7 of 30 against 12,
+difference CI -0.30 to -0.03), which the rule reports but does not count.
+
 Which model the live engine should run was compared on the same dev splits, each model at its own profile and on
 its own cost table (`results/dev/model_choice_dev.json`, its criterion committed before any v2b row existed). No
 model is best by that criterion. At the 30 % cap the three ONNX models find the same share of CODEBRIM dev100's
@@ -319,7 +327,13 @@ photos: v1 put a box on 1, v2a on 5, v2b on 13, and v2a and v2b each put measura
 one window). On dev only, the recommendation is v1 for the live engine, which runs the classical engine today: it
 is the one model with no measurable loss against any other, at 2.00 times the classical engine's modelled ms per
 CODEBRIM job on this Mac (CI 1.89-2.11). v2b's ms there are about 2.5 times v2a's, but timed in one window a v2b
-look costs 0.87 to 1.04 times a v2a look: its table was timed at a higher machine load. No held-out set was run for
+look costs 0.87 to 1.04 times a v2a look: its table was timed at a higher machine load. v2c, compared later under the
+same criterion (five models; the reading of "each of the others" and v2c's own rule were committed before any v2c
+row), changes none of this. It finds no measurably different share on either split (CODEBRIM 0.462, synth_dev
+0.600; against v1 x0.97, CI 0.88-1.06, and x0.98, 0.90-1.04), puts a box on 12 of the 30 clean photos, measurably
+more boxes than v1 and v2a (+2.60 and +1.93 per photo), and has lower IoU-only recall than v1 on CODEBRIM (x0.85,
+0.72-0.99); it sends 3.83 critical boxes per CODEBRIM photo to the gate. Its ms on its own table are 1.36 times
+v2a's, but timed in one window a v2c look costs 0.99 times a v2a look. No held-out set was run for
 this choice; the one held-out evaluation that followed, which changed nothing here, is in
 `results/heldout_models.json` (report, section 8).
 

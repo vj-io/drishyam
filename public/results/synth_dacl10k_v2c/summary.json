@@ -1,0 +1,789 @@
+{
+ "dataset": "synthetic-200 at 2048x1536 (labelled synthetic)",
+ "n_images": 200,
+ "segmenter": "onnx:drishyam_dacl10k_v2c.onnx",
+ "agent_config": {
+  "governor": false,
+  "use": "policy comparison: the governor's model, level and gaze-size overrides are off (caps and the kill switch stay), so Drishyam segments every look with the same accurate net as the baselines",
+  "profile": "onnx:drishyam_dacl10k_v2c.onnx"
+ },
+ "cost_model": {
+  "kind": "fixed",
+  "source": "results/local-macos-x86-dacl10k_v2c/micro.json job_ops (p50 ms per call)",
+  "ms_per_call": {
+   "pyrDown": 12.44,
+   "saliency": 4.71,
+   "warp": 2.3,
+   "quality": 1.68,
+   "segment:accurate": 736.45,
+   "segment:fast": 246.2,
+   "downscale": 1.52
+  }
+ },
+ "policies": {
+  "downscale": [
+   {
+    "pixels_frac": 0.25,
+    "net_pixels_frac": 0.0833,
+    "recall": 0.463,
+    "recall_ci": [
+     0.4286,
+     0.4985
+    ],
+    "recall_iou_only": 0.4393,
+    "recall_iou_only_ci": [
+     0.406,
+     0.4737
+    ],
+    "chance_recall": 0.0414,
+    "chance_recall_iou_only": 0.0207,
+    "precision": 0.5094,
+    "fp_per_image": 1.4,
+    "boxes_per_image": 2.9,
+    "hits_per_matched_gt": 1.0,
+    "usd": 6.9e-05
+   }
+  ],
+  "tiling": [
+   {
+    "pixels_frac": 0.0625,
+    "net_pixels_frac": 0.0833,
+    "recall": 0.4645,
+    "recall_ci": [
+     0.4309,
+     0.4985
+    ],
+    "recall_iou_only": 0.4393,
+    "recall_iou_only_ci": [
+     0.4075,
+     0.4712
+    ],
+    "chance_recall": 0.0399,
+    "chance_recall_iou_only": 0.0222,
+    "precision": 0.565,
+    "fp_per_image": 1.2,
+    "boxes_per_image": 2.7,
+    "hits_per_matched_gt": 1.0,
+    "usd": 7.1e-05
+   },
+   {
+    "pixels_frac": 0.5,
+    "net_pixels_frac": 0.5,
+    "recall": 0.6479,
+    "recall_ci": [
+     0.6109,
+     0.6844
+    ],
+    "recall_iou_only": 0.574,
+    "recall_iou_only_ci": [
+     0.5387,
+     0.6095
+    ],
+    "chance_recall": 0.1391,
+    "chance_recall_iou_only": 0.0148,
+    "precision": 0.2558,
+    "fp_per_image": 6.1,
+    "boxes_per_image": 8.2,
+    "hits_per_matched_gt": 1.03,
+    "usd": 0.000417
+   },
+   {
+    "pixels_frac": 1.6667,
+    "net_pixels_frac": 1.6667,
+    "recall": 0.7396,
+    "recall_ci": [
+     0.7087,
+     0.7708
+    ],
+    "recall_iou_only": 0.7101,
+    "recall_iou_only_ci": [
+     0.6773,
+     0.7429
+    ],
+    "chance_recall": 0.1524,
+    "chance_recall_iou_only": 0.0399,
+    "precision": 0.1213,
+    "fp_per_image": 17.7,
+    "boxes_per_image": 20.1,
+    "hits_per_matched_gt": 1.13,
+    "usd": 0.001387
+   }
+  ],
+  "drishyam": [
+   {
+    "pixels_frac": 0.0156,
+    "net_pixels_frac": 0.0,
+    "recall": 0.0,
+    "recall_ci": [
+     0.0,
+     0.0
+    ],
+    "recall_iou_only": 0.0,
+    "recall_iou_only_ci": [
+     0.0,
+     0.0
+    ],
+    "chance_recall": 0.0,
+    "chance_recall_iou_only": 0.0,
+    "precision": null,
+    "fp_per_image": 0.0,
+    "boxes_per_image": 0.0,
+    "hits_per_matched_gt": null,
+    "usd": 2e-06
+   },
+   {
+    "pixels_frac": 0.099,
+    "net_pixels_frac": 0.0833,
+    "recall": 0.3728,
+    "recall_ci": [
+     0.344,
+     0.4015
+    ],
+    "recall_iou_only": 0.3491,
+    "recall_iou_only_ci": [
+     0.3214,
+     0.3772
+    ],
+    "chance_recall": 0.0281,
+    "chance_recall_iou_only": 0.0118,
+    "precision": 0.3082,
+    "fp_per_image": 2.7,
+    "boxes_per_image": 3.9,
+    "hits_per_matched_gt": 1.0,
+    "usd": 7.1e-05
+   },
+   {
+    "pixels_frac": 0.1806,
+    "net_pixels_frac": 0.165,
+    "recall": 0.4985,
+    "recall_ci": [
+     0.4636,
+     0.5359
+    ],
+    "recall_iou_only": 0.4719,
+    "recall_iou_only_ci": [
+     0.4369,
+     0.508
+    ],
+    "chance_recall": 0.0636,
+    "chance_recall_iou_only": 0.0148,
+    "precision": 0.2704,
+    "fp_per_image": 4.5,
+    "boxes_per_image": 6.1,
+    "hits_per_matched_gt": 1.55,
+    "usd": 0.00014
+   },
+   {
+    "pixels_frac": 0.2548,
+    "net_pixels_frac": 0.2392,
+    "recall": 0.5725,
+    "recall_ci": [
+     0.5381,
+     0.6093
+    ],
+    "recall_iou_only": 0.5311,
+    "recall_iou_only_ci": [
+     0.4978,
+     0.5657
+    ],
+    "chance_recall": 0.0814,
+    "chance_recall_iou_only": 0.0325,
+    "precision": 0.2015,
+    "fp_per_image": 7.5,
+    "boxes_per_image": 9.4,
+    "hits_per_matched_gt": 1.78,
+    "usd": 0.000202
+   },
+   {
+    "pixels_frac": 0.3002,
+    "net_pixels_frac": 0.2846,
+    "recall": 0.5902,
+    "recall_ci": [
+     0.5547,
+     0.6266
+    ],
+    "recall_iou_only": 0.5459,
+    "recall_iou_only_ci": [
+     0.5112,
+     0.5806
+    ],
+    "chance_recall": 0.1213,
+    "chance_recall_iou_only": 0.0503,
+    "precision": 0.1718,
+    "fp_per_image": 9.4,
+    "boxes_per_image": 11.4,
+    "hits_per_matched_gt": 1.96,
+    "usd": 0.00024
+   },
+   {
+    "pixels_frac": 0.3002,
+    "net_pixels_frac": 0.2846,
+    "recall": 0.5902,
+    "recall_ci": [
+     0.5547,
+     0.6266
+    ],
+    "recall_iou_only": 0.5459,
+    "recall_iou_only_ci": [
+     0.5112,
+     0.5806
+    ],
+    "chance_recall": 0.0858,
+    "chance_recall_iou_only": 0.034,
+    "precision": 0.1718,
+    "fp_per_image": 9.4,
+    "boxes_per_image": 11.4,
+    "hits_per_matched_gt": 1.96,
+    "usd": 0.00024
+   }
+  ]
+ },
+ "headline_stats": {
+  "budget": 0.3,
+  "target": {
+   "recall_ratio": 0.9,
+   "pixels_ratio": 0.3
+  },
+  "recall_ratio_vs_tiling": 0.774,
+  "recall_ratio_vs_tiling_ci": [
+   0.7347,
+   0.8139
+  ],
+  "recall_ratio_iou_only_vs_tiling": 0.7479,
+  "recall_ratio_iou_only_vs_tiling_ci": [
+   0.7067,
+   0.7876
+  ],
+  "pixels_ratio_vs_tiling": 0.1529,
+  "meets_target": false,
+  "meets_target_ci": false,
+  "recall_ratio_vs_downscale": 1.2364,
+  "recall_ratio_vs_downscale_ci": [
+   1.1666,
+   1.3117
+  ]
+ },
+ "strata": {
+  "gt_boxes": {
+   "hairline_crack": 87,
+   "small_box": 16
+  },
+  "small_box_px": 9216,
+  "recall": {
+   "downscale": {
+    "hairline_crack": 0.2989,
+    "small_box": 0.0
+   },
+   "tiling@L2": {
+    "hairline_crack": 0.3103,
+    "small_box": 0.0
+   },
+   "tiling@L1": {
+    "hairline_crack": 0.7011,
+    "small_box": 0.375
+   },
+   "tiling@L0": {
+    "hairline_crack": 0.8046,
+    "small_box": 0.375
+   },
+   "drishyam@0.05": {
+    "hairline_crack": 0.0,
+    "small_box": 0.0
+   },
+   "drishyam@0.1": {
+    "hairline_crack": 0.2184,
+    "small_box": 0.0625
+   },
+   "drishyam@0.2": {
+    "hairline_crack": 0.4023,
+    "small_box": 0.0625
+   },
+   "drishyam@0.3": {
+    "hairline_crack": 0.4828,
+    "small_box": 0.0625
+   },
+   "drishyam@0.5": {
+    "hairline_crack": 0.5172,
+    "small_box": 0.0625
+   },
+   "drishyam@1.0": {
+    "hairline_crack": 0.5172,
+    "small_box": 0.0625
+   }
+  }
+ },
+ "per_class": {
+  "downscale": {
+   "crack": 0.185,
+   "spalling": 0.9112,
+   "efflorescence": 0.0,
+   "exposed_rebar": 0.0,
+   "corrosion": 0.975
+  },
+  "tiling@0.0625": {
+   "crack": 0.1894,
+   "spalling": 0.929,
+   "efflorescence": 0.0101,
+   "exposed_rebar": 0.0,
+   "corrosion": 0.9417
+  },
+  "tiling@0.25": {
+   "crack": 0.63,
+   "spalling": 0.9763,
+   "efflorescence": 0.101,
+   "exposed_rebar": 0.0,
+   "corrosion": 1.0
+  },
+  "tiling@1.0": {
+   "crack": 0.8722,
+   "spalling": 0.9822,
+   "efflorescence": 0.1616,
+   "exposed_rebar": 0.0,
+   "corrosion": 1.0
+  },
+  "drishyam@0.05": {
+   "crack": 0.0,
+   "spalling": 0.0,
+   "efflorescence": 0.0,
+   "exposed_rebar": 0.0,
+   "corrosion": 0.0
+  },
+  "drishyam@0.1": {
+   "crack": 0.2159,
+   "spalling": 0.6095,
+   "efflorescence": 0.0303,
+   "exposed_rebar": 0.0,
+   "corrosion": 0.8083
+  },
+  "drishyam@0.2": {
+   "crack": 0.2952,
+   "spalling": 0.9527,
+   "efflorescence": 0.0101,
+   "exposed_rebar": 0.0,
+   "corrosion": 0.9
+  },
+  "drishyam@0.3": {
+   "crack": 0.4361,
+   "spalling": 0.9882,
+   "efflorescence": 0.0303,
+   "exposed_rebar": 0.0,
+   "corrosion": 0.9833
+  },
+  "drishyam@0.5": {
+   "crack": 0.4802,
+   "spalling": 0.9882,
+   "efflorescence": 0.0404,
+   "exposed_rebar": 0.0,
+   "corrosion": 0.9917
+  },
+  "drishyam@1.0": {
+   "crack": 0.4802,
+   "spalling": 0.9882,
+   "efflorescence": 0.0404,
+   "exposed_rebar": 0.0,
+   "corrosion": 0.9917
+  }
+ },
+ "agent_metrics": {
+  "headline_budget": 0.3,
+  "escalation_rate": 0.0662,
+  "steps_per_image": {
+   "p50": 3.0,
+   "p95": 3.0
+  },
+  "pixels_per_image": {
+   "p50": 835505,
+   "p95": 835505,
+   "p50_frac": 0.2656,
+   "p95_frac": 0.2656
+  },
+  "steps_with_cause_pct": 100.0,
+  "by_budget": {
+   "0.05": {
+    "escalation_rate": 0.0,
+    "verify_rate": 0.0,
+    "steps_p50": 0.0,
+    "steps_p95": 0.0,
+    "pixels_frac_p50": 0.0156,
+    "pixels_frac_p95": 0.0156,
+    "pixels_p50": 49073,
+    "pixels_p95": 49073,
+    "halt_causes": {
+     "cap-hit": 200
+    }
+   },
+   "0.1": {
+    "escalation_rate": 0.0,
+    "verify_rate": 0.0,
+    "steps_p50": 1.0,
+    "steps_p95": 1.0,
+    "pixels_frac_p50": 0.099,
+    "pixels_frac_p95": 0.099,
+    "pixels_p50": 311427,
+    "pixels_p95": 311427,
+    "halt_causes": {
+     "cap-hit": 200
+    }
+   },
+   "0.2": {
+    "escalation_rate": 0.096,
+    "verify_rate": 0.3535,
+    "steps_p50": 2.0,
+    "steps_p95": 2.0,
+    "pixels_frac_p50": 0.1823,
+    "pixels_frac_p95": 0.1823,
+    "pixels_p50": 573466,
+    "pixels_p95": 573466,
+    "halt_causes": {
+     "cap-hit": 196,
+     "exhausted": 4
+    }
+   },
+   "0.3": {
+    "escalation_rate": 0.0662,
+    "verify_rate": 0.2439,
+    "steps_p50": 3.0,
+    "steps_p95": 3.0,
+    "pixels_frac_p50": 0.2656,
+    "pixels_frac_p95": 0.2656,
+    "pixels_p50": 835505,
+    "pixels_p95": 835505,
+    "halt_causes": {
+     "cap-hit": 178,
+     "exhausted": 4,
+     "stop-rule": 18
+    }
+   },
+   "0.5": {
+    "escalation_rate": 0.0556,
+    "verify_rate": 0.205,
+    "steps_p50": 3.0,
+    "steps_p95": 5.0,
+    "pixels_frac_p50": 0.2656,
+    "pixels_frac_p95": 0.4323,
+    "pixels_p50": 835505,
+    "pixels_p95": 1359898,
+    "halt_causes": {
+     "cap-hit": 16,
+     "exhausted": 17,
+     "stop-rule": 167
+    }
+   },
+   "1.0": {
+    "escalation_rate": 0.0556,
+    "verify_rate": 0.205,
+    "steps_p50": 3.0,
+    "steps_p95": 5.0,
+    "pixels_frac_p50": 0.2656,
+    "pixels_frac_p95": 0.4323,
+    "pixels_p50": 835505,
+    "pixels_p95": 1359898,
+    "halt_causes": {
+     "exhausted": 20,
+     "stop-rule": 180
+    }
+   }
+  },
+  "planner_recovery": {
+   "timeout": {
+    "injected": 0,
+    "fired": 0,
+    "recovered": 0
+   },
+   "malformed": {
+    "injected": 0,
+    "fired": 0,
+    "recovered": 0
+   },
+   "recovered_total": 0,
+   "injected_total": 0
+  },
+  "governor_response": {
+   "injected": 0,
+   "fired": 0,
+   "recovered": 0
+  },
+  "governor_activity_in_eval": {
+   "p95>SLA": 0,
+   "warp-spike": 0,
+   "usd≥80%": 0
+  },
+  "model_usage": {
+   "downscale": {
+    "accurate": 200
+   },
+   "tiling@L2": {
+    "accurate": 200
+   },
+   "tiling@L1": {
+    "accurate": 1200
+   },
+   "tiling@L0": {
+    "accurate": 4000
+   },
+   "drishyam@0.05": {},
+   "drishyam@0.1": {
+    "accurate": 200
+   },
+   "drishyam@0.2": {
+    "accurate": 396
+   },
+   "drishyam@0.3": {
+    "accurate": 574
+   },
+   "drishyam@0.5": {
+    "accurate": 683
+   },
+   "drishyam@1.0": {
+    "accurate": 683
+   }
+  },
+  "timing": {
+   "workers": 6,
+   "cv2_threads_per_worker": 1,
+   "note": "wall times are modelled (--cost-model fixed): micro.json job_ops p50 per call, not measured"
+  },
+  "false_accept_critical": {
+   "downscale": {
+    "critical_predictions": 111,
+    "false": 1,
+    "rate": 0.009
+   },
+   "tiling@L2": {
+    "critical_predictions": 115,
+    "false": 2,
+    "rate": 0.0174
+   },
+   "tiling@L1": {
+    "critical_predictions": 119,
+    "false": 0,
+    "rate": 0.0
+   },
+   "tiling@L0": {
+    "critical_predictions": 79,
+    "false": 0,
+    "rate": 0.0
+   },
+   "drishyam@0.05": {
+    "critical_predictions": 0,
+    "false": 0,
+    "rate": null
+   },
+   "drishyam@0.1": {
+    "critical_predictions": 70,
+    "false": 0,
+    "rate": 0.0
+   },
+   "drishyam@0.2": {
+    "critical_predictions": 195,
+    "false": 0,
+    "rate": 0.0
+   },
+   "drishyam@0.3": {
+    "critical_predictions": 226,
+    "false": 0,
+    "rate": 0.0
+   },
+   "drishyam@0.5": {
+    "critical_predictions": 253,
+    "false": 0,
+    "rate": 0.0
+   },
+   "drishyam@1.0": {
+    "critical_predictions": 253,
+    "false": 0,
+    "rate": 0.0
+   },
+   "note": "a critical prediction is exposed_rebar or spalling >= 40000 px^2; false = matches no critical GT box (spalling GT is critical at box area >= the same threshold)"
+  },
+  "box_convention": {
+   "primary": "components",
+   "note": "components: every policy reports one box per connected component; union: every policy reports one box per class per view (a Drishyam finding); as_specified: findings boxes for Drishyam, components for the baselines. Union boxes contain more GT centres, so as_specified favours Drishyam. iou_only drops the contains-centre clause.",
+   "recall": {
+    "components": {
+     "downscale": 0.463,
+     "tiling@L2": 0.4645,
+     "tiling@L1": 0.6479,
+     "tiling@L0": 0.7396,
+     "drishyam@0.05": 0.0,
+     "drishyam@0.1": 0.3728,
+     "drishyam@0.2": 0.4985,
+     "drishyam@0.3": 0.5725,
+     "drishyam@0.5": 0.5902,
+     "drishyam@1.0": 0.5902
+    },
+    "union": {
+     "downscale": 0.4896,
+     "tiling@L2": 0.4896,
+     "tiling@L1": 0.6686,
+     "tiling@L0": 0.753,
+     "drishyam@0.05": 0.0,
+     "drishyam@0.1": 0.3772,
+     "drishyam@0.2": 0.5178,
+     "drishyam@0.3": 0.5932,
+     "drishyam@0.5": 0.6124,
+     "drishyam@1.0": 0.6124
+    },
+    "as_specified": {
+     "downscale": 0.463,
+     "tiling@L2": 0.4645,
+     "tiling@L1": 0.6479,
+     "tiling@L0": 0.7396,
+     "drishyam@0.05": 0.0,
+     "drishyam@0.1": 0.3772,
+     "drishyam@0.2": 0.5178,
+     "drishyam@0.3": 0.5932,
+     "drishyam@0.5": 0.6124,
+     "drishyam@1.0": 0.6124
+    }
+   },
+   "recall_iou_only": {
+    "components": {
+     "downscale": 0.4393,
+     "tiling@L2": 0.4393,
+     "tiling@L1": 0.574,
+     "tiling@L0": 0.7101,
+     "drishyam@0.05": 0.0,
+     "drishyam@0.1": 0.3491,
+     "drishyam@0.2": 0.4719,
+     "drishyam@0.3": 0.5311,
+     "drishyam@0.5": 0.5459,
+     "drishyam@1.0": 0.5459
+    },
+    "union": {
+     "downscale": 0.2115,
+     "tiling@L2": 0.2263,
+     "tiling@L1": 0.3817,
+     "tiling@L0": 0.6834,
+     "drishyam@0.05": 0.0,
+     "drishyam@0.1": 0.253,
+     "drishyam@0.2": 0.2041,
+     "drishyam@0.3": 0.3003,
+     "drishyam@0.5": 0.3462,
+     "drishyam@1.0": 0.3462
+    },
+    "as_specified": {
+     "downscale": 0.4393,
+     "tiling@L2": 0.4393,
+     "tiling@L1": 0.574,
+     "tiling@L0": 0.7101,
+     "drishyam@0.05": 0.0,
+     "drishyam@0.1": 0.253,
+     "drishyam@0.2": 0.2041,
+     "drishyam@0.3": 0.3003,
+     "drishyam@0.5": 0.3462,
+     "drishyam@1.0": 0.3462
+    }
+   },
+   "false_accept_rate": {
+    "components": {
+     "downscale": 0.009,
+     "tiling@L2": 0.0174,
+     "tiling@L1": 0.0,
+     "tiling@L0": 0.0,
+     "drishyam@0.05": null,
+     "drishyam@0.1": 0.0,
+     "drishyam@0.2": 0.0,
+     "drishyam@0.3": 0.0,
+     "drishyam@0.5": 0.0,
+     "drishyam@1.0": 0.0
+    },
+    "union": {
+     "downscale": 0.0,
+     "tiling@L2": 0.0,
+     "tiling@L1": 0.0,
+     "tiling@L0": 0.0,
+     "drishyam@0.05": null,
+     "drishyam@0.1": 0.0156,
+     "drishyam@0.2": 0.0,
+     "drishyam@0.3": 0.0,
+     "drishyam@0.5": 0.0,
+     "drishyam@1.0": 0.0
+    },
+    "as_specified": {
+     "downscale": 0.009,
+     "tiling@L2": 0.0174,
+     "tiling@L1": 0.0,
+     "tiling@L0": 0.0,
+     "drishyam@0.05": null,
+     "drishyam@0.1": 0.0156,
+     "drishyam@0.2": 0.0,
+     "drishyam@0.3": 0.0,
+     "drishyam@0.5": 0.0,
+     "drishyam@1.0": 0.0
+    }
+   },
+   "predictions_per_image": {
+    "components": {
+     "downscale": 2.9,
+     "tiling@L2": 2.7,
+     "tiling@L1": 8.2,
+     "tiling@L0": 20.1,
+     "drishyam@0.05": 0.0,
+     "drishyam@0.1": 3.9,
+     "drishyam@0.2": 6.1,
+     "drishyam@0.3": 9.4,
+     "drishyam@0.5": 11.4,
+     "drishyam@1.0": 11.4
+    },
+    "union": {
+     "downscale": 1.6,
+     "tiling@L2": 1.6,
+     "tiling@L1": 4.1,
+     "tiling@L0": 10.9,
+     "drishyam@0.05": 0.0,
+     "drishyam@0.1": 1.6,
+     "drishyam@0.2": 1.8,
+     "drishyam@0.3": 2.6,
+     "drishyam@0.5": 3.1,
+     "drishyam@1.0": 3.1
+    },
+    "as_specified": {
+     "downscale": 2.9,
+     "tiling@L2": 2.7,
+     "tiling@L1": 8.2,
+     "tiling@L0": 20.1,
+     "drishyam@0.05": 0.0,
+     "drishyam@0.1": 1.6,
+     "drishyam@0.2": 1.8,
+     "drishyam@0.3": 2.6,
+     "drishyam@0.5": 3.1,
+     "drishyam@1.0": 3.1
+    }
+   }
+  }
+ },
+ "micro": [],
+ "provenance": {
+  "cv2": "5.0.0",
+  "build_info_sha256": "fe5f9337dbc8663639ee7bcb2deb09359893fc8d2aa5b6a447cee2a0117d2ec7",
+  "cv2_baseline": "SSE SSE2 SSE3 SSSE3 SSE4_1",
+  "cv2_dispatch": "SSE4_2 AVX FP16 AVX2 AVX512_SKX",
+  "cv2_parallel_framework": "GCD",
+  "cv2_custom_hal": "YES (ipp (ver 0.0.1))",
+  "machine": "Darwin 25.6.0 x86_64, 16 logical CPUs; eval ran 6 worker(s) x 1 cv2 thread(s); micro arm local-macos-x86-dacl10k_v2c",
+  "cpu": "Intel(R) Core(TM) i9-9880H CPU @ 2.30GHz",
+  "python": "3.13.16",
+  "timestamp": "2026-10-20T15:51:37Z",
+  "build": "stock (not COOL)",
+  "load_avg": [
+   11.36,
+   13.78,
+   14.29
+  ],
+  "load_avg_start": [
+   11.36,
+   13.78,
+   14.29
+  ],
+  "load_avg_end": [
+   25.65,
+   64.31,
+   109.49
+  ],
+  "dataset_gt_sha256": "a06f5c40620efc1f37e3f247be35e84790d3ed82e385f1cb1122eb30b0528b7f",
+  "dataset_images_sha256": "8cfbe42f03b89e6ad8851666db2869deb3745b575d5235d356a028945667a95a",
+  "dataset_generator_version": 2
+ },
+ "headline": "On 200 labelled synthetic images, Drishyam at a 30% pixel cap found 0.57 of ground-truth boxes using 0.25 of the image's pixels, versus 0.74 for 20%-overlap 512-px tiling using 1.67: 0.77x its recall (95% CI 0.73-0.81, 0.79x with one-box-per-class boxes, 0.80x with as-specified mixed boxes) at 0.15x its pixels, which does not meet the 0.9x-at-0.3x hypothesis. It is 1.24x a single 1024-px downscale (95% CI 1.17-1.31, 0.46 at 0.25 of the pixels), 0.88x L1 tiling (0.65 at 0.50) and 1.23x L2 tiling (0.46 at 0.06), and 0.75x L0 tiling when a match needs IoU >= 0.3 (95% CI 0.71-0.79, no contains-the-centre clause); its own boxes placed at random would score 0.08 (0.03 with IoU only)."
+}

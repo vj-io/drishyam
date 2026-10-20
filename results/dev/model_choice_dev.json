@@ -1,10 +1,39 @@
 {
- "what": "Dev-only comparison of the four segmenters the live engine could run, each at its own profile (drishyam.agent.PROFILES) and charged its own cost table: the dacl10k v2a and v2b ONNX models, the dacl10k v1 ONNX model and the classical engine. Never a held-out set. The criterion was committed in 7f37505 (2026-10-19T21:26:42Z) while v2b's grid was running, before its first row file was written (runs/v2b/v2b_grid_clean.json, 21:27:57Z); v2a's and v1's dev rows had been read. It is unchanged.",
+ "what": "Dev-only comparison of the five segmenters the live engine could run, each at its own profile (drishyam.agent.PROFILES) and charged its own cost table: the dacl10k v2c, v2b and v2a ONNX models, the dacl10k v1 ONNX model and the classical engine. Never a held-out set. The criterion was committed in 7f37505 (2026-10-19T21:26:42Z) while v2b's grid was running, before its first row file was written (runs/v2b/v2b_grid_clean.json, 21:27:57Z); v2a's and v1's dev rows had been read. It is unchanged. v2c joined after the four-way comparison was merged (7169b68, 2026-10-20T06:47:17+05:30): its grid, its rule and the five-way reading of the criterion (criterion_five_way) were committed in 7880a41 before any v2c row was run; the four models' rows, pairs, per-image data and run provenance are the four-way file's, carried over, not re-run (each carried pair is recomputed from the carried per-image data and matches).",
  "criterion": "Recall at the 30 % cap (JobConfig's default) on CODEBRIM dev100 (real photos) and on synth_dev. Model A is better than model B on a split when the paired 95 % bootstrap CI of A's recall ratio to B (images resampled together, evals.harness.boot_ci) lies wholly above 1, worse when it lies wholly below 1; a CI that touches or crosses 1 is no measurable difference. On the clean dev split at the 30 % cap A harms against B when the paired CI of A's boxes-per-photo difference to B, or of its difference in the share of photos with any box, lies wholly above 0, by the same standard. A model is best on dev when, against each of the other three, it is better on at least one recall split, worse on neither and has no clean harm. If no model qualifies, none is best on dev by this standard, and the pairs say where each wins and loses. Modelled ms per job, the 1.0 cap, IoU-only recall, critical boxes and the ratios to L0 tiling and the downscale are reported, not part of the criterion; ms from cost tables timed at different machine loads are not comparable between models (each table's load is listed).",
- "cost_tables": "Each model is charged its own table, timed on this Mac (x86, 1 cv2 thread per worker): v2b results/local-macos-x86-dacl10k_v2b/micro.json (2026-10-19T19:28Z, 1-min load 10.64 at start, 14.52 at end), v2a results/local-macos-x86-dacl10k_v2a/micro.json (2026-10-19T16:27Z, 1-min load 7.93 at start, 7.81 at end), v1 results/local-macos-x86-dacl10k-retime/micro.json (2026-10-19T16:31Z, 1-min load 8.0 at start, 7.39 at end), the classical engine results/local-macos-x86/micro.json (2026-10-17T20:19Z, 1-min load 23.82 at start, none recorded at end). One look at 4000x3000 (warp, quality and segment:accurate, p50) costs 1326.8 ms on v2b's table, 526.5 on v2a's, 568.1 on v1's and 108.0 on the classical engine's. v2a re-timed in v2b's window (runs/v2a/micro/local-macos-x86-dacl10k_v2a/micro.json, load 14.08 to 11.22) costs 1304.5: per look v2b costs 0.87 to 1.04 times v2a in one window across the three timed sizes, against 2.10 to 2.52 between their own tables, so the ms gap between v2b and v2a below is the machine load at timing, not the model. v1 and v2a were timed in one window (0.97 to 1.10 per look). The classical table's high load overstates its ms, so the ONNX models' ratios to it understate their extra cost at equal load.",
- "best_on_dev": "No model is best on dev by the criterion. At the 30 % cap the three ONNX models find the same share on CODEBRIM dev100 (v2b 0.480, v2a 0.480, v1 0.479; v2b/v1 x1.00, CI 0.93-1.09, v2a/v1 x1.00, CI 0.93-1.09, v2b/v2a x1.00, CI 0.94-1.06) and no pair of them differs measurably on synth_dev (v2b 0.565, v2a 0.630, v1 0.615; v2b/v2a x0.90, CI 0.80-1.01, v2b/v1 x0.92, CI 0.83-1.02, v2a/v1 x1.02, CI 0.94-1.10). Each finds about three times what the classical engine finds on CODEBRIM (0.153; v2b x3.14, CI 2.42-4.24, v2a x3.14, CI 2.38-4.22, v1 x3.13, CI 2.37-4.31); on synth_dev v2a and v1 find more than the classical engine (x1.25, CI 1.08-1.45; x1.22, CI 1.08-1.38) and v2b no measurable amount more (x1.12, CI 0.95-1.32). What separates the ONNX models is false alarms on the clean photos: v1 put 0.033 boxes on a clean photo (a box on 1 of 30), v2a 0.700 (5 of 30), v2b 1.267 (13 of 30), the classical engine 12.133 (21 of 30). v2a put more boxes on them than v1 (+0.67 boxes per photo, CI +0.07 to +1.47), v2b more than v1 (+1.23 boxes per photo, CI +0.57 to +2.07; +0.40 in the share of photos with a box, CI +0.20 to +0.60) and a box on more photos than v2a (+0.27 in the share, CI +0.10 to +0.47). v1 is the only model with no measurable loss against any other (where_each_loses): no worse than v2a and v2b on recall, not better either, and fewer clean false alarms.",
- "recommendation": "On the dev splits only: run the dacl10k v1 model (onnx:drishyam_dacl10k.onnx, at its profile) as the live engine's segmenter in place of the classical engine, and do not switch to v2a or v2b. Against the classical engine v1 finds 3.13 times (CI 2.37-4.31) its CODEBRIM recall and 1.22 times (CI 1.08-1.38) its synth_dev recall, with 12.1 fewer boxes per clean photo (-12.10 boxes per photo, CI -18.90 to -6.60), at 2.00 times the modelled ms per CODEBRIM job (CI 1.89-2.11; 3368 ms against 1686, each on its own table). The retrained models find no more and add clean false alarms; v2b also has lower IoU-only recall than v1 on synth_dev (x0.89, CI 0.80-0.98). v1's measurable costs against them: the human gate, as it sends 7.24 critical boxes per CODEBRIM photo to review, against v2a's 4.22 and v2b's 3.94 (v2a/v1 x0.58, CI 0.45-0.80; v2b/v1 x0.54, CI 0.41-0.75); and against v2a, whose table was timed in the same window, 1.05 times (CI 1.03-1.08) its modelled ms per CODEBRIM job, though 0.96 times (CI 0.94-0.98) on synth_dev. None of this was measured on a held-out set or on the Lambda's arm64 CPU; every ms here comes from this Mac's x86 tables.",
+ "criterion_five_way": "Stated before any v2c sweep row was run. v2c at the profile this rule gives it joins results/dev/model_choice_dev.json as a fifth model under the criterion committed there in 7f37505, unchanged (its text is kept byte for byte): with five models, 'against each of the other three' is read as against each of the other four (v2b, v2a, v1 and the classical engine). Its rows are the v2c grid's rows of the chosen values on the same three dev splits and image order; the four models' rows, pairs, per-image data and run provenance are the four-way file's as merged (7169b68), carried over, not re-run; v2c is paired with each of them on the same images. The dev recommendation (v1 as the live engine) is re-read under the same criterion and the same reading of where each model loses (where_each_loses).",
+ "cost_tables": "Each model is charged its own table, timed on this Mac (x86, 1 cv2 thread per worker): v2b results/local-macos-x86-dacl10k_v2b/micro.json (2026-10-19T19:28Z, 1-min load 10.64 at start, 14.52 at end), v2a results/local-macos-x86-dacl10k_v2a/micro.json (2026-10-19T16:27Z, 1-min load 7.93 at start, 7.81 at end), v1 results/local-macos-x86-dacl10k-retime/micro.json (2026-10-19T16:31Z, 1-min load 8.0 at start, 7.39 at end), the classical engine results/local-macos-x86/micro.json (2026-10-17T20:19Z, 1-min load 23.82 at start, none recorded at end). One look at 4000x3000 (warp, quality and segment:accurate, p50) costs 1326.8 ms on v2b's table, 526.5 on v2a's, 568.1 on v1's and 108.0 on the classical engine's. v2a re-timed in v2b's window (runs/v2a/micro/local-macos-x86-dacl10k_v2a/micro.json, load 14.08 to 11.22) costs 1304.5: per look v2b costs 0.87 to 1.04 times v2a in one window across the three timed sizes, against 2.10 to 2.52 between their own tables, so the ms gap between v2b and v2a below is the machine load at timing, not the model. v1 and v2a were timed in one window (0.97 to 1.10 per look). The classical table's high load overstates its ms, so the ONNX models' ratios to it understate their extra cost at equal load. v2c is charged its own table too, results/local-macos-x86-dacl10k_v2c/micro.json (2026-10-20T10:48Z, 1-min load 9.51 at start, 7.02 at end), where one look at 4000x3000 costs 744.9 ms. v2a re-timed in v2c's window (runs/v2c/micro/local-macos-x86-dacl10k_v2a/micro.json, load 7.02 to 7.36) costs 749.4: per look v2c costs 0.99 times v2a at each of the three timed sizes in one window (the same encoder), against 1.22 to 1.41 between their own tables, so the ms gap between v2c and v2a (and v1, timed in v2a's window) below is the machine load at timing, not the model.",
+ "best_on_dev": "No model is best on dev by the criterion, with v2c added as with four. At the 30 % cap the three ONNX models find the same share on CODEBRIM dev100 (v2b 0.480, v2a 0.480, v1 0.479; v2b/v1 x1.00, CI 0.93-1.09, v2a/v1 x1.00, CI 0.93-1.09, v2b/v2a x1.00, CI 0.94-1.06) and no pair of them differs measurably on synth_dev (v2b 0.565, v2a 0.630, v1 0.615; v2b/v2a x0.90, CI 0.80-1.01, v2b/v1 x0.92, CI 0.83-1.02, v2a/v1 x1.02, CI 0.94-1.10). Each finds about three times what the classical engine finds on CODEBRIM (0.153; v2b x3.14, CI 2.42-4.24, v2a x3.14, CI 2.38-4.22, v1 x3.13, CI 2.37-4.31); on synth_dev v2a and v1 find more than the classical engine (x1.25, CI 1.08-1.45; x1.22, CI 1.08-1.38) and v2b no measurable amount more (x1.12, CI 0.95-1.32). What separates the ONNX models is false alarms on the clean photos: v1 put 0.033 boxes on a clean photo (a box on 1 of 30), v2a 0.700 (5 of 30), v2b 1.267 (13 of 30), the classical engine 12.133 (21 of 30). v2a put more boxes on them than v1 (+0.67 boxes per photo, CI +0.07 to +1.47), v2b more than v1 (+1.23 boxes per photo, CI +0.57 to +2.07; +0.40 in the share of photos with a box, CI +0.20 to +0.60) and a box on more photos than v2a (+0.27 in the share, CI +0.10 to +0.47). v1 is the only model with no measurable loss against any other (where_each_loses): no worse than v2a and v2b on recall, not better either, and fewer clean false alarms. v2c, added later, finds 0.462 on CODEBRIM dev100 and 0.600 on synth_dev at the 30 % cap, no measurable difference from any of the other three ONNX models on either (v2c/v1 x0.97, CI 0.88-1.06 and x0.98, CI 0.90-1.04; v2c/v2a x0.96, CI 0.91-1.01 and x0.95, CI 0.87-1.05; v2c/v2b x0.96, CI 0.89-1.04 and x1.06, CI 0.95-1.19), and more than the classical engine on both (x3.02, CI 2.26-4.14; x1.19, CI 1.03-1.36). It puts more false alarms on the clean photos than v1 and v2a: 2.633 boxes per photo, a box on 12 of 30 (against v1 +2.60 boxes per photo, CI +0.90 to +4.77, and +0.37 in the share of photos with a box, CI +0.17 to +0.57; against v2a +1.93 boxes per photo, CI +0.43 to +3.80, and +0.23 in the share, CI +0.03 to +0.43), and no measurably more than v2b at this cap (+1.37 boxes per photo, CI -0.60 to +3.57). Its IoU-only recall on CODEBRIM is lower than v1's and v2b's (x0.85, CI 0.72-0.99; x0.86, CI 0.75-0.99). Weighting the rare classes in training did not show here: per class at the 30 % cap (point values, no CI) v2c, like v2a, found no exposed rebar on either split, and efflorescence 0.00 on synth_dev and 0.56 on CODEBRIM against v2a's 0.15 and 0.60. With v2c added, v1 is still the only model with no measurable loss against any other (where_each_loses).",
+ "recommendation": "On the dev splits only: run the dacl10k v1 model (onnx:drishyam_dacl10k.onnx, at its profile) as the live engine's segmenter in place of the classical engine, and do not switch to v2a, v2b or v2c. Against the classical engine v1 finds 3.13 times (CI 2.37-4.31) its CODEBRIM recall and 1.22 times (CI 1.08-1.38) its synth_dev recall, with 12.1 fewer boxes per clean photo (-12.10 boxes per photo, CI -18.90 to -6.60), at 2.00 times the modelled ms per CODEBRIM job (CI 1.89-2.11; 3368 ms against 1686, each on its own table). The retrained models find no more and add clean false alarms; v2b also has lower IoU-only recall than v1 on synth_dev (x0.89, CI 0.80-0.98). v1's measurable costs against them: the human gate, as it sends 7.24 critical boxes per CODEBRIM photo to review, against v2a's 4.22 and v2b's 3.94 (v2a/v1 x0.58, CI 0.45-0.80; v2b/v1 x0.54, CI 0.41-0.75); and against v2a, whose table was timed in the same window, 1.05 times (CI 1.03-1.08) its modelled ms per CODEBRIM job, though 0.96 times (CI 0.94-0.98) on synth_dev. Adding v2c does not change this: it finds no more than v1 either and puts more boxes on the clean photos (+2.60 boxes per photo, CI +0.90 to +4.77); against it v1's measurable cost is the same kind, 7.24 critical boxes per CODEBRIM photo against v2c's 3.83 (v2c/v1 x0.53, CI 0.41-0.72). v2c's modelled ms per CODEBRIM job are 1.36 times (CI 1.33-1.39) v2a's on their own tables, which is the load v2c's table was timed at (cost_tables), not a measured difference between the two nets. None of this was measured on a held-out set or on the Lambda's arm64 CPU; every ms here comes from this Mac's x86 tables.",
  "models": {
+  "v2c": {
+   "segmenter": "onnx:drishyam_dacl10k_v2c.onnx drishyam_dacl10k_v2c.onnx@24b4d561fb01 drishyam_dacl10k_v2c.fp16.onnx@fe45fea70cd0",
+   "profile": "onnx:drishyam_dacl10k_v2c.onnx",
+   "profile_values": {
+    "min_view": 0.3,
+    "absorb": false
+   },
+   "rows": "v2c_grid_<split>:ref@<cap> (the grid row of the chosen values; head check: v2c_head)",
+   "cost_table": {
+    "file": "results/local-macos-x86-dacl10k_v2c/micro.json",
+    "timestamp": "2026-10-20T10:48:19Z",
+    "load_start": [
+     9.51,
+     6.32,
+     4.95
+    ],
+    "load_end": [
+     7.02,
+     6.9,
+     5.64
+    ],
+    "per_look_p50_ms": {
+     "1024x768": 750.4,
+     "2048x1536": 740.4,
+     "4000x3000": 744.9
+    }
+   }
+  },
   "v2b": {
    "segmenter": "onnx:drishyam_dacl10k_v2b.onnx drishyam_dacl10k_v2b.onnx@47e4b687d179 drishyam_dacl10k_v2b.fp16.onnx@3f8b8648ccfd",
    "profile": "onnx:drishyam_dacl10k_v2b.onnx",
@@ -132,6 +161,31 @@
   }
  },
  "verdicts": {
+  "v2c vs v2b": {
+   "real": "same",
+   "synth_dev": "same",
+   "clean_harm": false
+  },
+  "v2c vs v2a": {
+   "real": "same",
+   "synth_dev": "same",
+   "clean_harm": true
+  },
+  "v2c vs v1": {
+   "real": "same",
+   "synth_dev": "same",
+   "clean_harm": true
+  },
+  "v2c vs classical-v1": {
+   "real": "better",
+   "synth_dev": "better",
+   "clean_harm": false
+  },
+  "v2b vs v2c": {
+   "real": "same",
+   "synth_dev": "same",
+   "clean_harm": false
+  },
   "v2b vs v2a": {
    "real": "same",
    "synth_dev": "same",
@@ -144,6 +198,11 @@
   },
   "v2b vs classical-v1": {
    "real": "better",
+   "synth_dev": "same",
+   "clean_harm": false
+  },
+  "v2a vs v2c": {
+   "real": "same",
    "synth_dev": "same",
    "clean_harm": false
   },
@@ -162,6 +221,11 @@
    "synth_dev": "better",
    "clean_harm": false
   },
+  "v1 vs v2c": {
+   "real": "same",
+   "synth_dev": "same",
+   "clean_harm": false
+  },
   "v1 vs v2b": {
    "real": "same",
    "synth_dev": "same",
@@ -176,6 +240,11 @@
    "real": "better",
    "synth_dev": "better",
    "clean_harm": false
+  },
+  "classical-v1 vs v2c": {
+   "real": "worse",
+   "synth_dev": "worse",
+   "clean_harm": true
   },
   "classical-v1 vs v2b": {
    "real": "worse",
@@ -195,6 +264,51 @@
  },
  "best": [],
  "where_each_loses": {
+  "classical-v1": [
+   "synth_dev@0.3 recall x0.842 (CI 0.74-0.97) against v2c",
+   "synth_dev@0.3 IoU-only recall x0.777 (CI 0.66-0.92) against v2c",
+   "synth_dev@0.3 recall x0.802 (CI 0.69-0.93) against v2a",
+   "synth_dev@0.3 IoU-only recall x0.737 (CI 0.61-0.90) against v2a",
+   "synth_dev@0.3 recall x0.821 (CI 0.72-0.93) against v1",
+   "synth_dev@0.3 IoU-only recall x0.737 (CI 0.62-0.86) against v1",
+   "synth_dev@1.0 IoU-only recall x0.800 (CI 0.68-0.95) against v2c",
+   "synth_dev@1.0 IoU-only recall x0.821 (CI 0.68-0.98) against v2b",
+   "synth_dev@1.0 recall x0.847 (CI 0.75-0.96) against v2a",
+   "synth_dev@1.0 IoU-only recall x0.748 (CI 0.62-0.90) against v2a",
+   "synth_dev@1.0 recall x0.860 (CI 0.77-0.96) against v1",
+   "synth_dev@1.0 IoU-only recall x0.742 (CI 0.63-0.86) against v1",
+   "clean@0.3 +9.500 boxes per clean photo (CI +3.098 to +17.267) against v2c",
+   "clean@0.3 +0.300 share of clean photos with a box (CI +0.033 to +0.567) against v2c",
+   "clean@0.3 +10.867 boxes per clean photo (CI +5.233 to +17.768) against v2b",
+   "clean@0.3 +11.433 boxes per clean photo (CI +5.832 to +18.434) against v2a",
+   "clean@0.3 +0.533 share of clean photos with a box (CI +0.266 to +0.800) against v2a",
+   "clean@0.3 +12.100 boxes per clean photo (CI +6.599 to +18.903) against v1",
+   "clean@0.3 +0.667 share of clean photos with a box (CI +0.500 to +0.833) against v1",
+   "clean@1.0 +12.100 boxes per clean photo (CI +3.965 to +21.367) against v2c",
+   "clean@1.0 +0.333 share of clean photos with a box (CI +0.067 to +0.600) against v2c",
+   "clean@1.0 +14.533 boxes per clean photo (CI +7.833 to +22.800) against v2b",
+   "clean@1.0 +0.333 share of clean photos with a box (CI +0.033 to +0.600) against v2b",
+   "clean@1.0 +14.833 boxes per clean photo (CI +7.767 to +23.302) against v2a",
+   "clean@1.0 +0.567 share of clean photos with a box (CI +0.267 to +0.833) against v2a",
+   "clean@1.0 +15.800 boxes per clean photo (CI +9.032 to +23.768) against v1",
+   "clean@1.0 +0.767 share of clean photos with a box (CI +0.632 to +0.900) against v1",
+   "real@0.3 recall x0.331 (CI 0.24-0.44) against v2c",
+   "real@0.3 IoU-only recall x0.291 (CI 0.18-0.42) against v2c",
+   "real@0.3 recall x0.318 (CI 0.24-0.41) against v2b",
+   "real@0.3 IoU-only recall x0.251 (CI 0.16-0.36) against v2b",
+   "real@0.3 recall x0.318 (CI 0.24-0.42) against v2a",
+   "real@0.3 IoU-only recall x0.271 (CI 0.18-0.38) against v2a",
+   "real@0.3 recall x0.319 (CI 0.23-0.42) against v1",
+   "real@0.3 IoU-only recall x0.247 (CI 0.16-0.35) against v1",
+   "real@1.0 recall x0.387 (CI 0.29-0.51) against v2c",
+   "real@1.0 IoU-only recall x0.381 (CI 0.26-0.52) against v2c",
+   "real@1.0 recall x0.373 (CI 0.28-0.49) against v2b",
+   "real@1.0 IoU-only recall x0.330 (CI 0.23-0.44) against v2b",
+   "real@1.0 recall x0.374 (CI 0.27-0.48) against v2a",
+   "real@1.0 IoU-only recall x0.357 (CI 0.25-0.47) against v2a",
+   "real@1.0 recall x0.372 (CI 0.27-0.50) against v1",
+   "real@1.0 IoU-only recall x0.323 (CI 0.22-0.43) against v1"
+  ],
   "v2b": [
    "synth_dev@0.3 IoU-only recall x0.890 (CI 0.80-0.98) against v1",
    "synth_dev@1.0 IoU-only recall x0.903 (CI 0.83-0.98) against v1",
@@ -205,39 +319,20 @@
    "clean@1.0 +1.267 boxes per clean photo (CI +0.632 to +2.100) against v1",
    "clean@1.0 +0.433 share of clean photos with a box (CI +0.233 to +0.633) against v1"
   ],
-  "classical-v1": [
-   "synth_dev@0.3 recall x0.802 (CI 0.69-0.93) against v2a",
-   "synth_dev@0.3 IoU-only recall x0.737 (CI 0.61-0.90) against v2a",
-   "synth_dev@0.3 recall x0.821 (CI 0.72-0.93) against v1",
-   "synth_dev@0.3 IoU-only recall x0.737 (CI 0.62-0.86) against v1",
-   "synth_dev@1.0 IoU-only recall x0.821 (CI 0.68-0.98) against v2b",
-   "synth_dev@1.0 recall x0.847 (CI 0.75-0.96) against v2a",
-   "synth_dev@1.0 IoU-only recall x0.748 (CI 0.62-0.90) against v2a",
-   "synth_dev@1.0 recall x0.860 (CI 0.77-0.96) against v1",
-   "synth_dev@1.0 IoU-only recall x0.742 (CI 0.63-0.86) against v1",
-   "clean@0.3 +10.867 boxes per clean photo (CI +5.233 to +17.768) against v2b",
-   "clean@0.3 +11.433 boxes per clean photo (CI +5.832 to +18.434) against v2a",
-   "clean@0.3 +0.533 share of clean photos with a box (CI +0.266 to +0.800) against v2a",
-   "clean@0.3 +12.100 boxes per clean photo (CI +6.599 to +18.903) against v1",
-   "clean@0.3 +0.667 share of clean photos with a box (CI +0.500 to +0.833) against v1",
-   "clean@1.0 +14.533 boxes per clean photo (CI +7.833 to +22.800) against v2b",
-   "clean@1.0 +0.333 share of clean photos with a box (CI +0.033 to +0.600) against v2b",
-   "clean@1.0 +14.833 boxes per clean photo (CI +7.767 to +23.302) against v2a",
-   "clean@1.0 +0.567 share of clean photos with a box (CI +0.267 to +0.833) against v2a",
-   "clean@1.0 +15.800 boxes per clean photo (CI +9.032 to +23.768) against v1",
-   "clean@1.0 +0.767 share of clean photos with a box (CI +0.632 to +0.900) against v1",
-   "real@0.3 recall x0.318 (CI 0.24-0.41) against v2b",
-   "real@0.3 IoU-only recall x0.251 (CI 0.16-0.36) against v2b",
-   "real@0.3 recall x0.318 (CI 0.24-0.42) against v2a",
-   "real@0.3 IoU-only recall x0.271 (CI 0.18-0.38) against v2a",
-   "real@0.3 recall x0.319 (CI 0.23-0.42) against v1",
-   "real@0.3 IoU-only recall x0.247 (CI 0.16-0.35) against v1",
-   "real@1.0 recall x0.373 (CI 0.28-0.49) against v2b",
-   "real@1.0 IoU-only recall x0.330 (CI 0.23-0.44) against v2b",
-   "real@1.0 recall x0.374 (CI 0.27-0.48) against v2a",
-   "real@1.0 IoU-only recall x0.357 (CI 0.25-0.47) against v2a",
-   "real@1.0 recall x0.372 (CI 0.27-0.50) against v1",
-   "real@1.0 IoU-only recall x0.323 (CI 0.22-0.43) against v1"
+  "v2c": [
+   "clean@0.3 +1.933 boxes per clean photo (CI +0.433 to +3.800) against v2a",
+   "clean@0.3 +0.233 share of clean photos with a box (CI +0.033 to +0.433) against v2a",
+   "clean@0.3 +2.600 boxes per clean photo (CI +0.899 to +4.767) against v1",
+   "clean@0.3 +0.367 share of clean photos with a box (CI +0.167 to +0.567) against v1",
+   "clean@1.0 +2.433 boxes per clean photo (CI +0.167 to +4.933) against v2b",
+   "clean@1.0 +2.733 boxes per clean photo (CI +0.866 to +5.000) against v2a",
+   "clean@1.0 +0.233 share of clean photos with a box (CI +0.033 to +0.433) against v2a",
+   "clean@1.0 +3.700 boxes per clean photo (CI +1.700 to +6.133) against v1",
+   "clean@1.0 +0.433 share of clean photos with a box (CI +0.233 to +0.633) against v1",
+   "real@0.3 IoU-only recall x0.863 (CI 0.75-0.99) against v2b",
+   "real@0.3 IoU-only recall x0.848 (CI 0.72-0.99) against v1",
+   "real@1.0 IoU-only recall x0.866 (CI 0.76-0.99) against v2b",
+   "real@1.0 IoU-only recall x0.847 (CI 0.73-0.98) against v1"
   ],
   "v2a": [
    "clean@0.3 +0.667 boxes per clean photo (CI +0.067 to +1.468) against v1",
@@ -247,6 +342,76 @@
  },
  "table": {
   "synth_dev@0.3": {
+   "v2c": {
+    "row": "v2c_grid_synth_dev:ref@0.3",
+    "profiles": [
+     "classical-v1"
+    ],
+    "recall": 0.6,
+    "recall_ci": [
+     0.5276,
+     0.6732
+    ],
+    "recall_iou_only": 0.56,
+    "chance_recall": 0.1,
+    "chance_recall_iou_only": 0.035,
+    "boxes_per_image": 8.05,
+    "images_with_any": 1.0,
+    "critical_per_image": 1.1167,
+    "pixels_frac": 0.2573,
+    "vs_downscale": 1.2371,
+    "vs_downscale_ci": [
+     1.1287,
+     1.3765
+    ],
+    "vs_downscale_iou_only_ci": [
+     1.1456,
+     1.4028
+    ],
+    "vs_tiling_L0": 0.7895,
+    "vs_tiling_L0_ci": [
+     0.7159,
+     0.8552
+    ],
+    "vs_tiling_L0_iou_only_ci": [
+     0.6918,
+     0.8456
+    ],
+    "pixels_vs_tiling_L0": 0.1544,
+    "halt": {
+     "cap-hit": 54,
+     "stop-rule": 6
+    },
+    "looks_mean": 2.9,
+    "boxes_per_image_ci": [
+     6.8992,
+     9.25
+    ],
+    "images_with_any_ci": [
+     1.0,
+     1.0
+    ],
+    "critical_per_image_ci": [
+     0.8167,
+     1.4667
+    ],
+    "ms_per_job": 2164.378,
+    "ms_per_job_ci": [
+     2102.6763,
+     2213.7393
+    ],
+    "jobs_at_20s": 0,
+    "ms_vs_tiling_L0": 0.1469,
+    "ms_vs_downscale": 2.9329,
+    "ms_vs_tiling_L0_ci": [
+     0.1428,
+     0.1503
+    ],
+    "ms_vs_downscale_ci": [
+     2.8493,
+     2.9998
+    ]
+   },
    "v2b": {
     "row": "v2b_grid_synth_dev:ref@0.3",
     "profiles": [
@@ -529,6 +694,76 @@
    }
   },
   "synth_dev@1.0": {
+   "v2c": {
+    "row": "v2c_grid_synth_dev:ref@1.0",
+    "profiles": [
+     "classical-v1"
+    ],
+    "recall": 0.615,
+    "recall_ci": [
+     0.5384,
+     0.6893
+    ],
+    "recall_iou_only": 0.575,
+    "chance_recall": 0.115,
+    "chance_recall_iou_only": 0.04,
+    "boxes_per_image": 9.4333,
+    "images_with_any": 1.0,
+    "critical_per_image": 1.1333,
+    "pixels_frac": 0.2906,
+    "vs_downscale": 1.268,
+    "vs_downscale_ci": [
+     1.1518,
+     1.4167
+    ],
+    "vs_downscale_iou_only_ci": [
+     1.1685,
+     1.4616
+    ],
+    "vs_tiling_L0": 0.8092,
+    "vs_tiling_L0_ci": [
+     0.7365,
+     0.8741
+    ],
+    "vs_tiling_L0_iou_only_ci": [
+     0.7182,
+     0.8611
+    ],
+    "pixels_vs_tiling_L0": 0.1744,
+    "halt": {
+     "exhausted": 1,
+     "stop-rule": 59
+    },
+    "looks_mean": 3.3,
+    "boxes_per_image_ci": [
+     8.05,
+     10.9508
+    ],
+    "images_with_any_ci": [
+     1.0,
+     1.0
+    ],
+    "critical_per_image_ci": [
+     0.8333,
+     1.4833
+    ],
+    "ms_per_job": 2460.5495,
+    "ms_per_job_ci": [
+     2337.1448,
+     2596.2938
+    ],
+    "jobs_at_20s": 0,
+    "ms_vs_tiling_L0": 0.1671,
+    "ms_vs_downscale": 3.3342,
+    "ms_vs_tiling_L0_ci": [
+     0.1587,
+     0.1763
+    ],
+    "ms_vs_downscale_ci": [
+     3.167,
+     3.5182
+    ]
+   },
    "v2b": {
     "row": "v2b_grid_synth_dev:ref@1.0",
     "profiles": [
@@ -811,6 +1046,65 @@
    }
   },
   "clean@0.3": {
+   "v2c": {
+    "row": "v2c_grid_clean:ref@0.3",
+    "profiles": [
+     "classical-v1"
+    ],
+    "recall": null,
+    "recall_ci": [
+     null,
+     null
+    ],
+    "recall_iou_only": null,
+    "chance_recall": null,
+    "chance_recall_iou_only": null,
+    "boxes_per_image": 2.6333,
+    "images_with_any": 0.4,
+    "critical_per_image": 0.0,
+    "pixels_frac": 0.2378,
+    "vs_downscale": null,
+    "vs_downscale_ci": null,
+    "vs_downscale_iou_only_ci": null,
+    "vs_tiling_L0": null,
+    "vs_tiling_L0_ci": null,
+    "vs_tiling_L0_iou_only_ci": null,
+    "pixels_vs_tiling_L0": null,
+    "halt": {
+     "stop-rule": 6,
+     "exhausted": 2,
+     "cap-hit": 22
+    },
+    "looks_mean": 2.6667,
+    "boxes_per_image_ci": [
+     0.9333,
+     4.7675
+    ],
+    "images_with_any_ci": [
+     0.2333,
+     0.5667
+    ],
+    "critical_per_image_ci": [
+     0.0,
+     0.0
+    ],
+    "ms_per_job": 1991.6127,
+    "ms_per_job_ci": [
+     1818.8467,
+     2139.697
+    ],
+    "jobs_at_20s": 0,
+    "ms_vs_tiling_L0": 0.1352,
+    "ms_vs_downscale": 2.6988,
+    "ms_vs_tiling_L0_ci": [
+     0.1235,
+     0.1453
+    ],
+    "ms_vs_downscale_ci": [
+     2.4647,
+     2.8994
+    ]
+   },
    "v2b": {
     "row": "v2b_grid_clean:ref@0.3",
     "profiles": [
@@ -1049,6 +1343,64 @@
    }
   },
   "clean@1.0": {
+   "v2c": {
+    "row": "v2c_grid_clean:ref@1.0",
+    "profiles": [
+     "classical-v1"
+    ],
+    "recall": null,
+    "recall_ci": [
+     null,
+     null
+    ],
+    "recall_iou_only": null,
+    "chance_recall": null,
+    "chance_recall_iou_only": null,
+    "boxes_per_image": 3.7333,
+    "images_with_any": 0.4667,
+    "critical_per_image": 0.0,
+    "pixels_frac": 0.2712,
+    "vs_downscale": null,
+    "vs_downscale_ci": null,
+    "vs_downscale_iou_only_ci": null,
+    "vs_tiling_L0": null,
+    "vs_tiling_L0_ci": null,
+    "vs_tiling_L0_iou_only_ci": null,
+    "pixels_vs_tiling_L0": null,
+    "halt": {
+     "stop-rule": 20,
+     "exhausted": 10
+    },
+    "looks_mean": 3.0667,
+    "boxes_per_image_ci": [
+     1.7325,
+     6.1342
+    ],
+    "images_with_any_ci": [
+     0.3,
+     0.6333
+    ],
+    "critical_per_image_ci": [
+     0.0,
+     0.0
+    ],
+    "ms_per_job": 2287.7837,
+    "ms_per_job_ci": [
+     1991.6133,
+     2534.592
+    ],
+    "jobs_at_20s": 0,
+    "ms_vs_tiling_L0": 0.1553,
+    "ms_vs_downscale": 3.1001,
+    "ms_vs_tiling_L0_ci": [
+     0.1352,
+     0.1721
+    ],
+    "ms_vs_downscale_ci": [
+     2.6988,
+     3.4346
+    ]
+   },
    "v2b": {
     "row": "v2b_grid_clean:ref@1.0",
     "profiles": [
@@ -1284,6 +1636,77 @@
    }
   },
   "real@0.3": {
+   "v2c": {
+    "row": "v2c_grid_real:ref@0.3",
+    "profiles": [
+     "classical-v1"
+    ],
+    "recall": 0.4624,
+    "recall_ci": [
+     0.3951,
+     0.5267
+    ],
+    "recall_iou_only": 0.2258,
+    "chance_recall": 0.2605,
+    "chance_recall_iou_only": 0.0585,
+    "boxes_per_image": 48.66,
+    "images_with_any": 0.92,
+    "critical_per_image": 3.83,
+    "pixels_frac": 0.14,
+    "vs_downscale": 1.1382,
+    "vs_downscale_ci": [
+     1.0272,
+     1.262
+    ],
+    "vs_downscale_iou_only_ci": [
+     1.2029,
+     1.677
+    ],
+    "vs_tiling_L0": 0.8856,
+    "vs_tiling_L0_ci": [
+     0.7021,
+     1.0662
+    ],
+    "vs_tiling_L0_iou_only_ci": [
+     0.6129,
+     1.3603
+    ],
+    "pixels_vs_tiling_L0": 0.086,
+    "halt": {
+     "cap-hit": 18,
+     "stop-rule": 76,
+     "exhausted": 6
+    },
+    "looks_mean": 5.74,
+    "boxes_per_image_ci": [
+     40.129,
+     58.39
+    ],
+    "images_with_any_ci": [
+     0.87,
+     0.97
+    ],
+    "critical_per_image_ci": [
+     3.1195,
+     4.66
+    ],
+    "ms_per_job": 4355.249,
+    "ms_per_job_ci": [
+     4131.5638,
+     4593.7609
+    ],
+    "jobs_at_20s": 0,
+    "ms_vs_tiling_L0": 0.0655,
+    "ms_vs_downscale": 5.4552,
+    "ms_vs_tiling_L0_ci": [
+     0.0623,
+     0.0689
+    ],
+    "ms_vs_downscale_ci": [
+     5.2007,
+     5.7304
+    ]
+   },
    "v2b": {
     "row": "v2b_grid_real:ref@0.3",
     "profiles": [
@@ -1570,6 +1993,76 @@
    }
   },
   "real@1.0": {
+   "v2c": {
+    "row": "v2c_grid_real:ref@1.0",
+    "profiles": [
+     "classical-v1"
+    ],
+    "recall": 0.4659,
+    "recall_ci": [
+     0.3989,
+     0.5286
+    ],
+    "recall_iou_only": 0.2318,
+    "chance_recall": 0.2569,
+    "chance_recall_iou_only": 0.0609,
+    "boxes_per_image": 50.93,
+    "images_with_any": 0.93,
+    "critical_per_image": 3.93,
+    "pixels_frac": 0.1671,
+    "vs_downscale": 1.1471,
+    "vs_downscale_ci": [
+     1.0387,
+     1.2721
+    ],
+    "vs_downscale_iou_only_ci": [
+     1.234,
+     1.7178
+    ],
+    "vs_tiling_L0": 0.8924,
+    "vs_tiling_L0_ci": [
+     0.7108,
+     1.0722
+    ],
+    "vs_tiling_L0_iou_only_ci": [
+     0.6333,
+     1.3806
+    ],
+    "pixels_vs_tiling_L0": 0.1027,
+    "halt": {
+     "stop-rule": 92,
+     "exhausted": 8
+    },
+    "looks_mean": 6.15,
+    "boxes_per_image_ci": [
+     42.3995,
+     60.5805
+    ],
+    "images_with_any_ci": [
+     0.88,
+     0.98
+    ],
+    "critical_per_image_ci": [
+     3.21,
+     4.73
+    ],
+    "ms_per_job": 4658.8233,
+    "ms_per_job_ci": [
+     4458.1462,
+     4881.1308
+    ],
+    "jobs_at_20s": 0,
+    "ms_vs_tiling_L0": 0.0701,
+    "ms_vs_downscale": 5.8354,
+    "ms_vs_tiling_L0_ci": [
+     0.0652,
+     0.0757
+    ],
+    "ms_vs_downscale_ci": [
+     5.5799,
+     6.1071
+    ]
+   },
    "v2b": {
     "row": "v2b_grid_real:ref@1.0",
     "profiles": [
@@ -1854,6 +2347,262 @@
   }
  },
  "pairs": {
+  "synth_dev@0.3: v2c / v2b": {
+   "recall": [
+    1.0619,
+    [
+     0.9524,
+     1.1917
+    ]
+   ],
+   "iou_only": [
+    1.0667,
+    [
+     0.9374,
+     1.217
+    ]
+   ],
+   "chance": [
+    1.5385,
+    [
+     0.7916,
+     3.6687
+    ]
+   ],
+   "boxes": [
+    1.4375,
+    [
+     1.2472,
+     1.6785
+    ]
+   ],
+   "critical": [
+    1.7632,
+    [
+     1.3673,
+     2.4098
+    ]
+   ],
+   "ms": [
+    0.504,
+    [
+     0.4898,
+     0.5186
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    2.45,
+    [
+     1.4829,
+     3.4667
+    ]
+   ],
+   "any_box_share_diff": [
+    0.0333,
+    [
+     0.0,
+     0.0833
+    ]
+   ],
+   "reading": {
+    "recall": "no measurable difference",
+    "iou_only": "no measurable difference",
+    "boxes_per_photo_diff": "more",
+    "any_box_share_diff": "no measurable difference"
+   }
+  },
+  "synth_dev@0.3: v2c / v2a": {
+   "recall": [
+    0.9524,
+    [
+     0.8738,
+     1.0468
+    ]
+   ],
+   "iou_only": [
+    0.9492,
+    [
+     0.8657,
+     1.0459
+    ]
+   ],
+   "chance": [
+    1.3333,
+    [
+     0.7141,
+     3.2869
+    ]
+   ],
+   "boxes": [
+    1.3269,
+    [
+     1.1338,
+     1.5604
+    ]
+   ],
+   "critical": [
+    1.2182,
+    [
+     1.0735,
+     1.4263
+    ]
+   ],
+   "ms": [
+    1.2128,
+    [
+     1.1784,
+     1.2478
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    1.9833,
+    [
+     0.8667,
+     3.0667
+    ]
+   ],
+   "any_box_share_diff": [
+    0.0167,
+    [
+     0.0,
+     0.05
+    ]
+   ],
+   "reading": {
+    "recall": "no measurable difference",
+    "iou_only": "no measurable difference",
+    "boxes_per_photo_diff": "more",
+    "any_box_share_diff": "no measurable difference"
+   }
+  },
+  "synth_dev@0.3: v2c / v1": {
+   "recall": [
+    0.9756,
+    [
+     0.9007,
+     1.0435
+    ]
+   ],
+   "iou_only": [
+    0.9492,
+    [
+     0.8692,
+     1.0233
+    ]
+   ],
+   "chance": [
+    2.0,
+    [
+     0.8073,
+     10.0
+    ]
+   ],
+   "boxes": [
+    1.3454,
+    [
+     1.1683,
+     1.558
+    ]
+   ],
+   "critical": [
+    1.3673,
+    [
+     1.1333,
+     1.7275
+    ]
+   ],
+   "ms": [
+    1.2659,
+    [
+     1.23,
+     1.3031
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    2.0667,
+    [
+     1.0667,
+     3.0833
+    ]
+   ],
+   "any_box_share_diff": [
+    0.05,
+    [
+     0.0,
+     0.1167
+    ]
+   ],
+   "reading": {
+    "recall": "no measurable difference",
+    "iou_only": "no measurable difference",
+    "boxes_per_photo_diff": "more",
+    "any_box_share_diff": "no measurable difference"
+   }
+  },
+  "synth_dev@0.3: v2c / classical-v1": {
+   "recall": [
+    1.1881,
+    [
+     1.0272,
+     1.3605
+    ]
+   ],
+   "iou_only": [
+    1.2874,
+    [
+     1.0901,
+     1.5072
+    ]
+   ],
+   "chance": [
+    5.0,
+    [
+     2.125,
+     22.0
+    ]
+   ],
+   "boxes": [
+    0.4497,
+    [
+     0.3759,
+     0.5414
+    ]
+   ],
+   "critical": [
+    0.7053,
+    [
+     0.4859,
+     1.1154
+    ]
+   ],
+   "ms": [
+    6.4471,
+    [
+     6.2662,
+     6.5941
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    -9.85,
+    [
+     -12.8842,
+     -7.0663
+    ]
+   ],
+   "any_box_share_diff": [
+    0.0333,
+    [
+     0.0,
+     0.0833
+    ]
+   ],
+   "reading": {
+    "recall": "higher",
+    "iou_only": "higher",
+    "boxes_per_photo_diff": "fewer",
+    "any_box_share_diff": "no measurable difference"
+   }
+  },
   "synth_dev@0.3: v2b / v2a": {
    "recall": [
     0.8968,
@@ -2233,6 +2982,262 @@
    ],
    "reading": {
     "recall": "higher",
+    "iou_only": "higher",
+    "boxes_per_photo_diff": "fewer",
+    "any_box_share_diff": "no measurable difference"
+   }
+  },
+  "synth_dev@1.0: v2c / v2b": {
+   "recall": [
+    1.025,
+    [
+     0.9365,
+     1.126
+    ]
+   ],
+   "iou_only": [
+    1.0268,
+    [
+     0.9256,
+     1.1309
+    ]
+   ],
+   "chance": [
+    1.5333,
+    [
+     0.75,
+     3.3344
+    ]
+   ],
+   "boxes": [
+    1.415,
+    [
+     1.2174,
+     1.7014
+    ]
+   ],
+   "critical": [
+    1.619,
+    [
+     1.2592,
+     2.2223
+    ]
+   ],
+   "ms": [
+    0.4775,
+    [
+     0.4521,
+     0.5014
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    2.7667,
+    [
+     1.5333,
+     4.1667
+    ]
+   ],
+   "any_box_share_diff": [
+    0.0333,
+    [
+     0.0,
+     0.0833
+    ]
+   ],
+   "reading": {
+    "recall": "no measurable difference",
+    "iou_only": "no measurable difference",
+    "boxes_per_photo_diff": "more",
+    "any_box_share_diff": "no measurable difference"
+   }
+  },
+  "synth_dev@1.0: v2c / v2a": {
+   "recall": [
+    0.9389,
+    [
+     0.8592,
+     1.0273
+    ]
+   ],
+   "iou_only": [
+    0.935,
+    [
+     0.8538,
+     1.0263
+    ]
+   ],
+   "chance": [
+    1.4375,
+    [
+     0.8125,
+     3.0
+    ]
+   ],
+   "boxes": [
+    1.3541,
+    [
+     1.1473,
+     1.6036
+    ]
+   ],
+   "critical": [
+    1.1333,
+    [
+     0.9861,
+     1.3335
+    ]
+   ],
+   "ms": [
+    1.1897,
+    [
+     1.1268,
+     1.2513
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    2.4667,
+    [
+     1.1,
+     3.85
+    ]
+   ],
+   "any_box_share_diff": [
+    0.0167,
+    [
+     0.0,
+     0.05
+    ]
+   ],
+   "reading": {
+    "recall": "no measurable difference",
+    "iou_only": "no measurable difference",
+    "boxes_per_photo_diff": "more",
+    "any_box_share_diff": "no measurable difference"
+   }
+  },
+  "synth_dev@1.0: v2c / v1": {
+   "recall": [
+    0.9535,
+    [
+     0.8769,
+     1.0264
+    ]
+   ],
+   "iou_only": [
+    0.9274,
+    [
+     0.8503,
+     1.0
+    ]
+   ],
+   "chance": [
+    1.6429,
+    [
+     0.8,
+     4.1667
+    ]
+   ],
+   "boxes": [
+    1.3476,
+    [
+     1.1348,
+     1.6301
+    ]
+   ],
+   "critical": [
+    1.2593,
+    [
+     1.0133,
+     1.6596
+    ]
+   ],
+   "ms": [
+    1.239,
+    [
+     1.1797,
+     1.3027
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    2.4333,
+    [
+     1.0654,
+     3.9
+    ]
+   ],
+   "any_box_share_diff": [
+    0.05,
+    [
+     0.0,
+     0.1167
+    ]
+   ],
+   "reading": {
+    "recall": "no measurable difference",
+    "iou_only": "no measurable difference",
+    "boxes_per_photo_diff": "more",
+    "any_box_share_diff": "no measurable difference"
+   }
+  },
+  "synth_dev@1.0: v2c / classical-v1": {
+   "recall": [
+    1.1081,
+    [
+     0.9675,
+     1.2617
+    ]
+   ],
+   "iou_only": [
+    1.25,
+    [
+     1.052,
+     1.4699
+    ]
+   ],
+   "chance": [
+    2.5556,
+    [
+     1.2857,
+     6.0
+    ]
+   ],
+   "boxes": [
+    0.3083,
+    [
+     0.2515,
+     0.3811
+    ]
+   ],
+   "critical": [
+    0.3736,
+    [
+     0.2547,
+     0.6277
+    ]
+   ],
+   "ms": [
+    4.1598,
+    [
+     3.8709,
+     4.5055
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    -21.1667,
+    [
+     -27.235,
+     -15.5792
+    ]
+   ],
+   "any_box_share_diff": [
+    0.0167,
+    [
+     0.0,
+     0.05
+    ]
+   ],
+   "reading": {
+    "recall": "no measurable difference",
     "iou_only": "higher",
     "boxes_per_photo_diff": "fewer",
     "any_box_share_diff": "no measurable difference"
@@ -2622,6 +3627,170 @@
     "any_box_share_diff": "no measurable difference"
    }
   },
+  "clean@0.3: v2c / v2b": {
+   "boxes": [
+    2.0789,
+    [
+     0.6428,
+     5.174
+    ]
+   ],
+   "critical": [
+    0.0,
+    [
+     0.0,
+     0.0
+    ]
+   ],
+   "ms": [
+    0.4919,
+    [
+     0.4736,
+     0.5041
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    1.3667,
+    [
+     -0.6008,
+     3.5667
+    ]
+   ],
+   "any_box_share_diff": [
+    -0.0333,
+    [
+     -0.3,
+     0.2
+    ]
+   ],
+   "reading": {
+    "boxes_per_photo_diff": "no measurable difference",
+    "any_box_share_diff": "no measurable difference"
+   }
+  },
+  "clean@0.3: v2c / v2a": {
+   "boxes": [
+    3.7619,
+    [
+     1.5672,
+     24.61
+    ]
+   ],
+   "critical": [
+    null,
+    [
+     null,
+     null
+    ]
+   ],
+   "ms": [
+    1.2198,
+    [
+     1.1755,
+     1.2651
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    1.9333,
+    [
+     0.4333,
+     3.8
+    ]
+   ],
+   "any_box_share_diff": [
+    0.2333,
+    [
+     0.0333,
+     0.4333
+    ]
+   ],
+   "reading": {
+    "boxes_per_photo_diff": "more",
+    "any_box_share_diff": "more"
+   }
+  },
+  "clean@0.3: v2c / v1": {
+   "boxes": [
+    79.0,
+    [
+     13.0333,
+     132.7
+    ]
+   ],
+   "critical": [
+    null,
+    [
+     null,
+     null
+    ]
+   ],
+   "ms": [
+    1.2212,
+    [
+     1.1766,
+     1.2514
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    2.6,
+    [
+     0.8992,
+     4.7667
+    ]
+   ],
+   "any_box_share_diff": [
+    0.3667,
+    [
+     0.1667,
+     0.5667
+    ]
+   ],
+   "reading": {
+    "boxes_per_photo_diff": "more",
+    "any_box_share_diff": "more"
+   }
+  },
+  "clean@0.3: v2c / classical-v1": {
+   "boxes": [
+    0.217,
+    [
+     0.0596,
+     0.5817
+    ]
+   ],
+   "critical": [
+    0.0,
+    [
+     0.0,
+     0.0
+    ]
+   ],
+   "ms": [
+    6.0635,
+    [
+     5.6257,
+     6.4227
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    -9.5,
+    [
+     -17.2675,
+     -3.0975
+    ]
+   ],
+   "any_box_share_diff": [
+    -0.3,
+    [
+     -0.5667,
+     -0.0333
+    ]
+   ],
+   "reading": {
+    "boxes_per_photo_diff": "fewer",
+    "any_box_share_diff": "fewer"
+   }
+  },
   "clean@0.3: v2b / v2a": {
    "boxes": [
     1.8095,
@@ -2861,6 +4030,170 @@
     [
      -0.8333,
      -0.5
+    ]
+   ],
+   "reading": {
+    "boxes_per_photo_diff": "fewer",
+    "any_box_share_diff": "fewer"
+   }
+  },
+  "clean@1.0: v2c / v2b": {
+   "boxes": [
+    2.8718,
+    [
+     1.08,
+     6.3936
+    ]
+   ],
+   "critical": [
+    0.0,
+    [
+     0.0,
+     0.0
+    ]
+   ],
+   "ms": [
+    0.5095,
+    [
+     0.4768,
+     0.5451
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    2.4333,
+    [
+     0.1667,
+     4.9333
+    ]
+   ],
+   "any_box_share_diff": [
+    0.0,
+    [
+     -0.2333,
+     0.2
+    ]
+   ],
+   "reading": {
+    "boxes_per_photo_diff": "more",
+    "any_box_share_diff": "no measurable difference"
+   }
+  },
+  "clean@1.0: v2c / v2a": {
+   "boxes": [
+    3.7333,
+    [
+     1.8234,
+     13.8638
+    ]
+   ],
+   "critical": [
+    null,
+    [
+     null,
+     null
+    ]
+   ],
+   "ms": [
+    1.2329,
+    [
+     1.178,
+     1.2892
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    2.7333,
+    [
+     0.8658,
+     5.0
+    ]
+   ],
+   "any_box_share_diff": [
+    0.2333,
+    [
+     0.0333,
+     0.4333
+    ]
+   ],
+   "reading": {
+    "boxes_per_photo_diff": "more",
+    "any_box_share_diff": "more"
+   }
+  },
+  "clean@1.0: v2c / v1": {
+   "boxes": [
+    112.0,
+    [
+     22.7,
+     172.0
+    ]
+   ],
+   "critical": [
+    null,
+    [
+     null,
+     null
+    ]
+   ],
+   "ms": [
+    1.2651,
+    [
+     1.2065,
+     1.3244
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    3.7,
+    [
+     1.7,
+     6.1333
+    ]
+   ],
+   "any_box_share_diff": [
+    0.4333,
+    [
+     0.2333,
+     0.6333
+    ]
+   ],
+   "reading": {
+    "boxes_per_photo_diff": "more",
+    "any_box_share_diff": "more"
+   }
+  },
+  "clean@1.0: v2c / classical-v1": {
+   "boxes": [
+    0.2358,
+    [
+     0.0889,
+     0.5734
+    ]
+   ],
+   "critical": [
+    0.0,
+    [
+     0.0,
+     0.0
+    ]
+   ],
+   "ms": [
+    4.2741,
+    [
+     3.8504,
+     4.7731
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    -12.1,
+    [
+     -21.3667,
+     -3.965
+    ]
+   ],
+   "any_box_share_diff": [
+    -0.3333,
+    [
+     -0.6,
+     -0.0667
     ]
    ],
    "reading": {
@@ -3110,6 +4443,262 @@
     ]
    ],
    "reading": {
+    "boxes_per_photo_diff": "fewer",
+    "any_box_share_diff": "fewer"
+   }
+  },
+  "real@0.3: v2c / v2b": {
+   "recall": [
+    0.9627,
+    [
+     0.8859,
+     1.044
+    ]
+   ],
+   "iou_only": [
+    0.863,
+    [
+     0.7499,
+     0.9852
+    ]
+   ],
+   "chance": [
+    1.0846,
+    [
+     0.9539,
+     1.2473
+    ]
+   ],
+   "boxes": [
+    1.1776,
+    [
+     1.0121,
+     1.3434
+    ]
+   ],
+   "critical": [
+    0.9721,
+    [
+     0.8549,
+     1.1067
+    ]
+   ],
+   "ms": [
+    0.547,
+    [
+     0.5341,
+     0.5598
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    7.34,
+    [
+     0.5485,
+     14.2602
+    ]
+   ],
+   "any_box_share_diff": [
+    0.02,
+    [
+     -0.02,
+     0.06
+    ]
+   ],
+   "reading": {
+    "recall": "no measurable difference",
+    "iou_only": "lower",
+    "boxes_per_photo_diff": "more",
+    "any_box_share_diff": "no measurable difference"
+   }
+  },
+  "real@0.3: v2c / v2a": {
+   "recall": [
+    0.9627,
+    [
+     0.9132,
+     1.0116
+    ]
+   ],
+   "iou_only": [
+    0.931,
+    [
+     0.8261,
+     1.0402
+    ]
+   ],
+   "chance": [
+    0.9776,
+    [
+     0.8323,
+     1.1454
+    ]
+   ],
+   "boxes": [
+    1.1539,
+    [
+     0.9973,
+     1.3346
+    ]
+   ],
+   "critical": [
+    0.9076,
+    [
+     0.7939,
+     1.0322
+    ]
+   ],
+   "ms": [
+    1.3622,
+    [
+     1.3305,
+     1.3935
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    6.49,
+    [
+     -0.121,
+     13.9802
+    ]
+   ],
+   "any_box_share_diff": [
+    0.03,
+    [
+     -0.01,
+     0.0702
+    ]
+   ],
+   "reading": {
+    "recall": "no measurable difference",
+    "iou_only": "no measurable difference",
+    "boxes_per_photo_diff": "no measurable difference",
+    "any_box_share_diff": "no measurable difference"
+   }
+  },
+  "real@0.3: v2c / v1": {
+   "recall": [
+    0.9651,
+    [
+     0.8847,
+     1.0636
+    ]
+   ],
+   "iou_only": [
+    0.8475,
+    [
+     0.7228,
+     0.9908
+    ]
+   ],
+   "chance": [
+    1.1295,
+    [
+     0.9735,
+     1.3075
+    ]
+   ],
+   "boxes": [
+    1.2439,
+    [
+     1.12,
+     1.3889
+    ]
+   ],
+   "critical": [
+    0.529,
+    [
+     0.4068,
+     0.7235
+    ]
+   ],
+   "ms": [
+    1.2933,
+    [
+     1.2595,
+     1.3293
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    9.54,
+    [
+     4.6792,
+     14.5305
+    ]
+   ],
+   "any_box_share_diff": [
+    0.01,
+    [
+     -0.02,
+     0.04
+    ]
+   ],
+   "reading": {
+    "recall": "no measurable difference",
+    "iou_only": "lower",
+    "boxes_per_photo_diff": "more",
+    "any_box_share_diff": "no measurable difference"
+   }
+  },
+  "real@0.3: v2c / classical-v1": {
+   "recall": [
+    3.0234,
+    [
+     2.2589,
+     4.1365
+    ]
+   ],
+   "iou_only": [
+    3.4364,
+    [
+     2.3542,
+     5.4075
+    ]
+   ],
+   "chance": [
+    3.0704,
+    [
+     2.0197,
+     5.0512
+    ]
+   ],
+   "boxes": [
+    0.0561,
+    [
+     0.0462,
+     0.0675
+    ]
+   ],
+   "critical": [
+    2.1517,
+    [
+     1.4844,
+     3.4168
+    ]
+   ],
+   "ms": [
+    2.5838,
+    [
+     2.4507,
+     2.7333
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    -819.28,
+    [
+     -969.4412,
+     -689.384
+    ]
+   ],
+   "any_box_share_diff": [
+    -0.07,
+    [
+     -0.12,
+     -0.02
+    ]
+   ],
+   "reading": {
+    "recall": "higher",
+    "iou_only": "higher",
     "boxes_per_photo_diff": "fewer",
     "any_box_share_diff": "fewer"
    }
@@ -3489,6 +5078,262 @@
     [
      -0.14,
      -0.03
+    ]
+   ],
+   "reading": {
+    "recall": "higher",
+    "iou_only": "higher",
+    "boxes_per_photo_diff": "fewer",
+    "any_box_share_diff": "fewer"
+   }
+  },
+  "real@1.0: v2c / v2b": {
+   "recall": [
+    0.963,
+    [
+     0.8876,
+     1.0372
+    ]
+   ],
+   "iou_only": [
+    0.8661,
+    [
+     0.7559,
+     0.9852
+    ]
+   ],
+   "chance": [
+    1.0,
+    [
+     0.8715,
+     1.1736
+    ]
+   ],
+   "boxes": [
+    1.1596,
+    [
+     1.0049,
+     1.3126
+    ]
+   ],
+   "critical": [
+    0.9656,
+    [
+     0.853,
+     1.1003
+    ]
+   ],
+   "ms": [
+    0.5411,
+    [
+     0.5268,
+     0.5555
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    7.01,
+    [
+     0.2183,
+     14.0022
+    ]
+   ],
+   "any_box_share_diff": [
+    0.01,
+    [
+     -0.02,
+     0.05
+    ]
+   ],
+   "reading": {
+    "recall": "no measurable difference",
+    "iou_only": "lower",
+    "boxes_per_photo_diff": "more",
+    "any_box_share_diff": "no measurable difference"
+   }
+  },
+  "real@1.0: v2c / v2a": {
+   "recall": [
+    0.9653,
+    [
+     0.914,
+     1.014
+    ]
+   ],
+   "iou_only": [
+    0.9372,
+    [
+     0.836,
+     1.0442
+    ]
+   ],
+   "chance": [
+    0.9513,
+    [
+     0.8186,
+     1.104
+    ]
+   ],
+   "boxes": [
+    1.1081,
+    [
+     0.9564,
+     1.2878
+    ]
+   ],
+   "critical": [
+    0.9055,
+    [
+     0.7924,
+     1.0249
+    ]
+   ],
+   "ms": [
+    1.3447,
+    [
+     1.3002,
+     1.3825
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    4.97,
+    [
+     -2.1135,
+     12.9808
+    ]
+   ],
+   "any_box_share_diff": [
+    0.02,
+    [
+     0.0,
+     0.05
+    ]
+   ],
+   "reading": {
+    "recall": "no measurable difference",
+    "iou_only": "no measurable difference",
+    "boxes_per_photo_diff": "no measurable difference",
+    "any_box_share_diff": "no measurable difference"
+   }
+  },
+  "real@1.0: v2c / v1": {
+   "recall": [
+    0.9606,
+    [
+     0.8783,
+     1.0562
+    ]
+   ],
+   "iou_only": [
+    0.8472,
+    [
+     0.7304,
+     0.9831
+    ]
+   ],
+   "chance": [
+    1.1685,
+    [
+     0.9525,
+     1.454
+    ]
+   ],
+   "boxes": [
+    1.235,
+    [
+     1.116,
+     1.3742
+    ]
+   ],
+   "critical": [
+    0.5296,
+    [
+     0.4075,
+     0.7228
+    ]
+   ],
+   "ms": [
+    1.3011,
+    [
+     1.2678,
+     1.338
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    9.69,
+    [
+     4.7285,
+     15.0503
+    ]
+   ],
+   "any_box_share_diff": [
+    0.01,
+    [
+     0.0,
+     0.03
+    ]
+   ],
+   "reading": {
+    "recall": "no measurable difference",
+    "iou_only": "lower",
+    "boxes_per_photo_diff": "more",
+    "any_box_share_diff": "no measurable difference"
+   }
+  },
+  "real@1.0: v2c / classical-v1": {
+   "recall": [
+    2.5828,
+    [
+     1.9536,
+     3.4958
+    ]
+   ],
+   "iou_only": [
+    2.6216,
+    [
+     1.9186,
+     3.8115
+    ]
+   ],
+   "chance": [
+    2.5595,
+    [
+     1.8103,
+     3.7634
+    ]
+   ],
+   "boxes": [
+    0.0341,
+    [
+     0.0285,
+     0.0403
+    ]
+   ],
+   "critical": [
+    1.3693,
+    [
+     0.9712,
+     2.1182
+    ]
+   ],
+   "ms": [
+    1.5795,
+    [
+     1.4559,
+     1.7125
+    ]
+   ],
+   "boxes_per_photo_diff": [
+    -1441.68,
+    [
+     -1682.7038,
+     -1237.7497
+    ]
+   ],
+   "any_box_share_diff": [
+    -0.06,
+    [
+     -0.1002,
+     -0.02
     ]
    ],
    "reading": {
@@ -3884,6 +5729,54 @@
   }
  },
  "head_check": {
+  "v2c synth_dev@0.3": {
+   "profiles": [
+    "onnx:drishyam_dacl10k_v2c.onnx"
+   ],
+   "boxes_identical": true,
+   "found_identical": true,
+   "ms_identical": true
+  },
+  "v2c synth_dev@1.0": {
+   "profiles": [
+    "onnx:drishyam_dacl10k_v2c.onnx"
+   ],
+   "boxes_identical": true,
+   "found_identical": true,
+   "ms_identical": true
+  },
+  "v2c clean@0.3": {
+   "profiles": [
+    "onnx:drishyam_dacl10k_v2c.onnx"
+   ],
+   "boxes_identical": true,
+   "found_identical": true,
+   "ms_identical": true
+  },
+  "v2c clean@1.0": {
+   "profiles": [
+    "onnx:drishyam_dacl10k_v2c.onnx"
+   ],
+   "boxes_identical": true,
+   "found_identical": true,
+   "ms_identical": true
+  },
+  "v2c real@0.3": {
+   "profiles": [
+    "onnx:drishyam_dacl10k_v2c.onnx"
+   ],
+   "boxes_identical": true,
+   "found_identical": true,
+   "ms_identical": true
+  },
+  "v2c real@1.0": {
+   "profiles": [
+    "onnx:drishyam_dacl10k_v2c.onnx"
+   ],
+   "boxes_identical": true,
+   "found_identical": true,
+   "ms_identical": true
+  },
   "v2a synth_dev@0.3": {
    "profiles": [
     "onnx:drishyam_dacl10k_v2a.onnx"
@@ -3981,6 +5874,105 @@
    "ms_identical": true
   }
  },
+ "same_code_control": {
+  "what": "The four-way rows ran at 7f37505 and 8dad39e, before drishyam/ and evals/ gained the cascade plumbing (off by default; files.*.drishyam_evals_changed_since) that the v2c runs ran with. v2a and the classical engine were re-run by profile name (no knob, no baselines) on the three dev splits at the v2c head check's commit, on their committed cost tables (runs/v2c/chain3.sh), and compared job by job with the carried rows (v2a: grid_<split>:ref@<cap>; classical-v1: classical_<split>:head@<cap>): boxes, found counts and modelled ms identical on every image means the code between them did not change these rows. v1 and v2b were not re-run; their rows go through the same code paths.",
+  "v2a_now synth_dev@0.3": {
+   "profiles": [
+    "onnx:drishyam_dacl10k_v2a.onnx"
+   ],
+   "boxes_identical": true,
+   "found_identical": true,
+   "ms_identical": true
+  },
+  "v2a_now synth_dev@1.0": {
+   "profiles": [
+    "onnx:drishyam_dacl10k_v2a.onnx"
+   ],
+   "boxes_identical": true,
+   "found_identical": true,
+   "ms_identical": true
+  },
+  "v2a_now clean@0.3": {
+   "profiles": [
+    "onnx:drishyam_dacl10k_v2a.onnx"
+   ],
+   "boxes_identical": true,
+   "found_identical": true,
+   "ms_identical": true
+  },
+  "v2a_now clean@1.0": {
+   "profiles": [
+    "onnx:drishyam_dacl10k_v2a.onnx"
+   ],
+   "boxes_identical": true,
+   "found_identical": true,
+   "ms_identical": true
+  },
+  "v2a_now real@0.3": {
+   "profiles": [
+    "onnx:drishyam_dacl10k_v2a.onnx"
+   ],
+   "boxes_identical": true,
+   "found_identical": true,
+   "ms_identical": true
+  },
+  "v2a_now real@1.0": {
+   "profiles": [
+    "onnx:drishyam_dacl10k_v2a.onnx"
+   ],
+   "boxes_identical": true,
+   "found_identical": true,
+   "ms_identical": true
+  },
+  "classical_now synth_dev@0.3": {
+   "profiles": [
+    "classical-v1"
+   ],
+   "boxes_identical": true,
+   "found_identical": true,
+   "ms_identical": true
+  },
+  "classical_now synth_dev@1.0": {
+   "profiles": [
+    "classical-v1"
+   ],
+   "boxes_identical": true,
+   "found_identical": true,
+   "ms_identical": true
+  },
+  "classical_now clean@0.3": {
+   "profiles": [
+    "classical-v1"
+   ],
+   "boxes_identical": true,
+   "found_identical": true,
+   "ms_identical": true
+  },
+  "classical_now clean@1.0": {
+   "profiles": [
+    "classical-v1"
+   ],
+   "boxes_identical": true,
+   "found_identical": true,
+   "ms_identical": true
+  },
+  "classical_now real@0.3": {
+   "profiles": [
+    "classical-v1"
+   ],
+   "boxes_identical": true,
+   "found_identical": true,
+   "ms_identical": true
+  },
+  "classical_now real@1.0": {
+   "profiles": [
+    "classical-v1"
+   ],
+   "boxes_identical": true,
+   "found_identical": true,
+   "ms_identical": true
+  }
+ },
  "files": {
   "classical_synth_dev": {
    "file": "runs/v2b/classical_synth_dev.json",
@@ -3993,7 +5985,13 @@
    "code_end": "7f37505c079ed9d4974ff3ec231b9c4f92fce5a1",
    "dirty_files": 0,
    "drishyam_evals_changed_since": [
-    "drishyam/agent.py"
+    "drishyam/agent.py",
+    "drishyam/cascade.py",
+    "drishyam/prefetch.py",
+    "evals/dev_sweep.py",
+    "evals/harness.py",
+    "evals/heldout.py",
+    "evals/model_eval.py"
    ],
    "workers": 6,
    "load": {
@@ -4021,7 +6019,13 @@
    "code_end": "7f37505c079ed9d4974ff3ec231b9c4f92fce5a1",
    "dirty_files": 0,
    "drishyam_evals_changed_since": [
-    "drishyam/agent.py"
+    "drishyam/agent.py",
+    "drishyam/cascade.py",
+    "drishyam/prefetch.py",
+    "evals/dev_sweep.py",
+    "evals/harness.py",
+    "evals/heldout.py",
+    "evals/model_eval.py"
    ],
    "workers": 6,
    "load": {
@@ -4049,7 +6053,13 @@
    "code_end": "7f37505c079ed9d4974ff3ec231b9c4f92fce5a1",
    "dirty_files": 0,
    "drishyam_evals_changed_since": [
-    "drishyam/agent.py"
+    "drishyam/agent.py",
+    "drishyam/cascade.py",
+    "drishyam/prefetch.py",
+    "evals/dev_sweep.py",
+    "evals/harness.py",
+    "evals/heldout.py",
+    "evals/model_eval.py"
    ],
    "workers": 6,
    "load": {
@@ -4101,7 +6111,13 @@
    "code_end": null,
    "dirty_files": 0,
    "drishyam_evals_changed_since": [
-    "drishyam/agent.py"
+    "drishyam/agent.py",
+    "drishyam/cascade.py",
+    "drishyam/prefetch.py",
+    "evals/dev_sweep.py",
+    "evals/harness.py",
+    "evals/heldout.py",
+    "evals/model_eval.py"
    ],
    "workers": 4,
    "load": {
@@ -4155,7 +6171,13 @@
    "code_end": null,
    "dirty_files": 0,
    "drishyam_evals_changed_since": [
-    "drishyam/agent.py"
+    "drishyam/agent.py",
+    "drishyam/cascade.py",
+    "drishyam/prefetch.py",
+    "evals/dev_sweep.py",
+    "evals/harness.py",
+    "evals/heldout.py",
+    "evals/model_eval.py"
    ],
    "workers": 4,
    "load": {
@@ -4204,7 +6226,13 @@
    "code_end": null,
    "dirty_files": 0,
    "drishyam_evals_changed_since": [
-    "drishyam/agent.py"
+    "drishyam/agent.py",
+    "drishyam/cascade.py",
+    "drishyam/prefetch.py",
+    "evals/dev_sweep.py",
+    "evals/harness.py",
+    "evals/heldout.py",
+    "evals/model_eval.py"
    ],
    "workers": 4,
    "load": {
@@ -4245,7 +6273,13 @@
    "code_end": null,
    "dirty_files": 0,
    "drishyam_evals_changed_since": [
-    "drishyam/agent.py"
+    "drishyam/agent.py",
+    "drishyam/cascade.py",
+    "drishyam/prefetch.py",
+    "evals/dev_sweep.py",
+    "evals/harness.py",
+    "evals/heldout.py",
+    "evals/model_eval.py"
    ],
    "workers": 4,
    "load": {
@@ -4275,7 +6309,13 @@
    "code_end": null,
    "dirty_files": 0,
    "drishyam_evals_changed_since": [
-    "drishyam/agent.py"
+    "drishyam/agent.py",
+    "drishyam/cascade.py",
+    "drishyam/prefetch.py",
+    "evals/dev_sweep.py",
+    "evals/harness.py",
+    "evals/heldout.py",
+    "evals/model_eval.py"
    ],
    "workers": 4,
    "load": {
@@ -4306,7 +6346,13 @@
    "code_end": "7f37505c079ed9d4974ff3ec231b9c4f92fce5a1",
    "dirty_files": 0,
    "drishyam_evals_changed_since": [
-    "drishyam/agent.py"
+    "drishyam/agent.py",
+    "drishyam/cascade.py",
+    "drishyam/prefetch.py",
+    "evals/dev_sweep.py",
+    "evals/harness.py",
+    "evals/heldout.py",
+    "evals/model_eval.py"
    ],
    "workers": 6,
    "load": {
@@ -4339,7 +6385,15 @@
    "code": "0e9c63b47fe2b64a8bbfc13cf50aac81ab25b688",
    "code_end": "0e9c63b47fe2b64a8bbfc13cf50aac81ab25b688",
    "dirty_files": 0,
-   "drishyam_evals_changed_since": [],
+   "drishyam_evals_changed_since": [
+    "drishyam/agent.py",
+    "drishyam/cascade.py",
+    "drishyam/prefetch.py",
+    "evals/dev_sweep.py",
+    "evals/harness.py",
+    "evals/heldout.py",
+    "evals/model_eval.py"
+   ],
    "workers": 6,
    "load": {
     "start": 11.47,
@@ -4365,7 +6419,15 @@
    "code": "0e9c63b47fe2b64a8bbfc13cf50aac81ab25b688",
    "code_end": "0e9c63b47fe2b64a8bbfc13cf50aac81ab25b688",
    "dirty_files": 0,
-   "drishyam_evals_changed_since": [],
+   "drishyam_evals_changed_since": [
+    "drishyam/agent.py",
+    "drishyam/cascade.py",
+    "drishyam/prefetch.py",
+    "evals/dev_sweep.py",
+    "evals/harness.py",
+    "evals/heldout.py",
+    "evals/model_eval.py"
+   ],
    "workers": 6,
    "load": {
     "start": 12.17,
@@ -4389,7 +6451,15 @@
    "code": "0e9c63b47fe2b64a8bbfc13cf50aac81ab25b688",
    "code_end": "0e9c63b47fe2b64a8bbfc13cf50aac81ab25b688",
    "dirty_files": 0,
-   "drishyam_evals_changed_since": [],
+   "drishyam_evals_changed_since": [
+    "drishyam/agent.py",
+    "drishyam/cascade.py",
+    "drishyam/prefetch.py",
+    "evals/dev_sweep.py",
+    "evals/harness.py",
+    "evals/heldout.py",
+    "evals/model_eval.py"
+   ],
    "workers": 6,
    "load": {
     "start": 9.61,
@@ -4439,7 +6509,13 @@
    "code_end": "7f37505c079ed9d4974ff3ec231b9c4f92fce5a1",
    "dirty_files": 0,
    "drishyam_evals_changed_since": [
-    "drishyam/agent.py"
+    "drishyam/agent.py",
+    "drishyam/cascade.py",
+    "drishyam/prefetch.py",
+    "evals/dev_sweep.py",
+    "evals/harness.py",
+    "evals/heldout.py",
+    "evals/model_eval.py"
    ],
    "workers": 6,
    "load": {
@@ -4493,7 +6569,13 @@
    "code_end": "7f37505c079ed9d4974ff3ec231b9c4f92fce5a1",
    "dirty_files": 0,
    "drishyam_evals_changed_since": [
-    "drishyam/agent.py"
+    "drishyam/agent.py",
+    "drishyam/cascade.py",
+    "drishyam/prefetch.py",
+    "evals/dev_sweep.py",
+    "evals/harness.py",
+    "evals/heldout.py",
+    "evals/model_eval.py"
    ],
    "workers": 6,
    "load": {
@@ -4550,7 +6632,13 @@
    "code_end": "7f37505c079ed9d4974ff3ec231b9c4f92fce5a1",
    "dirty_files": 0,
    "drishyam_evals_changed_since": [
-    "drishyam/agent.py"
+    "drishyam/agent.py",
+    "drishyam/cascade.py",
+    "drishyam/prefetch.py",
+    "evals/dev_sweep.py",
+    "evals/harness.py",
+    "evals/heldout.py",
+    "evals/model_eval.py"
    ],
    "workers": 6,
    "load": {
@@ -4589,7 +6677,15 @@
    "code": "0e9c63b47fe2b64a8bbfc13cf50aac81ab25b688",
    "code_end": "0e9c63b47fe2b64a8bbfc13cf50aac81ab25b688",
    "dirty_files": 0,
-   "drishyam_evals_changed_since": [],
+   "drishyam_evals_changed_since": [
+    "drishyam/agent.py",
+    "drishyam/cascade.py",
+    "drishyam/prefetch.py",
+    "evals/dev_sweep.py",
+    "evals/harness.py",
+    "evals/heldout.py",
+    "evals/model_eval.py"
+   ],
    "workers": 6,
    "load": {
     "start": 8.64,
@@ -4615,7 +6711,15 @@
    "code": "0e9c63b47fe2b64a8bbfc13cf50aac81ab25b688",
    "code_end": "0e9c63b47fe2b64a8bbfc13cf50aac81ab25b688",
    "dirty_files": 0,
-   "drishyam_evals_changed_since": [],
+   "drishyam_evals_changed_since": [
+    "drishyam/agent.py",
+    "drishyam/cascade.py",
+    "drishyam/prefetch.py",
+    "evals/dev_sweep.py",
+    "evals/harness.py",
+    "evals/heldout.py",
+    "evals/model_eval.py"
+   ],
    "workers": 6,
    "load": {
     "start": 5.88,
@@ -4639,7 +6743,15 @@
    "code": "0e9c63b47fe2b64a8bbfc13cf50aac81ab25b688",
    "code_end": "0e9c63b47fe2b64a8bbfc13cf50aac81ab25b688",
    "dirty_files": 0,
-   "drishyam_evals_changed_since": [],
+   "drishyam_evals_changed_since": [
+    "drishyam/agent.py",
+    "drishyam/cascade.py",
+    "drishyam/prefetch.py",
+    "evals/dev_sweep.py",
+    "evals/harness.py",
+    "evals/heldout.py",
+    "evals/model_eval.py"
+   ],
    "workers": 6,
    "load": {
     "start": 13.64,
@@ -4654,9 +6766,565 @@
      "com.apple.Virtualization.VirtualMachine": 394.6
     }
    }
+  },
+  "v2c_grid_synth_dev": {
+   "file": "runs/v2c/v2c_grid_synth_dev.json",
+   "segmenter": "onnx:drishyam_dacl10k_v2c.onnx drishyam_dacl10k_v2c.onnx@24b4d561fb01 drishyam_dacl10k_v2c.fp16.onnx@fe45fea70cd0",
+   "micro_arm": "local-macos-x86-dacl10k_v2c",
+   "variants": {
+    "ref": {
+     "min_view": 0.3,
+     "absorb": false
+    },
+    "mv0": {
+     "min_view": 0.0,
+     "absorb": false
+    },
+    "mv15": {
+     "min_view": 0.15,
+     "absorb": false
+    },
+    "mv25": {
+     "min_view": 0.25,
+     "absorb": false
+    },
+    "mv30_abs": {
+     "min_view": 0.3,
+     "absorb": true
+    },
+    "old": {
+     "min_view": 0.0,
+     "absorb": true
+    }
+   },
+   "code": "7880a417d19c0d465b4dba3299500f48500de379",
+   "code_end": "7880a417d19c0d465b4dba3299500f48500de379",
+   "dirty_files": 0,
+   "drishyam_evals_changed_since": [
+    "drishyam/agent.py"
+   ],
+   "workers": 6,
+   "load": {
+    "start": 9.81,
+    "end": 35.62,
+    "from": "2026-10-20T11:10:36Z",
+    "to": "2026-10-20T11:34:08Z",
+    "min": 11.24,
+    "median": 25.92,
+    "max": 104.12,
+    "samples": 23,
+    "other_top_processes_max_cpu_pct": {
+     "com.apple.Virtualization.VirtualMachine": 456.6,
+     "Brave": 191.9,
+     "npm": 190.7,
+     "claude": 189.6,
+     "Application": 175.5,
+     "node": 167.2,
+     "(2.1.283)": 166.2,
+     "next-build": 112.6,
+     "codex": 105.5,
+     "bun": 98.7,
+     "com.docker.backend": 89.9,
+     "ChatGPT": 88.6,
+     "WindowServer": 77.9
+    }
+   }
+  },
+  "v2c_grid_clean": {
+   "file": "runs/v2c/v2c_grid_clean.json",
+   "segmenter": "onnx:drishyam_dacl10k_v2c.onnx drishyam_dacl10k_v2c.onnx@24b4d561fb01 drishyam_dacl10k_v2c.fp16.onnx@fe45fea70cd0",
+   "micro_arm": "local-macos-x86-dacl10k_v2c",
+   "variants": {
+    "ref": {
+     "min_view": 0.3,
+     "absorb": false
+    },
+    "mv0": {
+     "min_view": 0.0,
+     "absorb": false
+    },
+    "mv15": {
+     "min_view": 0.15,
+     "absorb": false
+    },
+    "mv25": {
+     "min_view": 0.25,
+     "absorb": false
+    },
+    "mv30_abs": {
+     "min_view": 0.3,
+     "absorb": true
+    },
+    "old": {
+     "min_view": 0.0,
+     "absorb": true
+    }
+   },
+   "code": "7880a417d19c0d465b4dba3299500f48500de379",
+   "code_end": "7880a417d19c0d465b4dba3299500f48500de379",
+   "dirty_files": 0,
+   "drishyam_evals_changed_since": [
+    "drishyam/agent.py"
+   ],
+   "workers": 6,
+   "load": {
+    "start": 5.24,
+    "end": 9.81,
+    "from": "2026-10-20T11:02:06Z",
+    "to": "2026-10-20T11:10:35Z",
+    "min": 8.54,
+    "median": 13.77,
+    "max": 23.46,
+    "samples": 9,
+    "other_top_processes_max_cpu_pct": {
+     "com.apple.Virtualization.VirtualMachine": 316.9,
+     "claude": 128.6,
+     "WhatsApp": 104.2
+    }
+   }
+  },
+  "v2c_grid_real": {
+   "file": "runs/v2c/v2c_grid_real.json",
+   "segmenter": "onnx:drishyam_dacl10k_v2c.onnx drishyam_dacl10k_v2c.onnx@24b4d561fb01 drishyam_dacl10k_v2c.fp16.onnx@fe45fea70cd0",
+   "micro_arm": "local-macos-x86-dacl10k_v2c",
+   "variants": {
+    "ref": {
+     "min_view": 0.3,
+     "absorb": false
+    },
+    "mv0": {
+     "min_view": 0.0,
+     "absorb": false
+    },
+    "mv15": {
+     "min_view": 0.15,
+     "absorb": false
+    },
+    "mv25": {
+     "min_view": 0.25,
+     "absorb": false
+    },
+    "mv30_abs": {
+     "min_view": 0.3,
+     "absorb": true
+    },
+    "old": {
+     "min_view": 0.0,
+     "absorb": true
+    }
+   },
+   "code": "7880a417d19c0d465b4dba3299500f48500de379",
+   "code_end": "7880a417d19c0d465b4dba3299500f48500de379",
+   "dirty_files": 0,
+   "drishyam_evals_changed_since": [
+    "drishyam/agent.py"
+   ],
+   "workers": 6,
+   "load": {
+    "start": 35.62,
+    "end": 27.85,
+    "from": "2026-10-20T11:34:10Z",
+    "to": "2026-10-20T12:57:52Z",
+    "min": 13.3,
+    "median": 25.215000000000003,
+    "max": 76.16,
+    "samples": 84,
+    "other_top_processes_max_cpu_pct": {
+     "next-build": 823.0,
+     "node": 507.8,
+     "com.apple.Virtualization.VirtualMachine": 424.0,
+     "claude": 189.4,
+     "Claude": 157.4,
+     "com.docker.backend": 149.3,
+     "WhatsApp": 132.5,
+     "npm": 131.3,
+     "mds_stores": 116.4,
+     "Google": 110.3,
+     "mediaanalysisd": 109.4,
+     "WindowServer": 90.9,
+     "Python": 86.8
+    }
+   }
+  },
+  "v2c_head_synth_dev": {
+   "file": "runs/v2c/v2c_head_synth_dev.json",
+   "segmenter": "onnx:drishyam_dacl10k_v2c.onnx drishyam_dacl10k_v2c.onnx@24b4d561fb01 drishyam_dacl10k_v2c.fp16.onnx@fe45fea70cd0",
+   "micro_arm": "local-macos-x86-dacl10k_v2c",
+   "variants": {
+    "head": {}
+   },
+   "code": "2df29070eb1b0cd11939c7866e56844a673f932c",
+   "code_end": "2df29070eb1b0cd11939c7866e56844a673f932c",
+   "dirty_files": 0,
+   "drishyam_evals_changed_since": [],
+   "workers": 6,
+   "load": {
+    "start": 76.98,
+    "end": 37.27,
+    "from": "2026-10-20T13:05:14Z",
+    "to": "2026-10-20T13:07:27Z",
+    "min": 34.17,
+    "median": 40.535,
+    "max": 46.9,
+    "samples": 2,
+    "other_top_processes_max_cpu_pct": {
+     "next-server": 164.6,
+     "com.apple.Virtualization.VirtualMachine": 116.5,
+     "node": 104.4
+    }
+   }
+  },
+  "v2c_head_clean": {
+   "file": "runs/v2c/v2c_head_clean.json",
+   "segmenter": "onnx:drishyam_dacl10k_v2c.onnx drishyam_dacl10k_v2c.onnx@24b4d561fb01 drishyam_dacl10k_v2c.fp16.onnx@fe45fea70cd0",
+   "micro_arm": "local-macos-x86-dacl10k_v2c",
+   "variants": {
+    "head": {}
+   },
+   "code": "2df29070eb1b0cd11939c7866e56844a673f932c",
+   "code_end": "2df29070eb1b0cd11939c7866e56844a673f932c",
+   "dirty_files": 0,
+   "drishyam_evals_changed_since": [],
+   "workers": 6,
+   "load": {
+    "start": 14.43,
+    "end": 76.98,
+    "from": "2026-10-20T13:03:52Z",
+    "to": "2026-10-20T13:05:13Z",
+    "min": 84.71,
+    "median": 84.71,
+    "max": 84.71,
+    "samples": 1,
+    "other_top_processes_max_cpu_pct": {
+     "node": 106.7
+    }
+   }
+  },
+  "v2c_head_real": {
+   "file": "runs/v2c/v2c_head_real.json",
+   "segmenter": "onnx:drishyam_dacl10k_v2c.onnx drishyam_dacl10k_v2c.onnx@24b4d561fb01 drishyam_dacl10k_v2c.fp16.onnx@fe45fea70cd0",
+   "micro_arm": "local-macos-x86-dacl10k_v2c",
+   "variants": {
+    "head": {}
+   },
+   "code": "2df29070eb1b0cd11939c7866e56844a673f932c",
+   "code_end": "2df29070eb1b0cd11939c7866e56844a673f932c",
+   "dirty_files": 0,
+   "drishyam_evals_changed_since": [],
+   "workers": 6,
+   "load": {
+    "start": 37.27,
+    "end": 50.79,
+    "from": "2026-10-20T13:07:28Z",
+    "to": "2026-10-20T13:12:19Z",
+    "min": 20.48,
+    "median": 60.32,
+    "max": 130.02,
+    "samples": 5,
+    "other_top_processes_max_cpu_pct": {
+     "node": 178.2,
+     "com.apple.Virtualization.VirtualMachine": 111.5,
+     "(2.1.283)": 105.8
+    }
+   }
+  },
+  "v2a_now_synth_dev": {
+   "file": "runs/v2c/v2a_now_synth_dev.json",
+   "segmenter": "onnx:drishyam_dacl10k_v2a.onnx drishyam_dacl10k_v2a.onnx@95b503c2d205 drishyam_dacl10k_v2a.fp16.onnx@0f5fa16e9a65",
+   "micro_arm": "local-macos-x86-dacl10k_v2a",
+   "variants": {
+    "head": {}
+   },
+   "code": "2df29070eb1b0cd11939c7866e56844a673f932c",
+   "code_end": "2df29070eb1b0cd11939c7866e56844a673f932c",
+   "dirty_files": 0,
+   "drishyam_evals_changed_since": [],
+   "workers": 6,
+   "load": {
+    "start": 16.47,
+    "end": 17.18,
+    "from": "2026-10-20T13:17:57Z",
+    "to": "2026-10-20T13:19:18Z",
+    "min": 20.6,
+    "median": 20.6,
+    "max": 20.6,
+    "samples": 1,
+    "other_top_processes_max_cpu_pct": {
+     "Brave": 138.3
+    }
+   }
+  },
+  "v2a_now_clean": {
+   "file": "runs/v2c/v2a_now_clean.json",
+   "segmenter": "onnx:drishyam_dacl10k_v2a.onnx drishyam_dacl10k_v2a.onnx@95b503c2d205 drishyam_dacl10k_v2a.fp16.onnx@0f5fa16e9a65",
+   "micro_arm": "local-macos-x86-dacl10k_v2a",
+   "variants": {
+    "head": {}
+   },
+   "code": "2df29070eb1b0cd11939c7866e56844a673f932c",
+   "code_end": "2df29070eb1b0cd11939c7866e56844a673f932c",
+   "dirty_files": 0,
+   "drishyam_evals_changed_since": [],
+   "workers": 6,
+   "load": {
+    "start": 15.79,
+    "end": 16.47,
+    "from": "2026-10-20T13:17:14Z",
+    "to": "2026-10-20T13:17:56Z",
+    "min": 17.39,
+    "median": 17.39,
+    "max": 17.39,
+    "samples": 1,
+    "other_top_processes_max_cpu_pct": {
+     "mds_stores": 116.3
+    }
+   }
+  },
+  "v2a_now_real": {
+   "file": "runs/v2c/v2a_now_real.json",
+   "segmenter": "onnx:drishyam_dacl10k_v2a.onnx drishyam_dacl10k_v2a.onnx@95b503c2d205 drishyam_dacl10k_v2a.fp16.onnx@0f5fa16e9a65",
+   "micro_arm": "local-macos-x86-dacl10k_v2a",
+   "variants": {
+    "head": {}
+   },
+   "code": "2df29070eb1b0cd11939c7866e56844a673f932c",
+   "code_end": "2df29070eb1b0cd11939c7866e56844a673f932c",
+   "dirty_files": 0,
+   "drishyam_evals_changed_since": [],
+   "workers": 6,
+   "load": {
+    "start": 17.18,
+    "end": 19.06,
+    "from": "2026-10-20T13:19:19Z",
+    "to": "2026-10-20T13:23:37Z",
+    "min": 15.78,
+    "median": 17.54,
+    "max": 19.88,
+    "samples": 4,
+    "other_top_processes_max_cpu_pct": {
+     "node": 100.8
+    }
+   }
+  },
+  "classical_now_synth_dev": {
+   "file": "runs/v2c/classical_now_synth_dev.json",
+   "segmenter": "classical-v1",
+   "micro_arm": "local-macos-x86",
+   "variants": {
+    "head": {}
+   },
+   "code": "2df29070eb1b0cd11939c7866e56844a673f932c",
+   "code_end": "2df29070eb1b0cd11939c7866e56844a673f932c",
+   "dirty_files": 0,
+   "drishyam_evals_changed_since": [],
+   "workers": 6,
+   "load": {
+    "start": 19.04,
+    "end": 23.82,
+    "from": "2026-10-20T13:23:55Z",
+    "to": "2026-10-20T13:24:25Z",
+    "min": 19.04,
+    "median": 19.04,
+    "max": 19.04,
+    "samples": 1,
+    "other_top_processes_max_cpu_pct": {
+     "node": 96.4,
+     "Google": 64.3
+    }
+   }
+  },
+  "classical_now_clean": {
+   "file": "runs/v2c/classical_now_clean.json",
+   "segmenter": "classical-v1",
+   "micro_arm": "local-macos-x86",
+   "variants": {
+    "head": {}
+   },
+   "code": "2df29070eb1b0cd11939c7866e56844a673f932c",
+   "code_end": "2df29070eb1b0cd11939c7866e56844a673f932c",
+   "dirty_files": 0,
+   "drishyam_evals_changed_since": [],
+   "workers": 6,
+   "load": {
+    "start": 19.06,
+    "end": 19.04,
+    "from": "2026-10-20T13:23:38Z",
+    "to": "2026-10-20T13:23:54Z",
+    "min": null,
+    "median": [],
+    "max": null,
+    "samples": 0,
+    "other_top_processes_max_cpu_pct": {}
+   }
+  },
+  "classical_now_real": {
+   "file": "runs/v2c/classical_now_real.json",
+   "segmenter": "classical-v1",
+   "micro_arm": "local-macos-x86",
+   "variants": {
+    "head": {}
+   },
+   "code": "2df29070eb1b0cd11939c7866e56844a673f932c",
+   "code_end": "2df29070eb1b0cd11939c7866e56844a673f932c",
+   "dirty_files": 0,
+   "drishyam_evals_changed_since": [],
+   "workers": 6,
+   "load": {
+    "start": 23.82,
+    "end": 37.16,
+    "from": "2026-10-20T13:24:26Z",
+    "to": "2026-10-20T13:27:47Z",
+    "min": 20.57,
+    "median": 29.56,
+    "max": 43.91,
+    "samples": 3,
+    "other_top_processes_max_cpu_pct": {
+     "node": 179.7
+    }
+   }
   }
  },
  "latency": {
+  "v2a beside v2c": {
+   "file": "runs/v2c/micro/local-macos-x86-dacl10k_v2a/micro.json",
+   "segmenter": "onnx:drishyam_dacl10k_v2a.onnx",
+   "timestamp": "2026-10-20T10:53:19Z",
+   "load_start": [
+    7.02,
+    6.9,
+    5.64
+   ],
+   "load_end": [
+    7.36,
+    6.83,
+    5.94
+   ],
+   "p50_p95_ms": {
+    "warp 1024x768": [
+     2.471,
+     2.965
+    ],
+    "quality 1024x768": [
+     1.894,
+     3.518
+    ],
+    "segment:accurate 1024x768": [
+     751.074,
+     868.007
+    ],
+    "segment:fast 1024x768": [
+     252.083,
+     280.687
+    ],
+    "warp 2048x1536": [
+     2.273,
+     2.426
+    ],
+    "quality 2048x1536": [
+     1.856,
+     2.909
+    ],
+    "segment:accurate 2048x1536": [
+     740.689,
+     816.706
+    ],
+    "segment:fast 2048x1536": [
+     263.647,
+     303.949
+    ],
+    "warp 4000x3000": [
+     2.489,
+     3.8
+    ],
+    "quality 4000x3000": [
+     1.83,
+     3.155
+    ],
+    "segment:accurate 4000x3000": [
+     745.082,
+     903.484
+    ],
+    "segment:fast 4000x3000": [
+     252.951,
+     286.482
+    ]
+   },
+   "per_look_p50_ms": {
+    "1024x768": 755.4,
+    "2048x1536": 744.8,
+    "4000x3000": 749.4
+   }
+  },
+  "v2c": {
+   "file": "results/local-macos-x86-dacl10k_v2c/micro.json",
+   "segmenter": "onnx:drishyam_dacl10k_v2c.onnx",
+   "timestamp": "2026-10-20T10:48:19Z",
+   "load_start": [
+    9.51,
+    6.32,
+    4.95
+   ],
+   "load_end": [
+    7.02,
+    6.9,
+    5.64
+   ],
+   "p50_p95_ms": {
+    "warp 1024x768": [
+     2.327,
+     3.037
+    ],
+    "quality 1024x768": [
+     1.859,
+     2.779
+    ],
+    "segment:accurate 1024x768": [
+     746.181,
+     891.062
+    ],
+    "segment:fast 1024x768": [
+     258.446,
+     319.266
+    ],
+    "warp 2048x1536": [
+     2.297,
+     2.42
+    ],
+    "quality 2048x1536": [
+     1.679,
+     2.852
+    ],
+    "segment:accurate 2048x1536": [
+     736.449,
+     827.302
+    ],
+    "segment:fast 2048x1536": [
+     246.197,
+     264.147
+    ],
+    "warp 4000x3000": [
+     2.597,
+     3.192
+    ],
+    "quality 4000x3000": [
+     1.491,
+     3.994
+    ],
+    "segment:accurate 4000x3000": [
+     740.854,
+     890.075
+    ],
+    "segment:fast 4000x3000": [
+     244.336,
+     274.816
+    ]
+   },
+   "per_look_p50_ms": {
+    "1024x768": 750.4,
+    "2048x1536": 740.4,
+    "4000x3000": 744.9
+   }
+  },
   "v2a beside v2b": {
    "file": "runs/v2a/micro/local-macos-x86-dacl10k_v2a/micro.json",
    "segmenter": "onnx:drishyam_dacl10k_v2a.onnx",
@@ -5008,11 +7676,12 @@
   "table.<split@cap>.<model>: the model's row at its profile on that split and cap. recall_ci, *_ci: 95 % bootstrap intervals over images (1000 resamples, seed 0, evals.harness.boot_ci); vs_tiling_L0, vs_downscale and ms_vs_*: against the baselines of the model's own run (the same segmenter and cost table)",
   "pairs.<split@cap>: <a> / <b>: paired over the same images (the image ids of every run are asserted equal and every run's dataset sha256 equals results/dev/onnx_profile_sweep.json's): ratios of sums (recall, IoU-only, chance, boxes, critical, ms) and differences (boxes per photo, share of photos with any box), each [point, CI]; reading: higher / lower / more / fewer only when the CI excludes no change",
   "verdicts: the criterion read from the pairs at the 30 % cap; best: the models that meet it",
-  "ms_per_job: modelled ms per job on the model's own cost table (the fixed table's virtual clock: what the job would cost on this Mac at the load the table was timed at). The four tables were timed at different loads (models.<m>.cost_table), so ms are comparable within a model (to its own baselines) but not between models; latency.\"v2a beside v2b\" is v2a re-timed in v2b's window, the same-window control",
+  "ms_per_job: modelled ms per job on the model's own cost table (the fixed table's virtual clock: what the job would cost on this Mac at the load the table was timed at). The five tables were timed at different loads (models.<m>.cost_table), so ms are comparable within a model (to its own baselines) but not between models; latency.\"v2a beside v2b\" and latency.\"v2a beside v2c\" are v2a re-timed in v2b's and in v2c's window, the same-window controls",
   "jobs_at_20s: jobs whose modelled time reached JobConfig.seconds_cap (20 s), the one cap a cost table can trip",
   "v2a and v2b found the same number of CODEBRIM's ground-truth boxes at the 30 % cap (402 of 837), on different images (42 of 100 differ): equal totals, not one run read twice (each run's segmenter and weights are in files)",
   "files: each run's code commit (and at its end), the drishyam/ and evals/ files that differ from the head of this branch, its workers and the machine load over it",
-  "boxes are per-component boxes (the harness's primary convention for every policy); critical counts boxes of a critical class and size (findings.is_critical), the ones the human gate would hold; on the clean split every box is a false alarm"
+  "boxes are per-component boxes (the harness's primary convention for every policy); critical counts boxes of a critical class and size (findings.is_critical), the ones the human gate would hold; on the clean split every box is a false alarm",
+  "files: the four-way runs (grid_*, v1_head_*, v2a_head_*, v2b_*, classical_*) ran in the worktree of the v2a/v2b dev calibration; their entries are carried over as committed, with drishyam_evals_changed_since re-derived against this branch's head; the v2c runs (v2c_*) and the same-code control (*_now) ran in this one (runs/v2c)"
  ],
  "per_image": {
   "v2b_grid_synth_dev:ref@0.3": {"counts":[[1,1,0,0,3],[3,1,0,0,4],[1,1,0,0,2],[2,2,0,0,3],[1,1,0,0,1],[3,3,0,0,5],[1,1,0,0,1],[1,1,0,0,2],[2,2,0,0,2],[2,2,0,0,4],[1,1,0,0,1],[2,2,0,0,2],[1,1,0,0,5],[4,3,0,0,6],[0,0,0,0,1],[2,2,0,0,4],[3,3,0,0,4],[4,4,1,0,6],[0,0,0,0,5],[2,2,0,0,5],[2,2,0,0,3],[1,1,0,0,3],[1,1,1,0,6],[1,1,0,0,2],[3,3,1,0,5],[2,2,0,0,3],[2,2,0,0,7],[2,2,0,0,6],[2,2,0,0,3],[1,1,0,0,1],[3,3,0,0,6],[5,4,0,0,5],[4,3,2,0,5],[1,1,0,0,1],[1,1,0,0,3],[3,3,0,0,5],[1,1,0,0,1],[4,4,0,0,4],[1,1,0,0,4],[2,2,0,0,3],[1,1,0,0,2],[1,1,0,0,6],[1,1,0,0,1],[1,1,0,0,2],[2,2,0,0,3],[5,5,0,0,5],[3,3,1,0,4],[2,2,1,1,2],[1,1,0,0,2],[3,2,2,1,4],[0,0,0,0,1],[2,2,1,0,7],[1,1,0,0,1],[1,1,0,0,1],[2,2,0,0,2],[4,2,3,0,4],[0,0,0,0,1],[2,2,0,0,3],[1,1,0,0,2],[2,2,0,0,5]],"boxes":[2,4,4,5,14,9,6,2,2,10,7,2,9,14,0,6,9,16,3,5,2,2,7,3,5,4,8,8,3,3,8,12,6,1,1,11,2,9,3,4,5,5,3,2,8,17,10,4,6,10,0,9,2,3,2,5,2,3,5,4],"critical":[0,0,1,2,0,4,0,1,0,0,0,1,0,2,0,0,0,0,0,1,1,0,2,0,0,1,2,2,0,1,2,0,0,0,1,0,0,0,0,1,0,0,0,1,1,0,3,0,1,0,0,4,0,0,0,0,0,1,0,2],"ms":[4441.5,2968.45,2968.45,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,2968.45,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,2968.45,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,2968.45,4441.5,4441.5,4441.5,4441.5,4441.5,4441.5,2968.45,4441.5,4441.5,4441.5,4441.5],"profiles":["classical-v1"]},
@@ -5062,6 +7731,18 @@
   "v1_head_real:tiling@L0": {"counts":[[0,0,0,0,1],[0,0,0,0,2],[2,0,0,0,2],[1,0,0,0,2],[0,0,0,0,2],[0,0,0,0,2],[0,0,0,0,0],[0,0,0,0,2],[0,0,0,0,5],[11,4,5,0,12],[2,0,1,0,9],[3,1,1,0,5],[1,1,0,0,2],[0,0,0,0,4],[0,0,1,0,3],[3,1,2,0,5],[2,2,0,0,3],[0,0,0,0,2],[0,0,0,0,1],[1,1,0,0,1],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,2],[4,2,1,0,12],[5,3,0,0,14],[2,1,0,0,3],[2,2,0,0,2],[2,1,1,0,3],[0,0,0,0,1],[0,0,0,0,4],[0,0,0,0,12],[4,2,3,0,9],[0,0,0,0,3],[2,1,2,0,7],[0,0,0,0,3],[11,7,2,2,24],[10,7,0,0,24],[0,0,0,0,1],[0,0,0,0,1],[5,4,0,0,6],[1,1,0,0,2],[38,27,3,0,47],[0,0,0,0,0],[2,2,0,0,3],[1,1,0,0,1],[3,3,0,0,4],[0,0,0,0,1],[0,0,0,0,11],[3,0,0,0,6],[2,1,0,0,6],[0,0,0,0,3],[7,2,1,0,12],[0,0,0,0,9],[2,0,0,0,4],[2,0,0,0,10],[2,1,0,0,15],[6,3,0,0,11],[2,0,0,0,31],[14,3,5,0,34],[1,0,0,0,1],[2,1,1,0,6],[2,1,1,0,3],[0,0,0,0,2],[0,0,0,0,4],[3,0,3,2,8],[1,0,0,0,1],[11,3,1,1,30],[2,1,1,0,7],[6,4,0,0,14],[10,5,3,1,30],[3,2,0,0,5],[4,2,4,0,17],[1,0,0,0,9],[0,0,0,0,3],[0,0,0,0,1],[1,0,0,0,4],[1,1,0,0,5],[13,5,3,0,31],[6,0,3,0,17],[0,0,0,0,8],[1,0,3,0,4],[4,1,3,0,15],[1,0,0,0,3],[4,0,1,0,5],[8,3,1,1,16],[5,3,2,0,21],[3,1,0,0,8],[6,4,0,0,9],[8,2,0,0,14],[6,0,3,0,21],[1,0,0,0,7],[1,0,0,0,6],[1,0,0,0,4],[12,4,4,1,23],[12,4,2,0,20],[3,0,0,0,5],[1,0,0,0,7],[12,9,4,0,24],[3,2,0,0,7],[3,0,0,0,4]],"boxes":[35,68,80,97,6,165,126,139,110,403,507,216,81,61,107,105,30,34,141,51,6,2,268,92,83,227,134,318,10,13,12,60,236,42,38,117,66,17,156,816,134,860,559,617,468,300,480,133,190,100,698,406,60,235,136,289,215,109,538,120,431,215,18,74,72,358,251,386,124,275,62,608,144,163,120,419,462,196,423,119,284,33,21,103,358,171,54,95,356,725,317,21,175,441,372,38,156,336,45,259],"critical":[0,1,0,0,0,1,0,0,2,0,27,17,23,0,0,0,6,0,0,0,0,0,0,2,2,10,1,8,0,0,0,5,1,14,0,8,25,0,0,10,2,1,9,4,1,9,1,0,8,1,1,11,0,37,1,1,0,1,29,1,46,6,0,0,0,30,12,20,10,11,1,49,0,0,2,6,1,41,34,4,45,0,0,0,28,0,3,0,16,30,5,0,0,30,142,0,1,22,1,0],"ms":[20601.81,16481.44,16481.44,20601.81,16481.44,84694.2,84694.2,84694.2,84694.2,84694.2,84694.2,84694.2,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,14126.95,14126.95,20601.81,14126.95,20601.81,20601.81,11772.46,35571.56,11772.46,7063.48,7063.48,14126.95,35571.56,14126.95,35571.56,14126.95,20601.81,67755.36,67755.36,67755.36,67755.36,67755.36,67755.36,67755.36,67755.36,67755.36,67755.36,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17,55898.17],"profiles":[]},
   "v1_head_real:downscale": {"counts":[[0,0,0,0,1],[0,0,0,0,2],[0,0,0,0,2],[0,0,0,0,2],[0,0,0,0,2],[0,0,0,0,2],[0,0,0,0,0],[0,0,0,0,2],[0,0,0,0,5],[1,1,0,0,12],[0,0,0,0,9],[3,0,2,0,5],[1,1,0,0,2],[0,0,0,0,4],[1,1,1,1,3],[4,1,4,1,5],[2,2,0,0,3],[0,0,0,0,2],[1,1,1,1,1],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,2],[3,2,1,0,12],[3,2,2,2,14],[3,2,1,0,3],[2,2,1,0,2],[3,3,1,1,3],[1,1,0,0,1],[0,0,0,0,4],[0,0,0,0,12],[3,1,1,0,9],[2,2,2,2,3],[2,2,3,1,7],[0,0,1,0,3],[2,1,0,0,24],[7,4,0,0,24],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,6],[0,0,1,1,2],[8,0,2,0,47],[0,0,0,0,0],[0,0,0,0,3],[1,1,0,0,1],[1,1,0,0,4],[0,0,0,0,1],[5,4,2,2,11],[4,3,3,2,6],[3,3,0,0,6],[1,1,1,0,3],[9,3,2,2,12],[0,0,1,1,9],[0,0,0,0,4],[10,0,10,0,10],[2,2,0,0,15],[8,3,4,0,11],[18,6,6,1,31],[19,4,13,1,34],[1,0,1,0,1],[1,1,0,0,6],[1,1,0,0,3],[0,0,0,0,2],[2,1,0,0,4],[3,2,0,0,8],[0,0,0,0,1],[12,1,5,0,30],[3,2,1,0,7],[7,2,0,0,14],[20,3,7,0,30],[1,1,0,0,5],[9,7,3,0,17],[3,1,0,0,9],[3,0,3,0,3],[0,0,0,0,1],[1,1,0,0,4],[0,0,0,0,5],[13,3,1,0,31],[6,4,6,3,17],[4,4,0,0,8],[3,2,2,1,4],[9,2,6,0,15],[1,1,0,0,3],[4,4,1,1,5],[10,5,6,1,16],[9,5,1,1,21],[3,1,0,0,8],[8,5,0,0,9],[9,3,1,0,14],[15,6,10,0,21],[1,1,0,0,7],[0,0,0,0,6],[4,0,2,0,4],[5,2,2,0,23],[11,2,4,0,20],[2,0,0,0,5],[4,1,1,0,7],[14,6,3,0,24],[3,3,0,0,7],[2,1,1,0,4]],"boxes":[1,8,7,0,3,1,0,0,2,9,6,2,4,6,5,1,4,6,1,0,5,0,5,14,6,12,22,16,2,3,5,12,26,9,4,9,8,0,0,0,6,8,12,8,2,2,8,12,11,11,6,9,12,1,4,6,10,19,15,4,8,3,1,4,7,1,18,20,7,22,3,18,5,12,3,2,2,18,17,6,23,12,2,5,18,11,7,7,12,15,1,0,2,15,34,8,17,24,3,6],"critical":[0,1,1,0,0,0,0,0,0,0,2,2,1,1,0,0,0,1,0,0,0,0,0,0,0,2,2,4,0,0,0,1,3,2,2,1,3,0,0,0,0,1,0,0,1,0,0,4,3,1,1,2,0,0,0,1,1,10,1,0,1,1,0,0,0,1,6,2,5,8,1,5,2,1,0,1,1,4,1,3,5,0,0,0,1,3,3,0,2,2,0,0,1,3,14,0,6,4,2,0],"ms":[590.56,590.22,590.22,590.56,590.19,639.87,639.87,639.87,639.87,639.87,639.87,639.87,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,590.0,590.0,590.74,590.0,590.41,590.74,589.74,595.92,589.74,589.31,589.31,590.0,595.92,590.0,595.92,590.0,590.41,628.14,628.14,628.14,628.14,628.14,628.14,628.14,628.14,628.14,628.14,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56,614.56],"profiles":[]},
   "classical_real:tiling@L0": {"counts":[[0,0,1,0,1],[0,0,0,0,2],[0,0,0,0,2],[1,0,1,0,2],[0,0,0,0,2],[1,0,1,0,2],[0,0,0,0,0],[0,0,0,0,2],[0,0,0,0,5],[0,0,0,0,12],[3,0,1,0,9],[0,0,0,0,5],[1,1,0,0,2],[0,0,0,0,4],[0,0,0,0,3],[0,0,0,0,5],[1,1,0,0,3],[0,0,0,0,2],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,2],[1,0,2,0,12],[2,1,1,0,14],[3,2,1,1,3],[2,1,0,0,2],[2,2,1,0,3],[1,0,0,0,1],[0,0,0,0,4],[0,0,0,0,12],[1,1,0,0,9],[0,0,0,0,3],[2,2,0,0,7],[0,0,0,0,3],[9,3,2,1,24],[3,1,2,1,24],[0,0,0,0,1],[0,0,0,0,1],[3,0,1,0,6],[0,0,0,0,2],[31,9,3,1,47],[0,0,0,0,0],[1,0,0,0,3],[0,0,0,0,1],[2,0,2,1,4],[0,0,1,0,1],[3,1,2,0,11],[0,0,0,0,6],[1,1,0,0,6],[0,0,1,0,3],[7,2,2,0,12],[0,0,1,0,9],[0,0,0,0,4],[0,0,0,0,10],[1,1,0,0,15],[2,1,0,0,11],[9,6,3,2,31],[7,1,6,1,34],[0,0,0,0,1],[0,0,0,0,6],[0,0,0,0,3],[0,0,0,0,2],[2,1,0,0,4],[1,0,0,0,8],[0,0,0,0,1],[3,0,2,0,30],[1,0,2,0,7],[1,0,0,0,14],[3,3,6,4,30],[0,0,0,0,5],[1,0,0,0,17],[1,1,0,0,9],[0,0,0,0,3],[0,0,0,0,1],[0,0,0,0,4],[1,0,0,0,5],[4,2,2,0,31],[4,0,0,0,17],[1,0,1,0,8],[0,0,0,0,4],[2,0,0,0,15],[2,0,0,0,3],[3,0,0,0,5],[1,0,0,0,16],[8,3,1,1,21],[2,0,1,0,8],[6,0,1,0,9],[3,1,0,0,14],[3,0,0,0,21],[2,0,0,0,7],[0,0,1,0,6],[1,0,0,0,4],[10,5,0,0,23],[3,0,0,0,20],[1,0,0,0,5],[0,0,0,0,7],[2,0,0,0,24],[2,2,0,0,7],[2,0,0,0,4]],"boxes":[1903,755,715,2011,632,1464,6702,7093,5325,2279,8324,6940,2038,3189,3843,2735,1052,2318,2195,1873,127,81,865,822,1443,1328,522,1672,79,216,299,1168,2957,1393,901,1264,1613,2298,6175,9113,1699,4968,7194,8134,7112,6816,7069,3609,2657,1673,6234,8222,1261,3416,2853,2611,3429,2545,2609,4374,9908,2984,1024,1629,1608,6901,2794,4781,3115,4172,1815,3561,1067,2565,4413,3728,3411,1446,5811,1853,6922,693,1220,6346,4319,2301,2002,1320,2913,4100,2719,707,3843,2486,3355,971,3524,2788,7854,2446],"critical":[12,17,7,25,0,0,16,26,62,5,8,5,6,11,2,1,1,7,0,0,0,0,0,0,0,2,0,15,0,0,4,0,0,19,0,1,17,1,77,3,0,2,10,3,1,5,0,0,4,1,4,1,1,31,0,9,0,14,1,1,0,1,9,0,0,1,5,3,5,9,0,4,14,0,0,0,1,14,2,5,61,0,3,0,6,7,19,0,10,13,3,1,11,7,56,0,0,7,0,0],"ms":[3641.75,2913.4,2913.4,3641.75,2913.4,15492.0,15492.0,15492.0,15492.0,15492.0,15492.0,15492.0,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,2497.2,2497.2,3641.75,2497.2,3641.75,3641.75,2081.0,6506.64,2081.0,1248.6,1248.6,2497.2,6506.64,2497.2,6506.64,2497.2,3641.75,12393.6,12393.6,12393.6,12393.6,12393.6,12393.6,12393.6,12393.6,12393.6,12393.6,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72,10224.72],"profiles":[]},
-  "classical_real:downscale": {"counts":[[0,0,0,0,1],[0,0,0,0,2],[0,0,0,0,2],[1,1,0,0,2],[0,0,0,0,2],[1,0,1,0,2],[0,0,0,0,0],[0,0,0,0,2],[0,0,0,0,5],[0,0,2,0,12],[4,2,3,2,9],[0,0,1,0,5],[2,0,2,0,2],[0,0,0,0,4],[0,0,0,0,3],[0,0,0,0,5],[0,0,0,0,3],[0,0,0,0,2],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,2],[1,0,0,0,12],[0,0,1,0,14],[3,3,2,0,3],[2,2,0,0,2],[3,3,1,0,3],[1,1,0,0,1],[0,0,0,0,4],[0,0,0,0,12],[1,1,1,0,9],[0,0,0,0,3],[2,0,0,0,7],[0,0,0,0,3],[7,5,2,0,24],[1,0,6,2,24],[0,0,0,0,1],[0,0,0,0,1],[1,0,0,0,6],[0,0,0,0,2],[7,0,4,1,47],[0,0,0,0,0],[0,0,0,0,3],[0,0,0,0,1],[3,0,3,0,4],[0,0,0,0,1],[3,3,1,1,11],[1,1,1,0,6],[1,1,0,0,6],[2,0,0,0,3],[2,1,0,0,12],[0,0,1,0,9],[0,0,0,0,4],[1,0,0,0,10],[1,1,0,0,15],[3,2,0,0,11],[10,6,3,0,31],[7,1,5,1,34],[0,0,0,0,1],[0,0,0,0,6],[0,0,0,0,3],[0,0,0,0,2],[2,2,1,1,4],[0,0,0,0,8],[0,0,0,0,1],[0,0,1,0,30],[1,1,0,0,7],[0,0,0,0,14],[7,1,5,0,30],[0,0,0,0,5],[1,1,1,0,17],[1,0,1,0,9],[0,0,0,0,3],[0,0,0,0,1],[0,0,0,0,4],[1,0,0,0,5],[4,0,5,0,31],[3,2,0,0,17],[0,0,0,0,8],[1,0,0,0,4],[1,1,0,0,15],[3,2,2,0,3],[4,4,1,0,5],[1,0,0,0,16],[6,4,0,0,21],[1,0,0,0,8],[7,4,0,0,9],[4,1,0,0,14],[0,0,1,0,21],[0,0,0,0,7],[0,0,0,0,6],[1,0,0,0,4],[9,5,0,0,23],[2,0,0,0,20],[1,0,0,0,5],[0,0,0,0,7],[2,0,0,0,24],[2,2,0,0,7],[1,0,0,0,4]],"boxes":[96,49,59,285,46,26,330,170,145,34,362,323,189,251,89,263,304,30,112,78,65,62,29,211,202,158,133,161,52,132,170,194,275,281,100,274,241,104,138,139,85,129,140,140,75,266,64,287,146,29,87,91,36,187,124,70,119,248,308,153,741,130,94,70,85,152,117,249,101,332,37,248,76,26,167,139,68,257,441,42,394,29,132,180,213,207,90,106,166,212,87,81,71,183,95,108,324,190,189,74],"critical":[3,12,6,8,0,0,0,0,5,0,0,2,0,0,0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,3,0,0,0,0,0,2,1,8,0,1,0,1,0,0,0,0,0,0,0,0,15,0,0,0,4,0,0,0,0,0,0,0,0,0,0,8,0,0,0,0,0,0,0,0,0,0,0,0,0,57,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,13,0,0],"ms":[280.23,279.77,279.77,280.23,279.32,361.37,361.37,361.37,361.37,361.37,361.37,361.37,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,314.02,314.02,315.02,314.02,314.58,315.02,313.67,345.53,313.67,313.08,313.08,314.02,345.53,314.02,345.53,314.02,314.58,304.82,304.82,304.82,304.82,304.82,304.82,304.82,304.82,304.82,304.82,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79],"profiles":[]}
+  "classical_real:downscale": {"counts":[[0,0,0,0,1],[0,0,0,0,2],[0,0,0,0,2],[1,1,0,0,2],[0,0,0,0,2],[1,0,1,0,2],[0,0,0,0,0],[0,0,0,0,2],[0,0,0,0,5],[0,0,2,0,12],[4,2,3,2,9],[0,0,1,0,5],[2,0,2,0,2],[0,0,0,0,4],[0,0,0,0,3],[0,0,0,0,5],[0,0,0,0,3],[0,0,0,0,2],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,2],[1,0,0,0,12],[0,0,1,0,14],[3,3,2,0,3],[2,2,0,0,2],[3,3,1,0,3],[1,1,0,0,1],[0,0,0,0,4],[0,0,0,0,12],[1,1,1,0,9],[0,0,0,0,3],[2,0,0,0,7],[0,0,0,0,3],[7,5,2,0,24],[1,0,6,2,24],[0,0,0,0,1],[0,0,0,0,1],[1,0,0,0,6],[0,0,0,0,2],[7,0,4,1,47],[0,0,0,0,0],[0,0,0,0,3],[0,0,0,0,1],[3,0,3,0,4],[0,0,0,0,1],[3,3,1,1,11],[1,1,1,0,6],[1,1,0,0,6],[2,0,0,0,3],[2,1,0,0,12],[0,0,1,0,9],[0,0,0,0,4],[1,0,0,0,10],[1,1,0,0,15],[3,2,0,0,11],[10,6,3,0,31],[7,1,5,1,34],[0,0,0,0,1],[0,0,0,0,6],[0,0,0,0,3],[0,0,0,0,2],[2,2,1,1,4],[0,0,0,0,8],[0,0,0,0,1],[0,0,1,0,30],[1,1,0,0,7],[0,0,0,0,14],[7,1,5,0,30],[0,0,0,0,5],[1,1,1,0,17],[1,0,1,0,9],[0,0,0,0,3],[0,0,0,0,1],[0,0,0,0,4],[1,0,0,0,5],[4,0,5,0,31],[3,2,0,0,17],[0,0,0,0,8],[1,0,0,0,4],[1,1,0,0,15],[3,2,2,0,3],[4,4,1,0,5],[1,0,0,0,16],[6,4,0,0,21],[1,0,0,0,8],[7,4,0,0,9],[4,1,0,0,14],[0,0,1,0,21],[0,0,0,0,7],[0,0,0,0,6],[1,0,0,0,4],[9,5,0,0,23],[2,0,0,0,20],[1,0,0,0,5],[0,0,0,0,7],[2,0,0,0,24],[2,2,0,0,7],[1,0,0,0,4]],"boxes":[96,49,59,285,46,26,330,170,145,34,362,323,189,251,89,263,304,30,112,78,65,62,29,211,202,158,133,161,52,132,170,194,275,281,100,274,241,104,138,139,85,129,140,140,75,266,64,287,146,29,87,91,36,187,124,70,119,248,308,153,741,130,94,70,85,152,117,249,101,332,37,248,76,26,167,139,68,257,441,42,394,29,132,180,213,207,90,106,166,212,87,81,71,183,95,108,324,190,189,74],"critical":[3,12,6,8,0,0,0,0,5,0,0,2,0,0,0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,3,0,0,0,0,0,2,1,8,0,1,0,1,0,0,0,0,0,0,0,0,15,0,0,0,4,0,0,0,0,0,0,0,0,0,0,8,0,0,0,0,0,0,0,0,0,0,0,0,0,57,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,13,0,0],"ms":[280.23,279.77,279.77,280.23,279.32,361.37,361.37,361.37,361.37,361.37,361.37,361.37,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,314.02,314.02,315.02,314.02,314.58,315.02,313.67,345.53,313.67,313.08,313.08,314.02,345.53,314.02,345.53,314.02,314.58,304.82,304.82,304.82,304.82,304.82,304.82,304.82,304.82,304.82,304.82,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79,366.79],"profiles":[]},
+  "v2c_grid_synth_dev:ref@0.3": {"counts":[[0,0,0,0,3],[3,1,3,0,4],[1,1,0,0,2],[2,2,0,0,3],[0,0,0,0,1],[4,3,0,0,5],[1,1,0,0,1],[1,1,0,0,2],[1,1,0,0,2],[3,3,0,0,4],[1,1,0,0,1],[2,2,0,0,2],[4,4,1,1,5],[4,4,1,1,6],[1,0,1,0,1],[3,3,0,0,4],[3,3,0,0,4],[4,4,2,0,6],[4,4,1,1,5],[1,1,0,0,5],[2,2,0,0,3],[1,1,0,0,3],[1,1,0,0,6],[0,0,0,0,2],[3,3,0,0,5],[1,1,1,1,3],[2,2,1,1,7],[2,2,0,0,6],[1,1,0,0,3],[1,1,0,0,1],[3,3,0,0,6],[5,5,0,0,5],[4,4,1,0,5],[1,1,0,0,1],[1,1,0,0,3],[3,3,1,1,5],[1,1,1,0,1],[3,3,0,0,4],[4,4,0,0,4],[2,2,0,0,3],[1,1,0,0,2],[1,0,1,0,6],[1,1,0,0,1],[1,1,0,0,2],[2,2,0,0,3],[4,3,2,1,5],[3,3,0,0,4],[2,2,0,0,2],[1,1,0,0,2],[3,3,1,0,4],[1,1,0,0,1],[3,3,1,0,7],[1,1,0,0,1],[1,1,0,0,1],[2,1,1,0,2],[4,3,0,0,4],[0,0,0,0,1],[2,2,0,0,3],[1,1,0,0,2],[2,2,0,0,5]],"boxes":[2,12,2,4,1,18,5,5,17,13,4,3,9,18,6,8,9,16,7,3,4,8,9,2,9,9,14,14,10,7,8,15,14,11,2,7,4,11,8,4,6,9,5,4,11,16,10,6,6,16,6,16,3,2,5,13,1,6,5,5],"critical":[0,0,1,3,0,4,0,2,0,1,0,2,2,2,0,0,0,3,3,2,2,0,2,0,4,2,4,2,0,2,2,0,0,0,2,0,1,0,3,2,0,0,0,0,2,0,3,0,2,0,0,4,0,0,0,0,0,1,0,2],"ms":[2238.42,2238.42,2238.42,2238.42,2238.42,2238.42,2238.42,2238.42,2238.42,2238.42,2238.42,2238.42,2238.42,2238.42,2238.42,2238.42,1498.0,2238.42,2238.42,2238.42,2238.42,2238.42,2238.42,2238.42,2238.42,2238.42,1498.0,2238.42,2238.42,2238.42,2238.42,2238.42,2238.42,2238.42,1498.0,2238.42,2238.42,2238.42,2238.42,1498.0,2238.42,2238.42,2238.42,2238.42,1498.0,2238.42,2238.42,2238.42,1498.0,2238.42,2238.42,2238.42,2238.42,2238.42,2238.42,2238.42,2238.42,2238.42,2238.42,2238.42],"profiles":["classical-v1"]},
+  "v2c_grid_synth_dev:tiling@L0": {"counts":[[2,2,2,0,3],[4,4,2,1,4],[1,1,0,0,2],[2,2,0,0,3],[1,1,0,0,1],[4,4,1,1,5],[1,1,0,0,1],[2,2,0,0,2],[1,1,0,0,2],[3,3,0,0,4],[1,1,0,0,1],[2,2,0,0,2],[4,4,0,0,5],[5,5,0,0,6],[1,1,0,0,1],[4,4,0,0,4],[3,3,0,0,4],[4,4,0,0,6],[3,3,2,2,5],[4,4,1,0,5],[3,3,1,1,3],[2,2,0,0,3],[3,2,2,0,6],[2,2,0,0,2],[5,5,1,1,5],[2,2,1,1,3],[3,2,1,0,7],[3,3,1,0,6],[2,2,0,0,3],[1,1,0,0,1],[4,4,1,0,6],[5,5,1,0,5],[4,4,0,0,5],[1,1,0,0,1],[3,1,0,0,3],[3,3,2,1,5],[1,1,0,0,1],[4,4,0,0,4],[4,4,0,0,4],[3,3,0,0,3],[1,1,0,0,2],[2,1,0,0,6],[1,1,1,0,1],[1,1,0,0,2],[2,2,0,0,3],[5,5,1,1,5],[3,3,1,0,4],[2,2,0,0,2],[1,1,0,0,2],[4,3,2,2,4],[1,1,0,0,1],[4,4,0,0,7],[1,1,0,0,1],[1,1,0,0,1],[2,2,0,0,2],[4,3,0,0,4],[0,0,0,0,1],[2,2,0,0,3],[1,1,1,0,2],[4,4,1,1,5]],"boxes":[15,23,15,24,17,20,17,16,11,33,13,26,21,24,26,24,20,15,26,38,18,15,33,23,29,20,19,36,25,13,25,21,16,9,45,23,35,20,21,24,12,15,28,14,30,18,26,31,14,26,20,23,21,11,14,34,24,20,23,34],"critical":[0,0,0,1,0,2,0,1,0,0,0,1,2,1,0,0,0,0,1,1,1,0,0,0,0,1,1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,2,0,0,0,0,2,0,0,0,0,0,1,0,1],"ms":[14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98],"profiles":[]},
+  "v2c_grid_synth_dev:downscale": {"counts":[[0,0,0,0,3],[3,1,0,0,4],[1,1,0,0,2],[2,2,0,0,3],[1,1,0,0,1],[3,3,0,0,5],[1,1,0,0,1],[1,1,0,0,2],[1,1,0,0,2],[1,1,0,0,4],[1,1,0,0,1],[2,2,0,0,2],[3,3,0,0,5],[4,3,0,0,6],[0,0,0,0,1],[3,3,0,0,4],[3,3,0,0,4],[4,4,0,0,6],[2,2,0,0,5],[1,1,0,0,5],[1,1,0,0,3],[0,0,0,0,3],[1,1,0,0,6],[1,1,0,0,2],[3,3,0,0,5],[1,1,0,0,3],[2,2,1,0,7],[2,1,0,0,6],[1,1,0,0,3],[1,1,0,0,1],[3,3,0,0,6],[3,3,1,1,5],[4,2,1,0,5],[0,0,0,0,1],[1,1,0,0,3],[2,2,0,0,5],[1,1,0,0,1],[2,2,0,0,4],[3,3,0,0,4],[2,2,0,0,3],[1,1,0,0,2],[0,0,0,0,6],[0,0,1,0,1],[0,0,0,0,2],[2,2,0,0,3],[1,1,0,0,5],[3,3,1,1,4],[2,2,0,0,2],[1,1,0,0,2],[2,2,1,0,4],[0,0,0,0,1],[3,3,0,0,7],[0,0,0,0,1],[1,1,0,0,1],[1,1,0,0,2],[4,2,3,1,4],[0,0,0,0,1],[2,2,0,0,3],[1,1,0,0,2],[2,2,0,0,5]],"boxes":[1,3,3,2,3,5,2,1,2,5,3,1,4,10,2,4,3,8,2,3,3,0,3,1,4,1,3,5,1,1,5,4,5,2,1,2,1,2,3,2,4,0,3,7,4,4,4,2,1,4,0,5,2,1,2,3,3,4,2,4],"critical":[0,0,0,1,0,2,0,1,0,0,0,1,1,1,0,0,0,2,1,1,1,0,1,0,2,1,2,1,0,0,1,0,0,0,1,0,0,0,1,1,0,0,0,0,1,0,2,0,1,0,0,2,0,0,0,0,0,1,0,1],"ms":[737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97],"profiles":[]},
+  "v2c_grid_synth_dev:ref@1.0": {"counts":[[0,0,1,0,3],[3,1,3,0,4],[1,1,1,0,2],[2,2,1,1,3],[0,0,1,0,1],[4,3,2,1,5],[1,1,0,0,1],[1,1,0,0,2],[1,1,0,0,2],[3,3,0,0,4],[1,1,0,0,1],[2,2,0,0,2],[4,4,1,0,5],[4,4,0,0,6],[1,0,1,0,1],[3,3,1,0,4],[3,3,0,0,4],[4,4,0,0,6],[4,4,1,1,5],[1,1,0,0,5],[2,2,0,0,3],[1,1,0,0,3],[1,1,0,0,6],[2,1,1,0,2],[3,3,0,0,5],[1,1,1,0,3],[2,2,0,0,7],[2,2,0,0,6],[1,1,0,0,3],[1,1,0,0,1],[3,3,1,1,6],[5,5,0,0,5],[4,4,0,0,5],[1,1,0,0,1],[1,1,1,1,3],[3,3,0,0,5],[1,1,0,0,1],[3,3,0,0,4],[4,4,0,0,4],[2,2,0,0,3],[1,1,0,0,2],[1,0,1,0,6],[1,1,0,0,1],[1,1,0,0,2],[2,2,0,0,3],[5,5,0,0,5],[3,3,1,1,4],[2,2,0,0,2],[1,1,0,0,2],[3,3,1,1,4],[1,1,0,0,1],[3,3,1,1,7],[1,1,0,0,1],[1,1,0,0,1],[2,1,1,0,2],[4,3,0,0,4],[0,0,0,0,1],[2,2,0,0,3],[1,1,1,0,2],[2,2,0,0,5]],"boxes":[3,12,2,6,1,18,5,9,29,20,4,3,9,24,6,10,9,24,9,3,4,9,9,11,13,9,14,14,10,7,13,15,14,11,2,8,4,11,8,4,6,13,5,4,11,19,10,6,6,16,6,16,3,11,6,13,1,6,7,5],"critical":[0,0,1,3,0,4,0,2,0,2,0,2,2,2,0,0,0,3,3,2,2,0,2,0,4,2,4,2,0,2,2,0,0,0,2,0,1,0,3,2,0,0,0,0,2,0,3,0,2,0,0,4,0,0,0,0,0,1,0,2],"ms":[2978.85,2238.42,2238.42,2978.85,2238.42,2238.42,2238.42,2978.85,2978.85,2978.85,2238.42,2238.42,2238.42,2978.85,2238.42,2978.85,1498.0,2978.85,2978.85,2238.42,2238.42,2978.85,2238.42,3719.27,2978.85,2238.42,1498.0,2238.42,2238.42,2238.42,3719.27,2238.42,2238.42,2238.42,1498.0,2978.85,2238.42,2238.42,2238.42,1498.0,2978.85,3719.27,2238.42,2978.85,1498.0,2978.85,2238.42,2238.42,1498.0,2238.42,2238.42,2238.42,2238.42,2978.85,2978.85,2238.42,2238.42,2238.42,2978.85,2238.42],"profiles":["classical-v1"]},
+  "v2c_grid_clean:ref@0.3": {"counts":[[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]],"boxes":[0,0,0,0,0,0,0,19,0,2,4,0,0,0,6,0,1,1,7,1,0,0,8,0,0,20,8,0,0,2],"critical":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"ms":[1498.0,757.57,1498.0,2238.42,2238.42,2238.42,1498.0,2238.42,2238.42,2238.42,2238.42,2238.42,2238.42,1498.0,2238.42,1498.0,2238.42,2238.42,2238.42,2238.42,1498.0,2238.42,2238.42,2238.42,757.57,2238.42,2238.42,2238.42,2238.42,2238.42],"profiles":["classical-v1"]},
+  "v2c_grid_clean:tiling@L0": {"counts":[[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]],"boxes":[19,18,23,10,14,19,9,9,2,22,10,4,15,8,33,20,11,8,40,19,12,14,16,16,15,22,6,8,12,12],"critical":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"ms":[14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98,14728.98],"profiles":[]},
+  "v2c_grid_clean:downscale": {"counts":[[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]],"boxes":[0,0,0,4,0,2,0,0,0,8,0,2,0,0,1,0,0,0,4,0,1,0,2,2,0,2,2,1,0,1],"critical":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"ms":[737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97,737.97],"profiles":[]},
+  "v2c_grid_clean:ref@1.0": {"counts":[[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]],"boxes":[0,0,0,2,0,0,0,19,0,2,18,0,0,0,6,0,1,1,8,1,0,0,8,10,0,20,14,0,0,2],"critical":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"ms":[1498.0,757.57,1498.0,3719.27,2238.42,2978.85,1498.0,2978.85,2978.85,2238.42,2978.85,2238.42,2238.42,1498.0,2238.42,1498.0,2238.42,2238.42,2978.85,2238.42,1498.0,2238.42,2238.42,2978.85,757.57,2238.42,3719.27,2238.42,3719.27,2238.42],"profiles":["classical-v1"]},
+  "v2c_grid_real:ref@0.3": {"counts":[[0,0,0,0,1],[0,0,0,0,2],[0,0,0,0,2],[1,0,0,0,2],[1,1,1,0,2],[0,0,1,0,2],[0,0,0,0,0],[0,0,0,0,2],[0,0,0,0,5],[4,2,8,1,12],[1,1,1,0,9],[3,1,1,0,5],[2,2,1,0,2],[1,1,0,0,4],[3,3,2,0,3],[4,2,3,1,5],[0,0,0,0,3],[0,0,0,0,2],[1,1,1,1,1],[1,1,0,0,1],[1,1,1,1,1],[0,0,0,0,1],[1,1,1,1,2],[5,3,2,0,12],[6,1,5,0,14],[3,2,1,0,3],[1,1,0,0,2],[3,2,1,0,3],[0,0,0,0,1],[0,0,0,0,4],[0,0,0,0,12],[1,1,0,0,9],[2,1,2,1,3],[2,2,1,1,7],[0,0,1,0,3],[2,2,0,0,24],[8,5,1,0,24],[0,0,0,0,1],[0,0,0,0,1],[5,2,2,0,6],[1,1,0,0,2],[6,0,1,0,47],[0,0,0,0,0],[1,1,0,0,3],[1,0,1,0,1],[1,1,0,0,4],[1,0,1,0,1],[4,3,2,2,11],[6,4,3,0,6],[5,4,2,1,6],[2,2,1,0,3],[8,3,6,2,12],[2,0,2,1,9],[1,1,1,0,4],[10,1,10,1,10],[7,5,1,1,15],[9,6,5,2,11],[14,2,8,0,31],[17,4,16,4,34],[1,0,0,0,1],[1,1,4,1,6],[3,2,1,1,3],[0,0,0,0,2],[2,1,1,1,4],[0,0,0,0,8],[1,1,1,1,1],[12,2,7,0,30],[3,1,1,0,7],[7,5,1,1,14],[18,1,10,1,30],[4,3,1,0,5],[10,8,6,3,17],[3,3,3,1,9],[2,1,2,0,3],[0,0,0,0,1],[3,1,1,1,4],[2,2,0,0,5],[11,2,7,0,31],[10,6,6,2,17],[2,2,1,1,8],[3,3,3,3,4],[13,3,9,0,15],[0,0,0,0,3],[4,2,2,0,5],[10,3,5,2,16],[16,10,5,1,21],[2,2,0,0,8],[0,0,0,0,9],[8,4,0,0,14],[16,8,12,2,21],[6,4,3,1,7],[0,0,0,0,6],[4,2,3,0,4],[16,8,8,1,23],[11,7,8,1,20],[0,0,0,0,5],[6,3,2,0,7],[11,4,6,1,24],[4,4,1,1,7],[4,3,1,1,4]],"boxes":[11,6,6,16,4,18,107,1,27,14,32,30,28,30,32,14,0,13,10,9,8,0,32,25,15,45,42,69,0,0,8,10,243,17,31,10,31,1,25,143,49,95,47,86,57,34,65,64,39,43,29,91,30,59,32,42,37,83,146,78,74,49,3,16,2,36,122,69,29,128,41,127,47,75,61,26,54,91,99,42,232,38,0,34,157,94,20,0,28,88,69,0,45,105,168,0,21,101,83,23],"critical":[0,0,0,0,0,0,2,1,6,0,7,12,7,1,0,1,0,1,0,0,0,0,0,0,0,7,1,8,0,0,0,1,4,5,6,2,4,0,1,10,3,13,8,1,2,2,0,15,7,0,4,5,0,4,3,12,2,6,8,9,5,5,1,0,0,7,6,2,10,4,0,15,9,1,9,6,3,8,6,8,12,0,0,4,6,10,4,0,1,6,9,0,3,11,10,0,3,7,1,0],"ms":[3731.76,2986.21,2986.21,3731.76,2985.7,4606.68,7586.45,7586.45,6841.5,3861.74,6096.56,6096.56,4560.58,4560.58,3815.63,3815.63,3815.63,3070.69,3815.63,6050.46,2982.8,2982.8,4474.97,2982.8,3729.59,4474.97,2238.42,3036.75,17.15,1491.32,1491.32,2982.8,3036.75,2982.8,3036.75,2982.8,3729.59,4585.3,5330.24,5330.24,5330.24,5330.24,5330.24,4585.3,5330.24,5330.24,6075.19,4560.58,5305.52,4560.58,4560.58,4560.58,3815.63,5305.52,5305.52,4560.58,3070.69,4560.58,4560.58,5305.52,4560.58,5305.52,4560.58,4560.58,6050.46,4560.58,4560.58,4560.58,5305.52,3070.69,4560.58,4560.58,3815.63,4560.58,5305.52,4560.58,4560.58,4560.58,3815.63,3815.63,4560.58,3815.63,6795.4,3815.63,4560.58,4560.58,4560.58,2325.75,3815.63,4560.58,5305.52,4560.58,4560.58,4560.58,4560.58,4560.58,4560.58,4560.58,5305.52,4560.58],"profiles":["classical-v1"]},
+  "v2c_grid_real:tiling@L0": {"counts":[[0,0,0,0,1],[0,0,0,0,2],[2,0,0,0,2],[1,0,1,0,2],[0,0,0,0,2],[0,0,1,0,2],[0,0,0,0,0],[0,0,0,0,2],[0,0,0,0,5],[10,5,3,1,12],[4,2,1,0,9],[3,1,2,0,5],[1,1,0,0,2],[0,0,0,0,4],[0,0,1,0,3],[3,1,1,1,5],[2,1,0,0,3],[0,0,0,0,2],[1,0,0,0,1],[1,0,0,0,1],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,2],[5,3,1,0,12],[6,5,2,1,14],[3,2,0,0,3],[2,2,0,0,2],[2,2,0,0,3],[1,0,1,0,1],[0,0,0,0,4],[0,0,0,0,12],[4,3,1,0,9],[2,0,2,0,3],[2,2,0,0,7],[0,0,1,0,3],[11,9,1,0,24],[8,4,1,0,24],[0,0,0,0,1],[0,0,0,0,1],[5,4,0,0,6],[1,1,0,0,2],[46,30,6,2,47],[0,0,0,0,0],[2,1,0,0,3],[0,0,0,0,1],[1,0,0,0,4],[1,0,0,0,1],[5,2,2,0,11],[5,0,3,0,6],[3,1,0,0,6],[1,0,0,0,3],[9,2,4,1,12],[0,0,1,0,9],[2,1,0,0,4],[4,2,1,0,10],[7,5,2,1,15],[5,4,1,0,11],[19,13,6,1,31],[17,4,8,2,34],[1,0,0,0,1],[5,2,4,2,6],[3,1,0,0,3],[0,0,0,0,2],[2,1,0,0,4],[4,2,2,0,8],[1,0,1,0,1],[15,8,6,2,30],[3,1,1,1,7],[7,4,1,0,14],[18,11,10,5,30],[3,0,0,0,5],[7,2,6,0,17],[4,1,2,1,9],[1,0,0,0,3],[1,0,0,0,1],[2,1,1,0,4],[2,1,1,1,5],[13,3,2,0,31],[12,1,5,0,17],[4,2,2,1,8],[2,0,2,0,4],[4,1,1,1,15],[3,1,0,0,3],[5,1,2,0,5],[10,7,3,1,16],[10,5,1,0,21],[3,2,0,0,8],[7,3,2,1,9],[8,1,3,1,14],[9,2,7,2,21],[4,0,3,0,7],[2,1,0,0,6],[3,2,0,0,4],[15,8,1,0,23],[11,8,2,0,20],[2,0,2,2,5],[3,0,0,0,7],[14,9,3,0,24],[3,0,0,0,7],[4,0,0,0,4]],"boxes":[57,62,43,104,39,171,293,108,199,198,570,316,136,61,109,171,40,33,160,50,9,6,102,96,58,301,175,426,7,9,15,42,307,57,257,214,88,83,240,1087,120,732,606,602,546,326,592,416,333,628,881,626,106,240,309,387,511,328,309,540,143,532,41,444,113,300,392,430,243,333,197,309,334,583,633,311,723,292,543,615,319,82,51,176,509,348,147,53,504,281,382,37,766,435,422,78,309,431,182,463],"critical":[0,0,0,3,0,0,0,0,0,0,23,18,14,0,0,0,2,0,0,1,0,0,1,1,0,7,1,10,0,0,1,6,35,5,9,2,5,0,1,17,0,1,8,5,2,5,1,38,36,22,15,20,3,8,17,29,18,26,83,39,88,29,0,19,0,63,65,34,12,32,7,71,7,35,39,25,44,13,60,31,33,0,0,0,34,36,1,0,32,73,42,0,32,50,19,0,11,44,3,8],"ms":[25775.72,20620.57,20620.57,25775.72,20620.57,111128.1,111128.1,111128.1,111128.1,111128.1,111128.1,111128.1,73344.55,73344.55,73344.55,73344.55,73344.55,73344.55,73344.55,73344.55,17674.78,17674.78,25775.72,17674.78,25775.72,25775.72,14728.98,46673.8,14728.98,8837.39,8837.39,17674.78,46673.8,17674.78,46673.8,17674.78,25775.72,88902.48,88902.48,88902.48,88902.48,88902.48,88902.48,88902.48,88902.48,88902.48,88902.48,73344.55,73344.55,73344.55,73344.55,73344.55,73344.55,73344.55,73344.55,73344.55,73344.55,73344.55,73344.55,73344.55,73344.55,73344.55,73344.55,73344.55,73344.55,73344.55,73344.55,73344.55,73344.55,73344.55,73344.55,73344.55,73344.55,73344.55,73344.55,73344.55,73344.55,73344.55,73344.55,73344.55,73344.55,73344.55,73344.55,73344.55,73344.55,73344.55,73344.55,73344.55,73344.55,73344.55,73344.55,73344.55,73344.55,73344.55,73344.55,73344.55,73344.55,73344.55,73344.55,73344.55],"profiles":[]},
+  "v2c_grid_real:downscale": {"counts":[[0,0,0,0,1],[0,0,0,0,2],[0,0,0,0,2],[0,0,0,0,2],[0,0,0,0,2],[0,0,0,0,2],[0,0,0,0,0],[0,0,0,0,2],[0,0,0,0,5],[4,2,1,1,12],[0,0,0,0,9],[3,1,1,0,5],[1,1,0,0,2],[1,1,0,0,4],[2,2,1,0,3],[4,2,4,0,5],[2,2,0,0,3],[0,0,0,0,2],[1,1,0,0,1],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,1],[1,1,2,0,2],[3,2,1,0,12],[3,0,3,0,14],[2,1,2,1,3],[2,2,1,0,2],[3,2,1,1,3],[1,1,1,0,1],[0,0,0,0,4],[0,0,0,0,12],[2,2,1,0,9],[2,1,1,1,3],[1,0,0,0,7],[0,0,0,0,3],[4,1,0,0,24],[9,2,3,0,24],[0,0,0,0,1],[0,0,0,0,1],[2,0,1,0,6],[0,0,0,0,2],[8,0,4,0,47],[0,0,0,0,0],[0,0,0,0,3],[0,0,0,0,1],[0,0,0,0,4],[1,0,0,0,1],[5,4,3,2,11],[5,3,3,2,6],[4,3,0,0,6],[2,1,1,1,3],[8,2,1,1,12],[2,0,2,0,9],[1,1,0,0,4],[10,0,10,0,10],[5,4,0,0,15],[7,2,5,0,11],[12,4,4,2,31],[17,5,14,1,34],[1,0,0,0,1],[5,1,1,0,6],[1,1,0,0,3],[0,0,0,0,2],[3,1,0,0,4],[5,0,4,0,8],[1,1,1,1,1],[7,2,4,0,30],[2,0,0,0,7],[6,3,0,0,14],[11,1,6,1,30],[1,1,0,0,5],[7,7,3,2,17],[1,1,2,0,9],[3,0,3,0,3],[0,0,0,0,1],[2,2,0,0,4],[1,0,0,0,5],[7,2,0,0,31],[9,3,5,2,17],[3,3,2,1,8],[3,3,2,2,4],[12,3,5,1,15],[1,1,1,1,3],[4,4,2,0,5],[6,1,6,1,16],[8,4,3,1,21],[2,1,0,0,8],[8,5,0,0,9],[9,3,2,0,14],[15,3,11,0,21],[4,1,1,0,7],[1,1,1,1,6],[4,0,2,0,4],[12,7,2,1,23],[7,1,6,0,20],[3,0,3,0,5],[5,2,1,0,7],[13,4,2,0,24],[3,3,0,0,7],[4,1,0,0,4]],"boxes":[5,4,2,0,3,1,1,0,2,6,5,4,5,7,6,1,4,2,1,1,3,0,9,12,6,8,17,24,2,2,4,6,62,5,5,5,13,0,1,8,3,4,10,9,6,3,11,15,5,10,15,15,17,8,5,11,10,11,35,8,25,4,1,4,13,1,15,13,8,10,5,43,2,27,20,9,15,11,15,6,33,9,10,15,11,14,4,8,12,10,9,6,8,19,29,2,7,20,8,3],"critical":[0,1,1,0,0,0,0,0,0,0,1,2,1,0,0,0,1,0,0,0,0,0,0,0,0,2,0,4,0,2,0,2,1,1,2,1,2,0,1,4,0,2,1,2,1,0,4,3,2,1,3,1,0,1,0,5,1,2,1,3,4,2,0,0,0,1,3,1,2,1,1,4,1,9,5,4,6,3,2,3,2,0,2,3,1,2,2,0,2,1,3,1,1,3,1,0,2,2,1,0],"ms":[739.07,738.62,738.62,739.07,738.57,842.26,842.26,842.26,842.26,842.26,842.26,842.26,808.14,808.14,808.14,808.14,808.14,808.14,808.14,808.14,738.32,738.32,739.32,738.32,738.88,739.32,737.97,783.03,737.97,737.38,737.38,738.32,783.03,738.32,783.03,738.32,738.88,826.44,826.44,826.44,826.44,826.44,826.44,826.44,826.44,826.44,826.44,808.14,808.14,808.14,808.14,808.14,808.14,808.14,808.14,808.14,808.14,808.14,808.14,808.14,808.14,808.14,808.14,808.14,808.14,808.14,808.14,808.14,808.14,808.14,808.14,808.14,808.14,808.14,808.14,808.14,808.14,808.14,808.14,808.14,808.14,808.14,808.14,808.14,808.14,808.14,808.14,808.14,808.14,808.14,808.14,808.14,808.14,808.14,808.14,808.14,808.14,808.14,808.14,808.14],"profiles":[]},
+  "v2c_grid_real:ref@1.0": {"counts":[[0,0,0,0,1],[0,0,0,0,2],[0,0,0,0,2],[1,0,0,0,2],[1,1,0,0,2],[0,0,0,0,2],[0,0,0,0,0],[0,0,0,0,2],[0,0,0,0,5],[4,2,5,0,12],[1,1,1,0,9],[3,1,0,0,5],[2,2,0,0,2],[1,1,0,0,4],[3,3,1,1,3],[4,2,3,1,5],[0,0,0,0,3],[0,0,0,0,2],[1,1,1,1,1],[1,1,0,0,1],[1,1,1,1,1],[0,0,0,0,1],[1,1,1,0,2],[5,3,5,1,12],[6,3,5,1,14],[3,2,0,0,3],[2,2,1,1,2],[3,2,2,1,3],[0,0,0,0,1],[0,0,0,0,4],[0,0,0,0,12],[3,3,3,2,9],[2,1,2,1,3],[2,2,0,0,7],[0,0,0,0,3],[2,2,0,0,24],[8,5,3,2,24],[0,0,0,0,1],[0,0,0,0,1],[5,2,1,0,6],[1,1,0,0,2],[6,0,7,0,47],[0,0,0,0,0],[1,1,0,0,3],[1,0,1,0,1],[1,1,0,0,4],[1,0,0,0,1],[4,3,5,3,11],[6,4,5,3,6],[5,4,2,1,6],[2,2,1,0,3],[8,3,2,2,12],[2,0,2,1,9],[1,1,1,1,4],[10,1,10,1,10],[7,5,2,0,15],[9,6,5,1,11],[14,2,3,0,31],[17,4,14,2,34],[1,0,0,0,1],[1,1,1,1,6],[3,2,1,0,3],[0,0,0,0,2],[2,1,0,0,4],[0,0,0,0,8],[1,1,1,1,1],[12,2,9,1,30],[3,1,2,1,7],[7,5,3,0,14],[18,1,9,1,30],[4,3,0,0,5],[10,8,5,2,17],[3,3,2,0,9],[2,1,2,1,3],[0,0,0,0,1],[3,1,0,0,4],[2,2,0,0,5],[11,2,8,0,31],[10,6,9,2,17],[2,2,1,0,8],[3,3,1,1,4],[13,3,11,1,15],[0,0,0,0,3],[4,2,2,0,5],[10,3,5,1,16],[16,10,5,2,21],[2,2,0,0,8],[0,0,0,0,9],[8,4,4,2,14],[16,8,13,2,21],[6,4,3,0,7],[0,0,0,0,6],[4,2,3,0,4],[16,8,7,1,23],[11,7,6,2,20],[0,0,0,0,5],[6,3,3,0,7],[11,4,3,1,24],[4,4,0,0,7],[4,3,1,0,4]],"boxes":[11,17,16,24,8,18,107,1,27,14,32,30,28,30,32,14,0,13,10,9,13,0,50,37,29,88,62,69,0,4,21,32,243,27,31,29,45,1,25,143,49,95,47,86,57,34,65,64,39,43,29,91,30,59,32,42,37,83,146,78,74,49,3,16,2,36,122,69,29,128,41,127,47,75,61,26,54,91,99,42,232,38,0,34,157,94,20,0,28,88,69,0,45,105,168,0,21,101,83,23],"critical":[0,0,0,0,0,0,2,1,6,0,7,12,7,1,0,1,0,1,0,0,0,0,0,0,0,10,2,8,0,0,0,4,4,6,6,3,5,0,1,10,3,13,8,1,2,2,0,15,7,0,4,5,0,4,3,12,2,6,8,9,5,5,1,0,0,7,6,2,10,4,0,15,9,1,9,6,3,8,6,8,12,0,0,4,6,10,4,0,1,6,9,0,3,11,10,0,3,7,1,0],"ms":[3731.76,5207.48,5947.91,6693.46,4466.55,4606.68,7586.45,7586.45,6841.5,3861.74,6096.56,6096.56,4560.58,4560.58,3815.63,3815.63,3815.63,3070.69,3815.63,6050.46,5204.08,2982.8,6696.24,4463.65,5950.86,5955.82,2978.85,3036.75,17.15,2972.17,2972.17,5204.08,3036.75,5204.08,3036.75,4463.65,5210.44,4585.3,5330.24,5330.24,5330.24,5330.24,5330.24,4585.3,5330.24,5330.24,6075.19,4560.58,5305.52,4560.58,4560.58,4560.58,3815.63,5305.52,5305.52,4560.58,3070.69,4560.58,4560.58,5305.52,4560.58,5305.52,4560.58,4560.58,6050.46,4560.58,4560.58,4560.58,5305.52,3070.69,4560.58,4560.58,3815.63,4560.58,5305.52,4560.58,4560.58,4560.58,3815.63,3815.63,4560.58,3815.63,6795.4,3815.63,4560.58,4560.58,4560.58,2325.75,3815.63,4560.58,5305.52,4560.58,4560.58,4560.58,4560.58,4560.58,4560.58,4560.58,5305.52,4560.58],"profiles":["classical-v1"]}
  }
 }

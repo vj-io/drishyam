@@ -378,14 +378,16 @@ boxes and exhaustive tiling 53.
 
 ### The trained segmenters, held out
 
-These numbers call for a trained segmenter. Three dacl10k-trained UNets exist ([training/](../training/README.md),
-[models/README.md](../models/README.md)): v1 (MobileNetV3-Large encoder), v2a (the same encoder, training recipe v2)
-and v2b (EfficientNet-B2 encoder, recipe v2). None is the live segmenter. Which one the live engine should run was
-decided on the dev splits only (`results/dev/model_choice_dev.json`, [API contract](api-contract.md)): v1, the one
-model with no measurable loss against any other. Each was then scored **once** on the held-out sets, at its dev-chosen
-profile (`drishyam.agent.PROFILES`, unchanged) and charged the cost table the dev comparison charged it (v1
+These numbers call for a trained segmenter. Four dacl10k-trained UNets exist ([training/](../training/README.md),
+[models/README.md](../models/README.md)): v1 (MobileNetV3-Large encoder), v2a (the same encoder, training recipe v2),
+v2b (EfficientNet-B2 encoder, recipe v2) and v2c (v2a's encoder and recipe with the rare classes weighted harder in
+the loss). None is the live segmenter. Which one the live engine should run was decided on the dev splits only
+(`results/dev/model_choice_dev.json`, [API contract](api-contract.md)): v1, the one model with no measurable loss
+against any other. Each was then scored **once** on the held-out sets, at its dev-chosen profile
+(`drishyam.agent.PROFILES`, unchanged) and charged the cost table the dev comparison charged it (v1
 `results/local-macos-x86-dacl10k-retime/`, v2a `results/local-macos-x86-dacl10k_v2a/`, v2b
-`results/local-macos-x86-dacl10k_v2b/`, the classical engine `results/local-macos-x86/`; `python -m evals.model_eval
+`results/local-macos-x86-dacl10k_v2b/`, v2c `results/local-macos-x86-dacl10k_v2c/`, the classical engine
+`results/local-macos-x86/`; `python -m evals.model_eval
 --costs <table>` charges a committed table instead of re-timing over it). The classical engine was run once per set on
 its own table. CODEBRIM eval200 and synth200 ran through `evals.model_eval --publish` (the path `make eval-model`
 takes), the 51 clean photos and, for v1 and the classical engine only, the 100 photos at 4608×3456 through the
@@ -393,7 +395,10 @@ harness. `python -m evals.heldout` re-scores every run's per-image file into
 [results/heldout_models.json](../results/heldout_models.json) and reads it by the dev criterion, unchanged. Nothing was
 tuned on these numbers, and the live-engine recommendation stays as it was made on dev. One caveat: v1 had been scored
 once before on CODEBRIM eval200 and synth200 (2026-10-18, by the agent and cost table of that day, never published),
-so for v1 these are second scorings; v2a and v2b had never been scored on a held-out set.
+so for v1 these are second scorings; v2a, v2b and v2c had never been scored on a held-out set. v2c came last: it
+was calibrated on dev and joined the dev comparison first (five models; v1 stayed the dev choice), then was scored
+once here; the other models' held-out runs were not repeated, and the tables re-score their saved per-image files,
+which give the same numbers as before.
 
 At the 30 % cap (pixels ratio and per-class recall are in the JSON):
 
@@ -402,10 +407,12 @@ At the 30 % cap (pixels ratio and per-class recall are in the JSON):
 | CODEBRIM eval200 | v1 | 0.493 (0.44–0.54) | 0.253 | 0.299 | 0.077 | 45.8 | 9.60 | 1.39 (1.25–1.52) | 1.18 (1.11–1.28) | 3434 |
 | CODEBRIM eval200 | v2a | 0.480 (0.43–0.52) | 0.244 | 0.301 | 0.081 | 41.3 | 4.38 | 1.06 (0.99–1.14) | 1.11 (1.03–1.18) | 3281 |
 | CODEBRIM eval200 | v2b | 0.487 (0.44–0.53) | 0.251 | 0.285 | 0.075 | 44.4 | 4.65 | 1.03 (0.97–1.09) | 1.10 (1.03–1.19) | 8079 |
+| CODEBRIM eval200 | v2c | 0.484 (0.44–0.53) | 0.234 | 0.283 | 0.063 | 53.9 | 3.71 | 1.03 (0.96–1.10) | 1.20 (1.13–1.27) | 4422 |
 | CODEBRIM eval200 | classical-v1 | 0.194 (0.16–0.23) | 0.080 | 0.122 | 0.002 | 921.0 | 1.73 | 0.94 (0.85–1.04) | 0.98 (0.90–1.06) | 1726 |
 | synth200 | v1 | 0.639 (0.61–0.67) | 0.623 | 0.064 | 0.336 | 6.3 | 0.81 | 0.94 (0.90–0.97) | 1.05 (1.00–1.09) | 1718 |
 | synth200 | v2a | 0.607 (0.57–0.64) | 0.587 | 0.062 | 0.334 | 6.0 | 0.91 | 0.83 (0.79–0.86) | 1.17 (1.11–1.25) | 1772 |
 | synth200 | v2b | 0.573 (0.53–0.61) | 0.541 | 0.041 | 0.315 | 6.0 | 0.68 | 0.78 (0.74–0.82) | 1.18 (1.11–1.25) | 4287 |
+| synth200 | v2c | 0.573 (0.54–0.61) | 0.531 | 0.081 | 0.202 | 9.4 | 1.13 | 0.77 (0.73–0.81) | 1.24 (1.17–1.31) | 2142 |
 | synth200 | classical-v1 | 0.478 (0.44–0.52) | 0.425 | 0.028 | 0.084 | 19.1 | 1.60 | 0.87 (0.81–0.93) | 0.96 (0.91–1.02) | 337 |
 | synth_large, 4608×3456 | v1 | 0.669 (0.62–0.72) | 0.642 | 0.086 | 0.257 | 8.7 | 2.68 | 1.31 (1.18–1.48) | 1.20 (1.13–1.27) | 2669 |
 | synth_large, 4608×3456 | classical-v1 | 0.518 (0.46–0.58) | 0.444 | 0.044 | 0.015 | 118.3 | 3.41 | 1.64 (1.44–1.90) | 1.14 (1.04–1.25) | 1866 |
@@ -417,6 +424,7 @@ On the 51 clean photos (50 synthetic photos with distractors and no damage, plus
 | v1 | 0.000 (0.00–0.00) | 0 of 51 | 0.000 | 1567 |
 | v2a | 0.529 (0.12–1.04) | 9 of 51 | 0.000 | 1605 |
 | v2b | 0.510 (0.14–1.02) | 9 of 51 | 0.020 | 3914 |
+| v2c | 3.157 (1.74–4.67) | 22 of 51 | 0.000 | 1963 |
 | classical-v1 | 7.078 (4.63–9.59) | 34 of 51 | 0.020 | 332 |
 
 Each pair on the same photos, at the 30 % cap (paired 95 % bootstrap CIs; the criterion's three readings):
@@ -425,10 +433,14 @@ Each pair on the same photos, at the 30 % cap (paired 95 % bootstrap CIs; the cr
 | --- | --- | --- | --- | --- |
 | v1 / v2a | 1.03 (0.98–1.07) | 1.05 (1.01–1.11) | -0.53 (-1.04 to -0.12) | -0.18 (-0.27 to -0.08) |
 | v1 / v2b | 1.01 (0.96–1.06) | 1.12 (1.06–1.17) | -0.51 (-1.02 to -0.14) | -0.18 (-0.27 to -0.08) |
+| v1 / v2c | 1.02 (0.96–1.07) | 1.12 (1.07–1.17) | -3.16 (-4.67 to -1.74) | -0.43 (-0.57 to -0.29) |
 | v1 / classical-v1 | 2.54 (2.16–3.01) | 1.34 (1.24–1.45) | -7.08 (-9.59 to -4.63) | -0.67 (-0.78 to -0.53) |
 | v2a / v2b | 0.99 (0.95–1.02) | 1.06 (1.00–1.12) | +0.02 (-0.67 to +0.69) | +0.00 (-0.14 to +0.14) |
+| v2a / v2c | 0.99 (0.95–1.03) | 1.06 (1.01–1.12) | -2.63 (-4.25 to -1.10) | -0.25 (-0.43 to -0.08) |
 | v2a / classical-v1 | 2.47 (2.13–2.89) | 1.27 (1.16–1.39) | -6.55 (-9.02 to -4.12) | -0.49 (-0.65 to -0.31) |
+| v2b / v2c | 1.01 (0.96–1.05) | 1.00 (0.95–1.05) | -2.65 (-4.12 to -1.29) | -0.25 (-0.41 to -0.10) |
 | v2b / classical-v1 | 2.51 (2.14–2.96) | 1.20 (1.10–1.31) | -6.57 (-9.12 to -4.18) | -0.49 (-0.63 to -0.33) |
+| v2c / classical-v1 | 2.49 (2.13–2.94) | 1.20 (1.10–1.31) | -3.92 (-6.86 to -0.82) | -0.24 (-0.41 to -0.04) |
 
 Held-out confirms the dev choice: v1 is again the only model with no measurable loss against any other on CODEBRIM eval200, synth200 or the clean set. By the same criterion it is now also better than each of the others, which
 no model was on dev:
@@ -438,7 +450,7 @@ no model was on dev:
   the classical engine puts 7.08 per photo on 34 of them. On the 100 photos at 4608×3456 it finds 0.669 against
   0.518 (1.29×, 1.18–1.42) with 0.09 of the pixels against 0.29.
 - **Chance is high on CODEBRIM.** v1's own boxes moved to random places would find 0.30 of CODEBRIM's defects (v2a's
-  0.30, v2b's 0.28), because large boxes contain many ground-truth centres. With IoU only, v1 finds 0.253 against a
+  0.30, v2b's and v2c's 0.28), because large boxes contain many ground-truth centres. With IoU only, v1 finds 0.253 against a
   chance of 0.083 (the classical engine 0.080 against 0.026), 3.18× the classical engine (CI 2.50–4.10). On synth200
   chance stays below 0.07 for every model.
 - **Against v2a and v2b**, v1 finds the same share of CODEBRIM's defects (1.03×, CI 0.98–1.07; 1.01×, 0.96–1.06) and
@@ -446,6 +458,20 @@ no model was on dev:
   and v2b each put a box on 9 of the 51 clean photos (0.53 and 0.51 boxes per photo), v1 on none. Between the two
   retrained models, v2b finds less than v2a on synth200 (v2a ÷ v2b 1.06×, CI 1.00–1.12, its lower end just above 1)
   and the same on CODEBRIM.
+- **v2c**, v2a's net retrained with the rare classes weighted harder, is worse than v1 and v2a on two of the three
+  readings (synth200 recall and clean false alarms) and than v2b on one (clean false alarms), and better than none of
+  them. It finds the same share of CODEBRIM's defects as the other trained models (0.484; v1 ÷ v2c 1.02×, CI
+  0.96–1.07) but less than v1 and v2a on synth200 (0.573; v1 ÷ v2c 1.12×, 1.07–1.17; v2a ÷ v2c 1.06×, 1.01–1.12; the
+  same as v2b, 1.00×, 0.95–1.05), and its IoU-only recall on CODEBRIM is below v2b's (v2b ÷ v2c 1.07×, CI 1.00–1.15,
+  its lower end just above 1). It puts the most false alarms of the trained models on the clean photos: 3.16 boxes
+  per photo, a box on 22 of the 51, measurably more than each of v1, v2a and v2b (v2c − v1 +3.16, CI +1.74 to
+  +4.67), though fewer than the classical engine (−3.92, −6.86 to −0.82); on dev it had already put more on them than
+  v1 and v2a. Its one measurable advantage is the human gate: 3.71 critical boxes per CODEBRIM photo, the fewest of
+  the trained models (v1 sends 2.59× as many, CI 1.96–3.32). The rare-class weighting does not show in the
+  per-class recall (point values, no CI): like v2a and v2b it finds no exposed rebar on either set, and it finds
+  0.54 of CODEBRIM's efflorescence and 0.03 of synth200's against v2a's 0.51 and 0.14. Its modelled ms per CODEBRIM
+  job (4422) are 1.35× v2a's on their own tables, but its table was timed at a higher machine load (timed in one
+  window, a v2c look costs 0.99× a v2a look), so that gap is the timing, not the net.
 - **What v1 costs.** It sends about twice the critical boxes per CODEBRIM photo to the human gate that v2a and v2b
   send (9.60 against 4.38 and 4.65: 2.19×, CI 1.79–2.61, and 2.06×, 1.65–2.49), as it did on dev (7.24 against 4.22
   and 3.94), and 5.5 times the classical engine's 1.73. Its modelled ms per CODEBRIM job are 1.05 times v2a's (CI
@@ -459,12 +485,13 @@ no model was on dev:
   L0 tiling (1.25–1.52) at 0.09× tiling's pixels; L0 tiling is a weak baseline for this net (0.355, below its L1
   grid's 0.514), which then sees 512-px windows of full-resolution photos. On synth200 v1 is 0.94× L0 tiling (CI
   0.90–0.97) at 0.15× its pixels, which is the PRD hypothesis's ratio (≥ 0.9× tiling recall at ≤ 0.3× its pixels)
-  with the interval's lower end at 0.90, and 1.05× one downscale (1.00–1.09); v2a and v2b are 0.83× and 0.78× L0
-  tiling there.
+  with the interval's lower end at 0.90, and 1.05× one downscale (1.00–1.09); v2a, v2b and v2c are 0.83×, 0.78× and
+  0.77× L0 tiling there.
 - Every ms here is modelled from this Mac's x86 tables; none was measured on the Lambda's arm64 CPU. The intervals
   are not corrected for the number of pairs. The JSON also holds the 100 % cap, per-class recall, every pair at both
-  caps and each run's machine load at its start and end (1-minute load 2.2 to 13.1 then, and up to 43 in between,
-  on a shared laptop; fixed costs make the numbers independent of it).
+  caps and each run's machine load at its start and end (1-minute load 2.2 to 25.7 then; in between up to 43 for the
+  first three models and up to 462 during v2c's synth200 run, when a video render shared the laptop; fixed costs make
+  the numbers independent of it).
 
 The leakage check hashes each image with its lighting removed (a 255-bit pHash, in four rotations) to find
 candidates, and normalised cross-correlation confirms them. Calibrated on CODEBRIM with `python -m evals.leakage
