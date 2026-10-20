@@ -376,24 +376,105 @@ damage on 67 % of these images and a critical finding on 1 of the 51; one downsc
 exhaustive tiling on all of them. On `bridge_08` itself Drishyam reports nothing at any cap, one downscale 2 crack
 boxes and exhaustive tiling 53.
 
-### The trained segmenter (results pending)
+### The trained segmenters, held out
 
-These numbers call for a trained segmenter. A dacl10k-trained UNet ([training/](../training/README.md),
-[models/README.md](../models/README.md)) exists: its mIoU on the dacl10k validation split over Drishyam's five defect
-classes is 0.359, on the split that also chose its epoch, so no held-out number exists. Its CODEBRIM and synthetic
-results are pending and not published here, and it is not the live segmenter. After `scripts/install_model.sh`, `make eval-model
-DACL10K=<the dacl10k folder> CODEBRIM=data/codebrim` first runs the leakage check between dacl10k and this subset
-(`evals/leakage.py`), then both comparisons with `DRISHYAM_ONNX` set. It refuses to compare unless each summary
-names the segmenter it should, and publishes the model's numbers next to these (`public/results/codebrim_dacl10k/`),
-leaving the classical ones in place.
+These numbers call for a trained segmenter. Three dacl10k-trained UNets exist ([training/](../training/README.md),
+[models/README.md](../models/README.md)): v1 (MobileNetV3-Large encoder), v2a (the same encoder, training recipe v2)
+and v2b (EfficientNet-B2 encoder, recipe v2). None is the live segmenter. Which one the live engine should run was
+decided on the dev splits only (`results/dev/model_choice_dev.json`, [API contract](api-contract.md)): v1, the one
+model with no measurable loss against any other. Each was then scored **once** on the held-out sets, at its dev-chosen
+profile (`drishyam.agent.PROFILES`, unchanged) and charged the cost table the dev comparison charged it (v1
+`results/local-macos-x86-dacl10k-retime/`, v2a `results/local-macos-x86-dacl10k_v2a/`, v2b
+`results/local-macos-x86-dacl10k_v2b/`, the classical engine `results/local-macos-x86/`; `python -m evals.model_eval
+--costs <table>` charges a committed table instead of re-timing over it). The classical engine was run once per set on
+its own table. CODEBRIM eval200 and synth200 ran through `evals.model_eval --publish` (the path `make eval-model`
+takes), the 51 clean photos and, for v1 and the classical engine only, the 100 photos at 4608×3456 through the
+harness. `python -m evals.heldout` re-scores every run's per-image file into
+[results/heldout_models.json](../results/heldout_models.json) and reads it by the dev criterion, unchanged. Nothing was
+tuned on these numbers, and the live-engine recommendation stays as it was made on dev. One caveat: v1 had been scored
+once before on CODEBRIM eval200 and synth200 (2026-10-18, by the agent and cost table of that day, never published),
+so for v1 these are second scorings; v2a and v2b had never been scored on a held-out set.
+
+At the 30 % cap (pixels ratio and per-class recall are in the JSON):
+
+| Set | Model | recall (95 % CI) | IoU-only | chance | precision | boxes / photo | critical / photo | × L0 tiling (95 % CI) | × downscale (95 % CI) | modelled ms / job |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| CODEBRIM eval200 | v1 | 0.493 (0.44–0.54) | 0.253 | 0.299 | 0.077 | 45.8 | 9.60 | 1.39 (1.25–1.52) | 1.18 (1.11–1.28) | 3434 |
+| CODEBRIM eval200 | v2a | 0.480 (0.43–0.52) | 0.244 | 0.301 | 0.081 | 41.3 | 4.38 | 1.06 (0.99–1.14) | 1.11 (1.03–1.18) | 3281 |
+| CODEBRIM eval200 | v2b | 0.487 (0.44–0.53) | 0.251 | 0.285 | 0.075 | 44.4 | 4.65 | 1.03 (0.97–1.09) | 1.10 (1.03–1.19) | 8079 |
+| CODEBRIM eval200 | classical-v1 | 0.194 (0.16–0.23) | 0.080 | 0.122 | 0.002 | 921.0 | 1.73 | 0.94 (0.85–1.04) | 0.98 (0.90–1.06) | 1726 |
+| synth200 | v1 | 0.639 (0.61–0.67) | 0.623 | 0.064 | 0.336 | 6.3 | 0.81 | 0.94 (0.90–0.97) | 1.05 (1.00–1.09) | 1718 |
+| synth200 | v2a | 0.607 (0.57–0.64) | 0.587 | 0.062 | 0.334 | 6.0 | 0.91 | 0.83 (0.79–0.86) | 1.17 (1.11–1.25) | 1772 |
+| synth200 | v2b | 0.573 (0.53–0.61) | 0.541 | 0.041 | 0.315 | 6.0 | 0.68 | 0.78 (0.74–0.82) | 1.18 (1.11–1.25) | 4287 |
+| synth200 | classical-v1 | 0.478 (0.44–0.52) | 0.425 | 0.028 | 0.084 | 19.1 | 1.60 | 0.87 (0.81–0.93) | 0.96 (0.91–1.02) | 337 |
+| synth_large, 4608×3456 | v1 | 0.669 (0.62–0.72) | 0.642 | 0.086 | 0.257 | 8.7 | 2.68 | 1.31 (1.18–1.48) | 1.20 (1.13–1.27) | 2669 |
+| synth_large, 4608×3456 | classical-v1 | 0.518 (0.46–0.58) | 0.444 | 0.044 | 0.015 | 118.3 | 3.41 | 1.64 (1.44–1.90) | 1.14 (1.04–1.25) | 1866 |
+
+On the 51 clean photos (50 synthetic photos with distractors and no damage, plus the demo's `bridge_08`) every box is a false alarm:
+
+| Model | boxes / clean photo (95 % CI) | photos with a box | critical boxes / photo | modelled ms / job |
+| --- | --- | --- | --- | --- |
+| v1 | 0.000 (0.00–0.00) | 0 of 51 | 0.000 | 1567 |
+| v2a | 0.529 (0.12–1.04) | 9 of 51 | 0.000 | 1605 |
+| v2b | 0.510 (0.14–1.02) | 9 of 51 | 0.020 | 3914 |
+| classical-v1 | 7.078 (4.63–9.59) | 34 of 51 | 0.020 | 332 |
+
+Each pair on the same photos, at the 30 % cap (paired 95 % bootstrap CIs; the criterion's three readings):
+
+| A / B | CODEBRIM recall, A ÷ B (95 % CI) | synth200 recall, A ÷ B | clean boxes / photo, A − B | clean share of photos with a box, A − B |
+| --- | --- | --- | --- | --- |
+| v1 / v2a | 1.03 (0.98–1.07) | 1.05 (1.01–1.11) | -0.53 (-1.04 to -0.12) | -0.18 (-0.27 to -0.08) |
+| v1 / v2b | 1.01 (0.96–1.06) | 1.12 (1.06–1.17) | -0.51 (-1.02 to -0.14) | -0.18 (-0.27 to -0.08) |
+| v1 / classical-v1 | 2.54 (2.16–3.01) | 1.34 (1.24–1.45) | -7.08 (-9.59 to -4.63) | -0.67 (-0.78 to -0.53) |
+| v2a / v2b | 0.99 (0.95–1.02) | 1.06 (1.00–1.12) | +0.02 (-0.67 to +0.69) | +0.00 (-0.14 to +0.14) |
+| v2a / classical-v1 | 2.47 (2.13–2.89) | 1.27 (1.16–1.39) | -6.55 (-9.02 to -4.12) | -0.49 (-0.65 to -0.31) |
+| v2b / classical-v1 | 2.51 (2.14–2.96) | 1.20 (1.10–1.31) | -6.57 (-9.12 to -4.18) | -0.49 (-0.63 to -0.33) |
+
+Held-out confirms the dev choice: v1 is again the only model with no measurable loss against any other on CODEBRIM eval200, synth200 or the clean set. By the same criterion it is now also better than each of the others, which
+no model was on dev:
+
+- **Against the classical engine**, v1 finds 2.54× its recall on CODEBRIM (0.493 against 0.194, 95 % CI 2.16–3.01;
+  on dev100 it was 3.13×) and 1.34× on synth200 (1.24–1.45), and it puts no box on any of the 51 clean photos, where
+  the classical engine puts 7.08 per photo on 34 of them. On the 100 photos at 4608×3456 it finds 0.669 against
+  0.518 (1.29×, 1.18–1.42) with 0.09 of the pixels against 0.29.
+- **Chance is high on CODEBRIM.** v1's own boxes moved to random places would find 0.30 of CODEBRIM's defects (v2a's
+  0.30, v2b's 0.28), because large boxes contain many ground-truth centres. With IoU only, v1 finds 0.253 against a
+  chance of 0.083 (the classical engine 0.080 against 0.026), 3.18× the classical engine (CI 2.50–4.10). On synth200
+  chance stays below 0.07 for every model.
+- **Against v2a and v2b**, v1 finds the same share of CODEBRIM's defects (1.03×, CI 0.98–1.07; 1.01×, 0.96–1.06) and
+  more on synth200 (1.05×, 1.01–1.11; 1.12×, 1.06–1.17), where on dev no pair of the three differed measurably. v2a
+  and v2b each put a box on 9 of the 51 clean photos (0.53 and 0.51 boxes per photo), v1 on none. Between the two
+  retrained models, v2b finds less than v2a on synth200 (v2a ÷ v2b 1.06×, CI 1.00–1.12, its lower end just above 1)
+  and the same on CODEBRIM.
+- **What v1 costs.** It sends about twice the critical boxes per CODEBRIM photo to the human gate that v2a and v2b
+  send (9.60 against 4.38 and 4.65: 2.19×, CI 1.79–2.61, and 2.06×, 1.65–2.49), as it did on dev (7.24 against 4.22
+  and 3.94), and 5.5 times the classical engine's 1.73. Its modelled ms per CODEBRIM job are 1.05 times v2a's (CI
+  1.03–1.06; both tables were timed in one window) and 1.99 times the classical engine's (3434 against 1726 ms, CI
+  1.92–2.06); the classical table was timed at a 1-minute load of 23.8, which overstates its ms, so at equal load the
+  ratio would be higher. On synth200 v1 finds no efflorescence (0.00) and almost no exposed rebar (0.02), where the
+  classical engine finds 0.16 and 0.57; its overall recall is higher because it finds more cracks, spalling and
+  corrosion. v2b's ms are 2.35 to 2.61 times v1's, but its table was timed at a higher machine load (timed in one
+  window, a v2b look costs 0.87 to 1.04 times a v2a look), so that gap is the timing, not the model.
+- **Against the baselines.** On CODEBRIM v1 at the 30 % cap is 1.18× one downscale (1.11–1.28) and 1.39× exhaustive
+  L0 tiling (1.25–1.52) at 0.09× tiling's pixels; L0 tiling is a weak baseline for this net (0.355, below its L1
+  grid's 0.514), which then sees 512-px windows of full-resolution photos. On synth200 v1 is 0.94× L0 tiling (CI
+  0.90–0.97) at 0.15× its pixels, which is the PRD hypothesis's ratio (≥ 0.9× tiling recall at ≤ 0.3× its pixels)
+  with the interval's lower end at 0.90, and 1.05× one downscale (1.00–1.09); v2a and v2b are 0.83× and 0.78× L0
+  tiling there.
+- Every ms here is modelled from this Mac's x86 tables; none was measured on the Lambda's arm64 CPU. The intervals
+  are not corrected for the number of pairs. The JSON also holds the 100 % cap, per-class recall, every pair at both
+  caps and each run's machine load at its start and end (1-minute load 2.2 to 13.1 then, and up to 43 in between,
+  on a shared laptop; fixed costs make the numbers independent of it).
 
 The leakage check hashes each image with its lighting removed (a 255-bit pHash, in four rotations) to find
 candidates, and normalised cross-correlation confirms them. Calibrated on CODEBRIM with `python -m evals.leakage
 --codebrim data/codebrim`: resized, rotated, recompressed and re-exposed copies of 50 eval images sit at hash
 distance ≤ 10 and correlation ≥ 0.93, and each eval image's nearest other CODEBRIM photo at ≥ 56 and ≤ 0.43, so the
 thresholds 32 and 0.8 separate them; crops that drop 5 % of the frame are not found. The 9×8 dHash it replaces put
-70 of the 200 eval images within 10 of 64 of an unrelated CODEBRIM photo. It has been run against dacl10k
-(2026-10-18); its output is not yet published.
+70 of the 200 eval images within 10 of 64 of an unrelated CODEBRIM photo. Against dacl10k (all 8,922 images of the
+kagglehub download, its train, validation and test-dev folders) it finds no candidate at all: none of the 200 eval
+photos is within hash distance 64 of any dacl10k image (the `leakage` block of each published CODEBRIM summary, run
+before each model's evaluation, the same each time).
 
 ## 9. Failures
 
@@ -483,8 +564,9 @@ notes the large spall it missed.
 - The classical engine's probabilities are a softmax over hand-built evidence scores; its confidence and entropy
   are not calibrated.
 - The policy comparison holds on synthetic images, but on 200 real CODEBRIM photos the **classical** segmenter caps
-  every policy at about 0.2 recall. The dacl10k model is trained but not deployed, and its results here are pending
-  (section 8).
+  every policy at about 0.2 recall. The dacl10k models are trained but not deployed. Held out, v1 (the dev choice)
+  finds 0.49 of CODEBRIM's defects at the 30 % cap against the classical engine's 0.19, with twice the critical boxes
+  of the retrained models for the human gate, and its ms are modelled from x86 tables only (section 8).
 - The ablations show that two parts of the policy, the uncertainty term and the governor, change nothing measurable
   on these sets, and that image-driven gaze order beats random order only on the larger photos (section 8). The
   uncertainty term was inert by construction in that run (no unvisited candidate had an entropy); it has not been

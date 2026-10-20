@@ -611,6 +611,91 @@ def test_model_eval_refuses_a_mislabelled_confounded_or_other_data_arm(tmp_path)
         model_eval.main(["--onnx", str(onnx), "--codebrim", str(cb), "--publish"])
 
 
+def test_model_eval_costs_charges_the_committed_table_and_scores_classical_once(tmp_path, monkeypatch):
+    """--costs ARM times nothing (the committed table is not overwritten) and charges ARM; the classical side runs on
+    this machine's classical table once, and the next model reuses it; another machine's or another net's table is refused."""
+    from evals import model_eval
+
+    data = {"dataset_gt_sha256": "a" * 64, "dataset_images_sha256": "b" * 64}
+    for m, t in (("dacl10k", "mac-dacl10k-retime"), ("dacl10k_v2a", "mac-dacl10k_v2a")):
+        (tmp_path / "models" / f"drishyam_{m}.onnx").parent.mkdir(exist_ok=True)
+        (tmp_path / "models" / f"drishyam_{m}.onnx").write_bytes(b"")
+        (tmp_path / "results" / t).mkdir(parents=True)
+        (tmp_path / "results" / t / "micro.json").write_text(
+            json.dumps({"job_ops": {"segmenter": f"onnx:drishyam_{m}.onnx"}}))
+    (tmp_path / "public" / "results").mkdir(parents=True)  # the published classical run was charged the arm64 table
+    pub = {"segmenter": "classical-v1", "n_images": 3, "cost_model": {"kind": "fixed", "source": "results/linux-aarch64/micro.json"}}
+    (tmp_path / "public" / "results" / "summary.json").write_text(json.dumps(pub))
+    calls = []
+
+    def run(cmd, env, cwd, check):
+        calls.append(cmd)
+        arm, out = cmd[cmd.index("--micro-arm") + 1], Path(cmd[cmd.index("--out") + 1])
+        out.mkdir(parents=True, exist_ok=True)
+        seg = f"onnx:{Path(env['DRISHYAM_ONNX']).name}" if "DRISHYAM_ONNX" in env else "classical-v1"
+        (out / "summary.json").write_text(json.dumps({
+            "segmenter": seg, "n_images": 3, "provenance": data, "agent_config": {"governor": False},
+            "cost_model": {"kind": "fixed", "source": f"results/{arm}/micro.json job_ops (p50 ms per call)"}}))
+
+    monkeypatch.setattr(model_eval, "REPO", tmp_path)
+    monkeypatch.setattr(model_eval.subprocess, "run", run)
+    monkeypatch.setattr(model_eval, "table", lambda *a: None)
+    argv = ["--codebrim", str(tmp_path / "none"), "--n", "3", "--micro-arm", "mac", "--workers", "6"]
+    model_eval.main(["--onnx", "models/drishyam_dacl10k.onnx", "--costs", "mac-dacl10k-retime", *argv])
+    model_eval.main(["--onnx", "models/drishyam_dacl10k_v2a.onnx", "--costs", "mac-dacl10k_v2a", *argv])
+    assert not any("bench.micro" in c for c in calls)
+    assert [(Path(c[c.index("--out") + 1]).name, c[c.index("--micro-arm") + 1]) for c in calls] == [
+        ("onnx-synth", "mac-dacl10k-retime"), ("classical-synth", "mac"), ("onnx-v2a-synth", "mac-dacl10k_v2a")]
+    with pytest.raises(SystemExit, match="must be a mac table that timed onnx:drishyam_dacl10k_v2a.onnx"):  # another net's
+        model_eval.main(["--onnx", "models/drishyam_dacl10k_v2a.onnx", "--costs", "mac-dacl10k-retime", *argv])
+    with pytest.raises(SystemExit, match="must be a linux table"):  # the classical side would be charged another machine
+        model_eval.main(["--onnx", "models/drishyam_dacl10k.onnx", "--costs", "mac-dacl10k-retime", *argv[:4], "--micro-arm", "linux"])
+    assert len(calls) == 3
+
+
+def test_heldout_reads_each_pair_in_both_directions_by_the_dev_criterion():
+    """A ratio CI wholly below 1 is A's loss, wholly above B's (inverted); on the clean set a difference CI wholly above
+    0 is A's harm; critical boxes and ms are costs where higher is worse; a CI that touches the null is no verdict."""
+    from evals import heldout
+
+    pairs = {"codebrim@0.3: v1 / v2a": {"recall": [1.2, [1.1, 1.3]], "iou_only": [1.0, [0.9, 1.1]],
+                                        "critical": [1.5, [1.2, 1.8]], "ms": [0.9, [0.8, 0.95]]},
+             "synth@0.3: v1 / v2a": {"recall": [0.95, [0.9, 1.0]], "iou_only": [1.0, [0.9, 1.1]]},
+             "clean@0.3: v1 / v2a": {"boxes_per_photo_diff": [-0.5, [-0.9, -0.1]], "any_box_share_diff": [0.0, [-0.1, 0.1]],
+                                     "critical": [9.0, [2.0, 20.0]], "ms": [1.0, [0.9, 1.1]]}}
+    assert heldout.verdicts(pairs) == {"v1 vs v2a": {"codebrim": "better", "synth": "same", "clean_harm": False},
+                                       "v2a vs v1": {"codebrim": "worse", "synth": "same", "clean_harm": True}}
+    crit, other = heldout.losses(pairs)
+    assert crit["v1"] == [] and crit["v2a"] == ["codebrim@0.3 recall x0.833 (CI 0.77-0.91) against v1",
+                                                "clean@0.3 +0.500 boxes per clean photo (CI +0.100 to +0.900) against v1"]
+    assert other["v1"] == ["codebrim@0.3 critical boxes per photo x1.500 (CI 1.20-1.80) against v2a"]  # not on the clean set
+    assert other["v2a"] == ["codebrim@0.3 modelled ms per job x1.111 (CI 1.05-1.25) against v1"]
+
+
+def test_heldout_docs_quote_the_json():
+    """docs/report.md holds the held-out tables and verdict as evals.heldout renders them from
+    results/heldout_models.json, and the numbers its prose and README.md quote are the JSON's."""
+    from evals import heldout
+
+    out = json.loads((heldout.REPO / "results" / "heldout_models.json").read_text())
+    report, readme = ((heldout.REPO / f).read_text() for f in ("docs/report.md", "README.md"))
+    assert all(t in report for t in heldout.markdown(out).split("\n\n")) and out["dev_choice"]["statement"] in report
+    assert out["dev_choice"]["confirms"] is True and "Held-out confirms the dev choice" in readme
+    t, p, ci = out["table"], out["pairs"], lambda c: f"{c[0]:.2f}–{c[1]:.2f}"
+    v1, cl = t["codebrim@0.3"]["v1"], t["codebrim@0.3"]["classical-v1"]
+    r, s = p["codebrim@0.3: v1 / classical-v1"]["recall"], (lambda m: p[f"synth@0.3: v1 / {m}"]["recall"])
+    crit = [t["codebrim@0.3"][m]["critical_per_image"] for m in ("v1", "v2a", "v2b")]
+    clean = {m: round(t["clean@0.3"][m]["images_with_any"] * 51) for m in ("v1", "v2a", "v2b")}
+    leak = out["leakage"]
+    assert f"{r[0]:.2f}× its recall on CODEBRIM ({v1['recall']:.3f} against {cl['recall']:.3f}, 95 % CI {ci(r[1])}" in report
+    assert f"{r[0]:.2f}× ({ci(r[1])}" in readme and f"{v1['recall']:.2f} of the 200 CODEBRIM photos' defects (95 % CI {ci(v1['recall_ci'])})" in readme
+    assert f"({s('v2a')[0]:.2f}×, {ci(s('v2a')[1])}; {s('v2b')[0]:.2f}×, {ci(s('v2b')[1])})" in report
+    assert f"v1 is {s('v2a')[0]:.2f}× and {s('v2b')[0]:.2f}× them" in readme
+    assert all(f"({crit[0]:.2f} against {crit[1]:.2f} and {crit[2]:.2f}" in d for d in (report, readme))
+    assert clean == {"v1": 0, "v2a": 9, "v2b": 9} and "a box on 9 of the 51 clean photos" in report
+    assert leak["candidates"] == 0 and f"0 candidates of {leak['eval_images']} against {leak['train_images']:,}" in readme
+
+
 # ---------------------------------------------------------------- parity
 def test_parity_compare_saved_files(tmp_path):
     a = np.zeros((2, 8, 8), np.uint8)
