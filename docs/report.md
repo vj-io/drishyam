@@ -183,7 +183,10 @@ ONNX path, which `tests/test_segment.py` exercises with a tiny ONNX model. The l
 **What OpenCV 5's DNN module loaded, and what it did not.** The v1 model loads only on `ENGINE_NEW`:
 `ENGINE_CLASSIC` stops at the decoder's `Shape` node (`Assertion failed: !isDynamicShape in function 'parseShape'`)
 on the FP32 file and on both statically quantized copies (`results/local-macos-x86/int8.json`; the other three models
-were not tried on it). `training/parity.py` checks every export against its PyTorch
+were not tried on it). The cause is the export's symbolic input H and W (`[1, 3, 'h', 'w']`, so one file runs at both
+the 512 and the 256 size): a copy with them fixed loads on `ENGINE_CLASSIC` and matches the deployed net to max |dprob| 2.1e-5,
+while the FP16 copy loads there but fails its first forward; the engine timings, a minimal repro and the pending Arm
+run are in [bench.md](bench.md), "OpenCV 5 DNN engines for v1". `training/parity.py` checks every export against its PyTorch
 checkpoint through `OnnxSegmenter` on `ENGINE_NEW` (20 crops, FP32 tolerance max |dprob| 1e-3) and refuses an FP32
 file over it. A DeepLabV3+ (the dacl10k paper's baseline architecture, `--arch deeplabv3plus` in
 `training/train_dacl10k.py`) was tried first for v2c and dropped: its FP32 export, with the 19-to-6 class merge in the

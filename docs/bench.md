@@ -1,4 +1,4 @@
-# Benchmarks: OpenCV kernels, the agent loop, Arm against x86, Lambda threads, INT8
+# Benchmarks: OpenCV kernels, the agent loop, Arm against x86, Lambda threads, INT8, DNN engines
 
 Two metrics, each with the machine, its load and the file that holds the numbers. Nothing in this page ran on Lambda
 or on any AWS instance: this workstream does not deploy or write to AWS.
@@ -14,7 +14,7 @@ or on any AWS instance: this workstream does not deploy or write to AWS.
 
 | Where | CPU, threading | OpenCV | What ran | Files |
 | --- | --- | --- | --- | --- |
-| This Mac | Intel Core i9-9880H, x86, 8 cores / 16 threads; macOS GCD | opencv-python-headless 5.0.0 wheel (`uv.lock`), IPP HAL | Metric A, Metric B (1 thread and all 16), dacl10k latency, INT8 | `results/local-macos-x86/{kernels,loop,loop_onnx,int8,int8_repeat}.json` |
+| This Mac | Intel Core i9-9880H, x86, 8 cores / 16 threads; macOS GCD | opencv-python-headless 5.0.0 wheel (`uv.lock`), IPP HAL | Metric A, Metric B (1 thread and all 16), dacl10k latency, INT8, DNN engines | `results/local-macos-x86/{kernels,loop,loop_onnx,int8,int8_repeat,opencv5_engines,opencv5_engines_repeat}.json` |
 | GitHub `ubuntu-24.04-arm` | Neoverse-N2, 4 logical CPUs; Linux pthreads | the same version, aarch64 wheel (KleidiCV and carotene HAL) | Metric A, Metric B at 1, 2, 4 threads, micro, macro | `results/linux-aarch64/`: `micro.json` (the fixed cost table, 2026-10-18); `kernels.json`, `loop.json`, `macro.json` and `micro_run39220769299.json` from run 39220769299 |
 | GitHub `ubuntu-24.04` | AMD EPYC 7763, 4 logical CPUs; Linux pthreads | the same version, x86_64 wheel (IPP HAL) | the same | `results/linux-x86_64/{micro,macro,kernels,loop}.json`, run 39220769299 |
 | Lambda arm64, 3008 MB | Graviton, 1.7 vCPU of time (below) | the same version, aarch64 wheel | not measured here | the smoke runs' step p95s in `docs/aws.md` are the only Lambda timings: 67.7 to 88.0 ms with the classical engine, 0.52 to 1.14 s with v1 (live since 2026-10-21) |
@@ -514,6 +514,115 @@ so they are not ranked. They are also less faithful where it matters most: the Q
 FP32's at IoU 0.37, because a crack is a few pixels wide and quantization moves its edge. INT8 does not help the SLA
 above on this machine; onnxruntime stays out of the live path.
 
+## OpenCV 5 DNN engines for v1
+
+    uv run python -m bench.opencv5_engines --arm local-macos-x86
+
+OpenCV 5.0 ships two DNN engines: the classic one, whose ONNX importer and layers come from 4.x, and the new one,
+which `OnnxSegmenter._load` pins with `engine=cv2.dnn.ENGINE_NEW` (the default, `ENGINE_AUTO`, tries the new engine
+first and falls back to the classic one). `bench/opencv5_engines.py` reads each v1 release file
+(`drishyam_dacl10k.onnx`, FP32, and `.fp16.onnx`; their sha256 is in the JSON's `files`) and a static-shape copy of
+each with both engines. A static copy is the file with its input's symbolic H and W set to the size it will run at
+and nothing else changed, one per size, written to the git-ignored `runs/opencv5_engines/`; `models/` and the
+deployed files are untouched. For every pair that runs it times a forward at 512 and 256 (the agent's accurate and
+fast sizes) on 1 and 16 threads, in 20 rounds that each run one forward of every net at that size (so a
+change in load lands on all of them), with the deployed net timed in a second slot of each round as a null; and it
+compares the softmax output with the deployed net (the FP32 file on `ENGINE_NEW`) and with the other engine on the
+same file over 8 synthetic crops (`bench.parity.make_crops`, preprocessed as `OnnxSegmenter` does): max
+|dprob| and argmax agreement. This Mac, `results/local-macos-x86/opencv5_engines.json` (1-minute load average
+11.99 at the start and 9.53 at the end; `opencv5_engines_repeat.json` ran from
+9.53 to 9.63):
+
+| file | engine | size | result | 1 thread, p50 / p95 ms | 16 threads, p50 / p95 ms | max \|dprob\|, argmax agreement with the deployed net | the same, against the other engine |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| FP32 (the deployed file) | `ENGINE_NEW` | 512 | runs | 567.6 / 622.5 | 148.0 / 184.5 | (reference) |  |
+| FP32, the same net in a second timing slot (null) | `ENGINE_NEW` | 512 | | 576.1 / 730.6 | 145.5 / 196.1 | | |
+| FP32 (the deployed file) | `ENGINE_CLASSIC` | 512 | fails to load (a) |  |  |  |  |
+| FP32, static copy | `ENGINE_NEW` | 512 | runs | 560.7 / 645.5 | 145.0 / 209.8 | 0, 1.000000 | 2.1e-5, 1.000000 |
+| FP32, static copy | `ENGINE_CLASSIC` | 512 | runs | 493.0 / 723.5 | 209.9 / 383.4 | 2.1e-5, 1.000000 | 2.1e-5, 1.000000 |
+| FP16 | `ENGINE_NEW` | 512 | runs | 687.2 / 871.7 | 252.7 / 324.8 | 0.018, 0.999978 |  |
+| FP16 | `ENGINE_CLASSIC` | 512 | fails to load (a) |  |  |  |  |
+| FP16, static copy | `ENGINE_NEW` | 512 | runs | 648.4 / 822.9 | 254.5 / 295.0 | 0.018, 0.999978 |  |
+| FP16, static copy | `ENGINE_CLASSIC` | 512 | loads, forward fails (b) |  |  |  |  |
+| FP32 (the deployed file) | `ENGINE_NEW` | 256 | runs | 136.5 / 158.8 | 42.0 / 52.6 | (reference) |  |
+| FP32, the same net in a second timing slot (null) | `ENGINE_NEW` | 256 | | 136.2 / 146.8 | 41.4 / 46.6 | | |
+| FP32 (the deployed file) | `ENGINE_CLASSIC` | 256 | fails to load (a) |  |  |  |  |
+| FP32, static copy | `ENGINE_NEW` | 256 | runs | 134.6 / 165.8 | 41.4 / 49.2 | 0, 1.000000 | 1.4e-5, 1.000000 |
+| FP32, static copy | `ENGINE_CLASSIC` | 256 | runs | 104.5 / 129.4 | 58.5 / 79.6 | 1.4e-5, 1.000000 | 1.4e-5, 1.000000 |
+| FP16 | `ENGINE_NEW` | 256 | runs | 161.0 / 194.8 | 64.5 / 74.4 | 0.037, 0.999899 |  |
+| FP16 | `ENGINE_CLASSIC` | 256 | fails to load (a) |  |  |  |  |
+| FP16, static copy | `ENGINE_NEW` | 256 | runs | 159.6 / 179.4 | 66.7 / 73.3 | 0.037, 0.999899 |  |
+| FP16, static copy | `ENGINE_CLASSIC` | 256 | loads, forward fails (b) |  |  |  |  |
+
+The exact errors (the `OpenCV(5.0.0) <build path>` prefix trimmed; the JSON has them whole, with OpenCV's log lines):
+
+- (a) both v1 files on `ENGINE_CLASSIC`, at both sizes: `Node [Shape@ai.onnx]:(onnx_node!/net/decoder/Shape) parse
+  error: ... onnx_importer.cpp:2591: error: (-215:Assertion failed) !isDynamicShape in function 'parseShape'`, after
+  the log line `DNN/ONNX(Shape): dynamic 'zero' shapes are not supported, input input [<empty>]`, for the FP32 file
+  (the error in `int8.json`'s (a) above). The FP16 file stops at `/net/decoder/Shape_2` instead, whose input is
+  `/net/encoder/model/blocks.0/blocks.0.0/Add_output_0 [<empty>]`, because its nodes are in another order.
+- (b) the FP16 static copy on `ENGINE_CLASSIC` loads, and its first forward fails in the stem convolution's type
+  check: `layer.cpp:274: ... 'input == CV_32F || input == CV_64F || input == CV_8S || input == CV_8U || input ==
+  CV_64S' where 'input' is 7 (CV_16FC1)`, logged as `[Convolution]:(onnx_node!/net/encoder/model/conv_stem/Conv):
+  getMemoryShapes() throws exception`.
+
+**Why the classic engine fails.** v1's input is `[1, 3, 'h', 'w']` on purpose: one file runs at 512 and at 256. Its
+UNet decoder resizes each upsampled map to the size of its skip connection, which the PyTorch export writes as
+`Shape -> Gather -> Unsqueeze -> Concat -> Resize`, five times (`files.*.graph.shape_nodes`: `/net/decoder/Shape` on
+the graph input, `Shape_2` to `Shape_8` on encoder outputs). The classic importer folds every `Shape` into a constant
+while it imports, records a symbolic dim as 0, and asserts that no dim is 0 (`parseShape` in `onnx_importer.cpp`; the
+4.x importer has the same check, so this is not a 5.0 regression). `ENGINE_NEW` evaluates `Shape` at run time.
+[bench/repro/](../bench/repro/README.md) reproduces it with a 10-node model and no weights: symbolic H and W fail on
+`ENGINE_CLASSIC`, a symbolic batch alone does not, and every variant loads on `ENGINE_NEW`. That README also sets out
+what is and is not known about the DeepLabV3+ parity failure on `ENGINE_NEW` (commit 95741ba), which no file in this
+repository reproduces.
+
+**The static-shape finding.** Fixing the two dims is enough: the FP32 static copy loads and runs on
+`ENGINE_CLASSIC`, and its output differs from the deployed net by max |dprob| 2.1e-5 at 512 and
+1.4e-5 at 256, with every argmax equal (`ENGINE_NEW` on the same copy gives the deployed net's output
+exactly). The FP16 copy does not run there (b), so `ENGINE_CLASSIC` has no FP16 path for v1. Nothing is adopted: the
+agent still reads the deployed file on `ENGINE_NEW`, and a static copy would have to be one file per size.
+
+**Speed, on this machine.** Within each run the null slot's p50 was within 2 % of the deployed net's
+(3 % in the repeat), and the static copy on `ENGINE_NEW` within 2 % (3 %), so a fixed shape buys
+`ENGINE_NEW` nothing measurable here. `ENGINE_CLASSIC` on the static copy is faster on one thread and slower on
+16: at one thread it took x0.87, x0.77 of the deployed net's p50 at 512 and 256 (x0.84, x0.74 in the repeat),
+at 16 threads x1.42, x1.39 (x1.48, x1.41). The FP16 file on `ENGINE_NEW` took x1.21, x1.18, x1.71, x1.54 of the FP32 file's p50
+at 512 and 256 on one thread, then on 16 (x1.21, x1.19, x1.79, x1.53 in the repeat); why FP16 is slower on this CPU was not
+measured. The two runs went back
+to back once the load had fallen to about 10; their absolute numbers still carry the uncertainty described at the
+top of this page, and only the ratios within a run are compared here.
+
+**What the build says.** OpenCV 5.0 also has an ONNX Runtime engine, `ENGINE_ORT`, but this wheel is built without
+it: its build information reads ONNX Runtime `NO` (`onnx_runtime_in_build`), and asked for `ENGINE_ORT` it
+logs that it was built with `WITH_ONNXRUNTIME=OFF` and falls back to `ENGINE_AUTO` (seen once by hand, not in the
+JSON). `provenance` quotes the other build lines that decide which kernels run: `cv2_custom_hal` YES (ipp (ver 0.0.1)),
+dispatch SSE4_2 AVX FP16 AVX2 AVX512_SKX on a baseline of SSE SSE2 SSE3 SSSE3 SSE4_1, parallel framework GCD.
+
+**Arm: pending.** The `engines` job of `.github/workflows/bench-arm64.yml` runs the same command on GitHub's
+`ubuntu-24.04-arm` and `ubuntu-24.04` runners. It downloads `drishyam_dacl10k.onnx`, `.fp16.onnx` and `.sha256` from
+the public v1.1.0 release, checks them with `sha256sum -c` against that file and against the hashes committed in
+`models/drishyam_dacl10k.provenance.json`, and uploads only the JSON (artifacts `opencv5-engines-linux-aarch64` and
+`opencv5-engines-linux-x86_64`), never the weights. It has not run. From a pushed branch (or `main` once merged):
+
+```bash
+gh workflow run bench-arm64.yml --repo vj-io/drishyam --ref <branch> -f bench=false -f engines=true
+```
+
+```bash
+gh run download <run-id> --repo vj-io/drishyam --pattern 'opencv5-engines-*' --dir runs/engines
+```
+
+```bash
+cp runs/engines/opencv5-engines-linux-aarch64/opencv5_engines.json results/linux-aarch64/
+```
+
+```bash
+cp runs/engines/opencv5-engines-linux-x86_64/opencv5_engines.json results/linux-x86_64/
+```
+
+Until then no v1 forward has been timed on Arm outside the Lambda smoke runs' step p95s (`docs/aws.md`).
+
 ## What is not measured
 
 - Lambda itself: no timing in this page comes from the function; the GitHub arm64 runner is a different VM, a
@@ -527,4 +636,5 @@ above on this machine; onnxruntime stays out of the live path.
 - Mask parity between the Arm and x86 builds: `run_all.sh` saves `parity.npz` on each runner, but the workflow does
   not upload it.
 - The macro worker sweep (`WORKERS`) on GitHub: one worker only.
-- The dacl10k net on Arm, FP32 or INT8: the x86 INT8 result above does not predict it.
+- The dacl10k net on Arm, FP32 or INT8: the x86 INT8 result above does not predict it, and the `engines` job ("OpenCV
+  5 DNN engines for v1") that would time v1 on both engines there has not run.
