@@ -242,14 +242,15 @@ floor, the value of a look that finds nothing, so a photo with nothing to find c
 holds only once every candidate still worth a look (unseen > 0) has been shown by a look at least as fine as its
 own first look (L1 by default): a coarser look (the survey, L2 or L3) cannot resolve what that look would, a
 hairline crack for one, so its seed orders candidates but never ends a job. The stop rule therefore never ends a job on a saliency prior and a coarse view alone,
-nor before it has seen anything (an overview that proposes no candidate ends the job `exhausted` with no look, and its
-work order lists the whole photo as not assessed); on a photo whose candidates lie apart the floor rarely binds and the cap ends it. A `stop-rule` halt names the binding term:
+nor before it has seen anything (an overview that proposes no candidate gets one whole-photo look at L2, cause
+`fallback-l2`, then ends `exhausted`, and its work order lists the whole photo as not assessed: see the zero-candidate
+fallback below); on a photo whose candidates lie apart the floor rarely binds and the cap ends it. A `stop-rule` halt names the binding term:
 `"best score 1.2e-04 < lambda 2.0e-04 (floor: eps x v0 / t_hat)"` or `"... (eps x value/cost)"`.
 
 Step `decision.action` values: `gaze` (first look at a region, or the survey), `escalate`
 (one level finer, same centre, because the last look was uncertain), `verify`
 (one level finer to confirm a mask), `halt`. Look `cause` values:
-`survey`, `best-score`, `entropy>tau`, `area<A_min`, `verify-new-mask`, `iou<0.5`,
+`survey`, `fallback-l2`, `best-score`, `entropy>tau`, `area<A_min`, `verify-new-mask`, `iou<0.5`,
 `planner:<strategy>`, `replay`, and `random-order` (only under the `order="random"` ablation).
 `governor.cause` values: `p95>SLA`, `warp-spike`, `usd≥80%`. Halt `cause` values: `stop-rule`,
 `exhausted`, `cap-hit`, `kill-switch`, `planner:stop`. `planner_status.status` is `accepted`,
@@ -357,6 +358,28 @@ the job halting, with that size in `decision.args.size` and a rationale ending `
 leaves (108134 px)"` (synth_dev recall x1.03, clean boxes x1.40); and `survey_value`, which when False keeps the
 survey's finds out of the stop rule's value found per ms (no measurable effect).
 
+### Zero-candidate fallback (on by default)
+
+`JobConfig.fallback_l2` (True): when the overview proposes no candidate, the job spends one look at L2 whose window
+spans the whole photo before it ends (`decision.action` `gaze`, `cause` `fallback-l2`, region `w0`, a gaze of
+max(512, long side / 4) px centred on the photo, `decision.args.size` saying which), with the profile's accurate net.
+It takes the normal look path: the governor checks KILL and the caps first (a pixel cap it would exceed halts the job,
+`cap-hit`, with no look; on a 1024 × 768 photo the look is 33 % of the pixels), it is charged its pixels and its
+fixed-cost ms, the rules queue its follow-ups (an escalation or a verify one level finer where the profile allows it),
+and what it drafts is reported like any look's findings, critical ones held for a person. The photo keeps its
+`not_assessed` entry (`no candidate region was proposed`) whatever the look drafts, so its work order is never
+`ready`, and `coverage_looked` does not count the look. A resume replays it (`[action, x, y, 2, size]`; that size,
+and only at L2, may exceed the 512-px gaze). Why: on our wall photo IMG_2332 (`public/samples/real_01.jpg`, no ground
+truth) the saliency prior peaks at 0.22 against its 0.5 threshold, and the v1 net sees a hairline crack on a
+whole-photo L2 view that a whole-photo L3 view misses; that photo motivated the rule and is not evidence for it. It
+passed the rule stated before its dev run (`results/dev/zero_candidate_fallback.json`, v1 at the 30 % cap): recall
+did not drop on synth_dev or CODEBRIM dev100 and clean false alarms did not rise, but the pass rests on 1 dev photo of
+190, the only one with no candidate (a 2048 × 1536 CODEBRIM photo, whose one crack it found: recall ×1.0025, CI
+1.00–1.0093, +11.8 modelled ms per dev100 job); synth_dev and the clean dev split have none, so no clean photo tested
+its false alarms on dev. It is a `JobConfig` field, not a profile value, so it is on for every profile; every number
+published before it (the classical engine's, v1's first held-out numbers, v2a to v2c) ran with it off. v1's held-out
+read with it on is `"v1+fallback"` in `results/heldout_models.json` (report, section 8).
+
 ### Two-model cascade (off by default)
 
 `drishyam.cascade` lets a fast scout segment every look and a stronger net segment again only the looks that need it.
@@ -451,7 +474,8 @@ the classical engine); a work order the MCP tools draft has neither, since there
 `not_assessed` lists every window the quality gate refused (`reason` `blur`, `glare` or `dark`; `box` clipped to the
 image), and, with `step` 0, every blown-out or black area the overview found larger than 5 % of the image, which gets
 no look at all, so an area the agent could not read never passes for a clean one. With `action` `check-by-eye` it also
-lists the whole photo when the overview proposed no candidate (`reason` `no candidate region was proposed`) and, after
+lists the whole photo when the overview proposed no candidate (`reason` `no candidate region was proposed`, whatever
+the zero-candidate fallback look drafted) and, after
 a `kill-switch` or `cap-hit` halt, each candidate no look of its own reached (`region` names it).
 
 ### Downloaded work-order file
