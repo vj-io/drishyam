@@ -6,7 +6,9 @@ name: bench-arm64
 # time the classical engine: the dacl10k ONNX files are not in the repository, so no trained-model DNN row runs here.
 # Run and fetch: docs/bench.md ("Arm against x86 on GitHub").
 # The optional `engines` job (input engines=true) fetches the v1 weights from the public v1.1.0 release instead and runs
-# bench/opencv5_engines.py on both runners: docs/bench.md ("OpenCV 5 DNN engines for v1").
+# bench/opencv5_engines.py on both runners: docs/bench.md ("OpenCV 5 DNN engines for v1"); with features=true the same
+# job runs bench/opencv5_features.py (docs/bench.md, "OpenCV 5 features in the pipeline"). The `builds` job (input
+# builds=true) runs bench/opencv_builds.py, the pipeline's stages on OpenCV 4.14 against 5.0, and needs no weights.
 on:
   workflow_dispatch:
     inputs:
@@ -19,6 +21,14 @@ on:
         default: true
       engines:
         description: run bench/opencv5_engines.py on the v1 weights from the v1.1.0 release
+        type: boolean
+        default: false
+      features:
+        description: run bench/opencv5_features.py (pipeline flags, v1 layer profile, ENGINE_CLASSIC agent) on them
+        type: boolean
+        default: false
+      builds:
+        description: run bench/opencv_builds.py (the pipeline's stages on OpenCV 4.14 against the locked 5.0 wheel)
         type: boolean
         default: false
 
@@ -62,7 +72,55 @@ jobs:
     # Which OpenCV 5 DNN engine reads v1, its forward latency and parity (bench/opencv5_engines.py). The CC BY-NC 4.0
     # weights come from the public release, checked against its sha256 file and against the hashes committed in
     # models/drishyam_dacl10k.provenance.json; only the JSON is uploaded, never the weights.
-    if: inputs.engines
+    if: inputs.engines || inputs.features
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04-arm
+            arm: linux-aarch64
+          - runner: ubuntu-24.04
+            arm: linux-x86_64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0 (the v4 tag on 2026-10-19)
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e  # v6.8.0 (the v6 tag on 2026-10-19)
+      - run: uv sync --all-extras --locked
+      - name: v1 weights from the v1.1.0 release, sha256-checked
+        shell: bash  # -eo pipefail
+        run: |
+          base=https://github.com/vj-io/drishyam/releases/download/v1.1.0
+          for f in drishyam_dacl10k.onnx drishyam_dacl10k.fp16.onnx drishyam_dacl10k.sha256; do
+            curl -fsSL --retry 3 -o "models/$f" "$base/$f"
+          done
+          sha256sum -c models/drishyam_dacl10k.sha256
+          jq -r '.sha256 | to_entries[] | "\(.value)  models/\(.key)"' models/drishyam_dacl10k.provenance.json | sha256sum -c
+      - if: inputs.engines
+        run: uv run python -m bench.opencv5_engines --arm ${{ matrix.arm }}
+        env:
+          BENCH_LABEL: GitHub ${{ matrix.runner }} runner, not Lambda
+      - if: inputs.engines
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2 (the v4 tag on 2026-10-19)
+        with:
+          name: opencv5-engines-${{ matrix.arm }}
+          path: results/${{ matrix.arm }}/opencv5_engines.json
+          if-no-files-found: error
+      - if: inputs.features
+        run: uv run python -m bench.opencv5_features --arm ${{ matrix.arm }} --threads 1,2,4
+        env:
+          BENCH_LABEL: GitHub ${{ matrix.runner }} runner, not Lambda
+      - if: inputs.features
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2 (the v4 tag on 2026-10-19)
+        with:
+          name: opencv5-features-${{ matrix.arm }}
+          path: results/${{ matrix.arm }}/opencv5_features.json
+          if-no-files-found: error
+
+  builds:
+    # The pipeline's own stages on opencv-python-headless 4.14.0.94 (installed by uv into runs/, git-ignored) against
+    # the locked 5.0 wheel, one thread, interleaved worker processes (bench/opencv_builds.py). No weights needed.
+    if: inputs.builds
     strategy:
       fail-fast: false
       matrix:
@@ -77,20 +135,11 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0 (the v4 tag on 2026-10-19)
       - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e  # v6.8.0 (the v6 tag on 2026-10-19)
       - run: uv sync --all-extras --locked
-      - name: v1 weights from the v1.1.0 release, sha256-checked
-        shell: bash  # -eo pipefail
-        run: |
-          base=https://github.com/vj-io/drishyam/releases/download/v1.1.0
-          for f in drishyam_dacl10k.onnx drishyam_dacl10k.fp16.onnx drishyam_dacl10k.sha256; do
-            curl -fsSL --retry 3 -o "models/$f" "$base/$f"
-          done
-          sha256sum -c models/drishyam_dacl10k.sha256
-          jq -r '.sha256 | to_entries[] | "\(.value)  models/\(.key)"' models/drishyam_dacl10k.provenance.json | sha256sum -c
-      - run: uv run python -m bench.opencv5_engines --arm ${{ matrix.arm }}
+      - run: uv run python -m bench.opencv_builds --arm ${{ matrix.arm }}
         env:
           BENCH_LABEL: GitHub ${{ matrix.runner }} runner, not Lambda
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2 (the v4 tag on 2026-10-19)
         with:
-          name: opencv5-engines-${{ matrix.arm }}
-          path: results/${{ matrix.arm }}/opencv5_engines.json
+          name: opencv-builds-${{ matrix.arm }}
+          path: results/${{ matrix.arm }}/opencv_builds.json
           if-no-files-found: error
