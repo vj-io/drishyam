@@ -241,8 +241,9 @@ lambda = max(eps x value found / ms spent, eps x v0 / t_hat), with eps 0.25 and 
 floor, the value of a look that finds nothing, so a photo with nothing to find can stop before its cap. The floor
 holds only once every candidate still worth a look (unseen > 0) has been shown by a look at least as fine as its
 own first look (L1 by default): a coarser look (the survey, L2 or L3) cannot resolve what that look would, a
-hairline crack for one, so its seed orders candidates but never ends a job. A job therefore never stops on a saliency prior and a coarse view alone,
-nor before it has seen anything; on a photo whose candidates lie apart the floor rarely binds and the cap ends it. A `stop-rule` halt names the binding term:
+hairline crack for one, so its seed orders candidates but never ends a job. The stop rule therefore never ends a job on a saliency prior and a coarse view alone,
+nor before it has seen anything (an overview that proposes no candidate ends the job `exhausted` with no look, and its
+work order lists the whole photo as not assessed); on a photo whose candidates lie apart the floor rarely binds and the cap ends it. A `stop-rule` halt names the binding term:
 `"best score 1.2e-04 < lambda 2.0e-04 (floor: eps x v0 / t_hat)"` or `"... (eps x value/cost)"`.
 
 Step `decision.action` values: `gaze` (first look at a region, or the survey), `escalate`
