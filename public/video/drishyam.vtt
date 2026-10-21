@@ -133,93 +133,93 @@ Recorded on the classical segmenter;
 the site now runs the trained one, on OpenCV 5's new DNN engine.
 
 34
-00:02:22.474 --> 00:02:28.965
-On Lambda a step took under 90 ms at p95 then, and under 1.1 s now.
+00:02:22.474 --> 00:02:28.990
+On Lambda a step took under 90 ms at p95 then, and under 1.2 s now.
 
 35
-00:02:29.615 --> 00:02:37.102
+00:02:29.640 --> 00:02:37.127
 On 200 synthetic photos it finds 87 % of full tiling's recall at 26 % of the pixels,
 
 36
-00:02:37.112 --> 00:02:39.583
+00:02:37.137 --> 00:02:39.608
 short of its 90 % target.
 
 37
-00:02:39.593 --> 00:02:42.020
+00:02:39.618 --> 00:02:42.045
 One downscaled pass does about as well.
 
 38
-00:02:42.030 --> 00:02:45.589
+00:02:42.055 --> 00:02:45.614
 Ablations: only dropping the survey look loses recall,
 
 39
-00:02:45.599 --> 00:02:49.341
+00:02:45.624 --> 00:02:49.366
 and a random gaze order matches it on smaller photos.
 
 40
-00:02:49.351 --> 00:02:55.448
+00:02:49.376 --> 00:02:55.473
 On 200 real CODEBRIM photos, every classical method finds about 1 defect in 5;
 
 41
-00:02:55.458 --> 00:02:56.873
+00:02:55.483 --> 00:02:56.898
 chance, 1 in 8.
 
 42
-00:02:56.883 --> 00:03:01.841
+00:02:56.908 --> 00:03:01.866
 Held out, the trained segmenter finds 49 %, two and a half times as many;
 
 43
-00:03:01.851 --> 00:03:04.155
+00:03:01.876 --> 00:03:04.180
 but its boxes find 30 % at random,
 
 44
-00:03:04.165 --> 00:03:08.421
+00:03:04.190 --> 00:03:08.446
 and a person gets five and a half times the critical boxes.
 
 45
-00:03:08.431 --> 00:03:14.344
+00:03:08.456 --> 00:03:14.369
 On 51 undamaged synthetic photos, the classical engine flags something 2 times in 3;
 
 46
-00:03:14.354 --> 00:03:16.226
+00:03:14.379 --> 00:03:16.251
 the trained one, never.
 
 47
-00:03:16.876 --> 00:03:20.121
+00:03:16.901 --> 00:03:20.146
 Our own wall, no ground truth: no region was proposed,
 
 48
-00:03:20.131 --> 00:03:24.359
+00:03:20.156 --> 00:03:24.384
 so the trained segmenter never ran, and missed the hairline crack.
 
 49
-00:03:25.209 --> 00:03:29.526
+00:03:25.234 --> 00:03:29.551
 On a second wall, one close look flagged a crack on the lower of two we traced,
 
 50
-00:03:29.536 --> 00:03:32.250
+00:03:29.561 --> 00:03:32.275
 and never looked closely at most of the wall.
 
 51
-00:03:33.200 --> 00:03:34.524
+00:03:33.225 --> 00:03:34.549
 Failures in the open:
 
 52
-00:03:34.534 --> 00:03:39.294
+00:03:34.559 --> 00:03:39.319
 graffiti read as spalling, a formwork line as a crack, glare, and blur.
 
 53
-00:03:39.344 --> 00:03:41.814
+00:03:39.369 --> 00:03:41.839
 2 of these four rules are not built yet.
 
 54
-00:03:42.464 --> 00:03:48.332
+00:03:42.489 --> 00:03:48.357
 Pixels, not millimetres. AI-assisted, not an inspection. Only a person can approve.
 
 55
-00:03:49.582 --> 00:03:53.586
+00:03:49.607 --> 00:03:53.611
 make test, make eval, and one script for the AWS stack.
 
 56
-00:03:54.136 --> 00:03:57.800
+00:03:54.161 --> 00:03:57.825
 Drishyam. It looks where it matters, and asks a human first.

@@ -230,8 +230,8 @@ and AWS and Arm (the arm Lambda, its latency then and now).
 
 | Requirement | Covered by | From | To |
 | --- | --- | --- | --- |
-| At most 5 minutes, 1920x1080 | open, end | 0:00.0 | 3:59.9 |
-| Narrated (offline Kokoro voice af_heart) with burned-in captions; the same cues in public/video/drishyam.vtt | open, end | 0:00.0 | 3:59.9 |
+| At most 5 minutes, 1920x1080 | open, end | 0:00.0 | 4:00.0 |
+| Narrated (offline Kokoro voice af_heart) with burned-in captions; the same cues in public/video/drishyam.vtt | open, end | 0:00.0 | 4:00.0 |
 | The team: Vaibhav Jangid, Bhavya Dhoot. Each real photo, then the window's looks turn it into OpenCV line art (Canny, findContours, approxPolyDP); name cards without the private inputs | team | 0:08.7 | 0:22.9 |
 | Problem and user, with sources on screen | problem | 0:22.9 | 0:38.8 |
 | /api/health on the live site: opencv 5.0.0, aarch64, aws-lambda | l1 | 0:39.3 | 0:43.7 |
@@ -246,15 +246,15 @@ and AWS and Arm (the arm Lambda, its latency then and now).
 | Architecture: docs/agent-loop.svg, public/docs/aws-simple.svg, docs/architecture.png (AWS path and OpenCV layer) | arch | 1:54.0 | 2:29.1 |
 | The recording ran the classical engine; the live site now runs the trained segmenter v1 on OpenCV 5 DNN ENGINE_NEW, and its Lambda step p95 (video/live/aws-smoke.log) | a4, a5 | 2:15.0 | 2:28.7 |
 | Principal results: recall vs pixels, with one downscale, the tiling family and chance | r1, r3 | 2:29.6 | 2:41.8 |
-| Ablations (public/results/ablations.json) | r5 | 2:42.0 | 2:49.1 |
-| Real photos (CODEBRIM), said plainly weak; no CODEBRIM image shown | r6 | 2:49.4 | 2:56.6 |
-| False alarms on synthetic photos with no damage (public/results/clean/summary.json) | r7 | 3:08.4 | 3:16.0 |
+| Ablations (public/results/ablations.json) | r5 | 2:42.1 | 2:49.1 |
+| Real photos (CODEBRIM), said plainly weak; no CODEBRIM image shown | r6 | 2:49.4 | 2:56.7 |
+| False alarms on synthetic photos with no damage (public/results/clean/summary.json) | r7 | 3:08.5 | 3:16.0 |
 | Trained segmenter v1, held out (results/heldout_models.json): CODEBRIM recall against the classical engine, its chance recall, critical boxes, the clean set | r8, r7 | 2:56.9 | 3:16.0 |
 | Two real photos of our own (painted walls, no ground truth): the looks, the findings, what it missed (video/live/real.*, video/live/variants/IMG_2330/real.*) | real | 3:16.4 | 3:32.7 |
 | Failure cases: failures.json plates and their rules; one CODEBRIM case in words only | failures | 3:32.7 | 3:42.0 |
 | Limits and responsible use | limits | 3:42.0 | 3:49.1 |
-| Reproduce: make test, make eval, scripts/aws.sh | repro | 3:49.1 | 3:53.7 |
-| End card: live URL, repository, team | end | 3:53.7 | 3:59.9 |
+| Reproduce: make test, make eval, scripts/aws.sh | repro | 3:49.1 | 3:53.8 |
+| End card: live URL, repository, team | end | 3:53.8 | 4:00.0 |
 
 ### Chapters (from this build)
 
@@ -271,8 +271,8 @@ and AWS and Arm (the arm Lambda, its latency then and now).
 | Real photos (ours) | 3:16.4 | 3:32.7 | q1, q2 |
 | Failure cases | 3:32.7 | 3:42.0 | f1, f2 |
 | Limits | 3:42.0 | 3:49.1 | x1 |
-| Reproduce | 3:49.1 | 3:53.7 | y1 |
-| End | 3:53.7 | 3:59.9 | e1 |
+| Reproduce | 3:49.1 | 3:53.8 | y1 |
+| End | 3:53.8 | 4:00.0 | e1 |
 
 ### Every number and URL, with its source
 
@@ -393,10 +393,10 @@ and AWS and Arm (the arm Lambda, its latency then and now).
 | Lambda step p95 (ms), every smoke run with classical-v1 (min, max) | [67.7, 88.0] | `video/live/aws-smoke.log` | 'INFO latency' lines of the runs whose health says classical-v1: 2026-10-17T23:12:36Z, 2026-10-18T07:09:20Z, 2026-10-18T07:12:25Z |
 | smoke runs with classical-v1 | 3 | `video/live/aws-smoke.log` | count of those runs |
 | steps per smoke run with classical-v1 | [6] | `video/live/aws-smoke.log` | 'over N steps' |
-| Lambda step p95 (ms), every smoke run with onnx:drishyam_dacl10k.onnx (min, max) | [559.5, 1067.3] | `video/live/aws-smoke.log` | 'INFO latency' lines of the runs whose health says onnx:drishyam_dacl10k.onnx: 2026-10-20T19:32:23Z, 2026-10-20T19:35:07Z, 2026-10-20T19:49:31Z, 2026-10-20T19:50:52Z, 2026-10-20T19:53:48Z, 2026-10-20T19:54:14Z |
-| smoke runs with onnx:drishyam_dacl10k.onnx | 6 | `video/live/aws-smoke.log` | count of those runs |
-| steps per smoke run with onnx:drishyam_dacl10k.onnx | [5, 6] | `video/live/aws-smoke.log` | 'over N steps' |
-| the live site now: segmenter, commit (the last smoke run's /api/health) | {"segmenter": "onnx:drishyam_dacl10k.onnx", "commit": "38fcaeec678d5012b7f7b8f9c75e3270ae2d6ae4"} | `video/live/aws-smoke.log` | PASS health of the run 2026-10-20T19:54:14Z |
+| Lambda step p95 (ms), every smoke run with onnx:drishyam_dacl10k.onnx (min, max) | [524.7, 1138.9] | `video/live/aws-smoke.log` | 'INFO latency' lines of the runs whose health says onnx:drishyam_dacl10k.onnx: 2026-10-20T19:32:23Z, 2026-10-20T19:35:07Z, 2026-10-20T19:49:31Z, 2026-10-20T19:50:52Z, 2026-10-20T19:53:48Z, 2026-10-20T19:54:14Z, 2026-10-20T21:12:31Z, 2026-10-21T04:21:29Z, 2026-10-21T10:51:27Z, 2026-10-21T11:15:48Z |
+| smoke runs with onnx:drishyam_dacl10k.onnx | 10 | `video/live/aws-smoke.log` | count of those runs |
+| steps per smoke run with onnx:drishyam_dacl10k.onnx | [4, 5, 6] | `video/live/aws-smoke.log` | 'over N steps' |
+| the live site now: segmenter, commit (the last smoke run's /api/health) | {"segmenter": "onnx:drishyam_dacl10k.onnx", "commit": "4fe8e3014c5eae65bc2aeacaf683a7b34ca94a55"} | `video/live/aws-smoke.log` | PASS health of the run 2026-10-21T11:15:48Z |
 | work-order signature | HMAC-SHA256 | `docs/security.md` | 'Tampered or replayed work order' row |
 | stock aarch64 wheel custom HAL (GitHub arm64 runner, not Lambda) | YES (carotene (ver 0.0.1) KleidiCV (ver 26.03)) | `results/linux-aarch64/micro.json` | provenance.cv2_custom_hal |
 | US bridges (FHWA NBI 2026) | 624,939 | `docs/impact-sources.md` | section 1 Figure |
@@ -491,18 +491,18 @@ and AWS and Arm (the arm Lambda, its latency then and now).
 | a1 | 1:59.1 | CloudFront and a rate-limiting firewall front the arm Lambda; DynamoDB keeps kill flags, Secrets Manager the key. | CloudFront and a rate-limiting firewall front the arm Lambda; DynamoDB keeps kill flags, Secrets Manager the key. |
 | a3 | 2:06.8 | OpenCV does the looking: a pyramid, saliency, warp perspective as a pan-tilt-zoom camera, a blur gate, face blurring. | OpenCV does the looking: a pyramid, saliency, warpPerspective as a pan-tilt-zoom camera, a blur gate, face blurring. |
 | a4 | 2:15.0 | Recorded on the classical segmenter; the site now runs the trained one, on OpenCV five's new DNN engine. | Recorded on the classical segmenter; the site now runs the trained one, on OpenCV 5's new DNN engine. |
-| a5 | 2:22.5 | On Lambda a step took under ninety milliseconds at p ninety-five then, and under one point one seconds now. | On Lambda a step took under 90 ms at p95 then, and under 1.1 s now. |
+| a5 | 2:22.5 | On Lambda a step took under ninety milliseconds at p ninety-five then, and under one point two seconds now. | On Lambda a step took under 90 ms at p95 then, and under 1.2 s now. |
 | r1 | 2:29.6 | On two hundred synthetic photos it finds eighty-seven percent of full tiling's recall at twenty-six percent of the pixels, short of its ninety percent target. | On 200 synthetic photos it finds 87 % of full tiling's recall at 26 % of the pixels, short of its 90 % target. |
 | r3 | 2:39.6 | One downscaled pass does about as well. | One downscaled pass does about as well. |
-| r5 | 2:42.0 | Ablations: only dropping the survey look loses recall, and a random gaze order matches it on smaller photos. | Ablations: only dropping the survey look loses recall, and a random gaze order matches it on smaller photos. |
+| r5 | 2:42.1 | Ablations: only dropping the survey look loses recall, and a random gaze order matches it on smaller photos. | Ablations: only dropping the survey look loses recall, and a random gaze order matches it on smaller photos. |
 | r6 | 2:49.4 | On two hundred real CODEBRIM photos, every classical method finds about one defect in five; chance, one in eight. | On 200 real CODEBRIM photos, every classical method finds about 1 defect in 5; chance, 1 in 8. |
 | r8 | 2:56.9 | Held out, the trained segmenter finds forty-nine percent, two and a half times as many; but its boxes find thirty percent at random, and a person gets five and a half times the critical boxes. | Held out, the trained segmenter finds 49 %, two and a half times as many; but its boxes find 30 % at random, and a person gets five and a half times the critical boxes. |
-| r7 | 3:08.4 | On fifty-one undamaged synthetic photos, the classical engine flags something two times in three; the trained one, never. | On 51 undamaged synthetic photos, the classical engine flags something 2 times in 3; the trained one, never. |
+| r7 | 3:08.5 | On fifty-one undamaged synthetic photos, the classical engine flags something two times in three; the trained one, never. | On 51 undamaged synthetic photos, the classical engine flags something 2 times in 3; the trained one, never. |
 | q1 | 3:16.9 | Our own wall, no ground truth: no region was proposed, so the trained segmenter never ran, and missed the hairline crack. | Our own wall, no ground truth: no region was proposed, so the trained segmenter never ran, and missed the hairline crack. |
 | q2 | 3:25.2 | On a second wall, one close look flagged a crack on the lower of two we traced, and never looked closely at most of the wall. | On a second wall, one close look flagged a crack on the lower of two we traced, and never looked closely at most of the wall. |
 | f1 | 3:33.2 | Failures in the open: graffiti read as spalling, a formwork line as a crack, glare, and blur. | Failures in the open: graffiti read as spalling, a formwork line as a crack, glare, and blur. |
-| f2 | 3:39.3 | Two of these four rules are not built yet. | 2 of these four rules are not built yet. |
+| f2 | 3:39.4 | Two of these four rules are not built yet. | 2 of these four rules are not built yet. |
 | x1 | 3:42.5 | Pixels, not millimetres. AI-assisted, not an inspection. Only a person can approve. | Pixels, not millimetres. AI-assisted, not an inspection. Only a person can approve. |
 | y1 | 3:49.6 | Make test, make eval, and one script for the AWS stack. | make test, make eval, and one script for the AWS stack. |
-| e1 | 3:54.1 | Drishyam. It looks where it matters, and asks a human first. | Drishyam. It looks where it matters, and asks a human first. |
+| e1 | 3:54.2 | Drishyam. It looks where it matters, and asks a human first. | Drishyam. It looks where it matters, and asks a human first. |
 <!-- generated:end -->
