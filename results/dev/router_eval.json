@@ -1,0 +1,5294 @@
+{
+ "rule": "Stated before any paid router call (committed with this file). Backlog: synth_dev (60), synth_clean_dev (first 30) and CODEBRIM dev100, 190 photos in a seeded shuffle; per-photo engine v1 (onnx:drishyam_dacl10k.onnx, its FP16 net as the fast model) on the fixed costs of results/local-macos-x86-dacl10k-retime/micro.json, default per-photo caps, governor on. Router: Nova Lite (amazon.nova-lite-v1:0, us-east-1, temperature 0) with the fixed prompt of drishyam/router.py, one call per photo, cached. Primary metric: critical recall within budget, the share of the backlog's labelled critical defects that a critical finding queues for a person before the batch budget runs out, at a total budget of half the seconds the 190 jobs take run in full. The rule-triage arm and the router arm are charged their triage seconds, and the router arm also its Bedrock $ as seconds at the agent's $0.339 per hour. Gain: the paired 95 % bootstrap CI (1000 resamples of the photos within each of the three splits) of router / rule triage lies above 1, and so does that of router / random order (mean of 1000 seeded permutations; 100 per resample). Harm: either CI lies below 1. Otherwise: no measurable difference. Safety, reported with the verdict: the router's miss rate, the share of photos holding a labelled critical defect that it clears, with a Wilson 95 % CI; clearing is called safe only if that CI's upper bound is at most 0.05. Reported, not part of the verdict: the other budgets (a quarter, three quarters), the router arm with its $ not charged, IoU-only recall, time to the first queued critical defect, label agreement with the labels (Critical: a labelled critical defect; Requires zoom: any other labelled defect; Clear: no labelled defect), cost, latency and fallbacks by cause.",
+ "verdict": "harm",
+ "clearing": "not shown safe",
+ "primary_budget_frac": 0.5,
+ "n": 190,
+ "splits": {
+  "synth_dev": 60,
+  "clean": 30,
+  "codebrim_dev": 100
+ },
+ "file_order_seed": 0,
+ "dataset_gt_sha256": "77c3ddb63b1a71ca1a20d6d29984229a85d99e01b47876dbc7252416e7dbb6e5",
+ "dataset_images_sha256": "d5241da98b4776fe23dfb78be8a4f4d2ab3abe5300548633b39e783b1fd4c900",
+ "segmenter": "onnx:drishyam_dacl10k.onnx drishyam_dacl10k.onnx@c49416c10087 drishyam_dacl10k.fp16.onnx@f9b06fabbe47",
+ "micro_arm": "local-macos-x86-dacl10k-retime",
+ "router": {
+  "model": "amazon.nova-lite-v1:0",
+  "region": "us-east-1",
+  "prompt_key": "b07b0cca6b04"
+ },
+ "boot": {
+  "n": 1000,
+  "seed": 0,
+  "random_per_resample": 100
+ },
+ "gt_critical": 370,
+ "photos_with_gt_critical": 81,
+ "full_seconds": 487.1164279102936,
+ "triage_seconds": 7.320622910293608,
+ "budgets": {
+  "0.25": {
+   "budget_s": 121.7791069775734,
+   "router_seconds": 173.5467610619469,
+   "router": {
+    "recall": 0.0,
+    "recall_iou_only": 0.0,
+    "found": 0,
+    "gt": 370,
+    "ttfc_s": 121.7791069775734,
+    "ttfc_censored": true,
+    "reached": 0,
+    "false_critical": 0,
+    "spent_s": 180.86738397224053
+   },
+   "router_uncharged": {
+    "recall": 0.24864864864864866,
+    "recall_iou_only": 0.08648648648648649,
+    "found": 92,
+    "gt": 370,
+    "ttfc_s": 7.955312045077608,
+    "ttfc_censored": false,
+    "reached": 34,
+    "false_critical": 44,
+    "spent_s": 122.33549861019459
+   },
+   "triage": {
+    "recall": 0.17297297297297298,
+    "recall_iou_only": 0.06486486486486487,
+    "found": 64,
+    "gt": 370,
+    "ttfc_s": 7.989071910293608,
+    "ttfc_censored": false,
+    "reached": 32,
+    "false_critical": 39,
+    "spent_s": 121.78275694973773
+   },
+   "file": {
+    "recall": 0.13783783783783785,
+    "recall_iou_only": 0.04594594594594595,
+    "found": 51,
+    "gt": 370,
+    "ttfc_s": 3.0205300354798013,
+    "ttfc_censored": false,
+    "reached": 44,
+    "false_critical": 30,
+    "spent_s": 122.11757775399033
+   },
+   "random": {
+    "recall": 0.16995675675675675,
+    "recall_iou_only": 0.05161621621621622,
+    "ttfc_s": 6.127957963858268,
+    "reached": 48.005,
+    "false_critical": 24.919,
+    "found": 62.884
+   },
+   "ratios": {
+    "recall_vs_triage": 0.0,
+    "recall_vs_random": 0.0,
+    "uncharged_vs_triage": 1.4375,
+    "uncharged_vs_random": 1.4630112588257744,
+    "iou_vs_triage": 0.0,
+    "iou_vs_random": 0.0,
+    "ttfc_vs_triage": 15.243210769033857,
+    "ttfc_vs_random": 19.872705996974428,
+    "recall_vs_triage_ci": [
+     0.0,
+     0.0
+    ],
+    "recall_vs_random_ci": [
+     0.0,
+     0.0
+    ],
+    "uncharged_vs_triage_ci": [
+     1.0694,
+     3.3086
+    ],
+    "uncharged_vs_random_ci": [
+     0.9581,
+     2.5076
+    ],
+    "iou_vs_triage_ci": [
+     0.0,
+     0.0
+    ],
+    "iou_vs_random_ci": [
+     0.0,
+     0.0
+    ],
+    "ttfc_vs_triage_ci": [
+     2.2069,
+     15.8445
+    ],
+    "ttfc_vs_random_ci": [
+     14.1655,
+     27.9131
+    ]
+   }
+  },
+  "0.5": {
+   "budget_s": 243.5582139551468,
+   "router_seconds": 173.5467610619469,
+   "router": {
+    "recall": 0.1810810810810811,
+    "recall_iou_only": 0.05945945945945946,
+    "found": 67,
+    "gt": 370,
+    "ttfc_s": 181.50207310702453,
+    "ttfc_censored": false,
+    "reached": 19,
+    "false_critical": 27,
+    "spent_s": 243.71768462394954
+   },
+   "router_uncharged": {
+    "recall": 0.5648648648648649,
+    "recall_iou_only": 0.14864864864864866,
+    "found": 209,
+    "gt": 370,
+    "ttfc_s": 7.955312045077608,
+    "ttfc_censored": false,
+    "reached": 71,
+    "false_critical": 83,
+    "spent_s": 243.94446062736688
+   },
+   "triage": {
+    "recall": 0.4972972972972973,
+    "recall_iou_only": 0.12432432432432433,
+    "found": 184,
+    "gt": 370,
+    "ttfc_s": 7.989071910293608,
+    "ttfc_censored": false,
+    "reached": 64,
+    "false_critical": 77,
+    "spent_s": 244.03501560561642
+   },
+   "file": {
+    "recall": 0.3324324324324324,
+    "recall_iou_only": 0.0972972972972973,
+    "found": 123,
+    "gt": 370,
+    "ttfc_s": 3.0205300354798013,
+    "ttfc_censored": false,
+    "reached": 92,
+    "false_critical": 53,
+    "spent_s": 244.08877141979744
+   },
+   "random": {
+    "recall": 0.33084864864864866,
+    "recall_iou_only": 0.10202432432432434,
+    "ttfc_s": 6.127957963858268,
+    "reached": 95.533,
+    "false_critical": 49.906,
+    "found": 122.414
+   },
+   "ratios": {
+    "recall_vs_triage": 0.3641304347826087,
+    "recall_vs_random": 0.5473230186089827,
+    "uncharged_vs_triage": 1.1358695652173914,
+    "uncharged_vs_random": 1.707321058048916,
+    "iou_vs_triage": 0.4782608695652174,
+    "iou_vs_random": 0.5827968952819942,
+    "ttfc_vs_triage": 22.718793264730312,
+    "ttfc_vs_random": 29.61868768968312,
+    "recall_vs_triage_ci": [
+     0.1275,
+     0.6667
+    ],
+    "recall_vs_random_ci": [
+     0.2074,
+     0.8797
+    ],
+    "uncharged_vs_triage_ci": [
+     0.984,
+     1.4427
+    ],
+    "uncharged_vs_random_ci": [
+     1.5326,
+     1.8497
+    ],
+    "iou_vs_triage_ci": [
+     0.234,
+     0.7144
+    ],
+    "iou_vs_random_ci": [
+     0.2927,
+     0.8147
+    ],
+    "ttfc_vs_triage_ci": [
+     3.2421,
+     23.6042
+    ],
+    "ttfc_vs_random_ci": [
+     21.0338,
+     42.6477
+    ]
+   }
+  },
+  "0.75": {
+   "budget_s": 365.3373209327202,
+   "router_seconds": 173.5467610619469,
+   "router": {
+    "recall": 0.5324324324324324,
+    "recall_iou_only": 0.12972972972972974,
+    "found": 197,
+    "gt": 370,
+    "ttfc_s": 181.50207310702453,
+    "ttfc_censored": false,
+    "reached": 53,
+    "false_critical": 65,
+    "spent_s": 365.4131612793165
+   },
+   "router_uncharged": {
+    "recall": 0.6243243243243243,
+    "recall_iou_only": 0.1864864864864865,
+    "found": 231,
+    "gt": 370,
+    "ttfc_s": 7.955312045077608,
+    "ttfc_censored": false,
+    "reached": 137,
+    "false_critical": 86,
+    "spent_s": 365.73530514765906
+   },
+   "triage": {
+    "recall": 0.6081081081081081,
+    "recall_iou_only": 0.16756756756756758,
+    "found": 225,
+    "gt": 370,
+    "ttfc_s": 7.989071910293608,
+    "ttfc_censored": false,
+    "reached": 113,
+    "false_critical": 97,
+    "spent_s": 365.7137736059329
+   },
+   "file": {
+    "recall": 0.5,
+    "recall_iou_only": 0.14864864864864866,
+    "found": 185,
+    "gt": 370,
+    "ttfc_s": 3.0205300354798013,
+    "ttfc_censored": false,
+    "reached": 142,
+    "false_critical": 73,
+    "spent_s": 365.64041201422003
+   },
+   "random": {
+    "recall": 0.4926081081081081,
+    "recall_iou_only": 0.1520783783783784,
+    "ttfc_s": 6.127957963858268,
+    "reached": 143.051,
+    "false_critical": 74.394,
+    "found": 182.265
+   },
+   "ratios": {
+    "recall_vs_triage": 0.8755555555555555,
+    "recall_vs_random": 1.0808438262968754,
+    "uncharged_vs_triage": 1.0266666666666666,
+    "uncharged_vs_random": 1.2673854003785696,
+    "iou_vs_triage": 0.7741935483870968,
+    "iou_vs_random": 0.8530451936234871,
+    "ttfc_vs_triage": 22.718793264730312,
+    "ttfc_vs_random": 29.61868768968312,
+    "recall_vs_triage_ci": [
+     0.6727,
+     0.935
+    ],
+    "recall_vs_random_ci": [
+     0.8206,
+     1.1734
+    ],
+    "uncharged_vs_triage_ci": [
+     0.976,
+     1.0846
+    ],
+    "uncharged_vs_random_ci": [
+     1.1924,
+     1.3234
+    ],
+    "iou_vs_triage_ci": [
+     0.6458,
+     0.9054
+    ],
+    "iou_vs_random_ci": [
+     0.6926,
+     0.9913
+    ],
+    "ttfc_vs_triage_ci": [
+     3.2421,
+     23.6042
+    ],
+    "ttfc_vs_random_ci": [
+     21.3528,
+     41.9024
+    ]
+   }
+  }
+ },
+ "safety": {
+  "all": {
+   "photos_with_gt_critical": 81,
+   "cleared_with_gt_critical": 9,
+   "miss_rate": 0.1111111111111111,
+   "miss_rate_ci": [
+    0.0596,
+    0.1979
+   ],
+   "gt_critical_in_cleared": 16,
+   "gt_critical": 370,
+   "full_run_queued_in_cleared": 9,
+   "cleared": 36,
+   "photos": 190,
+   "clean_photos": 32,
+   "clean_cleared": 8,
+   "cleared_ids": [
+    "image_0000286",
+    "image_0000365",
+    "image_0000948",
+    "image_0001007",
+    "image_0001122",
+    "image_0001355",
+    "image_0001362",
+    "s0020",
+    "s0030"
+   ],
+   "miss_rate_boot_ci": [
+    0.0487,
+    0.1843
+   ]
+  },
+  "synth_dev": {
+   "photos_with_gt_critical": 29,
+   "cleared_with_gt_critical": 2,
+   "miss_rate": 0.06896551724137931,
+   "miss_rate_ci": [
+    0.0191,
+    0.2196
+   ],
+   "gt_critical_in_cleared": 3,
+   "gt_critical": 51,
+   "full_run_queued_in_cleared": 0,
+   "cleared": 10,
+   "photos": 60,
+   "clean_photos": 0,
+   "clean_cleared": 0,
+   "cleared_ids": [
+    "s0020",
+    "s0030"
+   ]
+  },
+  "clean": {
+   "photos_with_gt_critical": 0,
+   "cleared_with_gt_critical": 0,
+   "miss_rate": NaN,
+   "miss_rate_ci": [
+    null,
+    null
+   ],
+   "gt_critical_in_cleared": 0,
+   "gt_critical": 0,
+   "full_run_queued_in_cleared": 0,
+   "cleared": 7,
+   "photos": 30,
+   "clean_photos": 30,
+   "clean_cleared": 7,
+   "cleared_ids": []
+  },
+  "codebrim_dev": {
+   "photos_with_gt_critical": 52,
+   "cleared_with_gt_critical": 7,
+   "miss_rate": 0.1346153846153846,
+   "miss_rate_ci": [
+    0.0668,
+    0.2527
+   ],
+   "gt_critical_in_cleared": 13,
+   "gt_critical": 319,
+   "full_run_queued_in_cleared": 9,
+   "cleared": 19,
+   "photos": 100,
+   "clean_photos": 2,
+   "clean_cleared": 1,
+   "cleared_ids": [
+    "image_0000286",
+    "image_0000365",
+    "image_0000948",
+    "image_0001007",
+    "image_0001122",
+    "image_0001355",
+    "image_0001362"
+   ]
+  }
+ },
+ "agreement": {
+  "accuracy": 0.3684210526315789,
+  "confusion_gt_by_router": {
+   "Clear": {
+    "Clear": 8,
+    "Requires zoom": 24,
+    "Critical": 0
+   },
+   "Requires zoom": {
+    "Clear": 19,
+    "Requires zoom": 58,
+    "Critical": 0
+   },
+   "Critical": {
+    "Clear": 9,
+    "Requires zoom": 68,
+    "Critical": 4
+   }
+  },
+  "by_split": {
+   "synth_dev": {
+    "Clear": {
+     "Clear": 0,
+     "Requires zoom": 0,
+     "Critical": 0
+    },
+    "Requires zoom": {
+     "Clear": 8,
+     "Requires zoom": 23,
+     "Critical": 0
+    },
+    "Critical": {
+     "Clear": 2,
+     "Requires zoom": 27,
+     "Critical": 0
+    }
+   },
+   "clean": {
+    "Clear": {
+     "Clear": 7,
+     "Requires zoom": 23,
+     "Critical": 0
+    },
+    "Requires zoom": {
+     "Clear": 0,
+     "Requires zoom": 0,
+     "Critical": 0
+    },
+    "Critical": {
+     "Clear": 0,
+     "Requires zoom": 0,
+     "Critical": 0
+    }
+   },
+   "codebrim_dev": {
+    "Clear": {
+     "Clear": 1,
+     "Requires zoom": 1,
+     "Critical": 0
+    },
+    "Requires zoom": {
+     "Clear": 11,
+     "Requires zoom": 35,
+     "Critical": 0
+    },
+    "Critical": {
+     "Clear": 7,
+     "Requires zoom": 41,
+     "Critical": 4
+    }
+   }
+  }
+ },
+ "cost": {
+  "calls_this_run": 0,
+  "cached_this_run": 190,
+  "usd": 0.016342320000000004,
+  "usd_per_photo": 8.601221052631581e-05,
+  "input_tokens": 247240,
+  "output_tokens": 6283,
+  "router_seconds_charged": 173.5467610619469,
+  "full_jobs_usd_modelled": 0.045870130294885986,
+  "full_job_usd_per_photo": 0.00024142173839413676,
+  "status": {
+   "accepted": 190,
+   "rejected": 0,
+   "fallback": 0
+  },
+  "causes": {},
+  "latency_ms_this_run": {
+   "p50": null,
+   "p95": null,
+   "max": null
+  },
+  "price_per_1k_tokens": {
+   "input": 6.000000000000001e-05,
+   "output": 0.00024000000000000003
+  }
+ },
+ "check": {
+  "batch": "runs/eval-router-2/batch-a2fee4",
+  "replay_arm": "router_uncharged",
+  "reached": [
+   71,
+   71
+  ],
+  "found": [
+   209,
+   209
+  ],
+  "router_seconds": [
+   0.0,
+   173.5467610619469
+  ],
+  "cleared": [
+   36,
+   36
+  ],
+  "agrees": true
+ },
+ "per_photo": [
+  {
+   "id": "image_0000188",
+   "split": "codebrim_dev",
+   "file_index": 0,
+   "prior_sum": 3.3102,
+   "seconds": 2.385840900695801,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Clear",
+    "reason": "No visible damage, consistent texture, and no areas of concern.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 819,
+     "outputTokens": 32,
+     "totalTokens": 851
+    },
+    "usd": 5.682000000000001e-05,
+    "seconds": 0.6033982300884957
+   }
+  },
+  {
+   "id": "image_0001488",
+   "split": "codebrim_dev",
+   "file_index": 1,
+   "prior_sum": 4.6116,
+   "seconds": 2.907117134784,
+   "gt_label": "Critical",
+   "gt_critical": 5,
+   "queued_full_run": 2,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Potential rust stains and small surface irregularities that may require closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2036,
+     "outputTokens": 34,
+     "totalTokens": 2070
+    },
+    "usd": 0.00013032,
+    "seconds": 1.3839292035398232
+   }
+  },
+  {
+   "id": "image_0001004",
+   "split": "codebrim_dev",
+   "file_index": 2,
+   "prior_sum": 8.3249,
+   "seconds": 4.061437648,
+   "gt_label": "Clear",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Possible efflorescence and spalling visible, but not clear enough to confirm.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 1094,
+     "outputTokens": 38,
+     "totalTokens": 1132
+    },
+    "usd": 7.476000000000002e-05,
+    "seconds": 0.793911504424779
+   }
+  },
+  {
+   "id": "image_0000089",
+   "split": "codebrim_dev",
+   "file_index": 3,
+   "prior_sum": 2.8802,
+   "seconds": 2.386247232376099,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Potential crack or spall visible, but too small to judge at this size.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 819,
+     "outputTokens": 37,
+     "totalTokens": 856
+    },
+    "usd": 5.802000000000001e-05,
+    "seconds": 0.616141592920354
+   }
+  },
+  {
+   "id": "s0012",
+   "split": "clean",
+   "file_index": 4,
+   "prior_sum": 0.934,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Clear",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "A small, dark spot may be a surface defect.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 830,
+     "outputTokens": 32,
+     "totalTokens": 862
+    },
+    "usd": 5.7480000000000005e-05,
+    "seconds": 0.6104070796460177
+   }
+  },
+  {
+   "id": "image_0000756",
+   "split": "codebrim_dev",
+   "file_index": 5,
+   "prior_sum": 4.1055,
+   "seconds": 2.882264428224,
+   "gt_label": "Critical",
+   "gt_critical": 3,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Dark spots that may be spalling or rust stains.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2046,
+     "outputTokens": 33,
+     "totalTokens": 2079
+    },
+    "usd": 0.00013068000000000002,
+    "seconds": 1.3877522123893806
+   }
+  },
+  {
+   "id": "image_0001432",
+   "split": "codebrim_dev",
+   "file_index": 6,
+   "prior_sum": 7.1827,
+   "seconds": 3.475224134784,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Visible cracks and spalling that may require closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2037,
+     "outputTokens": 33,
+     "totalTokens": 2070
+    },
+    "usd": 0.00013014,
+    "seconds": 1.3820176991150441
+   }
+  },
+  {
+   "id": "image_0000321",
+   "split": "codebrim_dev",
+   "file_index": 7,
+   "prior_sum": 6.8162,
+   "seconds": 5.213305000000001,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Clear",
+    "reason": "No visible damage, just some stains and marks.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2211,
+     "outputTokens": 29,
+     "totalTokens": 2240
+    },
+    "usd": 0.00013962000000000002,
+    "seconds": 1.4826902654867258
+   }
+  },
+  {
+   "id": "image_0000286",
+   "split": "codebrim_dev",
+   "file_index": 8,
+   "prior_sum": 8.5399,
+   "seconds": 5.213305000000001,
+   "gt_label": "Critical",
+   "gt_critical": 1,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Clear",
+    "reason": "No visible concrete damage, only graffiti.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2198,
+     "outputTokens": 27,
+     "totalTokens": 2225
+    },
+    "usd": 0.00013836000000000002,
+    "seconds": 1.4693097345132744
+   }
+  },
+  {
+   "id": "image_0001123",
+   "split": "codebrim_dev",
+   "file_index": 9,
+   "prior_sum": 5.8459,
+   "seconds": 2.907117134784,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "White spots may be efflorescence or spalling.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2037,
+     "outputTokens": 33,
+     "totalTokens": 2070
+    },
+    "usd": 0.00013014,
+    "seconds": 1.3820176991150441
+   }
+  },
+  {
+   "id": "image_0001515",
+   "split": "codebrim_dev",
+   "file_index": 10,
+   "prior_sum": 6.9737,
+   "seconds": 2.907117134784,
+   "gt_label": "Critical",
+   "gt_critical": 4,
+   "queued_full_run": 2,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Visible spalling and rust stains that may indicate damage.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2036,
+     "outputTokens": 33,
+     "totalTokens": 2069
+    },
+    "usd": 0.00013008,
+    "seconds": 1.3813805309734513
+   }
+  },
+  {
+   "id": "image_0001140",
+   "split": "codebrim_dev",
+   "file_index": 11,
+   "prior_sum": 7.546,
+   "seconds": 2.907117134784,
+   "gt_label": "Critical",
+   "gt_critical": 3,
+   "queued_full_run": 1,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "White stains and discolorations may indicate efflorescence or other damage.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2035,
+     "outputTokens": 35,
+     "totalTokens": 2070
+    },
+    "usd": 0.00013050000000000003,
+    "seconds": 1.385840707964602
+   }
+  },
+  {
+   "id": "image_0000536",
+   "split": "codebrim_dev",
+   "file_index": 12,
+   "prior_sum": 5.656,
+   "seconds": 4.043331134784,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Potential rust stains on the concrete surface.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2036,
+     "outputTokens": 22,
+     "totalTokens": 2058
+    },
+    "usd": 0.00012744,
+    "seconds": 1.3533451327433628
+   }
+  },
+  {
+   "id": "s0001",
+   "split": "synth_dev",
+   "file_index": 13,
+   "prior_sum": 1.8435,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Clear",
+    "reason": "No visible damage, low saliency, and good image quality.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 830,
+     "outputTokens": 34,
+     "totalTokens": 864
+    },
+    "usd": 5.796000000000001e-05,
+    "seconds": 0.6155044247787611
+   }
+  },
+  {
+   "id": "s0036",
+   "split": "synth_dev",
+   "file_index": 14,
+   "prior_sum": 2.2256,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Potential stains and marks that may be damage, too small to judge at this size",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 38,
+     "totalTokens": 870
+    },
+    "usd": 5.904000000000001e-05,
+    "seconds": 0.6269734513274337
+   }
+  },
+  {
+   "id": "image_0001122",
+   "split": "codebrim_dev",
+   "file_index": 15,
+   "prior_sum": 5.3992,
+   "seconds": 2.907117134784,
+   "gt_label": "Critical",
+   "gt_critical": 4,
+   "queued_full_run": 3,
+   "route": {
+    "label": "Clear",
+    "reason": "No visible damage or potential issues in the photo.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2036,
+     "outputTokens": 29,
+     "totalTokens": 2065
+    },
+    "usd": 0.00012912,
+    "seconds": 1.3711858407079647
+   }
+  },
+  {
+   "id": "image_0000505",
+   "split": "codebrim_dev",
+   "file_index": 16,
+   "prior_sum": 2.0968,
+   "seconds": 2.907117134784,
+   "gt_label": "Critical",
+   "gt_critical": 2,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Photo is blurry, cannot determine if the small stain is a concern.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2035,
+     "outputTokens": 35,
+     "totalTokens": 2070
+    },
+    "usd": 0.00013050000000000003,
+    "seconds": 1.385840707964602
+   }
+  },
+  {
+   "id": "image_0001253",
+   "split": "codebrim_dev",
+   "file_index": 17,
+   "prior_sum": 6.0918,
+   "seconds": 4.043331134784,
+   "gt_label": "Critical",
+   "gt_critical": 15,
+   "queued_full_run": 15,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Visible rust stains that may indicate corrosion of reinforcing bars.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2038,
+     "outputTokens": 32,
+     "totalTokens": 2070
+    },
+    "usd": 0.00012996000000000004,
+    "seconds": 1.3801061946902657
+   }
+  },
+  {
+   "id": "s0006",
+   "split": "synth_dev",
+   "file_index": 18,
+   "prior_sum": 1.7798,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Critical",
+   "gt_critical": 3,
+   "queued_full_run": 2,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Potential spalls and rust stains present, too small to judge at this size",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 831,
+     "outputTokens": 38,
+     "totalTokens": 869
+    },
+    "usd": 5.898000000000001e-05,
+    "seconds": 0.6263362831858407
+   }
+  },
+  {
+   "id": "image_0000740",
+   "split": "codebrim_dev",
+   "file_index": 19,
+   "prior_sum": 3.7569,
+   "seconds": 2.314157428224,
+   "gt_label": "Critical",
+   "gt_critical": 2,
+   "queued_full_run": 2,
+   "route": {
+    "label": "Critical",
+    "reason": "Exposed reinforcing bars and spalling visible",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2037,
+     "outputTokens": 21,
+     "totalTokens": 2058
+    },
+    "usd": 0.00012726,
+    "seconds": 1.351433628318584
+   }
+  },
+  {
+   "id": "s0025",
+   "split": "clean",
+   "file_index": 20,
+   "prior_sum": 0.7535,
+   "seconds": 0.605394,
+   "gt_label": "Clear",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Clear",
+    "reason": "The photo shows a sound concrete surface with no visible damage.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 31,
+     "totalTokens": 863
+    },
+    "usd": 5.736000000000001e-05,
+    "seconds": 0.609132743362832
+   }
+  },
+  {
+   "id": "image_0000571",
+   "split": "codebrim_dev",
+   "file_index": 21,
+   "prior_sum": 3.9787,
+   "seconds": 2.3835176872558597,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Possible spalling or damage around the pipe area needs closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 831,
+     "outputTokens": 35,
+     "totalTokens": 866
+    },
+    "usd": 5.826000000000001e-05,
+    "seconds": 0.6186902654867257
+   }
+  },
+  {
+   "id": "image_0001552",
+   "split": "codebrim_dev",
+   "file_index": 22,
+   "prior_sum": 2.8317,
+   "seconds": 3.475224134784,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Image is blurry, making it difficult to assess for potential issues.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2036,
+     "outputTokens": 34,
+     "totalTokens": 2070
+    },
+    "usd": 0.00013032,
+    "seconds": 1.3839292035398232
+   }
+  },
+  {
+   "id": "image_0000749",
+   "split": "codebrim_dev",
+   "file_index": 23,
+   "prior_sum": 4.6635,
+   "seconds": 2.3835176872558597,
+   "gt_label": "Critical",
+   "gt_critical": 4,
+   "queued_full_run": 2,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Visible spalling and discoloration, possibly indicating damage.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 25,
+     "totalTokens": 857
+    },
+    "usd": 5.5920000000000013e-05,
+    "seconds": 0.5938407079646019
+   }
+  },
+  {
+   "id": "image_0000332",
+   "split": "codebrim_dev",
+   "file_index": 24,
+   "prior_sum": 4.1604,
+   "seconds": 3.508984,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Clear",
+    "reason": "The photo shows a wall, not a bridge surface.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2195,
+     "outputTokens": 30,
+     "totalTokens": 2225
+    },
+    "usd": 0.00013890000000000004,
+    "seconds": 1.475044247787611
+   }
+  },
+  {
+   "id": "image_0001507",
+   "split": "codebrim_dev",
+   "file_index": 25,
+   "prior_sum": 1.0505,
+   "seconds": 1.770903134784,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Photo is blurry, cannot determine if there are any damages.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2035,
+     "outputTokens": 33,
+     "totalTokens": 2068
+    },
+    "usd": 0.00013002,
+    "seconds": 1.3807433628318584
+   }
+  },
+  {
+   "id": "s0040",
+   "split": "synth_dev",
+   "file_index": 26,
+   "prior_sum": 2.0227,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Critical",
+   "gt_critical": 1,
+   "queued_full_run": 1,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Small dark spots that may be spalls or rust stains.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 34,
+     "totalTokens": 866
+    },
+    "usd": 5.808000000000001e-05,
+    "seconds": 0.6167787610619471
+   }
+  },
+  {
+   "id": "s0006",
+   "split": "clean",
+   "file_index": 27,
+   "prior_sum": 1.4343,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Clear",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Clear",
+    "reason": "No visible damage or anomalies detected in the photo.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 29,
+     "totalTokens": 861
+    },
+    "usd": 5.688000000000001e-05,
+    "seconds": 0.6040353982300886
+   }
+  },
+  {
+   "id": "s0011",
+   "split": "synth_dev",
+   "file_index": 28,
+   "prior_sum": 1.8583,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "A potential crack is visible but too small to judge at this size.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 35,
+     "totalTokens": 867
+    },
+    "usd": 5.832000000000001e-05,
+    "seconds": 0.6193274336283187
+   }
+  },
+  {
+   "id": "image_0001053",
+   "split": "codebrim_dev",
+   "file_index": 29,
+   "prior_sum": 8.3858,
+   "seconds": 5.765758648000001,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Clear",
+    "reason": "No visible damage, just two small holes and some wear.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 1092,
+     "outputTokens": 31,
+     "totalTokens": 1123
+    },
+    "usd": 7.296e-05,
+    "seconds": 0.7747964601769911
+   }
+  },
+  {
+   "id": "image_0001594",
+   "split": "codebrim_dev",
+   "file_index": 30,
+   "prior_sum": 8.0963,
+   "seconds": 3.475224134784,
+   "gt_label": "Critical",
+   "gt_critical": 4,
+   "queued_full_run": 1,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Potential rust stains and small surface irregularities that may require closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2036,
+     "outputTokens": 34,
+     "totalTokens": 2070
+    },
+    "usd": 0.00013032,
+    "seconds": 1.3839292035398232
+   }
+  },
+  {
+   "id": "s0013",
+   "split": "clean",
+   "file_index": 31,
+   "prior_sum": 1.3455,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Clear",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Potential cracks or damage are present, but too small to judge at this size.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 830,
+     "outputTokens": 37,
+     "totalTokens": 867
+    },
+    "usd": 5.868000000000001e-05,
+    "seconds": 0.6231504424778761
+   }
+  },
+  {
+   "id": "s0014",
+   "split": "synth_dev",
+   "file_index": 32,
+   "prior_sum": 1.815,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Critical",
+   "gt_critical": 2,
+   "queued_full_run": 1,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "There are small areas of discoloration and spalling that need closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 831,
+     "outputTokens": 36,
+     "totalTokens": 867
+    },
+    "usd": 5.850000000000001e-05,
+    "seconds": 0.6212389380530974
+   }
+  },
+  {
+   "id": "image_0000503",
+   "split": "codebrim_dev",
+   "file_index": 33,
+   "prior_sum": 4.6241,
+   "seconds": 3.475224134784,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "White streaks on the concrete surface may indicate efflorescence or other damage.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2036,
+     "outputTokens": 36,
+     "totalTokens": 2072
+    },
+    "usd": 0.0001308,
+    "seconds": 1.3890265486725664
+   }
+  },
+  {
+   "id": "image_0001069",
+   "split": "codebrim_dev",
+   "file_index": 34,
+   "prior_sum": 7.2623,
+   "seconds": 3.475224134784,
+   "gt_label": "Critical",
+   "gt_critical": 6,
+   "queued_full_run": 2,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Visible rust stains and potential spalling, but too small to judge at this size.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2035,
+     "outputTokens": 39,
+     "totalTokens": 2074
+    },
+    "usd": 0.00013146000000000002,
+    "seconds": 1.3960353982300886
+   }
+  },
+  {
+   "id": "image_0001184",
+   "split": "codebrim_dev",
+   "file_index": 35,
+   "prior_sum": 7.0357,
+   "seconds": 3.475224134784,
+   "gt_label": "Critical",
+   "gt_critical": 25,
+   "queued_full_run": 12,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Visible rust stains and potential spalling need closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2037,
+     "outputTokens": 33,
+     "totalTokens": 2070
+    },
+    "usd": 0.00013014,
+    "seconds": 1.3820176991150441
+   }
+  },
+  {
+   "id": "s0055",
+   "split": "synth_dev",
+   "file_index": 36,
+   "prior_sum": 1.4591,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Small dark spots may be spalls or rust stains, too small to judge at this size.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 41,
+     "totalTokens": 873
+    },
+    "usd": 5.976000000000001e-05,
+    "seconds": 0.6346194690265488
+   }
+  },
+  {
+   "id": "image_0001185",
+   "split": "codebrim_dev",
+   "file_index": 37,
+   "prior_sum": 7.9475,
+   "seconds": 3.475224134784,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Several areas of interest with potential damage or anomalies.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2037,
+     "outputTokens": 31,
+     "totalTokens": 2068
+    },
+    "usd": 0.00012966,
+    "seconds": 1.376920353982301
+   }
+  },
+  {
+   "id": "image_0001191",
+   "split": "codebrim_dev",
+   "file_index": 38,
+   "prior_sum": 7.6826,
+   "seconds": 4.043331134784,
+   "gt_label": "Critical",
+   "gt_critical": 5,
+   "queued_full_run": 3,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Potential spalling and other anomalies need closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2038,
+     "outputTokens": 32,
+     "totalTokens": 2070
+    },
+    "usd": 0.00012996000000000004,
+    "seconds": 1.3801061946902657
+   }
+  },
+  {
+   "id": "s0018",
+   "split": "synth_dev",
+   "file_index": 39,
+   "prior_sum": 1.903,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Critical",
+   "gt_critical": 4,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Several areas of interest with potential spalling or rust stains.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 831,
+     "outputTokens": 34,
+     "totalTokens": 865
+    },
+    "usd": 5.802000000000001e-05,
+    "seconds": 0.616141592920354
+   }
+  },
+  {
+   "id": "s0016",
+   "split": "clean",
+   "file_index": 40,
+   "prior_sum": 1.0413,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Clear",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Potential cracks or damage are present but too small to judge at this size",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 831,
+     "outputTokens": 28,
+     "totalTokens": 859
+    },
+    "usd": 5.658000000000001e-05,
+    "seconds": 0.600849557522124
+   }
+  },
+  {
+   "id": "image_0001097",
+   "split": "codebrim_dev",
+   "file_index": 41,
+   "prior_sum": 6.0514,
+   "seconds": 3.475224134784,
+   "gt_label": "Critical",
+   "gt_critical": 5,
+   "queued_full_run": 2,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Visible crack and rust, but not clear if they are significant issues.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2037,
+     "outputTokens": 35,
+     "totalTokens": 2072
+    },
+    "usd": 0.00013062000000000002,
+    "seconds": 1.3871150442477878
+   }
+  },
+  {
+   "id": "s0054",
+   "split": "synth_dev",
+   "file_index": 42,
+   "prior_sum": 2.5417,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "A small reddish stain is visible, which may be efflorescence or rust.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 37,
+     "totalTokens": 869
+    },
+    "usd": 5.880000000000001e-05,
+    "seconds": 0.6244247787610621
+   }
+  },
+  {
+   "id": "image_0000163",
+   "split": "codebrim_dev",
+   "file_index": 43,
+   "prior_sum": 5.7434,
+   "seconds": 2.98201166784668,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Potential rust stains and discolorations need closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 821,
+     "outputTokens": 31,
+     "totalTokens": 852
+    },
+    "usd": 5.670000000000001e-05,
+    "seconds": 0.6021238938053097
+   }
+  },
+  {
+   "id": "image_0000572",
+   "split": "codebrim_dev",
+   "file_index": 44,
+   "prior_sum": 1.4161,
+   "seconds": 2.3835176872558597,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Possible crack or spall near the edge of the concrete surface.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 34,
+     "totalTokens": 866
+    },
+    "usd": 5.808000000000001e-05,
+    "seconds": 0.6167787610619471
+   }
+  },
+  {
+   "id": "s0042",
+   "split": "synth_dev",
+   "file_index": 45,
+   "prior_sum": 2.3762,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Clear",
+    "reason": "The photo shows a uniform concrete surface with no visible damage.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 831,
+     "outputTokens": 31,
+     "totalTokens": 862
+    },
+    "usd": 5.730000000000001e-05,
+    "seconds": 0.608495575221239
+   }
+  },
+  {
+   "id": "image_0000664",
+   "split": "codebrim_dev",
+   "file_index": 46,
+   "prior_sum": 4.3274,
+   "seconds": 2.314157428224,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Visible crack and potential spalling near the object.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2037,
+     "outputTokens": 32,
+     "totalTokens": 2069
+    },
+    "usd": 0.0001299,
+    "seconds": 1.3794690265486726
+   }
+  },
+  {
+   "id": "s0011",
+   "split": "clean",
+   "file_index": 47,
+   "prior_sum": 1.8696,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Clear",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Potential crack or damage too small to judge at this size.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 831,
+     "outputTokens": 33,
+     "totalTokens": 864
+    },
+    "usd": 5.7780000000000006e-05,
+    "seconds": 0.6135929203539824
+   }
+  },
+  {
+   "id": "s0043",
+   "split": "synth_dev",
+   "file_index": 48,
+   "prior_sum": 1.3431,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Possible spall or crack detected, needs closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 831,
+     "outputTokens": 32,
+     "totalTokens": 863
+    },
+    "usd": 5.754000000000001e-05,
+    "seconds": 0.6110442477876107
+   }
+  },
+  {
+   "id": "image_0001355",
+   "split": "codebrim_dev",
+   "file_index": 49,
+   "prior_sum": 6.1748,
+   "seconds": 2.339010134784,
+   "gt_label": "Critical",
+   "gt_critical": 1,
+   "queued_full_run": 1,
+   "route": {
+    "label": "Clear",
+    "reason": "No visible damage, just some efflorescence and minor surface irregularities.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2037,
+     "outputTokens": 33,
+     "totalTokens": 2070
+    },
+    "usd": 0.00013014,
+    "seconds": 1.3820176991150441
+   }
+  },
+  {
+   "id": "image_0001588",
+   "split": "codebrim_dev",
+   "file_index": 50,
+   "prior_sum": 5.9972,
+   "seconds": 3.475224134784,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Visible cracks and spalling that may require closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2036,
+     "outputTokens": 33,
+     "totalTokens": 2069
+    },
+    "usd": 0.00013008,
+    "seconds": 1.3813805309734513
+   }
+  },
+  {
+   "id": "image_0001132",
+   "split": "codebrim_dev",
+   "file_index": 51,
+   "prior_sum": 6.4272,
+   "seconds": 4.043331134784,
+   "gt_label": "Critical",
+   "gt_critical": 9,
+   "queued_full_run": 7,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Potential cracks and discolorations need closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2036,
+     "outputTokens": 30,
+     "totalTokens": 2066
+    },
+    "usd": 0.00012936000000000002,
+    "seconds": 1.3737345132743364
+   }
+  },
+  {
+   "id": "image_0000703",
+   "split": "codebrim_dev",
+   "file_index": 52,
+   "prior_sum": 0.9423,
+   "seconds": 1.1916900615234376,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Potential damage is too small to judge at this size and the photo is blurry.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 30,
+     "totalTokens": 862
+    },
+    "usd": 5.712000000000001e-05,
+    "seconds": 0.6065840707964603
+   }
+  },
+  {
+   "id": "s0028",
+   "split": "clean",
+   "file_index": 53,
+   "prior_sum": 1.2682,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Clear",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Potential cracks or spalls detected by saliency map.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 35,
+     "totalTokens": 867
+    },
+    "usd": 5.832000000000001e-05,
+    "seconds": 0.6193274336283187
+   }
+  },
+  {
+   "id": "s0037",
+   "split": "synth_dev",
+   "file_index": 54,
+   "prior_sum": 2.3793,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Critical",
+   "gt_critical": 1,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "A small, dark spot is visible, which may be a crack or spall.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 830,
+     "outputTokens": 38,
+     "totalTokens": 868
+    },
+    "usd": 5.8920000000000005e-05,
+    "seconds": 0.6256991150442478
+   }
+  },
+  {
+   "id": "image_0001241",
+   "split": "codebrim_dev",
+   "file_index": 55,
+   "prior_sum": 4.6126,
+   "seconds": 4.043331134784,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Clear",
+    "reason": "No visible damage or anomalies in the concrete surface.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2035,
+     "outputTokens": 29,
+     "totalTokens": 2064
+    },
+    "usd": 0.00012906000000000001,
+    "seconds": 1.3705486725663716
+   }
+  },
+  {
+   "id": "image_0001299",
+   "split": "codebrim_dev",
+   "file_index": 56,
+   "prior_sum": 4.3806,
+   "seconds": 2.907117134784,
+   "gt_label": "Critical",
+   "gt_critical": 22,
+   "queued_full_run": 17,
+   "route": {
+    "label": "Critical",
+    "reason": "Exposed reinforcing bars and spalling visible.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2036,
+     "outputTokens": 29,
+     "totalTokens": 2065
+    },
+    "usd": 0.00012912,
+    "seconds": 1.3711858407079647
+   }
+  },
+  {
+   "id": "image_0000422",
+   "split": "codebrim_dev",
+   "file_index": 57,
+   "prior_sum": 5.3777,
+   "seconds": 3.475224134784,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Visible crack pattern that may require closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2036,
+     "outputTokens": 30,
+     "totalTokens": 2066
+    },
+    "usd": 0.00012936000000000002,
+    "seconds": 1.3737345132743364
+   }
+  },
+  {
+   "id": "image_0001421",
+   "split": "codebrim_dev",
+   "file_index": 58,
+   "prior_sum": 2.7737,
+   "seconds": 2.907117134784,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Clear",
+    "reason": "No visible damage or areas of concern in the photo.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2036,
+     "outputTokens": 30,
+     "totalTokens": 2066
+    },
+    "usd": 0.00012936000000000002,
+    "seconds": 1.3737345132743364
+   }
+  },
+  {
+   "id": "s0030",
+   "split": "clean",
+   "file_index": 59,
+   "prior_sum": 1.2784,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Clear",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Potential stains or damage present, but too small to judge at this size.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 829,
+     "outputTokens": 36,
+     "totalTokens": 865
+    },
+    "usd": 5.838000000000001e-05,
+    "seconds": 0.6199646017699115
+   }
+  },
+  {
+   "id": "s0009",
+   "split": "clean",
+   "file_index": 60,
+   "prior_sum": 1.5935,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Clear",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Possible efflorescence or other surface anomaly detected.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 828,
+     "outputTokens": 31,
+     "totalTokens": 859
+    },
+    "usd": 5.712000000000001e-05,
+    "seconds": 0.6065840707964603
+   }
+  },
+  {
+   "id": "image_0001331",
+   "split": "codebrim_dev",
+   "file_index": 61,
+   "prior_sum": 8.4103,
+   "seconds": 3.475224134784,
+   "gt_label": "Critical",
+   "gt_critical": 8,
+   "queued_full_run": 7,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Visible cracks and rust stains that may indicate damage.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2037,
+     "outputTokens": 31,
+     "totalTokens": 2068
+    },
+    "usd": 0.00012966,
+    "seconds": 1.376920353982301
+   }
+  },
+  {
+   "id": "image_0001295",
+   "split": "codebrim_dev",
+   "file_index": 62,
+   "prior_sum": 6.0677,
+   "seconds": 4.043331134784,
+   "gt_label": "Critical",
+   "gt_critical": 13,
+   "queued_full_run": 9,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Potential cracks and spalling visible, but too small to judge at this size.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2036,
+     "outputTokens": 38,
+     "totalTokens": 2074
+    },
+    "usd": 0.00013128,
+    "seconds": 1.3941238938053098
+   }
+  },
+  {
+   "id": "image_0000640",
+   "split": "codebrim_dev",
+   "file_index": 63,
+   "prior_sum": 3.4939,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Visible crack and potential spalling, but too small to judge at this size",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 30,
+     "totalTokens": 862
+    },
+    "usd": 5.712000000000001e-05,
+    "seconds": 0.6065840707964603
+   }
+  },
+  {
+   "id": "s0029",
+   "split": "synth_dev",
+   "file_index": 64,
+   "prior_sum": 1.7011,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Potential rust stain and small marks that may be cracks or spalls.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 36,
+     "totalTokens": 868
+    },
+    "usd": 5.856000000000001e-05,
+    "seconds": 0.6218761061946904
+   }
+  },
+  {
+   "id": "image_0001210",
+   "split": "codebrim_dev",
+   "file_index": 65,
+   "prior_sum": 6.655,
+   "seconds": 4.043331134784,
+   "gt_label": "Critical",
+   "gt_critical": 2,
+   "queued_full_run": 2,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Several areas of potential spalling and discoloration visible.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2037,
+     "outputTokens": 32,
+     "totalTokens": 2069
+    },
+    "usd": 0.0001299,
+    "seconds": 1.3794690265486726
+   }
+  },
+  {
+   "id": "image_0000083",
+   "split": "codebrim_dev",
+   "file_index": 66,
+   "prior_sum": 2.6579,
+   "seconds": 2.39036066784668,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Clear",
+    "reason": "The photo shows sound concrete with no visible damage or areas requiring closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 820,
+     "outputTokens": 34,
+     "totalTokens": 854
+    },
+    "usd": 5.7360000000000006e-05,
+    "seconds": 0.6091327433628319
+   }
+  },
+  {
+   "id": "image_0001592",
+   "split": "codebrim_dev",
+   "file_index": 67,
+   "prior_sum": 7.9316,
+   "seconds": 3.475224134784,
+   "gt_label": "Critical",
+   "gt_critical": 18,
+   "queued_full_run": 16,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Visible rust stains and potential spalling areas that need closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2036,
+     "outputTokens": 35,
+     "totalTokens": 2071
+    },
+    "usd": 0.00013056,
+    "seconds": 1.3864778761061947
+   }
+  },
+  {
+   "id": "image_0001007",
+   "split": "codebrim_dev",
+   "file_index": 68,
+   "prior_sum": 5.3659,
+   "seconds": 3.4933306479999997,
+   "gt_label": "Critical",
+   "gt_critical": 1,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Clear",
+    "reason": "No visible cracks, spalls, rust, or other damage.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 1091,
+     "outputTokens": 33,
+     "totalTokens": 1124
+    },
+    "usd": 7.338000000000002e-05,
+    "seconds": 0.7792566371681418
+   }
+  },
+  {
+   "id": "s0021",
+   "split": "clean",
+   "file_index": 69,
+   "prior_sum": 1.2848,
+   "seconds": 1.1970450000000001,
+   "gt_label": "Clear",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Clear",
+    "reason": "No visible damage, just some markings that are not related to concrete condition.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 34,
+     "totalTokens": 866
+    },
+    "usd": 5.808000000000001e-05,
+    "seconds": 0.6167787610619471
+   }
+  },
+  {
+   "id": "s0017",
+   "split": "synth_dev",
+   "file_index": 70,
+   "prior_sum": 1.1733,
+   "seconds": 1.1970450000000001,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Potential rust stains that need closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 29,
+     "totalTokens": 861
+    },
+    "usd": 5.688000000000001e-05,
+    "seconds": 0.6040353982300886
+   }
+  },
+  {
+   "id": "image_0000668",
+   "split": "codebrim_dev",
+   "file_index": 71,
+   "prior_sum": 0,
+   "seconds": 0.013743000000000002,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Photo is too dark to judge the condition of the bridge surface.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 821,
+     "outputTokens": 34,
+     "totalTokens": 855
+    },
+    "usd": 5.742000000000001e-05,
+    "seconds": 0.6097699115044248
+   }
+  },
+  {
+   "id": "image_0000577",
+   "split": "codebrim_dev",
+   "file_index": 72,
+   "prior_sum": 8.0767,
+   "seconds": 3.5758888593750005,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Clear",
+    "reason": "No visible signs of spalling, cracks, rust, or other damage.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 837,
+     "outputTokens": 28,
+     "totalTokens": 865
+    },
+    "usd": 5.694000000000001e-05,
+    "seconds": 0.6046725663716814
+   }
+  },
+  {
+   "id": "image_0000970",
+   "split": "codebrim_dev",
+   "file_index": 73,
+   "prior_sum": 5.457,
+   "seconds": 4.629544648,
+   "gt_label": "Critical",
+   "gt_critical": 1,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Potential rust stains and discolorations need closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 1104,
+     "outputTokens": 31,
+     "totalTokens": 1135
+    },
+    "usd": 7.368e-05,
+    "seconds": 0.7824424778761061
+   }
+  },
+  {
+   "id": "image_0000603",
+   "split": "codebrim_dev",
+   "file_index": 74,
+   "prior_sum": 8.3478,
+   "seconds": 2.9802686286621096,
+   "gt_label": "Critical",
+   "gt_critical": 3,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Potential efflorescence and discolorations that may indicate damage.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 833,
+     "outputTokens": 33,
+     "totalTokens": 866
+    },
+    "usd": 5.7900000000000005e-05,
+    "seconds": 0.6148672566371681
+   }
+  },
+  {
+   "id": "s0005",
+   "split": "clean",
+   "file_index": 75,
+   "prior_sum": 1.4557,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Clear",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "A small, potentially significant feature is detected, requiring closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 34,
+     "totalTokens": 866
+    },
+    "usd": 5.808000000000001e-05,
+    "seconds": 0.6167787610619471
+   }
+  },
+  {
+   "id": "s0031",
+   "split": "synth_dev",
+   "file_index": 76,
+   "prior_sum": 2.6766,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Critical",
+   "gt_critical": 2,
+   "queued_full_run": 1,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Several small, dark spots that may be damage or stains.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 33,
+     "totalTokens": 865
+    },
+    "usd": 5.784000000000001e-05,
+    "seconds": 0.6142300884955753
+   }
+  },
+  {
+   "id": "image_0000987",
+   "split": "codebrim_dev",
+   "file_index": 77,
+   "prior_sum": 6.9821,
+   "seconds": 4.629544648,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Clear",
+    "reason": "No visible damage, just minor spots and lines, and the photo is clear enough to judge.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 1093,
+     "outputTokens": 38,
+     "totalTokens": 1131
+    },
+    "usd": 7.47e-05,
+    "seconds": 0.7932743362831858
+   }
+  },
+  {
+   "id": "image_0001520",
+   "split": "codebrim_dev",
+   "file_index": 78,
+   "prior_sum": 6.5458,
+   "seconds": 3.475224134784,
+   "gt_label": "Critical",
+   "gt_critical": 9,
+   "queued_full_run": 9,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Visible cracks and spalling that may require closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2038,
+     "outputTokens": 33,
+     "totalTokens": 2071
+    },
+    "usd": 0.00013020000000000002,
+    "seconds": 1.3826548672566372
+   }
+  },
+  {
+   "id": "s0023",
+   "split": "clean",
+   "file_index": 79,
+   "prior_sum": 1.1904,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Clear",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "A small bright spot that could be a defect or efflorescence.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 831,
+     "outputTokens": 35,
+     "totalTokens": 866
+    },
+    "usd": 5.826000000000001e-05,
+    "seconds": 0.6186902654867257
+   }
+  },
+  {
+   "id": "image_0001582",
+   "split": "codebrim_dev",
+   "file_index": 80,
+   "prior_sum": 2.4559,
+   "seconds": 3.475224134784,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Potential stains and discolorations that may require closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2036,
+     "outputTokens": 32,
+     "totalTokens": 2068
+    },
+    "usd": 0.00012984000000000002,
+    "seconds": 1.3788318584070798
+   }
+  },
+  {
+   "id": "s0045",
+   "split": "synth_dev",
+   "file_index": 81,
+   "prior_sum": 1.7408,
+   "seconds": 1.1970450000000001,
+   "gt_label": "Critical",
+   "gt_critical": 2,
+   "queued_full_run": 1,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "A small stain and a small object that may be a crack or spall.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 831,
+     "outputTokens": 30,
+     "totalTokens": 861
+    },
+    "usd": 5.7060000000000006e-05,
+    "seconds": 0.6059469026548673
+   }
+  },
+  {
+   "id": "s0002",
+   "split": "synth_dev",
+   "file_index": 82,
+   "prior_sum": 1.8567,
+   "seconds": 1.1970450000000001,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Potential small cracks or damage not visible at this size",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 32,
+     "totalTokens": 864
+    },
+    "usd": 5.760000000000001e-05,
+    "seconds": 0.6116814159292037
+   }
+  },
+  {
+   "id": "image_0001092",
+   "split": "codebrim_dev",
+   "file_index": 83,
+   "prior_sum": 7.4843,
+   "seconds": 3.475224134784,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Visible crack and potential spalling, but too small to judge at this size.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2037,
+     "outputTokens": 38,
+     "totalTokens": 2075
+    },
+    "usd": 0.00013134,
+    "seconds": 1.3947610619469026
+   }
+  },
+  {
+   "id": "s0003",
+   "split": "synth_dev",
+   "file_index": 84,
+   "prior_sum": 1.533,
+   "seconds": 1.1970450000000001,
+   "gt_label": "Critical",
+   "gt_critical": 2,
+   "queued_full_run": 1,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "A small area of spalling is detected, requiring closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 831,
+     "outputTokens": 35,
+     "totalTokens": 866
+    },
+    "usd": 5.826000000000001e-05,
+    "seconds": 0.6186902654867257
+   }
+  },
+  {
+   "id": "image_0001320",
+   "split": "codebrim_dev",
+   "file_index": 85,
+   "prior_sum": 6.3529,
+   "seconds": 3.475224134784,
+   "gt_label": "Critical",
+   "gt_critical": 1,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "A small, dark area with a protruding object that may be a crack or spall.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2037,
+     "outputTokens": 39,
+     "totalTokens": 2076
+    },
+    "usd": 0.00013158,
+    "seconds": 1.3973097345132743
+   }
+  },
+  {
+   "id": "image_0001250",
+   "split": "codebrim_dev",
+   "file_index": 86,
+   "prior_sum": 7.0243,
+   "seconds": 3.475224134784,
+   "gt_label": "Critical",
+   "gt_critical": 1,
+   "queued_full_run": 1,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Several areas of discoloration and spalling visible, but too small to assess severity.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2037,
+     "outputTokens": 31,
+     "totalTokens": 2068
+    },
+    "usd": 0.00012966,
+    "seconds": 1.376920353982301
+   }
+  },
+  {
+   "id": "s0012",
+   "split": "synth_dev",
+   "file_index": 87,
+   "prior_sum": 2.8714,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Small dark spot that could be a crack or spall, needs closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 37,
+     "totalTokens": 869
+    },
+    "usd": 5.880000000000001e-05,
+    "seconds": 0.6244247787610621
+   }
+  },
+  {
+   "id": "image_0000092",
+   "split": "codebrim_dev",
+   "file_index": 88,
+   "prior_sum": 3.9421,
+   "seconds": 2.386247232376099,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Potential spalling and rust stains visible, but too small to judge at this size.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 818,
+     "outputTokens": 39,
+     "totalTokens": 857
+    },
+    "usd": 5.844e-05,
+    "seconds": 0.6206017699115044
+   }
+  },
+  {
+   "id": "s0049",
+   "split": "synth_dev",
+   "file_index": 89,
+   "prior_sum": 2.052,
+   "seconds": 1.1970450000000001,
+   "gt_label": "Critical",
+   "gt_critical": 2,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "A small spall is visible, but its size and condition are not clear.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 830,
+     "outputTokens": 37,
+     "totalTokens": 867
+    },
+    "usd": 5.868000000000001e-05,
+    "seconds": 0.6231504424778761
+   }
+  },
+  {
+   "id": "s0038",
+   "split": "synth_dev",
+   "file_index": 90,
+   "prior_sum": 2.6134,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Possible rust stains and a small anomaly that needs closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 33,
+     "totalTokens": 865
+    },
+    "usd": 5.784000000000001e-05,
+    "seconds": 0.6142300884955753
+   }
+  },
+  {
+   "id": "s0053",
+   "split": "synth_dev",
+   "file_index": 91,
+   "prior_sum": 2.3099,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Clear",
+    "reason": "The photo shows a uniform concrete surface with no visible damage or anomalies.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 33,
+     "totalTokens": 865
+    },
+    "usd": 5.784000000000001e-05,
+    "seconds": 0.6142300884955753
+   }
+  },
+  {
+   "id": "image_0001234",
+   "split": "codebrim_dev",
+   "file_index": 92,
+   "prior_sum": 8.4021,
+   "seconds": 3.475224134784,
+   "gt_label": "Critical",
+   "gt_critical": 2,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Potential rust stains and small surface irregularities need closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2037,
+     "outputTokens": 32,
+     "totalTokens": 2069
+    },
+    "usd": 0.0001299,
+    "seconds": 1.3794690265486726
+   }
+  },
+  {
+   "id": "s0016",
+   "split": "synth_dev",
+   "file_index": 93,
+   "prior_sum": 3.0782,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Potential rust stains and small marks that need closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 32,
+     "totalTokens": 864
+    },
+    "usd": 5.760000000000001e-05,
+    "seconds": 0.6116814159292037
+   }
+  },
+  {
+   "id": "s0029",
+   "split": "clean",
+   "file_index": 94,
+   "prior_sum": 2.784,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Clear",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "A potential crack is visible, but its nature cannot be determined at this size.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 830,
+     "outputTokens": 37,
+     "totalTokens": 867
+    },
+    "usd": 5.868000000000001e-05,
+    "seconds": 0.6231504424778761
+   }
+  },
+  {
+   "id": "image_0001389",
+   "split": "codebrim_dev",
+   "file_index": 95,
+   "prior_sum": 6.1437,
+   "seconds": 3.475224134784,
+   "gt_label": "Critical",
+   "gt_critical": 6,
+   "queued_full_run": 6,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Visible cracks and rust stains that may indicate damage.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2037,
+     "outputTokens": 31,
+     "totalTokens": 2068
+    },
+    "usd": 0.00012966,
+    "seconds": 1.376920353982301
+   }
+  },
+  {
+   "id": "s0024",
+   "split": "synth_dev",
+   "file_index": 96,
+   "prior_sum": 2.4704,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Small, potentially significant stains present, requiring closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 32,
+     "totalTokens": 864
+    },
+    "usd": 5.760000000000001e-05,
+    "seconds": 0.6116814159292037
+   }
+  },
+  {
+   "id": "image_0001419",
+   "split": "codebrim_dev",
+   "file_index": 97,
+   "prior_sum": 6.1484,
+   "seconds": 3.475224134784,
+   "gt_label": "Critical",
+   "gt_critical": 3,
+   "queued_full_run": 2,
+   "route": {
+    "label": "Critical",
+    "reason": "Exposed reinforcing bars and spalling visible.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2038,
+     "outputTokens": 29,
+     "totalTokens": 2067
+    },
+    "usd": 0.00012924000000000003,
+    "seconds": 1.3724601769911506
+   }
+  },
+  {
+   "id": "image_0000432",
+   "split": "codebrim_dev",
+   "file_index": 98,
+   "prior_sum": 6.9582,
+   "seconds": 3.475224134784,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Visible crack and spalling, but too small to judge at this size",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2037,
+     "outputTokens": 29,
+     "totalTokens": 2066
+    },
+    "usd": 0.00012918,
+    "seconds": 1.3718230088495575
+   }
+  },
+  {
+   "id": "s0039",
+   "split": "synth_dev",
+   "file_index": 99,
+   "prior_sum": 1.7525,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Critical",
+   "gt_critical": 1,
+   "queued_full_run": 1,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Potential cracks and spalls detected, but too small to judge at this size.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 38,
+     "totalTokens": 870
+    },
+    "usd": 5.904000000000001e-05,
+    "seconds": 0.6269734513274337
+   }
+  },
+  {
+   "id": "image_0000364",
+   "split": "codebrim_dev",
+   "file_index": 100,
+   "prior_sum": 5.3494,
+   "seconds": 4.077091,
+   "gt_label": "Critical",
+   "gt_critical": 2,
+   "queued_full_run": 1,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Visible spalling and rust stains that may require closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2195,
+     "outputTokens": 34,
+     "totalTokens": 2229
+    },
+    "usd": 0.00013986000000000003,
+    "seconds": 1.4852389380530977
+   }
+  },
+  {
+   "id": "s0051",
+   "split": "synth_dev",
+   "file_index": 101,
+   "prior_sum": 1.3587,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Clear",
+    "reason": "The photo shows a uniform concrete surface with no visible damage or anomalies.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 33,
+     "totalTokens": 865
+    },
+    "usd": 5.784000000000001e-05,
+    "seconds": 0.6142300884955753
+   }
+  },
+  {
+   "id": "s0056",
+   "split": "synth_dev",
+   "file_index": 102,
+   "prior_sum": 1.6475,
+   "seconds": 1.1970450000000001,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Potential crack or damage visible, but too small to judge at this size.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 831,
+     "outputTokens": 36,
+     "totalTokens": 867
+    },
+    "usd": 5.850000000000001e-05,
+    "seconds": 0.6212389380530974
+   }
+  },
+  {
+   "id": "s0021",
+   "split": "synth_dev",
+   "file_index": 103,
+   "prior_sum": 2.2827,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Critical",
+   "gt_critical": 1,
+   "queued_full_run": 1,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Small, dark spots that could be damage or debris, requiring closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 830,
+     "outputTokens": 36,
+     "totalTokens": 866
+    },
+    "usd": 5.844e-05,
+    "seconds": 0.6206017699115044
+   }
+  },
+  {
+   "id": "s0010",
+   "split": "synth_dev",
+   "file_index": 104,
+   "prior_sum": 2.0844,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Critical",
+   "gt_critical": 2,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "A small area of discoloration and potential spalling is visible.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 831,
+     "outputTokens": 34,
+     "totalTokens": 865
+    },
+    "usd": 5.802000000000001e-05,
+    "seconds": 0.616141592920354
+   }
+  },
+  {
+   "id": "s0035",
+   "split": "synth_dev",
+   "file_index": 105,
+   "prior_sum": 2.0238,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Critical",
+   "gt_critical": 1,
+   "queued_full_run": 1,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Potential crack and spalling, too small to judge at this size",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 36,
+     "totalTokens": 868
+    },
+    "usd": 5.856000000000001e-05,
+    "seconds": 0.6218761061946904
+   }
+  },
+  {
+   "id": "s0015",
+   "split": "clean",
+   "file_index": 106,
+   "prior_sum": 1.8749,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Clear",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Clear",
+    "reason": "The photo shows a uniform concrete surface with no visible damage or anomalies.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 831,
+     "outputTokens": 33,
+     "totalTokens": 864
+    },
+    "usd": 5.7780000000000006e-05,
+    "seconds": 0.6135929203539824
+   }
+  },
+  {
+   "id": "s0028",
+   "split": "synth_dev",
+   "file_index": 107,
+   "prior_sum": 1.2692,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Critical",
+   "gt_critical": 2,
+   "queued_full_run": 1,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "A small area of spalling is visible, but its nature is unclear at this size.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 40,
+     "totalTokens": 872
+    },
+    "usd": 5.952000000000001e-05,
+    "seconds": 0.632070796460177
+   }
+  },
+  {
+   "id": "image_0000948",
+   "split": "codebrim_dev",
+   "file_index": 108,
+   "prior_sum": 6.2709,
+   "seconds": 5.197651648000001,
+   "gt_label": "Critical",
+   "gt_critical": 3,
+   "queued_full_run": 3,
+   "route": {
+    "label": "Clear",
+    "reason": "No visible cracks, spalls, rust, or other damage.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 1093,
+     "outputTokens": 33,
+     "totalTokens": 1126
+    },
+    "usd": 7.350000000000001e-05,
+    "seconds": 0.7805309734513276
+   }
+  },
+  {
+   "id": "s0058",
+   "split": "synth_dev",
+   "file_index": 109,
+   "prior_sum": 1.5907,
+   "seconds": 1.1970450000000001,
+   "gt_label": "Critical",
+   "gt_critical": 2,
+   "queued_full_run": 1,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Potential spall and rust stains detected, too small to judge at this size.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 37,
+     "totalTokens": 869
+    },
+    "usd": 5.880000000000001e-05,
+    "seconds": 0.6244247787610621
+   }
+  },
+  {
+   "id": "s0001",
+   "split": "clean",
+   "file_index": 110,
+   "prior_sum": 1.1489,
+   "seconds": 1.1970450000000001,
+   "gt_label": "Clear",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Potential small damage or stain that needs closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 31,
+     "totalTokens": 863
+    },
+    "usd": 5.736000000000001e-05,
+    "seconds": 0.609132743362832
+   }
+  },
+  {
+   "id": "s0026",
+   "split": "synth_dev",
+   "file_index": 111,
+   "prior_sum": 1.8753,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Critical",
+   "gt_critical": 1,
+   "queued_full_run": 1,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Potential spalling or rust stains that are too small to judge at this size.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 38,
+     "totalTokens": 870
+    },
+    "usd": 5.904000000000001e-05,
+    "seconds": 0.6269734513274337
+   }
+  },
+  {
+   "id": "s0044",
+   "split": "synth_dev",
+   "file_index": 112,
+   "prior_sum": 2.4622,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Small dark spots that could be damage need closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 831,
+     "outputTokens": 32,
+     "totalTokens": 863
+    },
+    "usd": 5.754000000000001e-05,
+    "seconds": 0.6110442477876107
+   }
+  },
+  {
+   "id": "image_0001087",
+   "split": "codebrim_dev",
+   "file_index": 113,
+   "prior_sum": 6.9512,
+   "seconds": 3.475224134784,
+   "gt_label": "Critical",
+   "gt_critical": 1,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Visible crack with rust, potential damage needs closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2036,
+     "outputTokens": 32,
+     "totalTokens": 2068
+    },
+    "usd": 0.00012984000000000002,
+    "seconds": 1.3788318584070798
+   }
+  },
+  {
+   "id": "s0009",
+   "split": "synth_dev",
+   "file_index": 114,
+   "prior_sum": 2.019,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "A small, faint stain is visible, which may be a concern.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 831,
+     "outputTokens": 35,
+     "totalTokens": 866
+    },
+    "usd": 5.826000000000001e-05,
+    "seconds": 0.6186902654867257
+   }
+  },
+  {
+   "id": "s0041",
+   "split": "synth_dev",
+   "file_index": 115,
+   "prior_sum": 1.5568,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "A small stain is visible, but its nature cannot be determined at this size.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 37,
+     "totalTokens": 869
+    },
+    "usd": 5.880000000000001e-05,
+    "seconds": 0.6244247787610621
+   }
+  },
+  {
+   "id": "image_0000768",
+   "split": "codebrim_dev",
+   "file_index": 116,
+   "prior_sum": 4.0862,
+   "seconds": 2.9802686286621096,
+   "gt_label": "Critical",
+   "gt_critical": 9,
+   "queued_full_run": 2,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Visible spalling and rust stains that require closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 830,
+     "outputTokens": 33,
+     "totalTokens": 863
+    },
+    "usd": 5.772e-05,
+    "seconds": 0.6129557522123894
+   }
+  },
+  {
+   "id": "image_0001384",
+   "split": "codebrim_dev",
+   "file_index": 117,
+   "prior_sum": 5.9505,
+   "seconds": 3.475224134784,
+   "gt_label": "Critical",
+   "gt_critical": 25,
+   "queued_full_run": 20,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Visible cracks and rust stains that may require closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2037,
+     "outputTokens": 32,
+     "totalTokens": 2069
+    },
+    "usd": 0.0001299,
+    "seconds": 1.3794690265486726
+   }
+  },
+  {
+   "id": "s0048",
+   "split": "synth_dev",
+   "file_index": 118,
+   "prior_sum": 2.1715,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Small spots and stains that may be damage, too small to judge at this size",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 38,
+     "totalTokens": 870
+    },
+    "usd": 5.904000000000001e-05,
+    "seconds": 0.6269734513274337
+   }
+  },
+  {
+   "id": "s0024",
+   "split": "clean",
+   "file_index": 119,
+   "prior_sum": 1.8742,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Clear",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "A small dark spot is visible, possibly a crack or spall.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 35,
+     "totalTokens": 867
+    },
+    "usd": 5.832000000000001e-05,
+    "seconds": 0.6193274336283187
+   }
+  },
+  {
+   "id": "s0023",
+   "split": "synth_dev",
+   "file_index": 120,
+   "prior_sum": 1.1483,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Critical",
+   "gt_critical": 2,
+   "queued_full_run": 1,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "A potential spall is detected, but its size and condition are unclear.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 36,
+     "totalTokens": 868
+    },
+    "usd": 5.856000000000001e-05,
+    "seconds": 0.6218761061946904
+   }
+  },
+  {
+   "id": "s0020",
+   "split": "synth_dev",
+   "file_index": 121,
+   "prior_sum": 2.6298,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Critical",
+   "gt_critical": 2,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Clear",
+    "reason": "The photo shows a sound concrete surface with no visible damage.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 31,
+     "totalTokens": 863
+    },
+    "usd": 5.736000000000001e-05,
+    "seconds": 0.609132743362832
+   }
+  },
+  {
+   "id": "image_0001332",
+   "split": "codebrim_dev",
+   "file_index": 122,
+   "prior_sum": 5.3835,
+   "seconds": 2.907117134784,
+   "gt_label": "Critical",
+   "gt_critical": 5,
+   "queued_full_run": 4,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Visible crack and spalling, but too small to judge at this size.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2036,
+     "outputTokens": 37,
+     "totalTokens": 2073
+    },
+    "usd": 0.00013104000000000002,
+    "seconds": 1.391575221238938
+   }
+  },
+  {
+   "id": "s0007",
+   "split": "synth_dev",
+   "file_index": 123,
+   "prior_sum": 2.0555,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "A small rust stain is present, but its significance cannot be determined at this size.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 830,
+     "outputTokens": 38,
+     "totalTokens": 868
+    },
+    "usd": 5.8920000000000005e-05,
+    "seconds": 0.6256991150442478
+   }
+  },
+  {
+   "id": "image_0001333",
+   "split": "codebrim_dev",
+   "file_index": 124,
+   "prior_sum": 7.4676,
+   "seconds": 3.475224134784,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Visible cracks and spalls that need closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2036,
+     "outputTokens": 32,
+     "totalTokens": 2068
+    },
+    "usd": 0.00012984000000000002,
+    "seconds": 1.3788318584070798
+   }
+  },
+  {
+   "id": "s0019",
+   "split": "synth_dev",
+   "file_index": 125,
+   "prior_sum": 1.8236,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Critical",
+   "gt_critical": 1,
+   "queued_full_run": 1,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Several highlighted areas may indicate potential damage or anomalies.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 31,
+     "totalTokens": 863
+    },
+    "usd": 5.736000000000001e-05,
+    "seconds": 0.609132743362832
+   }
+  },
+  {
+   "id": "image_0000532",
+   "split": "codebrim_dev",
+   "file_index": 126,
+   "prior_sum": 5.1527,
+   "seconds": 2.907117134784,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "White streaks may be efflorescence or other damage.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2033,
+     "outputTokens": 32,
+     "totalTokens": 2065
+    },
+    "usd": 0.00012966000000000003,
+    "seconds": 1.376920353982301
+   }
+  },
+  {
+   "id": "image_0001031",
+   "split": "codebrim_dev",
+   "file_index": 127,
+   "prior_sum": 6.6121,
+   "seconds": 4.061437648,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Visible spalling and rust stains that may indicate damage.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 1093,
+     "outputTokens": 33,
+     "totalTokens": 1126
+    },
+    "usd": 7.350000000000001e-05,
+    "seconds": 0.7805309734513276
+   }
+  },
+  {
+   "id": "s0005",
+   "split": "synth_dev",
+   "file_index": 128,
+   "prior_sum": 1.8528,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Clear",
+    "reason": "The photo shows a uniform concrete surface with no visible damage or anomalies.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 831,
+     "outputTokens": 33,
+     "totalTokens": 864
+    },
+    "usd": 5.7780000000000006e-05,
+    "seconds": 0.6135929203539824
+   }
+  },
+  {
+   "id": "image_0001292",
+   "split": "codebrim_dev",
+   "file_index": 129,
+   "prior_sum": 7.6486,
+   "seconds": 2.907117134784,
+   "gt_label": "Critical",
+   "gt_critical": 5,
+   "queued_full_run": 2,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Visible rust stains and potential spalling require closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2038,
+     "outputTokens": 33,
+     "totalTokens": 2071
+    },
+    "usd": 0.00013020000000000002,
+    "seconds": 1.3826548672566372
+   }
+  },
+  {
+   "id": "s0022",
+   "split": "clean",
+   "file_index": 130,
+   "prior_sum": 1.0926,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Clear",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Potential crack or damage visible, but too small to judge at this size",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 36,
+     "totalTokens": 868
+    },
+    "usd": 5.856000000000001e-05,
+    "seconds": 0.6218761061946904
+   }
+  },
+  {
+   "id": "s0020",
+   "split": "clean",
+   "file_index": 131,
+   "prior_sum": 1.4924,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Clear",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Potential cracks or spalls identified by the saliency map.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 831,
+     "outputTokens": 36,
+     "totalTokens": 867
+    },
+    "usd": 5.850000000000001e-05,
+    "seconds": 0.6212389380530974
+   }
+  },
+  {
+   "id": "s0026",
+   "split": "clean",
+   "file_index": 132,
+   "prior_sum": 1.3954,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Clear",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Clear",
+    "reason": "The photo shows a sound concrete surface with no visible damage.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 31,
+     "totalTokens": 863
+    },
+    "usd": 5.736000000000001e-05,
+    "seconds": 0.609132743362832
+   }
+  },
+  {
+   "id": "s0004",
+   "split": "synth_dev",
+   "file_index": 133,
+   "prior_sum": 2.5114,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Critical",
+   "gt_critical": 1,
+   "queued_full_run": 1,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "A small dark spot is visible, which may be a crack or spall.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 829,
+     "outputTokens": 37,
+     "totalTokens": 866
+    },
+    "usd": 5.862000000000001e-05,
+    "seconds": 0.6225132743362833
+   }
+  },
+  {
+   "id": "image_0001215",
+   "split": "codebrim_dev",
+   "file_index": 134,
+   "prior_sum": 5.8264,
+   "seconds": 3.475224134784,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Potential spalling and discolorations that need closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2036,
+     "outputTokens": 33,
+     "totalTokens": 2069
+    },
+    "usd": 0.00013008,
+    "seconds": 1.3813805309734513
+   }
+  },
+  {
+   "id": "s0007",
+   "split": "clean",
+   "file_index": 135,
+   "prior_sum": 1.5672,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Clear",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Potential small cracks or stains that need closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 31,
+     "totalTokens": 863
+    },
+    "usd": 5.736000000000001e-05,
+    "seconds": 0.609132743362832
+   }
+  },
+  {
+   "id": "image_0001080",
+   "split": "codebrim_dev",
+   "file_index": 136,
+   "prior_sum": 5.1282,
+   "seconds": 4.043331134784,
+   "gt_label": "Critical",
+   "gt_critical": 3,
+   "queued_full_run": 3,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "A visible crack in the concrete surface.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2038,
+     "outputTokens": 29,
+     "totalTokens": 2067
+    },
+    "usd": 0.00012924000000000003,
+    "seconds": 1.3724601769911506
+   }
+  },
+  {
+   "id": "image_0000514",
+   "split": "codebrim_dev",
+   "file_index": 137,
+   "prior_sum": 3.1854,
+   "seconds": 3.475224134784,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Potential rust stains and small discolorations that need closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2034,
+     "outputTokens": 33,
+     "totalTokens": 2067
+    },
+    "usd": 0.00012996,
+    "seconds": 1.3801061946902655
+   }
+  },
+  {
+   "id": "image_0001466",
+   "split": "codebrim_dev",
+   "file_index": 138,
+   "prior_sum": 7.6319,
+   "seconds": 2.907117134784,
+   "gt_label": "Critical",
+   "gt_critical": 12,
+   "queued_full_run": 10,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Visible rust stains and spalling, but not clear enough to determine severity.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2037,
+     "outputTokens": 37,
+     "totalTokens": 2074
+    },
+    "usd": 0.00013110000000000002,
+    "seconds": 1.392212389380531
+   }
+  },
+  {
+   "id": "image_0001017",
+   "split": "codebrim_dev",
+   "file_index": 139,
+   "prior_sum": 6.8976,
+   "seconds": 5.765758648000001,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Several small spots and holes that may be damage, too small to judge at this size",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 1090,
+     "outputTokens": 39,
+     "totalTokens": 1129
+    },
+    "usd": 7.476000000000001e-05,
+    "seconds": 0.7939115044247789
+   }
+  },
+  {
+   "id": "s0008",
+   "split": "clean",
+   "file_index": 140,
+   "prior_sum": 1.8767,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Clear",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "A small, dark spot is visible, possibly a stain or minor damage.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 830,
+     "outputTokens": 36,
+     "totalTokens": 866
+    },
+    "usd": 5.844e-05,
+    "seconds": 0.6206017699115044
+   }
+  },
+  {
+   "id": "image_0001114",
+   "split": "codebrim_dev",
+   "file_index": 141,
+   "prior_sum": 4.403,
+   "seconds": 3.475224134784,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Visible cracks and potential spalling areas that need closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2034,
+     "outputTokens": 34,
+     "totalTokens": 2068
+    },
+    "usd": 0.00013020000000000002,
+    "seconds": 1.3826548672566372
+   }
+  },
+  {
+   "id": "s0025",
+   "split": "synth_dev",
+   "file_index": 142,
+   "prior_sum": 3.1296,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Critical",
+   "gt_critical": 1,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Potential rust stains and small spalls that need closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 34,
+     "totalTokens": 866
+    },
+    "usd": 5.808000000000001e-05,
+    "seconds": 0.6167787610619471
+   }
+  },
+  {
+   "id": "image_0001566",
+   "split": "codebrim_dev",
+   "file_index": 143,
+   "prior_sum": 7.7056,
+   "seconds": 3.475224134784,
+   "gt_label": "Critical",
+   "gt_critical": 1,
+   "queued_full_run": 1,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Several small rust stains and cracks are visible, requiring closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2038,
+     "outputTokens": 27,
+     "totalTokens": 2065
+    },
+    "usd": 0.00012876000000000003,
+    "seconds": 1.3673628318584072
+   }
+  },
+  {
+   "id": "s0022",
+   "split": "synth_dev",
+   "file_index": 144,
+   "prior_sum": 2.7307,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Small dark spot, possibly a crack or spall, needs closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 831,
+     "outputTokens": 36,
+     "totalTokens": 867
+    },
+    "usd": 5.850000000000001e-05,
+    "seconds": 0.6212389380530974
+   }
+  },
+  {
+   "id": "image_0001156",
+   "split": "codebrim_dev",
+   "file_index": 145,
+   "prior_sum": 5.8658,
+   "seconds": 3.475224134784,
+   "gt_label": "Critical",
+   "gt_critical": 20,
+   "queued_full_run": 18,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Visible reinforcing bars, potential spalling, and rust stains need closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2037,
+     "outputTokens": 37,
+     "totalTokens": 2074
+    },
+    "usd": 0.00013110000000000002,
+    "seconds": 1.392212389380531
+   }
+  },
+  {
+   "id": "image_0000832",
+   "split": "codebrim_dev",
+   "file_index": 146,
+   "prior_sum": 8.1168,
+   "seconds": 4.629544648,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Several small spots and discolorations that may be damage.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 1106,
+     "outputTokens": 32,
+     "totalTokens": 1138
+    },
+    "usd": 7.404000000000002e-05,
+    "seconds": 0.7862654867256639
+   }
+  },
+  {
+   "id": "s0003",
+   "split": "clean",
+   "file_index": 147,
+   "prior_sum": 1.3033,
+   "seconds": 1.1970450000000001,
+   "gt_label": "Clear",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Clear",
+    "reason": "No visible damage, just a bright spot and some green marks.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 32,
+     "totalTokens": 864
+    },
+    "usd": 5.760000000000001e-05,
+    "seconds": 0.6116814159292037
+   }
+  },
+  {
+   "id": "s0046",
+   "split": "synth_dev",
+   "file_index": 148,
+   "prior_sum": 2.4155,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Potential rust stains and possible cracks need closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 31,
+     "totalTokens": 863
+    },
+    "usd": 5.736000000000001e-05,
+    "seconds": 0.609132743362832
+   }
+  },
+  {
+   "id": "s0027",
+   "split": "clean",
+   "file_index": 149,
+   "prior_sum": 2.758,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Clear",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "A potential crack is present, requiring closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 831,
+     "outputTokens": 31,
+     "totalTokens": 862
+    },
+    "usd": 5.730000000000001e-05,
+    "seconds": 0.608495575221239
+   }
+  },
+  {
+   "id": "s0004",
+   "split": "clean",
+   "file_index": 150,
+   "prior_sum": 1.844,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Clear",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "A small dark spot is visible, possibly a crack or spall.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 831,
+     "outputTokens": 35,
+     "totalTokens": 866
+    },
+    "usd": 5.826000000000001e-05,
+    "seconds": 0.6186902654867257
+   }
+  },
+  {
+   "id": "image_0000761",
+   "split": "codebrim_dev",
+   "file_index": 151,
+   "prior_sum": 4.0848,
+   "seconds": 2.3835176872558597,
+   "gt_label": "Critical",
+   "gt_critical": 5,
+   "queued_full_run": 1,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Potential spalling and rust stains need closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 830,
+     "outputTokens": 25,
+     "totalTokens": 855
+    },
+    "usd": 5.580000000000001e-05,
+    "seconds": 0.592566371681416
+   }
+  },
+  {
+   "id": "s0027",
+   "split": "synth_dev",
+   "file_index": 152,
+   "prior_sum": 2.0278,
+   "seconds": 1.1970450000000001,
+   "gt_label": "Critical",
+   "gt_critical": 4,
+   "queued_full_run": 2,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Potential spalling and rust stains need closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 32,
+     "totalTokens": 864
+    },
+    "usd": 5.760000000000001e-05,
+    "seconds": 0.6116814159292037
+   }
+  },
+  {
+   "id": "s0052",
+   "split": "synth_dev",
+   "file_index": 153,
+   "prior_sum": 3.0913,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Critical",
+   "gt_critical": 3,
+   "queued_full_run": 2,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Several areas of spalling and discoloration that need closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 34,
+     "totalTokens": 866
+    },
+    "usd": 5.808000000000001e-05,
+    "seconds": 0.6167787610619471
+   }
+  },
+  {
+   "id": "image_0000365",
+   "split": "codebrim_dev",
+   "file_index": 154,
+   "prior_sum": 8.9023,
+   "seconds": 4.077091,
+   "gt_label": "Critical",
+   "gt_critical": 2,
+   "queued_full_run": 2,
+   "route": {
+    "label": "Clear",
+    "reason": "No visible damage, just minor surface imperfections.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2197,
+     "outputTokens": 28,
+     "totalTokens": 2225
+    },
+    "usd": 0.00013854,
+    "seconds": 1.471221238938053
+   }
+  },
+  {
+   "id": "s0050",
+   "split": "synth_dev",
+   "file_index": 155,
+   "prior_sum": 1.4861,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Potential cracks present, too small to judge at this size.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 831,
+     "outputTokens": 33,
+     "totalTokens": 864
+    },
+    "usd": 5.7780000000000006e-05,
+    "seconds": 0.6135929203539824
+   }
+  },
+  {
+   "id": "image_0001337",
+   "split": "codebrim_dev",
+   "file_index": 156,
+   "prior_sum": 7.1775,
+   "seconds": 4.043331134784,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Clear",
+    "reason": "No visible signs of spalling, cracks, rust, or other damage.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2038,
+     "outputTokens": 35,
+     "totalTokens": 2073
+    },
+    "usd": 0.00013068000000000004,
+    "seconds": 1.3877522123893808
+   }
+  },
+  {
+   "id": "image_0000249",
+   "split": "codebrim_dev",
+   "file_index": 157,
+   "prior_sum": 6.7866,
+   "seconds": 5.781412000000001,
+   "gt_label": "Clear",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Clear",
+    "reason": "No visible damage or areas of concern in the photo.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2195,
+     "outputTokens": 30,
+     "totalTokens": 2225
+    },
+    "usd": 0.00013890000000000004,
+    "seconds": 1.475044247787611
+   }
+  },
+  {
+   "id": "image_0001426",
+   "split": "codebrim_dev",
+   "file_index": 158,
+   "prior_sum": 4.1996,
+   "seconds": 5.179545134784001,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "potential stains and marks on the surface",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2036,
+     "outputTokens": 21,
+     "totalTokens": 2057
+    },
+    "usd": 0.0001272,
+    "seconds": 1.350796460176991
+   }
+  },
+  {
+   "id": "s0002",
+   "split": "clean",
+   "file_index": 159,
+   "prior_sum": 0.6557,
+   "seconds": 0.605394,
+   "gt_label": "Clear",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Potential crack or spall indicated by saliency map, needs closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 38,
+     "totalTokens": 870
+    },
+    "usd": 5.904000000000001e-05,
+    "seconds": 0.6269734513274337
+   }
+  },
+  {
+   "id": "s0013",
+   "split": "synth_dev",
+   "file_index": 160,
+   "prior_sum": 2.3525,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Critical",
+   "gt_critical": 1,
+   "queued_full_run": 1,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Potential spalling and discolorations that need closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 33,
+     "totalTokens": 865
+    },
+    "usd": 5.784000000000001e-05,
+    "seconds": 0.6142300884955753
+   }
+  },
+  {
+   "id": "s0033",
+   "split": "synth_dev",
+   "file_index": 161,
+   "prior_sum": 2.1387,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Small brown spot and gray area may be damage.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 31,
+     "totalTokens": 863
+    },
+    "usd": 5.736000000000001e-05,
+    "seconds": 0.609132743362832
+   }
+  },
+  {
+   "id": "s0057",
+   "split": "synth_dev",
+   "file_index": 162,
+   "prior_sum": 1.3763,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Clear",
+    "reason": "No visible damage, and the photo quality is acceptable.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 30,
+     "totalTokens": 862
+    },
+    "usd": 5.712000000000001e-05,
+    "seconds": 0.6065840707964603
+   }
+  },
+  {
+   "id": "s0047",
+   "split": "synth_dev",
+   "file_index": 163,
+   "prior_sum": 2.7338,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Critical",
+   "gt_critical": 3,
+   "queued_full_run": 2,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Potential spalls and rust stains detected, too small to judge at this size",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 38,
+     "totalTokens": 870
+    },
+    "usd": 5.904000000000001e-05,
+    "seconds": 0.6269734513274337
+   }
+  },
+  {
+   "id": "s0059",
+   "split": "synth_dev",
+   "file_index": 164,
+   "prior_sum": 1.8582,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Possible crack or damage too small to judge at this size",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 831,
+     "outputTokens": 33,
+     "totalTokens": 864
+    },
+    "usd": 5.7780000000000006e-05,
+    "seconds": 0.6135929203539824
+   }
+  },
+  {
+   "id": "s0015",
+   "split": "synth_dev",
+   "file_index": 165,
+   "prior_sum": 1.4975,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Clear",
+    "reason": "The photo shows sound concrete with no visible damage or issues.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 831,
+     "outputTokens": 31,
+     "totalTokens": 862
+    },
+    "usd": 5.730000000000001e-05,
+    "seconds": 0.608495575221239
+   }
+  },
+  {
+   "id": "s0014",
+   "split": "clean",
+   "file_index": 166,
+   "prior_sum": 1.2144,
+   "seconds": 1.1970450000000001,
+   "gt_label": "Clear",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Potential cracks or spalls detected by saliency map.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 831,
+     "outputTokens": 35,
+     "totalTokens": 866
+    },
+    "usd": 5.826000000000001e-05,
+    "seconds": 0.6186902654867257
+   }
+  },
+  {
+   "id": "image_0001362",
+   "split": "codebrim_dev",
+   "file_index": 167,
+   "prior_sum": 7.2816,
+   "seconds": 4.043331134784,
+   "gt_label": "Critical",
+   "gt_critical": 1,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Clear",
+    "reason": "No visible damage or anomalies in the concrete surface.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2038,
+     "outputTokens": 29,
+     "totalTokens": 2067
+    },
+    "usd": 0.00012924000000000003,
+    "seconds": 1.3724601769911506
+   }
+  },
+  {
+   "id": "image_0001469",
+   "split": "codebrim_dev",
+   "file_index": 168,
+   "prior_sum": 6.7969,
+   "seconds": 3.475224134784,
+   "gt_label": "Critical",
+   "gt_critical": 7,
+   "queued_full_run": 4,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Visible cracks and rust stains that may require closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2036,
+     "outputTokens": 32,
+     "totalTokens": 2068
+    },
+    "usd": 0.00012984000000000002,
+    "seconds": 1.3788318584070798
+   }
+  },
+  {
+   "id": "image_0001527",
+   "split": "codebrim_dev",
+   "file_index": 169,
+   "prior_sum": 6.2569,
+   "seconds": 2.907117134784,
+   "gt_label": "Critical",
+   "gt_critical": 2,
+   "queued_full_run": 2,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Potential cracks and spalling visible, but too small to judge at this size.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2037,
+     "outputTokens": 38,
+     "totalTokens": 2075
+    },
+    "usd": 0.00013134,
+    "seconds": 1.3947610619469026
+   }
+  },
+  {
+   "id": "image_0000639",
+   "split": "codebrim_dev",
+   "file_index": 170,
+   "prior_sum": 8.3224,
+   "seconds": 3.5758888593750005,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Visible crack and spalling, but too small to judge at this size",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 834,
+     "outputTokens": 29,
+     "totalTokens": 863
+    },
+    "usd": 5.700000000000001e-05,
+    "seconds": 0.6053097345132744
+   }
+  },
+  {
+   "id": "s0032",
+   "split": "synth_dev",
+   "file_index": 171,
+   "prior_sum": 1.6542,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Critical",
+   "gt_critical": 1,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Potential cracks and stains that need closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 30,
+     "totalTokens": 862
+    },
+    "usd": 5.712000000000001e-05,
+    "seconds": 0.6065840707964603
+   }
+  },
+  {
+   "id": "image_0000502",
+   "split": "codebrim_dev",
+   "file_index": 172,
+   "prior_sum": 2.404,
+   "seconds": 2.339010134784,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Visible cracks and stains that may indicate damage.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2035,
+     "outputTokens": 30,
+     "totalTokens": 2065
+    },
+    "usd": 0.00012930000000000003,
+    "seconds": 1.3730973451327435
+   }
+  },
+  {
+   "id": "s0018",
+   "split": "clean",
+   "file_index": 173,
+   "prior_sum": 1.7993,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Clear",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Potential small damage or stain visible, needs closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 32,
+     "totalTokens": 864
+    },
+    "usd": 5.760000000000001e-05,
+    "seconds": 0.6116814159292037
+   }
+  },
+  {
+   "id": "s0017",
+   "split": "clean",
+   "file_index": 174,
+   "prior_sum": 2.3009,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Clear",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "A small, dark spot is visible, which may be a crack or spall.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 38,
+     "totalTokens": 870
+    },
+    "usd": 5.904000000000001e-05,
+    "seconds": 0.6269734513274337
+   }
+  },
+  {
+   "id": "s0008",
+   "split": "synth_dev",
+   "file_index": 175,
+   "prior_sum": 2.425,
+   "seconds": 1.1970450000000001,
+   "gt_label": "Critical",
+   "gt_critical": 1,
+   "queued_full_run": 1,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Small spall and a possible crack, too small to judge at this size.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 830,
+     "outputTokens": 37,
+     "totalTokens": 867
+    },
+    "usd": 5.868000000000001e-05,
+    "seconds": 0.6231504424778761
+   }
+  },
+  {
+   "id": "image_0001597",
+   "split": "codebrim_dev",
+   "file_index": 176,
+   "prior_sum": 7.37,
+   "seconds": 2.907117134784,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Visible cracks and potential spalling areas need closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2035,
+     "outputTokens": 33,
+     "totalTokens": 2068
+    },
+    "usd": 0.00013002,
+    "seconds": 1.3807433628318584
+   }
+  },
+  {
+   "id": "s0010",
+   "split": "clean",
+   "file_index": 177,
+   "prior_sum": 2.739,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Clear",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Clear",
+    "reason": "No visible damage, low saliency, and good image quality.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 830,
+     "outputTokens": 34,
+     "totalTokens": 864
+    },
+    "usd": 5.796000000000001e-05,
+    "seconds": 0.6155044247787611
+   }
+  },
+  {
+   "id": "image_0000583",
+   "split": "codebrim_dev",
+   "file_index": 178,
+   "prior_sum": 4.271,
+   "seconds": 2.3835176872558597,
+   "gt_label": "Critical",
+   "gt_critical": 1,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Visible crack and discoloration, but too small to judge at this size",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 831,
+     "outputTokens": 27,
+     "totalTokens": 858
+    },
+    "usd": 5.6340000000000006e-05,
+    "seconds": 0.5983008849557523
+   }
+  },
+  {
+   "id": "image_0000800",
+   "split": "codebrim_dev",
+   "file_index": 179,
+   "prior_sum": 5.9857,
+   "seconds": 3.4933306479999997,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Clear",
+    "reason": "No visible damage or areas of concern in the photo.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 1093,
+     "outputTokens": 30,
+     "totalTokens": 1123
+    },
+    "usd": 7.278e-05,
+    "seconds": 0.7728849557522124
+   }
+  },
+  {
+   "id": "image_0000731",
+   "split": "codebrim_dev",
+   "file_index": 180,
+   "prior_sum": 4.9123,
+   "seconds": 2.3835176872558597,
+   "gt_label": "Critical",
+   "gt_critical": 6,
+   "queued_full_run": 3,
+   "route": {
+    "label": "Critical",
+    "reason": "Exposed reinforcing bars and spalling visible in the photo.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 25,
+     "totalTokens": 857
+    },
+    "usd": 5.5920000000000013e-05,
+    "seconds": 0.5938407079646019
+   }
+  },
+  {
+   "id": "s0019",
+   "split": "clean",
+   "file_index": 181,
+   "prior_sum": 2.3532,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Clear",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Potential spall or rust stain detected, needs closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 33,
+     "totalTokens": 865
+    },
+    "usd": 5.784000000000001e-05,
+    "seconds": 0.6142300884955753
+   }
+  },
+  {
+   "id": "image_0000705",
+   "split": "codebrim_dev",
+   "file_index": 182,
+   "prior_sum": 2.0911,
+   "seconds": 1.1916900615234376,
+   "gt_label": "Critical",
+   "gt_critical": 1,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Potential spalling or rust stains that are too small to judge at this size.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 836,
+     "outputTokens": 38,
+     "totalTokens": 874
+    },
+    "usd": 5.928000000000001e-05,
+    "seconds": 0.6295221238938054
+   }
+  },
+  {
+   "id": "s0060",
+   "split": "synth_dev",
+   "file_index": 183,
+   "prior_sum": 3.188,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Critical",
+   "gt_critical": 1,
+   "queued_full_run": 1,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Potential spall and rust stains that need closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 831,
+     "outputTokens": 32,
+     "totalTokens": 863
+    },
+    "usd": 5.754000000000001e-05,
+    "seconds": 0.6110442477876107
+   }
+  },
+  {
+   "id": "image_0001553",
+   "split": "codebrim_dev",
+   "file_index": 184,
+   "prior_sum": 8.1173,
+   "seconds": 3.475224134784,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Visible cracks and potential spalling areas that need closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2038,
+     "outputTokens": 34,
+     "totalTokens": 2072
+    },
+    "usd": 0.00013044000000000003,
+    "seconds": 1.3852035398230091
+   }
+  },
+  {
+   "id": "s0030",
+   "split": "synth_dev",
+   "file_index": 185,
+   "prior_sum": 2.4255,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Critical",
+   "gt_critical": 1,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Clear",
+    "reason": "The photo shows a sound concrete surface with no visible damage.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 31,
+     "totalTokens": 863
+    },
+    "usd": 5.736000000000001e-05,
+    "seconds": 0.609132743362832
+   }
+  },
+  {
+   "id": "image_0001401",
+   "split": "codebrim_dev",
+   "file_index": 186,
+   "prior_sum": 7.9496,
+   "seconds": 3.475224134784,
+   "gt_label": "Critical",
+   "gt_critical": 5,
+   "queued_full_run": 4,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Potential spalling and rust stains need closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2037,
+     "outputTokens": 32,
+     "totalTokens": 2069
+    },
+    "usd": 0.0001299,
+    "seconds": 1.3794690265486726
+   }
+  },
+  {
+   "id": "image_0001573",
+   "split": "codebrim_dev",
+   "file_index": 187,
+   "prior_sum": 5.6234,
+   "seconds": 4.043331134784,
+   "gt_label": "Critical",
+   "gt_critical": 15,
+   "queued_full_run": 13,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Visible rust stains and potential spalling need closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2036,
+     "outputTokens": 33,
+     "totalTokens": 2069
+    },
+    "usd": 0.00013008,
+    "seconds": 1.3813805309734513
+   }
+  },
+  {
+   "id": "s0034",
+   "split": "synth_dev",
+   "file_index": 188,
+   "prior_sum": 1.9739,
+   "seconds": 1.7886960000000003,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Clear",
+    "reason": "No visible damage, and the photo quality is sufficient for inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 832,
+     "outputTokens": 32,
+     "totalTokens": 864
+    },
+    "usd": 5.760000000000001e-05,
+    "seconds": 0.6116814159292037
+   }
+  },
+  {
+   "id": "image_0000237",
+   "split": "codebrim_dev",
+   "file_index": 189,
+   "prior_sum": 3.0859,
+   "seconds": 2.940877,
+   "gt_label": "Requires zoom",
+   "gt_critical": 0,
+   "queued_full_run": 0,
+   "route": {
+    "label": "Requires zoom",
+    "reason": "Potential cracks and rust stains need closer inspection.",
+    "status": "accepted",
+    "cause": "",
+    "cached": true,
+    "latency_ms": 0.0,
+    "usage": {
+     "inputTokens": 2196,
+     "outputTokens": 30,
+     "totalTokens": 2226
+    },
+    "usd": 0.00013896000000000004,
+    "seconds": 1.4756814159292038
+   }
+  }
+ ]
+}

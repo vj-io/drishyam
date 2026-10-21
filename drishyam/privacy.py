@@ -22,6 +22,7 @@ DETECT_SIDE = 640
 NANO_SIZE = 416
 NANO_REG_MAX = 7
 PERSON, VEHICLES = 0, (1, 2, 3, 5, 7)  # COCO: bicycle, car, motorcycle, bus, truck
+BLUR_SIGMA_MAX = 24.0  # a box's blur sigma is its width / 6; above this it runs on a shrunk copy (blur_boxes)
 
 
 class PeopleDominant(ValueError):
@@ -91,7 +92,17 @@ def blur_boxes(img: np.ndarray, boxes: list[list[int]]) -> None:
     for x, y, w, h in boxes:
         x0, y0, x1, y1 = max(0, x), max(0, y), min(W, x + w), min(H, y + h)
         if x1 > x0 and y1 > y0:
-            img[y0:y1, x0:x1] = cv2.GaussianBlur(img[y0:y1, x0:x1], (0, 0), max(6.0, (x1 - x0) / 6))
+            sigma = max(6.0, (x1 - x0) / 6)
+            if sigma <= BLUR_SIGMA_MAX:
+                img[y0:y1, x0:x1] = cv2.GaussianBlur(img[y0:y1, x0:x1], (0, 0), sigma)
+                continue
+            # The same blur on a copy shrunk by BLUR_SIGMA_MAX / sigma, then enlarged: a box 2,859 px wide (a vehicle
+            # in a 6000x4000 photo) took minutes with its 2,857-tap kernel, and milliseconds this way.
+            f = BLUR_SIGMA_MAX / sigma
+            small = cv2.resize(img[y0:y1, x0:x1], (max(1, round((x1 - x0) * f)), max(1, round((y1 - y0) * f))),
+                               interpolation=cv2.INTER_AREA)
+            img[y0:y1, x0:x1] = cv2.resize(cv2.GaussianBlur(small, (0, 0), BLUR_SIGMA_MAX), (x1 - x0, y1 - y0),
+                                           interpolation=cv2.INTER_LINEAR)
 
 
 def privacy_pass(img: np.ndarray, max_person_frac: float = PERSON_FRAC_MAX) -> dict:
