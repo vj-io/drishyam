@@ -103,6 +103,21 @@ uv run drishyam run public/samples/bridge_03.jpg --pixel-cap 0.3
 uv run drishyam review runs/j_XXXXXX/work_order.json f1 approve --by "Your Name"
 ```
 
+With the live engine, v1 (its CC BY-NC 4.0 weights are assets of the v1.1.0 release, not in git): download them,
+check their sha256, then run with them.
+
+```bash
+gh release download v1.1.0 --repo vj-io/drishyam --pattern 'drishyam_dacl10k*' --dir models
+```
+
+```bash
+shasum -a 256 -c models/drishyam_dacl10k.sha256
+```
+
+```bash
+DRISHYAM_ONNX=models/drishyam_dacl10k.onnx DRISHYAM_ONNX_FP16=models/drishyam_dacl10k.fp16.onnx uv run drishyam run public/samples/bridge_03.jpg --pixel-cap 0.3
+```
+
 MCP server over stdio (12 allow-listed tools, no approve tool, no shell):
 
 ```bash
