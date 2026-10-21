@@ -148,6 +148,69 @@ text painted on a wall could steer its label, though the prompt says to ignore i
 clear it, and a cleared photo stays in the report as not assessed. Credentials come from the default AWS chain
 (`AWS_PROFILE`); a profile made by `aws login` also needs `pip install "botocore[crt]"`.
 
+**Price.** On-demand Nova Lite in us-east-1 is $0.00006 per 1,000 input tokens and $0.00024 per 1,000 output tokens
+(AWS Price List API, `USE1-NovaLite-input-tokens` and `-output-tokens`, read 2026-10-21); an image is billed as input
+tokens. Measured: a 2048x1536 photo's 256x192 overview is about 830 input tokens ($0.000057 a call), a 4608x3456
+photo's 576x432 overview about 2,036 ($0.00013 a call), and a reply about 30 output tokens.
+
+### Does the router help? (dev only)
+
+`python -m evals.router_eval` writes [results/dev/router_eval.json](../results/dev/router_eval.json). The backlog is
+the dev splits only: synth_dev (60), the first 30 of synth_clean_dev and CODEBRIM dev100, 190 photos in a seeded
+shuffle (file order). Each photo's job runs once with v1 (`onnx:drishyam_dacl10k.onnx`, its FP16 net as the fast
+model) on the fixed costs of results/local-macos-x86-dacl10k-retime/micro.json, and any order and budget is replayed
+from those runs as in the triage evaluation above; each photo is routed once through drishyam.router. The 190 jobs
+take 487.1 s run in full; triage costs 7.3 s; the router's 190 calls cost $0.0163, which the batch charges as 173.5
+s. A real `drishyam batch --router nova` run at the primary budget matched the replay: 71 photos reached, 209
+labelled critical defects queued (its labels came from the cache, so it charged no router $, as the replay with the
+router's $ not charged).
+
+**The rule, committed before any paid router call (0d38696, `RULE` in evals/router_eval.py).** The primary metric is
+critical recall within a total budget of half the seconds the 190 jobs take in full, the router arm charged its
+triage and its Bedrock $. Gain: the paired 95 % bootstrap CIs of router / rule triage and of router / random order
+both lie above 1. Harm: either lies below 1. Safety: the share of photos holding a labelled critical defect that the
+router clears, with a Wilson 95 % CI; clearing is called safe only if its upper bound is at most 0.05.
+
+**Verdict: harm, and clearing is not shown safe.**
+
+At the primary budget (243.6 s, of which the router's $ is 173.5 s):
+
+| Arm | Critical recall (of 370) | IoU-only | Photos reached | First critical queued at | Queued criticals matching no label |
+| --- | --- | --- | --- | --- | --- |
+| router, its $ charged | 0.181 (67) | 0.059 | 19 | 181.5 s | 27 |
+| router, its $ not charged | 0.565 (209) | 0.149 | 71 | 8.0 s | 83 |
+| rule triage | 0.497 (184) | 0.124 | 64 | 8.0 s | 77 |
+| file order | 0.332 (123) | 0.097 | 92 | 3.0 s | 53 |
+| random order | 0.331 (122.4) | 0.102 | 95.5 | 6.1 s | 49.9 |
+
+Recall ratios of the router to each arm, with paired 95 % bootstrap CIs (1000 resamples within each split):
+
+| Budget | vs rule triage | vs random | $ not charged, vs rule triage | $ not charged, vs random |
+| --- | --- | --- | --- | --- |
+| a quarter (121.8 s) | 0 (0-0) | 0 (0-0) | 1.44 (1.07-3.31) | 1.46 (0.96-2.51) |
+| **half (243.6 s), primary** | **0.36 (0.13-0.67)** | **0.55 (0.21-0.88)** | 1.14 (0.98-1.44) | 1.71 (1.53-1.85) |
+| three quarters (365.3 s) | 0.88 (0.67-0.94) | 1.08 (0.82-1.17) | 1.03 (0.98-1.08) | 1.27 (1.19-1.32) |
+
+What the numbers say:
+
+- **The router costs more than it saves.** One call is $0.000086 a photo on this backlog, 36 % of the modelled $
+  of the photo's whole v1 job ($0.000241). Routing all 190 photos costs 173.5 s of the 243.6 s budget, so the router
+  arm reaches 19 photos where the triage alone reaches 64; at a quarter of the budget it reaches none.
+- **Its order, free, is no measurable gain over the triage.** With its $ not charged, Critical first and Clear
+  skipped queues 209 critical defects against the triage's 184: 1.14 (CI 0.98-1.44).
+- **It clears photos that hold critical defects.** It cleared 36 of the 190 photos: 8 of the 32 with no labelled
+  defect, 19 with only non-critical ones, and 9 of the 81 holding a labelled critical defect (miss rate 0.111, Wilson
+  CI 0.060-0.198; 2 of 29 on synth_dev, 7 of 52 on CODEBRIM). Those 9 hold 16 of the 370 labelled critical defects,
+  9 of which the agent queues when it runs them in full.
+- **It rarely says Critical.** Labels against the labels (rows: label; columns: router, Clear / Requires zoom /
+  Critical): no defect 8 / 24 / 0, non-critical 19 / 58 / 0, critical 9 / 68 / 4; accuracy 0.37. All four
+  Critical calls were right, all on CODEBRIM.
+- **Latency and failures.** At a 10 s timeout the first pass timed out 37 of the 190 calls (19 %, most of them
+  4608x3456 CODEBRIM photos; 9 timed out again on a second pass, with the machine at a load average of 100 to 500
+  from other work); one such call alone took 5.9 s. Failures are not cached, so each rerun asked again; at 30 s every
+  photo had an accepted reply (p50 1.2 s on the first pass, 1.7 s for the last 10, the slowest 3.0 s). No reply was
+  rejected once the ```json fence was accepted.
+
 ## Not done
 
 - No MCP tool: a read-only `batch_status` would be small, but it would change the MCP allow-list of twelve that

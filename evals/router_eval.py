@@ -250,7 +250,8 @@ def main(argv=None) -> None:
               "per_photo": [{"id": p["id"], "split": p["split"], "file_index": p["file_index"],
                              "prior_sum": p["triage"]["prior_sum"], "seconds": batch_triage.full_seconds(p),
                              "gt_label": p["gt_label"], "gt_critical": len(p["gt"]),
-                             "queued_full_run": sum(s is not None for s in p["gt"]), **p["route"]} for p in photos]}
+                             "queued_full_run": sum(s is not None for s in p["gt"]),
+                             "route": {k: v for k, v in p["route"].items() if k != "prior_sum"}} for p in photos]}
     Path(a.out).write_text(json.dumps(result, indent=1, default=float) + "\n")
     print(json.dumps({k: v for k, v in result.items() if k not in ("per_photo", "rule")}, indent=1, default=float))
 
