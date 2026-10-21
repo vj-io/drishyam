@@ -1,5 +1,8 @@
 # Recorded MCP session: Claude drives Drishyam on `bridge_03.jpg`
 
+This session ran on the classical engine; two sessions with the same bridge and rules on the live v1 engine (on
+`bridge_03.jpg` and the team's `real_01.jpg`) are in [../mcp-session-v1/transcript.md](../mcp-session-v1/transcript.md).
+
 Recorded 2026-10-18 on macOS (x86_64), OpenCV 5.0.0, classical segmenter, default caps (30 % of pixels,
 $0.05, 20 s). The client was Claude (Opus 5.5) inside Claude Code. `claude -p` could not run on this machine
 (the account's organisation disables subscription access for it), so the session went through

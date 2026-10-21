@@ -1,0 +1,58 @@
+{
+  "id": "wo_aa5556",
+  "job": "j_aa5556",
+  "created": "2026-10-21T15:33:05Z",
+  "findings": [
+    {
+      "id": "f1",
+      "cls": "crack",
+      "confidence": 0.9622,
+      "measure": {
+        "length_px": 3211.6,
+        "width_px": 69.29,
+        "area_px": 222528,
+        "orientation_deg": 41.1
+      },
+      "box": [
+        480,
+        100,
+        1944,
+        2048
+      ],
+      "step": 2,
+      "level": 2,
+      "region": "g1",
+      "critical": false,
+      "state": "draft",
+      "verify_iou": null,
+      "steps": [
+        2
+      ],
+      "critical_step": null,
+      "critical_area_px": null,
+      "critical_rule": null,
+      "verified": null
+    }
+  ],
+  "gaze_path": [
+    [
+      1460,
+      1124,
+      2
+    ],
+    [
+      1460,
+      1124,
+      1
+    ],
+    [
+      2300,
+      1738,
+      1
+    ]
+  ],
+  "not_assessed": [],
+  "approvals": [],
+  "disclaimer": "AI-assisted, not an inspection. Measurements are image pixels, not millimetres.",
+  "status": "ready"
+}
