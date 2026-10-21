@@ -7,13 +7,13 @@ flowchart TB
         MCPC["MCP client, e.g. Claude Code, local<br/>drishyam mcp over stdio<br/>12 allow-listed tools: no approve, no shell"]
     end
 
-    subgraph AWS["2 · AWS path (deployed, us-east-1)"]
-        CF["CloudFront + Origin Access Control<br/>AWS WAF rate-based rules<br/>POST bodies carry x-amz-content-sha256"]
+    subgraph AWS["2 · AWS path (deployed, us-east-1; v1 live since 2026-10-21, commit 02219a2)"]
+        CF["CloudFront + Origin Access Control on both origins<br/>site from a private S3 bucket · /api/* to the Function URL<br/>AWS WAF rate-based rules<br/>POST bodies carry x-amz-content-sha256"]
         FURL["Lambda Function URL<br/>AuthType AWS_IAM · InvokeMode RESPONSE_STREAM"]
         LAMBDA["Lambda arm64 (Graviton) · Python 3.12<br/>AWS Lambda Web Adapter → FastAPI web tier, web.py<br/>CSP · HMAC-SHA256 work-order token · per-job kill token"]
         DDB[("DynamoDB kill-flag table<br/>GetItem ConsistentRead before every step")]
         SM["Secrets Manager<br/>DRISHYAM_SIGNING_KEY"]
-        CW["CloudWatch<br/>EMF metrics · dashboard · alarms → SNS (email subscription unconfirmed)"]
+        CW["CloudWatch + X-Ray<br/>EMF metrics · dashboard · traces · alarms → SNS → email (verified 2026-10-21)"]
         BUD["AWS Budgets<br/>spend alerts → the same SNS topic"]
     end
 
@@ -34,7 +34,7 @@ flowchart TB
         SAL["saliency at L3<br/>cv2.createCLAHE · cv2.Sobel · cv2.morphologyEx BLACKHAT<br/>cv2.adaptiveThreshold · cv2.inRange · cv2.connectedComponentsWithStats"]
         GAZE["virtual PTZ gaze<br/>cv2.warpPerspective · cv2.perspectiveTransform"]
         QG["quality gate<br/>cv2.Laplacian variance, glare, dark"]
-        SEG["segment<br/>cv2.dnn.readNetFromONNX, engine=cv2.dnn.ENGINE_NEW (OpenCV 5 only)<br/>or the classical engine, no weights"]
+        SEG["segment<br/>cv2.dnn.readNetFromONNX, engine=cv2.dnn.ENGINE_NEW (OpenCV 5 only): v1, the live engine<br/>fallback: the classical engine, no weights"]
         MEAS["measure + verify<br/>cv2.morphologyEx HITMISS · cv2.minAreaRect · cv2.arcLength<br/>look_iou: cv2.warpPerspective + cv2.dilate"]
         DEC --> PRIV --> PYR --> SAL
         GAZE --> QG --> SEG --> MEAS
