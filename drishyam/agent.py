@@ -170,8 +170,10 @@ class JobConfig:
     # scores and the stop rule then do not move with machine load. The caps still run on the real clock.
     t_hat_ms: dict | None = None
     # fallback: when the overview proposes no candidate, one look at L2 whose window spans the whole photo before the
-    # fallback: job ends (cause fallback-l2), then the rules' follow-ups; off, such a photo gets no look at all
-    fallback_l2: bool = False  # fallback
+    # fallback: job ends (cause fallback-l2), then the rules' follow-ups; off, such a photo gets no look at all. On for
+    # fallback: every profile since it passed the rule stated before its dev run (results/dev/zero_candidate_fallback.json,
+    # fallback: v1 at the 30 % cap; it acted on 1 dev photo of 190); every number published before it ran with it off.
+    fallback_l2: bool = True  # fallback
     # cascade: with a confirm net (Job(confirm=...), drishyam.cascade; none by default), the scout entropy band, both
     # cascade: ends included, in which the confirm net segments a look again. Not tuned: it straddles tau.
     tau_confirm_lo: float = 0.35  # cascade
@@ -542,11 +544,12 @@ class Job:
         # fallback: the overview's L3 pyramid can blur a hairline crack away, so a photo the prior is silent on gets one
         # fallback: look at L2 spanning it (a gaze of the long side / 4 px, never under `size`), governed and capped
         # fallback: like any look; it stays not assessed whatever that look drafts. A resumed job replays the look.
-        if cfg.fallback_l2 and not cands and self.replay:  # fallback
+        whole = max(cfg.size, math.ceil(max(W, H) / 4))  # fallback
+        if cfg.fallback_l2 and not cands and self.replay and self.replay[0][3:] == (2, whole):  # fallback
             self.not_assessed.append({"step": 0, "box": [0, 0, W, H],  # fallback
                                       "reason": "no candidate region was proposed", "action": "check-by-eye"})  # fallback
-        elif cfg.fallback_l2 and not cands:  # fallback
-            self.settings.size = max(cfg.size, math.ceil(max(W, H) / 4))  # fallback
+        elif cfg.fallback_l2 and not cands and not self.replay:  # fallback
+            self.settings.size = whole  # fallback
             r = self.regions["w0"] = Region("w0", W // 2, H // 2, 0.0, 2)  # fallback
             why = f"no candidate region was proposed: one L2 look of {self.settings.size} px spans the photo"  # fallback
             self.forced.append(("gaze", r, 2, "fallback-l2", why))  # fallback

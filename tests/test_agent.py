@@ -847,21 +847,21 @@ def test_quality_refused_windows_are_not_assessed(scene, monkeypatch):
     assert x <= bx and y <= by and bx + bw <= x + w and by + bh <= y + h
 
 
-def test_a_photo_with_no_candidate_region_is_not_assessed_not_ready():
-    """The team's wall photo IMG_2332 (public/samples/real_01.jpg): the overview proposes no candidate, so no look
-    runs. That is not a clean wall: the whole photo is not assessed and the work order is not ready. The job's own
-    status and cause stay what the evals publish (completed, exhausted)."""
-    from pathlib import Path
-
+@pytest.mark.parametrize("fallback", [True, False])
+def test_a_photo_with_no_candidate_region_is_not_assessed_not_ready(fallback):
+    """The team's wall photo IMG_2332 (public/samples/real_01.jpg): the overview proposes no candidate. With the
+    fallback (the default) one whole-photo L2 look runs, without it no look; either way that is not a clean wall: the
+    whole photo is not assessed and the work order is not ready. The job's own cause stays exhausted."""
     img = cv2.imread(str(Path(__file__).resolve().parent.parent / "public" / "samples" / "real_01.jpg"))
     H, W = img.shape[:2]
-    _, events = run(img)
+    _, events = run(img, fallback_l2=fallback)
     done, wo = events[-1], events[-1]["work_order"]
-    assert events[1]["candidates"] == [] and done["summary"]["steps"] == 0
-    assert (done["status"], done["cause"]) == ("completed", "exhausted")
-    assert wo["not_assessed"] == [{"step": 0, "box": [0, 0, W, H], "reason": "no candidate region was proposed",
-                                   "action": "check-by-eye"}]
-    assert wo["status"] == "incomplete" and done["coverage_looked"] == 0.0
+    assert events[1]["candidates"] == [] and (done["summary"]["steps"] > 0) == fallback and done["cause"] == "exhausted"
+    assert {"step": 0, "box": [0, 0, W, H], "reason": "no candidate region was proposed",
+            "action": "check-by-eye"} in wo["not_assessed"]
+    assert wo["status"] in ("incomplete", "blocked")
+    if not fallback:
+        assert done["status"] == "completed" and len(wo["not_assessed"]) == 1 and done["coverage_looked"] == 0.0
 
 
 def unvisited_not_assessed(done, shape):
@@ -980,7 +980,9 @@ def named(name, sha256=None):
 def test_the_classical_profile_is_the_agent_every_classical_number_ran_with(scene):
     """classical-v1 resolves to exactly the JobConfig defaults from before profiles existed (first look L1, any level,
     absorption on), so no classical result moves (results/dev/onnx_profile_sweep.json: the byte-for-byte rerun).
-    tau_scout, fill and survey_value stay off: measured, not adopted (results/dev/tune_sweep.json)."""
+    tau_scout, fill and survey_value stay off: measured, not adopted (results/dev/tune_sweep.json). fallback_l2 is on
+    for every profile since its dev run (results/dev/zero_candidate_fallback.json, measured on v1); the classical numbers
+    ran before it, with it off, and it changes only a photo with no candidate."""
     from dataclasses import asdict
 
     from drishyam.agent import PROFILES
@@ -996,7 +998,7 @@ def test_the_classical_profile_is_the_agent_every_classical_number_ran_with(scen
         "usd_per_hour": USD_PER_HOUR, "thumbs": True, "max_steps": 200, "use_uncertainty": True,
         "seed_from_looks": True, "v0": 2.0, "survey": True, "verify": True, "absorb": True, "order": "score", "seed": 0,
         "governor": True, "fill": False, "survey_value": True,
-        "t_hat_ms": None, "fallback_l2": False, "tau_confirm_lo": 0.35, "tau_confirm_hi": 0.65}
+        "t_hat_ms": None, "fallback_l2": True, "tau_confirm_lo": 0.35, "tau_confirm_hi": 0.65}
 
 
 def test_a_job_takes_its_segmenters_profile_by_name_and_a_knob_set_explicitly_wins(scene, monkeypatch):
@@ -1290,7 +1292,7 @@ def test_with_the_flag_a_photo_with_no_candidate_gets_one_whole_photo_l2_look():
     """No candidate: with fallback_l2 the job spends one look at L2 whose window spans the whole photo, with the
     profile's accurate net, cause fallback-l2, its pixels and fixed-cost ms charged like any look's; what it drafts is
     reported like any look's finding (a critical one goes to a human) and the photo stays not assessed. Under v1's
-    profile L2 is the finest level on a 4000-px photo, so it is the only look. Off (the default): no look, as before."""
+    profile L2 is the finest level on a 4000-px photo, so it is the only look. Off: no look, as before."""
     from evals import harness
 
     img, (H, W) = soft_disc(4000, 3000), (3000, 4000)
@@ -1311,13 +1313,15 @@ def test_with_the_flag_a_photo_with_no_candidate_gets_one_whole_photo_l2_look():
     assert {"step": 0, "box": [0, 0, W, H], "reason": "no candidate region was proposed",
             "action": "check-by-eye"} in done["work_order"]["not_assessed"] and done["work_order"]["status"] == "blocked"
     assert done["coverage_looked"] == 0.0  # one whole-photo look is not a close one
-    off = list(fixed_job(img, Sure(ONNX)).run())
+    off = list(fixed_job(img, Sure(ONNX), fallback_l2=False).run())
     assert looks_of(off) == [] and off[-1]["summary"]["findings"] == 0
     # the eval path (evals.dev_sweep, evals.harness): the switch reaches the job, and the look's boxes are scored
     r = harness.run_drishyam(img, 0.3, FALLBACK_COSTS, segmenter=Sure(ONNX), fallback_l2=True)
     assert r["switches"]["fallback_l2"] is True and [t["cause"] for t in r["trace"]] == ["fallback-l2", "exhausted"]
     assert r["preds"] and {p["cls"] for p in r["preds"]} == {"spalling"} and r["wall_s"] == pytest.approx(0.61)
-    assert harness.run_drishyam(img, 0.3, FALLBACK_COSTS, segmenter=Sure(ONNX))["switches"]["fallback_l2"] is False
+    r = harness.run_drishyam(img, 0.3, FALLBACK_COSTS, segmenter=Sure(ONNX), fallback_l2=False)
+    assert r["switches"]["fallback_l2"] is False and [t["cause"] for t in r["trace"]] == ["exhausted"]
+    assert harness.run_drishyam(img, 0.3, FALLBACK_COSTS, segmenter=Sure(ONNX))["switches"]["fallback_l2"] is True
 
 
 @pytest.mark.parametrize("name, size, cap", [("real_01", 750, 0.3), ("concrete_1024", 512, 1.0)])
@@ -1418,8 +1422,8 @@ def _no_wall_clock(x):
 @pytest.mark.parametrize("name", [*(p.stem for p in SAMPLE_PHOTOS), "soft_disc", "soft_disc@v1"])
 def test_with_the_flag_off_every_event_is_the_agents_before_the_fallback(name, monkeypatch):
     """Every bundled sample (real_01 has no candidate) and a synthetic photo with none, on the classical engine (and the
-    disc under v1's profile): with fallback_l2 off (the default), the whole event stream (thumbnails, timings on the
-    job's clock) equals the agent's with the fallback's lines removed."""
+    disc under v1's profile): with fallback_l2 off, the whole event stream (thumbnails, timings on the job's clock)
+    equals the agent's with the fallback's lines removed, the agent every number published before it ran with."""
     import json
 
     from drishyam import agent
@@ -1428,6 +1432,7 @@ def test_with_the_flag_off_every_event_is_the_agents_before_the_fallback(name, m
     paths = {p.stem: p for p in SAMPLE_PHOTOS}
     img = cv2.imread(str(paths[name])) if name in paths else soft_disc(3000, 2250)
     seg = Sure(ONNX) if name.endswith("@v1") else None
-    streams = [json.dumps(_no_wall_clock(list(mod.Job(img, mod.JobConfig(), clock=FakeClock(), job_id="j_test",
-                                                       segmenter=seg).run())), sort_keys=True) for mod in (agent, off)]
+    streams = [json.dumps(_no_wall_clock(list(mod.Job(img, mod.JobConfig(**kw), clock=FakeClock(), job_id="j_test",
+                                                       segmenter=seg).run())), sort_keys=True)
+               for mod, kw in ((agent, {"fallback_l2": False}), (off, {}))]
     assert streams[0] == streams[1]
