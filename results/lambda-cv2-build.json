@@ -1,0 +1,28 @@
+{
+ "what": "The deployed Lambda's own OpenCV build, as its GET /api/health reports it: cv2_build is read from cv2.getBuildInformation() once per process (docs/api-contract.md).",
+ "url": "https://d1xg58guluup8c.cloudfront.net/api/health",
+ "fetched_at": "2026-10-21T12:37:43Z",
+ "http_status": 200,
+ "time_to_first_byte_s": 5.713,
+ "health": {
+  "ok": true,
+  "version": "1.1.0",
+  "opencv": "5.0.0",
+  "build": "stock (not COOL)",
+  "segmenter": "onnx:drishyam_dacl10k.onnx",
+  "segmenter_licence": "CC BY-NC 4.0, trained on dacl10k",
+  "max_upload_bytes": 4400000,
+  "max_pixels": 25000000,
+  "host": "aws-lambda",
+  "arch": "aarch64",
+  "commit": "f12f50f8cebf758daa047ceefa9317c3557f56bb",
+  "cv2_build": {
+   "hal": "YES (carotene (ver 0.0.1) KleidiCV (ver 26.03))",
+   "cpu_baseline": "NEON FP16",
+   "cpu_dispatch": "NEON_DOTPROD NEON_FP16 NEON_BF16",
+   "parallel": "pthreads",
+   "onnx_runtime": "NO",
+   "dnn_engines": ["auto", "classic", "new"]
+  }
+ }
+}

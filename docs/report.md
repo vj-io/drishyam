@@ -30,6 +30,11 @@ photos; chance is the same model's boxes moved to random places, and IoU-only dr
 - **What the held-out runs measured:** the governor off and the 512-px FP32 net on every look. Live, the v1
   profile's SLA is 1500 ms, so looks stay on the 512-px FP32 net unless steps exceed 1.5 s. v1's finest look is L1
   (half size) on a 2048-px photo and L2 on a 4608-px one, so on these photos it never looks at full resolution.
+- **How much v1 zooms, and a tiling grid it does not beat:** on CODEBRIM at the 30 % cap an escalation fired on
+  5.9 % of v1's looks and a verify on 9.4 %, and an L2 tiling grid finds 0.50 with 0.10 of the pixels, against the
+  agent's 0.49 with 0.14; on synth200 an L1 grid finds 0.70 with 0.50 of the pixels, against 0.64 with 0.26
+  ([codebrim_dacl10k](../public/results/codebrim_dacl10k/summary.json),
+  [synth_dacl10k](../public/results/synth_dacl10k/summary.json) summaries).
 - **Against the classical engine,** v1 finds 2.54× (2.16–3.01) its recall on CODEBRIM and 1.34× (1.24–1.45) on
   synth200, and puts no box on a clean photo where the classical engine puts 7.08 per photo. But chance is high on
   CODEBRIM because its boxes are large; it sends 5.5 times the critical boxes to the human gate (at that rate, about 24,000
@@ -67,9 +72,9 @@ the triage of a backlog may cost. **Judges** need a trace in which an OpenCV out
 failure drills they can trigger, a live endpoint and honest failure cases. The **operator** who pays for the AWS
 account needs caps, a budget alert and one command that stops all spending.
 
-The narrated submission film (4 minutes, captions on) has its player on the site's Docs and links sheet (the MP4
-goes to the site bucket at deploy, not into git); `video/plan.md` says how it is built and where each number in it
-comes from.
+The narrated submission film (4 minutes, captions on) is an asset of the v1.1.0 release
+([drishyam.mp4](https://github.com/vj-io/drishyam/releases/download/v1.1.0/drishyam.mp4), not in git) and also plays
+on the site's Docs and links sheet; `video/plan.md` says how it is built and where each number in it comes from.
 
 Not built yet: approval from an SNS email link (approval is the web review or `drishyam review`); the COOL
 benchmark (section 6); a budget stop action or auto-stop schedule (the stop is `scripts/aws.sh stop`); a live LLM planner (the
@@ -196,7 +201,10 @@ limit found: the dynamically quantized model loads on neither engine, and the st
 That wheel's aarch64 build already includes Arm's KleidiCV and carotene: the Lambda package pins the same
 `opencv-python-headless` 5.0.0.93 wheel (`pyproject.toml`), whose `cv2.getBuildInformation()` on GitHub's arm64
 runner reads "Custom HAL: YES (carotene (ver 0.0.1) KleidiCV (ver 26.03))" and "Baseline: NEON FP16"
-(`results/linux-aarch64/micro.json`); the Lambda's own build information is not recorded. The camera moves use ops KleidiCV covers in some formats (`pyrDown`,
+(`results/linux-aarch64/micro.json`). The deployed Lambda reports the same build in its `GET /api/health`
+(`cv2_build`, fetched 2026-10-21 into `results/lambda-cv2-build.json`): hal "YES (carotene (ver 0.0.1) KleidiCV (ver
+26.03))", cpu_baseline "NEON FP16", cpu_dispatch "NEON_DOTPROD NEON_FP16 NEON_BF16", parallel "pthreads", on
+`aarch64`. The camera moves use ops KleidiCV covers in some formats (`pyrDown`,
 `resize`, `warpPerspective`), so a COOL gain would have to come on top of the KleidiCV the wheel already has.
 Whether the 3-channel `BORDER_REFLECT_101` `warpPerspective` used here takes the HAL path has not been measured. There is no `filter2D` and no NumPy pixel loop on the gaze path; the classical
 segmenter adds `connectedComponentsWithStats` and a NumPy softmax, and measurement adds `findContours`.
@@ -692,7 +700,7 @@ Failure drills, each runnable from the UI (`chaos` toggles) and covered by tests
 | --- | --- |
 | 20 planner timeouts + 20 malformed planner replies | 40 / 40 recovered by the rule planner (`test_20_timeouts_and_20_malformed_all_recover`) |
 | Forced p95 spike on the segmenter | the next step's cause is `p95>SLA` and its model is `fast` (`test_forced_p95_spike_changes_next_steps_model`) |
-| KILL during a live job | kill sent during step 3 → step 4 halted with cause `kill-switch` (`test_kill_endpoint_halts_a_running_job`, the live e2e run; on the deployed site, check 3 of `scripts/smoke.sh`, sent once step 2 has streamed: halted after 2 steps in the 02219a2 smoke run, section 5) |
+| KILL during a live job | kill sent during step 3 → step 4 halted with cause `kill-switch` (`test_kill_endpoint_halts_a_running_job`, the live e2e run; on the deployed site, check 3 of `scripts/smoke.sh`, sent once step 2 has streamed: halted after 3 steps in the f12f50f smoke run, section 5) |
 | $ and pixel caps | the job halts inside one step with coverage and unvisited regions reported (`test_pixel_cap_is_never_exceeded`, `test_seconds_and_usd_caps_halt`) |
 | Agent tries to approve its own critical finding | `ForbiddenTransition` (`test_agent_cannot_decide_or_downgrade`) |
 
@@ -729,8 +737,8 @@ notes the large spall it missed.
   measurable, that the uncertainty term and the seeding earn a little recall only uncapped on the 2048×1536 set, and
   that image-driven gaze order beats random order only on the larger photos (section 8).
 - On one of our own wall photos the overview proposed no region, so no look was taken and a hairline crack visible
-  by eye was missed (section 9). Its work order shows an empty gaze path and no finding, which a reader could take
-  for a clean wall.
+  by eye was missed (section 9). Its work order has no finding, but it lists the whole photo as `not_assessed`
+  (action `check-by-eye`) and reads `incomplete`, not `ready`, so it does not pass for a clean wall.
 - COOL on Graviton was not run (section 6).
 - The arm64 timings come from GitHub's `ubuntu-24.04-arm` runner (`results/linux-aarch64/`, Neoverse-N2, one
   thread for the cost table), a GitHub Actions VM, not the deployed Lambda; on the Lambda the only numbers are the

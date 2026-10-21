@@ -57,7 +57,7 @@
 <path class="cross" d="M1305 1614H1323M1314 1605V1623"/><circle class="cross" cx="1314" cy="1614" r="4.5"/>
 <text x="60" y="74" class="sheet-title" xml:space="preserve">DRISHYAM · SYSTEM ARCHITECTURE</text>
 <text x="1280" y="56" class="fs" text-anchor="end" xml:space="preserve">FIG. A-1 · OpenCV 5 components, AWS services and agent components</text>
-<text x="1280" y="74" class="fs" text-anchor="end" xml:space="preserve">cv2 calls, modules and causes are real names in drishyam/ at 03af85b</text>
+<text x="1280" y="74" class="fs" text-anchor="end" xml:space="preserve">cv2 calls, modules and causes are real names in drishyam/ at v1.1.0 (ae16bd8)</text>
 <line class="tbl" x1="36" y1="92" x2="1304" y2="92"/>
 <rect class="frame" x="60" y="108" width="460" height="156"/>
 <circle class="n" cx="82" cy="128" r="11"/>
@@ -213,7 +213,7 @@
 <text x="700" y="890" xml:space="preserve">sees Job.digest(): numbers only</text>
 <text x="700" y="906" xml:space="preserve">validate(): 6-strategy allow-list</text>
 <text x="700" y="922" xml:space="preserve">2 s timeout; bad reply → rejected</text>
-<text x="700" y="938" xml:space="preserve"><tspan class="ca">planner-fallback</tspan>: rule choice stands</text>
+<text x="700" y="938" xml:space="preserve">any failure: the rule choice stands</text>
 <text x="700" y="954" xml:space="preserve">accepted → <tspan class="ca">planner:&lt;strategy&gt;</tspan></text>
 <text x="700" y="970" xml:space="preserve">HTTPS or loopback endpoint only</text>
 </g>

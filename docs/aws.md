@@ -258,9 +258,10 @@ classical engine. Since 2026-10-21 the live segmenter is v1, the CC BY-NC 4.0 da
    OpenCV wheel, not the COOL build). It is the p95 over one job's steps, a handful of numbers.
 3. KILL: a second job is started, `/api/kill` is sent once step 2 has streamed, and the job must end
    `halted` with cause `kill-switch`. The job holds its Lambda environment while it streams, so the kill lands in
-   another one; if that one starts cold (about 3 s with v1), a short job can finish first, as on the first smoke
-   after the v1 deploy (2026-10-20). So the browser (`public/js/api.js`) sends `GET /api/health` as soon as a job
-   starts streaming, which starts a second environment for a later KILL, and this script does the same during both
+   another one; if that one starts cold (over the eleven v1 smoke runs the first `/api/health`, cold when the
+   function was idle or just deployed, took 0.86 to 6.27 s to its first byte: `video/live/aws-smoke.log`), a short
+   job can finish first, as on the first smoke after the v1 deploy (2026-10-20). So the browser
+   (`public/js/api.js`) sends `GET /api/health` as soon as a job starts streaming, which starts a second environment for a later KILL, and this script does the same during both
    jobs and waits for that request before the kill. A KILL pressed during the very first job on a cold function can
    still arrive after a short job has finished.
 4. Behind CloudFront only: a `POST` without `x-amz-content-sha256` gets 403.
