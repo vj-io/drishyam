@@ -16,6 +16,7 @@ import json
 import logging
 import os
 import platform
+import re
 import secrets
 import threading
 import time
@@ -45,6 +46,9 @@ CHAOS = {"p95_spike", "planner_timeout", "planner_malformed"}
 ROOT = Path(__file__).resolve().parent.parent
 MAX_PACED_S = 25.0  # viewing pauses per job (pace_ms): with the 30 s seconds cap, still inside a 60 s function limit
 HOST = "aws-lambda" if os.environ.get("AWS_LAMBDA_FUNCTION_NAME") else "local"
+if CV_THREADS := os.environ.get("DRISHYAM_CV_THREADS"):  # OpenCV's thread count; the stack sets 2 (docs/bench.md)
+    cv2.setNumThreads(int(CV_THREADS))
+    log.info("DRISHYAM_CV_THREADS=%s: cv2.getNumThreads() = %d", CV_THREADS, cv2.getNumThreads())
 
 
 def _signing_key() -> bytes:
@@ -153,6 +157,8 @@ def _log_review(token_in: str, token_out: str, wo: dict) -> None:
     _emf("Decision", [{"Name": "Reviews", "Unit": "Count"}], {"Reviews": 1, **record})
 
 app = FastAPI(title="Drishyam", docs_url=None, redoc_url=None, openapi_url=None)
+API_HEADERS = {"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff",
+               "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'"}
 
 
 def error(status: int, message: str) -> JSONResponse:
@@ -168,17 +174,38 @@ async def _invalid(_: Request, exc: RequestValidationError) -> JSONResponse:
 @app.exception_handler(Exception)
 async def _crash(_: Request, exc: Exception) -> JSONResponse:
     log.exception("unhandled error", exc_info=exc)
-    return error(500, "internal error")
+    # Starlette sends this from outside every middleware, so _api_headers never sees it
+    return JSONResponse({"error": "internal error"}, status_code=500, headers=API_HEADERS)
 
 
 @app.middleware("http")
 async def _api_headers(request: Request, call_next):
     response = await call_next(request)
     if request.url.path.startswith("/api/"):
-        response.headers["Cache-Control"] = "no-store"
-        response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'"
+        response.headers.update(API_HEADERS)
     return response
+
+
+def build_facts() -> dict:
+    """The OpenCV build facts a reviewer asks about, read from cv2.getBuildInformation(): the custom HAL (the Lambda's
+    aarch64 wheel names carotene and KleidiCV there), the CPU baseline and dispatched SIMD sets, the parallel framework,
+    the `ONNX Runtime` line, and the cv2.dnn engines this build can run: the ENGINE_* names cv2.dnn exposes, without
+    `ort` unless the ONNX Runtime line says YES (the constant exists whether or not that backend is built in).
+    A line the build does not print is None."""
+    info = cv2.getBuildInformation()
+
+    def line(label: str) -> str | None:
+        m = re.search(rf"^\s*{re.escape(label)}:[ \t]*(\S.*?)\s*$", info, re.MULTILINE)
+        return m.group(1) if m else None
+
+    ort = line("ONNX Runtime")
+    engines = sorted(n.removeprefix("ENGINE_").lower() for n in dir(cv2.dnn) if n.startswith("ENGINE_"))
+    return {"hal": line("Custom HAL"), "cpu_baseline": line("Baseline"), "cpu_dispatch": line("Dispatched code generation"),
+            "parallel": line("Parallel framework"), "onnx_runtime": ort,
+            "dnn_engines": [e for e in engines if e != "ort" or str(ort).startswith("YES")]}
+
+
+BUILD = build_facts()  # fixed for the process: read once, not per request
 
 
 @app.api_route("/api/health", methods=["GET", "HEAD"])  # HEAD: uptime monitors
@@ -192,7 +219,7 @@ def health() -> dict:
             "segmenter": name, "segmenter_licence": licence,
             "max_upload_bytes": MAX_UPLOAD_BYTES, "max_pixels": imaging.MAX_PIXELS,
             "host": HOST, "arch": platform.machine(),
-            "commit": os.environ.get("DRISHYAM_COMMIT") or None}
+            "commit": os.environ.get("DRISHYAM_COMMIT") or None, "cv2_build": BUILD}
 
 
 async def _read_capped(request: Request, cap: int) -> bytes | None:
@@ -215,7 +242,7 @@ def _parse_replay(header: str | None) -> list:
         raise ValueError("replay header too large")
     try:
         data = json.loads(base64.urlsafe_b64decode(header + "=" * (-len(header) % 4)))
-    except (binascii.Error, ValueError, UnicodeDecodeError) as exc:
+    except (binascii.Error, ValueError, UnicodeDecodeError, RecursionError) as exc:
         raise ValueError("replay header is not base64url JSON") from exc
     return data
 

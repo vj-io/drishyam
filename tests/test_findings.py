@@ -123,11 +123,25 @@ def test_two_decisions_forked_from_one_token_are_visible_siblings():
         assert parent.split(".")[1] not in F._unb64(child.split(".")[0]).decode()
 
 
+def test_a_signed_token_has_one_spelling():
+    """A lenient base64 decoder reads padding and '+' '/' as '-' '_' to the same MAC bytes, so a re-spelt token
+    verified and a second decision forked from one token named a different prev_token_sha256. Only the spelling
+    sign() wrote is accepted."""
+    token = F.sign(F.work_order("j_x", [make()], []), KEY)
+    body, mac = token.split(".")
+    for bad in {token + "=", token + "==", body + "." + mac.translate(str.maketrans("-_", "+/"))} - {token}:
+        with pytest.raises(F.SignatureError):
+            F.verify(bad, KEY)
+    assert F.verify(token, KEY)["job"] == "j_x"
+
+
 def test_tampering_expiry_and_reviewer_validation():
     token = F.sign(F.work_order("j_x", [make()], []), KEY)
     body, mac = token.split(".")
+    m = len(mac) // 2  # flip one middle character: overwriting the tail with "AA" was a no-op when the MAC ended in AA
+    flipped = mac[:m] + ("B" if mac[m] == "A" else "A") + mac[m + 1:]
     forged = F.sign({"findings": [{"id": "f1", "state": "approved"}]}, b"other-key")
-    for bad in (forged, body + "." + mac[:-2] + "AA", "garbage", body[:-4] + "." + mac, ""):
+    for bad in (forged, body + "." + flipped, "garbage", body[:-4] + "." + mac, ""):
         with pytest.raises(F.SignatureError):
             F.verify(bad, KEY)
     with pytest.raises(F.SignatureError, match="expired"):
@@ -174,3 +188,13 @@ def test_work_order_lists_what_was_not_assessed():
     na = [{"step": 3, "box": [0, 0, 512, 512], "reason": "glare", "action": "re-shoot"}]
     assert F.work_order("j_x", [], [], na)["not_assessed"] == na
     assert F.work_order("j_x", [], [])["not_assessed"] == []
+
+
+def test_an_order_with_areas_not_assessed_is_incomplete_not_ready():
+    """ready only when nothing is left for a person: no critical finding pending and no area not assessed."""
+    na = [{"step": 0, "box": [0, 0, 64, 64], "reason": "no candidate region was proposed", "action": "check-by-eye"}]
+    assert F.work_order("j_x", [], [], na)["status"] == "incomplete"
+    wo = F.work_order("j_x", [make()], [[1, 2, 1]], na)
+    assert wo["status"] == "blocked"  # a pending critical finding comes first
+    _, wo2 = F.apply_review(F.sign(wo, KEY), KEY, "f1", "approve", "Ann")
+    assert wo2["status"] == "incomplete"

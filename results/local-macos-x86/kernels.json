@@ -1,0 +1,661 @@
+{
+ "arm": "local-macos-x86",
+ "config": {
+  "repeats": 30,
+  "warmup": 3,
+  "threads": [
+   1,
+   16
+  ],
+  "all_threads": 16,
+  "sizes": [
+   "1024x768",
+   "2048x1536",
+   "4000x3000"
+  ],
+  "frames": "evals.synth.generate(9000, w, h)",
+  "min_contour_points": 50,
+  "frame_facts": {
+   "1024x768": {
+    "contours": 6,
+    "mask_frac": 0.0087
+   },
+   "2048x1536": {
+    "contours": 9,
+    "mask_frac": 0.008
+   },
+   "4000x3000": {
+    "contours": 29,
+    "mask_frac": 0.0094
+   }
+  }
+ },
+ "provenance": {
+  "cv2": "5.0.0",
+  "build_info_sha256": "fe5f9337dbc8663639ee7bcb2deb09359893fc8d2aa5b6a447cee2a0117d2ec7",
+  "cv2_baseline": "SSE SSE2 SSE3 SSSE3 SSE4_1",
+  "cv2_dispatch": "SSE4_2 AVX FP16 AVX2 AVX512_SKX",
+  "cv2_parallel_framework": "GCD",
+  "cv2_custom_hal": "YES (ipp (ver 0.0.1))",
+  "cv2_file": "/Users/mac/Documents/Projects/opencv/.claude/worktrees/wf_63705f18-04c-2/.venv/lib/python3.13/site-packages/cv2/__init__.py",
+  "under_opt_cool": false,
+  "build": "stock (not COOL)",
+  "machine": "Darwin 25.6.0 x86_64",
+  "platform": "macOS-26.7.1-x86_64-i386-64bit-Mach-O",
+  "cpu": "Intel(R) Core(TM) i9-9880H CPU @ 2.30GHz",
+  "logical_cpus": 16,
+  "cv2_threads": 16,
+  "python": "3.13.16",
+  "numpy": "2.5.4",
+  "timestamp": "2026-10-19T05:47:54Z",
+  "load_avg": [
+   8.29,
+   25.67,
+   76.41
+  ],
+  "label": "this Mac (i9-9880H, macOS, GCD), shared with other workstreams: see load_avg"
+ },
+ "results": [
+  {
+   "kernel": "pyramid",
+   "size": "1024x768",
+   "threads": 1,
+   "n": 30,
+   "p50_ms": 2.42,
+   "p95_ms": 2.706,
+   "mean_ms": 2.455,
+   "min_ms": 2.269,
+   "ops_per_s": 407.33
+  },
+  {
+   "kernel": "clahe_lab",
+   "size": "1024x768",
+   "threads": 1,
+   "n": 30,
+   "p50_ms": 14.93,
+   "p95_ms": 16.488,
+   "mean_ms": 14.873,
+   "min_ms": 13.421,
+   "ops_per_s": 67.24
+  },
+  {
+   "kernel": "scharr_tensor",
+   "size": "1024x768",
+   "threads": 1,
+   "n": 30,
+   "p50_ms": 17.461,
+   "p95_ms": 23.792,
+   "mean_ms": 18.045,
+   "min_ms": 13.612,
+   "ops_per_s": 55.42
+  },
+  {
+   "kernel": "blackhat_tophat",
+   "size": "1024x768",
+   "threads": 1,
+   "n": 30,
+   "p50_ms": 7.134,
+   "p95_ms": 8.222,
+   "mean_ms": 7.223,
+   "min_ms": 6.584,
+   "ops_per_s": 138.45
+  },
+  {
+   "kernel": "canny",
+   "size": "1024x768",
+   "threads": 1,
+   "n": 30,
+   "p50_ms": 3.835,
+   "p95_ms": 4.678,
+   "mean_ms": 3.948,
+   "min_ms": 3.383,
+   "ops_per_s": 253.29
+  },
+  {
+   "kernel": "components_contours",
+   "size": "1024x768",
+   "threads": 1,
+   "n": 30,
+   "p50_ms": 8.175,
+   "p95_ms": 9.947,
+   "mean_ms": 8.367,
+   "min_ms": 7.08,
+   "ops_per_s": 119.52
+  },
+  {
+   "kernel": "warp_gaze",
+   "size": "1024x768",
+   "threads": 1,
+   "n": 30,
+   "p50_ms": 2.378,
+   "p95_ms": 2.864,
+   "mean_ms": 2.428,
+   "min_ms": 2.11,
+   "ops_per_s": 411.86
+  },
+  {
+   "kernel": "blob",
+   "size": "1024x768",
+   "threads": 1,
+   "n": 30,
+   "p50_ms": 3.527,
+   "p95_ms": 5.091,
+   "mean_ms": 3.699,
+   "min_ms": 2.525,
+   "ops_per_s": 270.34
+  },
+  {
+   "kernel": "pyramid",
+   "size": "2048x1536",
+   "threads": 1,
+   "n": 30,
+   "p50_ms": 11.117,
+   "p95_ms": 14.406,
+   "mean_ms": 11.41,
+   "min_ms": 9.727,
+   "ops_per_s": 87.64
+  },
+  {
+   "kernel": "clahe_lab",
+   "size": "2048x1536",
+   "threads": 1,
+   "n": 30,
+   "p50_ms": 66.974,
+   "p95_ms": 80.373,
+   "mean_ms": 68.167,
+   "min_ms": 54.556,
+   "ops_per_s": 14.67
+  },
+  {
+   "kernel": "scharr_tensor",
+   "size": "2048x1536",
+   "threads": 1,
+   "n": 30,
+   "p50_ms": 53.015,
+   "p95_ms": 71.732,
+   "mean_ms": 55.513,
+   "min_ms": 45.89,
+   "ops_per_s": 18.01
+  },
+  {
+   "kernel": "blackhat_tophat",
+   "size": "2048x1536",
+   "threads": 1,
+   "n": 30,
+   "p50_ms": 34.942,
+   "p95_ms": 40.65,
+   "mean_ms": 35.45,
+   "min_ms": 30.176,
+   "ops_per_s": 28.21
+  },
+  {
+   "kernel": "canny",
+   "size": "2048x1536",
+   "threads": 1,
+   "n": 30,
+   "p50_ms": 12.754,
+   "p95_ms": 14.588,
+   "mean_ms": 12.789,
+   "min_ms": 11.297,
+   "ops_per_s": 78.19
+  },
+  {
+   "kernel": "components_contours",
+   "size": "2048x1536",
+   "threads": 1,
+   "n": 30,
+   "p50_ms": 32.424,
+   "p95_ms": 38.137,
+   "mean_ms": 32.405,
+   "min_ms": 26.736,
+   "ops_per_s": 30.86
+  },
+  {
+   "kernel": "warp_gaze",
+   "size": "2048x1536",
+   "threads": 1,
+   "n": 30,
+   "p50_ms": 2.323,
+   "p95_ms": 3.26,
+   "mean_ms": 2.434,
+   "min_ms": 2.09,
+   "ops_per_s": 410.85
+  },
+  {
+   "kernel": "blob",
+   "size": "2048x1536",
+   "threads": 1,
+   "n": 30,
+   "p50_ms": 3.726,
+   "p95_ms": 7.714,
+   "mean_ms": 4.423,
+   "min_ms": 2.75,
+   "ops_per_s": 226.09
+  },
+  {
+   "kernel": "pyramid",
+   "size": "4000x3000",
+   "threads": 1,
+   "n": 30,
+   "p50_ms": 41.357,
+   "p95_ms": 45.106,
+   "mean_ms": 41.844,
+   "min_ms": 39.564,
+   "ops_per_s": 23.9
+  },
+  {
+   "kernel": "clahe_lab",
+   "size": "4000x3000",
+   "threads": 1,
+   "n": 30,
+   "p50_ms": 220.381,
+   "p95_ms": 246.626,
+   "mean_ms": 221.381,
+   "min_ms": 202.298,
+   "ops_per_s": 4.52
+  },
+  {
+   "kernel": "scharr_tensor",
+   "size": "4000x3000",
+   "threads": 1,
+   "n": 30,
+   "p50_ms": 251.957,
+   "p95_ms": 283.03,
+   "mean_ms": 252.83,
+   "min_ms": 224.173,
+   "ops_per_s": 3.96
+  },
+  {
+   "kernel": "blackhat_tophat",
+   "size": "4000x3000",
+   "threads": 1,
+   "n": 30,
+   "p50_ms": 131.54,
+   "p95_ms": 140.337,
+   "mean_ms": 128.318,
+   "min_ms": 113.774,
+   "ops_per_s": 7.79
+  },
+  {
+   "kernel": "canny",
+   "size": "4000x3000",
+   "threads": 1,
+   "n": 30,
+   "p50_ms": 42.369,
+   "p95_ms": 47.475,
+   "mean_ms": 43.069,
+   "min_ms": 39.692,
+   "ops_per_s": 23.22
+  },
+  {
+   "kernel": "components_contours",
+   "size": "4000x3000",
+   "threads": 1,
+   "n": 30,
+   "p50_ms": 102.761,
+   "p95_ms": 111.923,
+   "mean_ms": 102.995,
+   "min_ms": 95.955,
+   "ops_per_s": 9.71
+  },
+  {
+   "kernel": "warp_gaze",
+   "size": "4000x3000",
+   "threads": 1,
+   "n": 30,
+   "p50_ms": 2.138,
+   "p95_ms": 2.881,
+   "mean_ms": 2.241,
+   "min_ms": 2.043,
+   "ops_per_s": 446.23
+  },
+  {
+   "kernel": "blob",
+   "size": "4000x3000",
+   "threads": 1,
+   "n": 30,
+   "p50_ms": 4.936,
+   "p95_ms": 8.814,
+   "mean_ms": 5.265,
+   "min_ms": 3.083,
+   "ops_per_s": 189.93
+  },
+  {
+   "kernel": "pyramid",
+   "size": "1024x768",
+   "threads": 16,
+   "n": 30,
+   "p50_ms": 0.776,
+   "p95_ms": 3.479,
+   "mean_ms": 1.254,
+   "min_ms": 0.596,
+   "ops_per_s": 797.45
+  },
+  {
+   "kernel": "clahe_lab",
+   "size": "1024x768",
+   "threads": 16,
+   "n": 30,
+   "p50_ms": 5.31,
+   "p95_ms": 7.718,
+   "mean_ms": 5.738,
+   "min_ms": 4.577,
+   "ops_per_s": 174.28
+  },
+  {
+   "kernel": "scharr_tensor",
+   "size": "1024x768",
+   "threads": 16,
+   "n": 30,
+   "p50_ms": 20.09,
+   "p95_ms": 24.109,
+   "mean_ms": 20.209,
+   "min_ms": 15.637,
+   "ops_per_s": 49.48
+  },
+  {
+   "kernel": "blackhat_tophat",
+   "size": "1024x768",
+   "threads": 16,
+   "n": 30,
+   "p50_ms": 8.045,
+   "p95_ms": 10.626,
+   "mean_ms": 8.421,
+   "min_ms": 7.536,
+   "ops_per_s": 118.75
+  },
+  {
+   "kernel": "canny",
+   "size": "1024x768",
+   "threads": 16,
+   "n": 30,
+   "p50_ms": 2.76,
+   "p95_ms": 4.029,
+   "mean_ms": 2.644,
+   "min_ms": 1.088,
+   "ops_per_s": 378.21
+  },
+  {
+   "kernel": "components_contours",
+   "size": "1024x768",
+   "threads": 16,
+   "n": 30,
+   "p50_ms": 7.239,
+   "p95_ms": 12.732,
+   "mean_ms": 8.015,
+   "min_ms": 5.161,
+   "ops_per_s": 124.77
+  },
+  {
+   "kernel": "warp_gaze",
+   "size": "1024x768",
+   "threads": 16,
+   "n": 30,
+   "p50_ms": 0.457,
+   "p95_ms": 0.646,
+   "mean_ms": 0.505,
+   "min_ms": 0.388,
+   "ops_per_s": 1980.2
+  },
+  {
+   "kernel": "blob",
+   "size": "1024x768",
+   "threads": 16,
+   "n": 30,
+   "p50_ms": 4.113,
+   "p95_ms": 7.347,
+   "mean_ms": 4.268,
+   "min_ms": 2.326,
+   "ops_per_s": 234.3
+  },
+  {
+   "kernel": "pyramid",
+   "size": "2048x1536",
+   "threads": 16,
+   "n": 30,
+   "p50_ms": 3.0,
+   "p95_ms": 5.63,
+   "mean_ms": 3.422,
+   "min_ms": 2.355,
+   "ops_per_s": 292.23
+  },
+  {
+   "kernel": "clahe_lab",
+   "size": "2048x1536",
+   "threads": 16,
+   "n": 30,
+   "p50_ms": 18.979,
+   "p95_ms": 21.815,
+   "mean_ms": 18.133,
+   "min_ms": 13.208,
+   "ops_per_s": 55.15
+  },
+  {
+   "kernel": "scharr_tensor",
+   "size": "2048x1536",
+   "threads": 16,
+   "n": 30,
+   "p50_ms": 33.075,
+   "p95_ms": 44.225,
+   "mean_ms": 34.13,
+   "min_ms": 22.678,
+   "ops_per_s": 29.3
+  },
+  {
+   "kernel": "blackhat_tophat",
+   "size": "2048x1536",
+   "threads": 16,
+   "n": 30,
+   "p50_ms": 15.019,
+   "p95_ms": 19.342,
+   "mean_ms": 15.498,
+   "min_ms": 10.322,
+   "ops_per_s": 64.52
+  },
+  {
+   "kernel": "canny",
+   "size": "2048x1536",
+   "threads": 16,
+   "n": 30,
+   "p50_ms": 7.417,
+   "p95_ms": 11.283,
+   "mean_ms": 7.781,
+   "min_ms": 4.749,
+   "ops_per_s": 128.52
+  },
+  {
+   "kernel": "components_contours",
+   "size": "2048x1536",
+   "threads": 16,
+   "n": 30,
+   "p50_ms": 27.58,
+   "p95_ms": 36.144,
+   "mean_ms": 28.456,
+   "min_ms": 22.62,
+   "ops_per_s": 35.14
+  },
+  {
+   "kernel": "warp_gaze",
+   "size": "2048x1536",
+   "threads": 16,
+   "n": 30,
+   "p50_ms": 0.493,
+   "p95_ms": 0.666,
+   "mean_ms": 0.554,
+   "min_ms": 0.426,
+   "ops_per_s": 1805.05
+  },
+  {
+   "kernel": "blob",
+   "size": "2048x1536",
+   "threads": 16,
+   "n": 30,
+   "p50_ms": 3.7,
+   "p95_ms": 7.529,
+   "mean_ms": 4.128,
+   "min_ms": 2.114,
+   "ops_per_s": 242.25
+  },
+  {
+   "kernel": "pyramid",
+   "size": "4000x3000",
+   "threads": 16,
+   "n": 30,
+   "p50_ms": 10.093,
+   "p95_ms": 13.387,
+   "mean_ms": 10.404,
+   "min_ms": 7.473,
+   "ops_per_s": 96.12
+  },
+  {
+   "kernel": "clahe_lab",
+   "size": "4000x3000",
+   "threads": 16,
+   "n": 30,
+   "p50_ms": 55.513,
+   "p95_ms": 60.525,
+   "mean_ms": 55.838,
+   "min_ms": 51.368,
+   "ops_per_s": 17.91
+  },
+  {
+   "kernel": "scharr_tensor",
+   "size": "4000x3000",
+   "threads": 16,
+   "n": 30,
+   "p50_ms": 129.535,
+   "p95_ms": 144.636,
+   "mean_ms": 129.383,
+   "min_ms": 108.933,
+   "ops_per_s": 7.73
+  },
+  {
+   "kernel": "blackhat_tophat",
+   "size": "4000x3000",
+   "threads": 16,
+   "n": 30,
+   "p50_ms": 42.559,
+   "p95_ms": 46.664,
+   "mean_ms": 42.148,
+   "min_ms": 34.021,
+   "ops_per_s": 23.73
+  },
+  {
+   "kernel": "canny",
+   "size": "4000x3000",
+   "threads": 16,
+   "n": 30,
+   "p50_ms": 15.316,
+   "p95_ms": 21.426,
+   "mean_ms": 15.826,
+   "min_ms": 12.273,
+   "ops_per_s": 63.19
+  },
+  {
+   "kernel": "components_contours",
+   "size": "4000x3000",
+   "threads": 16,
+   "n": 30,
+   "p50_ms": 86.558,
+   "p95_ms": 96.303,
+   "mean_ms": 84.416,
+   "min_ms": 72.034,
+   "ops_per_s": 11.85
+  },
+  {
+   "kernel": "warp_gaze",
+   "size": "4000x3000",
+   "threads": 16,
+   "n": 30,
+   "p50_ms": 0.58,
+   "p95_ms": 0.744,
+   "mean_ms": 0.606,
+   "min_ms": 0.468,
+   "ops_per_s": 1650.17
+  },
+  {
+   "kernel": "blob",
+   "size": "4000x3000",
+   "threads": 16,
+   "n": 30,
+   "p50_ms": 5.254,
+   "p95_ms": 7.226,
+   "mean_ms": 5.204,
+   "min_ms": 2.76,
+   "ops_per_s": 192.16
+  }
+ ],
+ "dnn": [
+  {
+   "model": "nanodet",
+   "size": "416x416",
+   "threads": 1,
+   "n": 30,
+   "p50_ms": 44.882,
+   "p95_ms": 50.285,
+   "mean_ms": 44.507,
+   "min_ms": 38.347,
+   "ops_per_s": 22.47
+  },
+  {
+   "model": "onnx:fp32@256",
+   "size": "256x256",
+   "threads": 1,
+   "n": 30,
+   "p50_ms": 177.151,
+   "p95_ms": 199.296,
+   "mean_ms": 179.743,
+   "min_ms": 167.072,
+   "ops_per_s": 5.56
+  },
+  {
+   "model": "onnx:fp32@512",
+   "size": "512x512",
+   "threads": 1,
+   "n": 30,
+   "p50_ms": 704.892,
+   "p95_ms": 814.493,
+   "mean_ms": 717.441,
+   "min_ms": 668.243,
+   "ops_per_s": 1.39
+  },
+  {
+   "model": "nanodet",
+   "size": "416x416",
+   "threads": 16,
+   "n": 30,
+   "p50_ms": 23.233,
+   "p95_ms": 29.222,
+   "mean_ms": 23.536,
+   "min_ms": 17.622,
+   "ops_per_s": 42.49
+  },
+  {
+   "model": "onnx:fp32@256",
+   "size": "256x256",
+   "threads": 16,
+   "n": 30,
+   "p50_ms": 64.873,
+   "p95_ms": 73.311,
+   "mean_ms": 62.379,
+   "min_ms": 46.783,
+   "ops_per_s": 16.03
+  },
+  {
+   "model": "onnx:fp32@512",
+   "size": "512x512",
+   "threads": 16,
+   "n": 30,
+   "p50_ms": 198.241,
+   "p95_ms": 209.234,
+   "mean_ms": 196.078,
+   "min_ms": 177.258,
+   "ops_per_s": 5.1
+  }
+ ],
+ "load_avg_end": [
+  11.32,
+  21.43,
+  69.1
+ ]
+}

@@ -50,7 +50,7 @@ import numpy as np
 
 from bench.micro import check_load, provenance, set_threads
 from drishyam import imaging
-from drishyam.agent import PLANNER_MALFORMED_STEP, PLANNER_TIMEOUT_STEP, Job, JobConfig
+from drishyam.agent import PLANNER_MALFORMED_STEP, PLANNER_TIMEOUT_STEP, Job, JobConfig, profile_for
 from drishyam.findings import SPALL_CRITICAL_AREA_PX, is_critical
 from drishyam.governor import USD_PER_HOUR
 from drishyam.segment import DEFECTS, ClassicalSegmenter, default_segmenter, drop_straight_lines, restrict
@@ -67,16 +67,25 @@ BOOT_N, BOOT_SEED, CHANCE_SEED = 1000, 0, 1
 SMALL_PX = 96 * 96  # GT boxes below this area form the small-box stratum
 PER_IMAGE_OPS = ("pyrDown", "saliency", "downscale")  # their cost grows with the image; per-look ops read 512x512
 REPO = Path(__file__).resolve().parents[1]
-SWITCHES = ("order", "seed", "use_uncertainty", "survey", "verify", "governor")  # JobConfig fields a variant may flip
+SWITCHES = ("order", "seed", "use_uncertainty", "seed_from_looks", "v0", "survey", "verify",
+            "governor")  # JobConfig fields a variant may flip
 ABLATION_CAPS = (0.3, 1.0)
 ABLATIONS = {  # FR-21: each variant flips one switch of the compared agent (governor off, as in every comparison)
     "full": {},
     **{f"random-order-s{s}": {"order": "random", "seed": s} for s in (0, 1, 2)},
     "no-uncertainty": {"use_uncertainty": False},
+    "no-seed": {"seed_from_looks": False},  # no look sets an unvisited candidate's entropy or class: score = prior x unseen
+    "no-floor": {"v0": 0.0},  # the stop rule's lambda is 0 until something is found
+    # A score term also moves the stop floor (it compares the score with eps x v0), so turning one off changes when a
+    # job stops as well as where it looks. These two take the floor away too and are compared with no-floor (REFERENCE):
+    # that ratio is the term's effect on gaze order alone.
+    "no-uncertainty+no-floor": {"use_uncertainty": False, "v0": 0.0},
+    "no-seed+no-floor": {"seed_from_looks": False, "v0": 0.0},
     "no-survey": {"survey": False},
     "no-verify": {"verify": False},
     "governor-on": {"governor": True},  # deployment behaviour: may switch to the fast net, so not like for like
 }
+REFERENCE = {"no-uncertainty+no-floor": "no-floor", "no-seed+no-floor": "no-floor"}  # also scored against these
 GOVERNOR_USE = {
     False: "policy comparison: the governor's model, level and gaze-size overrides are off (caps and the kill switch "
            "stay), so Drishyam segments every look with the same accurate net as the baselines",
@@ -245,10 +254,12 @@ def run_tiling(img: np.ndarray, seg, level: int, costs: dict | None = None) -> d
 
 
 class RecordingSegmenter:
-    """The default segmenter, keeping every Segmentation so per-component boxes can be rebuilt after a job."""
+    """The default segmenter (or `inner`), keeping every Segmentation so per-component boxes can be rebuilt after a job."""
 
-    def __init__(self) -> None:
-        self.inner, self.log = default_segmenter(), []
+    def __init__(self, inner=None) -> None:
+        self.inner, self.log = inner or default_segmenter(), []
+        self.name = self.inner.name  # the Job picks its profile by this name and these weights (agent.PROFILES)
+        self.sha256 = getattr(self.inner, "sha256", None)
 
     def predict(self, crop, model="accurate"):
         self.log.append(self.inner.predict(crop, model))
@@ -261,12 +272,16 @@ def gaze_to_l0(x: int, y: int, level: int, size: int) -> np.ndarray:
     return np.array([[s, 0, s * (x / s - size / 2)], [0, s, s * (y / s - size / 2)], [0, 0, 1.0]])
 
 
-def finding_components(job: Job, segs: list) -> list[dict]:
+def finding_components(job: Job, segs: list, confirms: list = ()) -> list[dict]:
     """Drishyam's evidence in the baselines' box semantics: per-component boxes of the classes behind each
-    finding, from every look in its evidence trail. Lets the harness score both box conventions (see `run`)."""
+    finding, from every look in its evidence trail. Lets the harness score both box conventions (see `run`).
+    `segs`: the scout's raw output per look; `confirms`: the confirm net's, in order, for the looks it segmented
+    again (a cascade, drishyam.cascade), which then kept the confirm's."""
     looks = [r for r in job.trace if r["decision"]["action"] != "halt"]
-    out, wh = [], job.image.shape[1::-1]
+    out, wh, again = [], job.image.shape[1::-1], iter(confirms)
     for rec, seg in zip(looks, segs, strict=True):
+        if "latency_ms" in rec.get("confirm", {}):
+            seg = next(again)
         classes = {f.cls for f in job.findings if rec["step"] in f.steps}
         if classes:
             a = rec["decision"]["args"]
@@ -294,13 +309,16 @@ class FixedCostJob(Job):
         return out, ms
 
 
-def run_drishyam(img: np.ndarray, cap: float, costs: dict | None = None, **switches) -> dict:
+def run_drishyam(img: np.ndarray, cap: float, costs: dict | None = None, segmenter=None, confirm=None,
+                 **switches) -> dict:
     """One Job at pixel cap `cap`. `switches` are JobConfig ablation fields; the governor's overrides are off unless
-    governor=True, so a policy comparison runs the accurate net on every look, as the baselines do."""
+    governor=True, so a policy comparison runs the accurate net on every look, as the baselines do. `segmenter`: the
+    job's (default `default_segmenter()`); `confirm`: a confirm net, for a cascade (drishyam.cascade; default none)."""
     t0 = time.perf_counter()
-    rec_seg = RecordingSegmenter()
+    rec_seg, rec_confirm = RecordingSegmenter(segmenter), None if confirm is None else RecordingSegmenter(confirm)
     cfg = JobConfig(pixel_cap=cap, thumbs=False, **{"governor": False, **switches})
-    job = Job(img, cfg, segmenter=rec_seg) if costs is None else FixedCostJob(img, cfg, costs, segmenter=rec_seg)
+    kw = {"segmenter": rec_seg, "confirm": rec_confirm}
+    job = Job(img, cfg, **kw) if costs is None else FixedCostJob(img, cfg, costs, **kw)
     done = list(job.run())[-1]
     wall = time.perf_counter() - t0 if costs is None else job.now
     preds = [{"cls": f.cls, "box": list(f.box), "area": int(f.measure["area_px"]), "conf": round(f.confidence, 3),
@@ -310,13 +328,17 @@ def run_drishyam(img: np.ndarray, cap: float, costs: dict | None = None, **switc
               "level": r["decision"]["args"].get("level"), "window": r.get("window"),
               "q_ok": r.get("quality", {}).get("ok", True), "q_reason": r.get("quality", {}).get("reason"),
               "sharpness": r.get("observation", {}).get("sharpness"), "model": r.get("model"),
-              "governor": r.get("governor", {}).get("cause")} for r in job.trace]
-    net = net_px(rec_seg.log)
-    return {"preds": finding_components(job, rec_seg.log), "preds_union": preds, "pixels_frac": done["summary"]["pixels_frac"],
+              "governor": r.get("governor", {}).get("cause"), "seeded": len(r.get("seeded", ())),
+              **({"confirm": r["confirm"]} if "confirm" in r else {})} for r in job.trace]
+    confirms = rec_confirm.log if rec_confirm else []
+    net = net_px(rec_seg.log + confirms)
+    return {"preds": finding_components(job, rec_seg.log, confirms), "preds_union": preds,
+            "pixels_frac": done["summary"]["pixels_frac"],
             "net_pixels_frac": None if net is None else net / (img.shape[0] * img.shape[1]), "wall_s": wall,
             "trace": trace, "status": done["status"], "halt_cause": done["cause"],
             "models": dict(collections.Counter(t["model"] for t in trace if t["action"] != "halt")),
-            "switches": {k: getattr(job.cfg, k) for k in SWITCHES}}  # what the job read, not what was asked
+            "switches": {k: getattr(job.cfg, k) for k in SWITCHES},  # what the job read, not what was asked
+            "profile": job.cfg.profile, "segmenter": rec_seg.name, "confirm": rec_confirm and rec_confirm.name}
 
 
 def eval_image(rec: dict, budgets=BUDGETS, cost_rows: list | None = None, governor: bool = False) -> dict:
@@ -333,8 +355,9 @@ def eval_image(rec: dict, budgets=BUDGETS, cost_rows: list | None = None, govern
 
 
 # ---------------------------------------------------------------- fixed cost model
-def cost_rows(micro_arm: str, seg_name: str) -> list[dict]:
-    """The job_ops rows of results/<micro_arm>/micro.json, which must have timed this segmenter."""
+def cost_rows(micro_arm: str, seg_name: str, confirm_name: str | None = None) -> list[dict]:
+    """The job_ops rows of results/<micro_arm>/micro.json, which must have timed this segmenter (and, for a cascade,
+    this confirm net: its segment:confirm row)."""
     p = REPO / "results" / micro_arm / "micro.json"
     jobs = json.loads(p.read_text()).get("job_ops") if p.exists() else None
     if not jobs:
@@ -342,6 +365,9 @@ def cost_rows(micro_arm: str, seg_name: str) -> list[dict]:
     if jobs["segmenter"] != seg_name:
         raise SystemExit(f"{p} timed {jobs['segmenter']}, but this process segments with {seg_name}: time it with "
                          f"`python -m bench.micro --arm <new arm> --job-ops-only` (same DRISHYAM_ONNX) and pass --micro-arm")
+    if confirm_name and jobs.get("confirm") != confirm_name:
+        raise SystemExit(f"{p} timed confirm net {jobs.get('confirm')}, not {confirm_name}: time the pair with "
+                         "`python -m bench.micro --arm <new arm> --job-ops-only` (same DRISHYAM_ONNX_CONFIRM)")
     return jobs["results"]
 
 
@@ -426,12 +452,15 @@ CONVENTIONS = {"components": lambda key: "preds", "union": lambda key: "preds_un
                "as_specified": lambda key: "preds_union" if key.startswith("drishyam") else "preds"}
 
 
-def load_records(data_dir, n: int, kind: str = "auto", seed: int = 7, size=(2048, 1536)) -> tuple[list[dict], str]:
+def load_records(data_dir, n: int, kind: str = "auto", seed: int = 7, size=(2048, 1536),
+                 list_file=None) -> tuple[list[dict], str]:
     """Records and a dataset label. A missing synthetic set is built with `seed` and `size` (w, h); an existing one
-    must have been built with `seed`."""
+    must have been built with `seed`. `list_file`: the CODEBRIM image list to score (default <data_dir>/eval200.txt;
+    evals/codebrim_dev100.txt is the dev split tuning may read)."""
     d = Path(data_dir)
     if kind == "auto":
-        kind = "synth" if (d / "annotations.json").exists() or not (d / "eval200.txt").exists() else "codebrim"
+        kind = "codebrim" if list_file or (
+            (d / "eval200.txt").exists() and not (d / "annotations.json").exists()) else "synth"
     if kind == "synth":
         if not (d / "annotations.json").exists():
             print(f"{d}/annotations.json missing: building synthetic-{n} at {size[0]}x{size[1]}, seed {seed}", flush=True)
@@ -447,6 +476,9 @@ def load_records(data_dir, n: int, kind: str = "auto", seed: int = 7, size=(2048
         if ann.get("clean"):
             return recs, f"synthetic clean set, {len(recs)} images with distractors and no damage (labelled synthetic)"
         return recs, f"synthetic-{len(recs)} at {recs[0]['width']}x{recs[0]['height']} (labelled synthetic)"
+    if list_file:
+        recs = codebrim.load_eval(d, Path(list_file))[:n]
+        return recs, f"CODEBRIM {Path(list_file).stem} subset ({len(recs)} images)"
     recs = codebrim.load_eval(d, d / "eval200.txt")[:n]
     return recs, f"CODEBRIM eval subset ({len(recs)} images)"
 
@@ -723,9 +755,9 @@ def short_provenance(prov: dict, workers: int, threads, micro_arm: str, data_id:
 
 
 def segmenter_id(seg) -> str:
-    """seg.name plus each ONNX file's name and short sha256: every trained model installs as
-    models/drishyam_dacl10k.onnx, and the FP16 net (if any) serves the 'fast' looks, so the name alone does not say
-    which model made a cache."""
+    """seg.name plus each ONNX file's name and short sha256: a retrained model installs under the same name
+    (models/drishyam_dacl10k.onnx, or drishyam_dacl10k_<variant>.onnx), and the FP16 net (if any) serves the 'fast'
+    looks, so the name alone does not say which model made a cache."""
     files = [Path(p) for p in getattr(seg, "files", ()) if p]
     return " ".join([seg.name, *(f"{p.name}@{hashlib.sha256(p.read_bytes()).hexdigest()[:12]}" for p in files)])
 
@@ -733,12 +765,12 @@ def segmenter_id(seg) -> str:
 def run(data_dir="data/synth200", n=200, out_dir="public/results", results_dir="results", workers=None,
         chaos=(20, 20, 10), kind="auto", micro_arm="local-macos-x86", primary_boxes="components", reuse=False,
         log=lambda msg: print(msg, flush=True), cost_model="fixed", seed=7, size=(2048, 1536), governor=False,
-        max_load=None) -> dict:
+        max_load=None, list_file=None) -> dict:
     from evals import failures
 
     t_start, load_start = time.time(), check_load(max_load)
     workers = max(1, min(8, (mp.cpu_count() or 2) // 2)) if workers is None else workers
-    records, label = load_records(data_dir, n, kind, seed, size)
+    records, label = load_records(data_dir, n, kind, seed, size, list_file)
     synthetic, data_id = label.startswith("synthetic"), dataset_sha256(records)
     out, repo = Path(out_dir).resolve(), REPO
     kept_local = [repo / "results" / "codebrim", repo / "runs"]  # git-ignored, and outside public/, which is all the site serves
@@ -823,7 +855,7 @@ def run(data_dir="data/synth200", n=200, out_dir="public/results", results_dir="
         "dataset": label,
         "n_images": len(records),
         "segmenter": seg_name,
-        "agent_config": {"governor": governor, "use": GOVERNOR_USE[governor]},
+        "agent_config": {"governor": governor, "use": GOVERNOR_USE[governor], "profile": profile_for(seg)},
         "cost_model": {"kind": cost_model, **({"source": f"results/{micro_arm}/micro.json job_ops (p50 ms per call)",
                                                "ms_per_call": {k: round(v, 2) for k, v in op_costs(
                                                    rows, records[0]["width"], records[0]["height"]).items()}}
@@ -883,7 +915,7 @@ def ablation_image(rec: dict, caps=ABLATION_CAPS, cost_rows: list | None = None)
 
 def check_variants(results: list[dict], caps) -> None:
     """Refuse to compare unless every output ran its label's switches (read from the job's own config) and shows it:
-    no verify look with verify off, no survey look with the survey off."""
+    no verify look with verify off, no survey look with the survey off, no seeded candidate with seeding off."""
     for res in results:
         for v in ABLATIONS:
             want = switches(v)
@@ -892,7 +924,8 @@ def check_variants(results: list[dict], caps) -> None:
                 if c["switches"] != want:
                     raise SystemExit(f"{res['id']} {v}@{cap} ran {c['switches']}, not its label's {want}")
                 if (not want["verify"] and any(t["action"] == "verify" for t in c["trace"])) or (
-                        not want["survey"] and any(t["cause"] == "survey" for t in c["trace"])):
+                        not want["survey"] and any(t["cause"] == "survey" for t in c["trace"])) or (
+                        not want["seed_from_looks"] and any(t.get("seeded") for t in c["trace"])):
                     raise SystemExit(f"{res['id']} {v}@{cap}: the trace shows a look its switches turn off")
 
 
@@ -929,12 +962,12 @@ def random_order_note(rows: dict, cap: float, pooled_ci: list, n: int) -> str:
 
 def run_ablations(data_dir="data/synth200", n=200, out_dir="public/results", results_dir="runs/ablations", workers=None,
                   kind="auto", micro_arm="local-macos-x86", primary_boxes="components", caps=ABLATION_CAPS,
-                  log=lambda msg: print(msg, flush=True), seed=7, size=(2048, 1536), max_load=None) -> dict:
+                  log=lambda msg: print(msg, flush=True), seed=7, size=(2048, 1536), max_load=None, list_file=None) -> dict:
     """The ABLATIONS variants at `caps` on fixed costs, each against the full agent (paired bootstrap) and its own
     chance baseline. Merges this dataset's entry into <out_dir>/ablations.json; writes no image."""
     t_start, load_start = time.time(), check_load(max_load)
     workers = max(1, min(8, (mp.cpu_count() or 2) // 2)) if workers is None else workers
-    records, label = load_records(data_dir, n, kind, seed, size)
+    records, label = load_records(data_dir, n, kind, seed, size, list_file)
     data_id, seg = dataset_sha256(records), default_segmenter()
     rows = cost_rows(micro_arm, seg.name)
     log(f"{len(records)} images, {workers} worker(s); ablations {list(ABLATIONS)} at caps {caps}")
@@ -960,13 +993,24 @@ def run_ablations(data_dir="data/synth200", n=200, out_dir="public/results", res
                       "steps_p50": _r(np.percentile([sum(t["action"] != "halt" for t in trace) for trace in tr], 50), 1),
                       "verify_looks": sum(t["action"] == "verify" for t in steps),
                       "survey_looks": sum(t["cause"] == "survey" for t in steps),
+                      # how the jobs ended: a variant that stops earlier also spends fewer pixels (pixels_frac)
+                      "halt_causes": dict(collections.Counter(r["configs"][f"{v}@{cap}"]["halt_cause"] for r in results)),
                       "model_usage": usage[f"{v}@{cap}"]}
+            if ref := REFERENCE.get(v):
+                mr, ci_ref = m[f"{ref}@{cap}"], ratio_ci(mv, m[f"{ref}@{cap}"], n_img)
+                out[v] |= {"ref": ref, "ratio_vs_ref": _r(mv["recall"] / mr["recall"]) if mr["recall"] else None,
+                           "ratio_vs_ref_ci": ci_ref, "vs_ref": vs_full(ci_ref).replace("the full agent", ref)}
         by_cap[str(cap)] = out
     threads = sorted({r["cv2_threads"] for r in results})
     prov = run_provenance(load_start)
-    entry = {"dataset": label, "n_images": n_img, "segmenter": seg.name, "box_convention": primary_boxes,
+    entry = {"dataset": label, "n_images": n_img, "segmenter": seg.name, "profile": profile_for(seg),
+             "box_convention": primary_boxes,
              "cost_model": {"kind": "fixed", "source": f"results/{micro_arm}/micro.json job_ops (p50 ms per call)"},
              "variants": {v: switches(v) for v in ABLATIONS}, "by_cap": by_cap,
+             "coupling": ("no-uncertainty and no-seed lower every score, so the stop floor (eps x v0) also ends their "
+                          "jobs sooner: their ratio_vs_full mixes the term's effect on where the agent looks with a "
+                          "smaller pixel spend (see pixels_frac and halt_causes). The '+no-floor' rows remove the floor "
+                          "as well; their ratio_vs_ref, against no-floor, is the term's effect on gaze order alone."),
              "random_order": [random_order_note(by_cap[str(c)], c, ratio_ci(pooled_seeds(m, c), m[f"full@{c}"], n_img), n_img)
                               for c in caps],
              "provenance": short_provenance(prov, workers, threads[0] if len(threads) == 1 else threads, micro_arm, data_id,
@@ -993,6 +1037,7 @@ def main(argv=None) -> None:
     ap.add_argument("--workers", type=int, default=None, help="default: min(8, cpus/2); 1 runs inline")
     ap.add_argument("--chaos", default="20,20,10", help="planner_timeout,planner_malformed,p95_spike job counts")
     ap.add_argument("--kind", choices=("auto", "synth", "codebrim"), default="auto")
+    ap.add_argument("--list", help="CODEBRIM image list to score (default <data>/eval200.txt)")
     ap.add_argument("--micro-arm", default="local-macos-x86", help="results/<arm>/micro.json to embed")
     ap.add_argument("--reuse", action="store_true", help="re-score and re-draw from results/eval_per_image.json (last run)")
     ap.add_argument("--primary-boxes", choices=tuple(CONVENTIONS), default="components",
@@ -1013,10 +1058,12 @@ def main(argv=None) -> None:
         if a.cost_model != "fixed" or a.governor or a.reuse:
             ap.error("--ablation runs on fixed costs, with the governor as each variant says, and never --reuse")
         run_ablations(a.data, a.n, a.out, a.results_dir, a.workers, a.kind, a.micro_arm, a.primary_boxes,
-                      tuple(float(c) for c in a.ablation_caps.split(",")), seed=a.seed, size=size, max_load=a.max_load)
+                      tuple(float(c) for c in a.ablation_caps.split(",")), seed=a.seed, size=size, max_load=a.max_load,
+                      list_file=a.list)
         return
     run(a.data, a.n, a.out, a.results_dir, a.workers, tuple(int(x) for x in a.chaos.split(",")), a.kind, a.micro_arm,
-        a.primary_boxes, a.reuse, cost_model=a.cost_model, seed=a.seed, size=size, governor=a.governor, max_load=a.max_load)
+        a.primary_boxes, a.reuse, cost_model=a.cost_model, seed=a.seed, size=size, governor=a.governor, max_load=a.max_load,
+        list_file=a.list)
 
 
 if __name__ == "__main__":

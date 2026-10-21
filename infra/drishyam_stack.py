@@ -12,10 +12,11 @@ complete it.
 from __future__ import annotations
 
 import json
+import mmap
 import re
 from pathlib import Path
 
-from aws_cdk import CfnOutput, Duration, RemovalPolicy, Stack
+from aws_cdk import CfnOutput, Duration, RemovalPolicy, Size, Stack
 from aws_cdk import aws_budgets as budgets
 from aws_cdk import aws_cloudfront as cf
 from aws_cdk import aws_cloudfront_origins as origins
@@ -49,6 +50,17 @@ RATE_LIMITS = {"job-starts": f"{JOBS_LIMIT} job starts per {JOBS_WINDOW_S // 60}
                "kill-and-review": f"{KILL_REVIEW_PER_MINUTE} kill and review calls per min",
                "all-requests": f"{REQUESTS_PER_MINUTE} requests per min"}
 BUDGET_USD = 20
+# video/build.py --standin renders the film with stand-in data (a relabelled trained-segmenter result) and writes this
+# into the MP4's metadata and file name; such a film must never reach the site.
+STANDIN_MARK = b"STAND-IN DATA, NOT FOR PUBLICATION"
+
+
+def refuse_standin(public: Path) -> None:
+    """Stop the deployment if any MP4 under public/ was rendered with stand-in data, whatever it is called now."""
+    for f in public.rglob("*.mp4"):
+        with f.open("rb") as fh, mmap.mmap(fh.fileno(), 0, access=mmap.ACCESS_READ) as m:
+            if "standin" in f.name or m.find(STANDIN_MARK) >= 0:
+                raise SystemExit(f"{f} is a stand-in film (video/build.py --standin), not for publication")
 
 
 def _path_is(path: str) -> waf.CfnWebACL.StatementProperty:
@@ -97,6 +109,8 @@ class DrishyamStack(Stack):
             "AWS_LWA_READINESS_CHECK_PATH": "/api/health",
             "DRISHYAM_KILL_TABLE": kills.table_name,
             "DRISHYAM_SIGNING_KEY_SECRET_ARN": key.secret_arn,
+            # cv2.setNumThreads at startup (web.py): 3008 MB is 1.7 vCPU of time (1,769 MB = 1 vCPU), so 2 threads
+            "DRISHYAM_CV_THREADS": "2",
         }
         if commit:
             env["DRISHYAM_COMMIT"] = commit
@@ -166,6 +180,7 @@ class DrishyamStack(Stack):
         dist = cf.Distribution(
             self, "Cdn", comment="Drishyam web app", web_acl_id=acl.attr_arn, price_class=cf.PriceClass.PRICE_CLASS_100,
             http_version=cf.HttpVersion.HTTP2_AND_3, default_root_object="index.html",
+            enable_ipv6=False,  # WAF rate rules count per address; an IPv6 /64 would give a client millions of them
             default_behavior=cf.BehaviorOptions(  # the static site: cached; the deployment below invalidates it
                 origin=origins.S3BucketOrigin.with_origin_access_control(site),
                 viewer_protocol_policy=cf.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
@@ -175,13 +190,16 @@ class DrishyamStack(Stack):
                 allowed_methods=cf.AllowedMethods.ALLOW_ALL, cache_policy=cf.CachePolicy.CACHING_DISABLED,
                 origin_request_policy=cf.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER, compress=False)})
         # Uploads public/ on each deploy that changes it, deletes files no longer there and invalidates /*.
+        # 1 GiB of memory and 2 GiB of /tmp: the asset holds the video (public/video/drishyam.mp4, git-ignored).
+        refuse_standin(ROOT / "public")
         s3deploy.BucketDeployment(
             self, "SiteFiles", sources=[s3deploy.Source.asset(str(ROOT / "public"))], destination_bucket=site,
-            distribution=dist, distribution_paths=["/*"],
+            distribution=dist, distribution_paths=["/*"], memory_limit=1024,
+            ephemeral_storage_size=Size.mebibytes(2048),
             log_group=logs.LogGroup(self, "SiteFilesLogs", retention=logs.RetentionDays.TWO_WEEKS,
                                     removal_policy=RemovalPolicy.DESTROY))
 
-        # Alerts go to a topic with no subscribers; the owner adds an email with the command in docs/aws.md.
+        # The stack adds no subscriber to the alerts topic; the owner subscribes an email (see docs/aws.md).
         topic = sns.Topic(self, "Alerts", display_name="Drishyam alerts")
         for service, source in (("cloudwatch", f"arn:aws:cloudwatch:{self.region}:{self.account}:alarm:*"),
                                 ("budgets", f"arn:aws:budgets::{self.account}:*")):

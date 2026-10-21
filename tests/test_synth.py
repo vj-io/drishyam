@@ -1,5 +1,6 @@
 import hashlib
 import json
+import platform
 from pathlib import Path
 
 import cv2
@@ -31,7 +32,8 @@ def test_hairline_flag_leaves_the_images_unchanged():
     """Recording the hairline flag in the GT must not move a single random draw: these hashes predate the flag."""
     for spec, digest in ((None, "cc42421dae3ed5e1"), (FULL_SPEC, "c662995f7c2cbd4d"), ({"crack": 3}, "2b3ce7b116f067f1")):
         img, gt = synth.generate(5, 640, 480, spec)
-        assert hashlib.sha256(img.tobytes()).hexdigest()[:16] == digest
+        if platform.machine() in ("x86_64", "AMD64"):  # recorded on x86: the aarch64 HAL (carotene, KleidiCV) rounds some pixel ops differently
+            assert hashlib.sha256(img.tobytes()).hexdigest()[:16] == digest
         assert all(isinstance(g["hairline"], bool) for g in gt if g["cls"] == "crack")
         assert all("hairline" not in g for g in gt if g["cls"] != "crack")
     _, gt, _ = synth.render(5, 640, 480, {"crack": 2, "hairline": True, "distractors": ["blur_region"]})
@@ -134,9 +136,37 @@ def test_clean_set_has_distractors_and_no_damage(tmp_path):
 @pytest.mark.skipif(not (SAMPLES_DIR / "index.json").exists(), reason="samples not generated")
 def test_samples_manifest_and_sizes():
     manifest = json.loads((SAMPLES_DIR / "index.json").read_text())
-    assert [m["file"] for m in manifest] == [f"bridge_{k:02d}.jpg" for k in range(1, 9)]
-    for m in manifest:
-        assert m["synthetic"] is True and m["title"] and m["note"]
+    made = [m for m in manifest if m["synthetic"] is True]
+    assert [m["file"] for m in made] == [f"bridge_{k:02d}.jpg" for k in range(1, 9)]
+    for m in made:
+        assert m["title"] and m["note"]
         assert all(b["cls"] in synth.CLASSES and _in_bounds(b["box"], m["width"], m["height"]) for b in m["boxes"])
-        assert (SAMPLES_DIR / m["file"]).stat().st_size < synth.SAMPLE_LIMIT
-    assert manifest[-1]["boxes"] == []  # clean concrete + formwork line: nothing real to find
+    assert made[-1]["boxes"] == []  # clean concrete + formwork line: nothing real to find
+    # the team's own wall photos: labelled as such, no ground truth, each with the recorded v1 run on that very file
+    real = [m for m in manifest if m["synthetic"] is False]
+    assert [m["file"] for m in real] == ["real_01.jpg", "real_02.jpg"] and len(made) + len(real) == len(manifest)
+    for m in real:
+        assert m["title"] == "REAL PHOTO (ours), painted plaster wall, no ground truth" and "not ground truth" in m["note"]
+        assert "boxes" not in m and "distractors" not in m
+        ev = [json.loads(ln) for ln in (SAMPLES_DIR / m["trace"]).read_text().splitlines()]
+        assert cv2.imread(str(SAMPLES_DIR / m["file"])).shape[1::-1] == (m["width"], m["height"]) == (ev[0]["width"], ev[0]["height"])
+        assert ev[0]["cost_model"]["micro_arm"].endswith("-dacl10k-retime") and ev[-1]["work_order"]["profile"] == "onnx:drishyam_dacl10k.onnx"
+        assert "token" not in ev[0] and "kill_token" not in ev[0] and "token" not in ev[-1]
+    for m in manifest:
+        assert (SAMPLES_DIR / m["file"]).stat().st_size < synth.SAMPLE_LIMIT and (SAMPLES_DIR / m["thumb"]).exists()
+
+
+def test_sample_jpegs_carry_no_exif():
+    """Every JPEG under public/samples ships with no metadata but its JFIF header: EXIF and XMP (where a camera puts GPS)
+    are APP1 segments, IPTC is APP13. The team's photos are copied from private-assets/real-photos/clean/ only."""
+    jpegs = sorted(p for p in SAMPLES_DIR.rglob("*") if p.suffix.lower() in (".jpg", ".jpeg"))
+    assert len(jpegs) >= 20
+    for p in jpegs:
+        b = p.read_bytes()
+        assert b[:2] == b"\xff\xd8", p
+        i, apps = 2, []
+        while b[i] == 0xFF and b[i + 1] != 0xDA:  # every marker segment up to the start of scan
+            if 0xE0 <= b[i + 1] <= 0xEF:
+                apps.append((hex(b[i + 1]), b[i + 4:i + 9]))
+            i += 2 + int.from_bytes(b[i + 2:i + 4], "big")
+        assert apps == [("0xe0", b"JFIF\0")], (p.name, apps)

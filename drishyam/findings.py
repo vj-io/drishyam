@@ -1,7 +1,8 @@
 """Findings, the human-approval state machine, work orders and their signatures.
 
 The rule this module exists to enforce: a critical finding (exposed rebar, or
-spalling above the area threshold) can only leave `pending_review` through a
+spalling above the area threshold, or a finding at a place another look saw as
+one of those: `Finding.hold`) can only leave `pending_review` through a
 human decision, and the agent can never make a finding less critical.
 """
 
@@ -115,6 +116,14 @@ class Finding:
             self.critical_step, self.critical_area_px = step, measure.get("area_px", 0)
             self.critical_rule = critical_rule(self.cls, self.critical_area_px)
 
+    def hold(self, step: int, area_px: int, rule: str) -> None:
+        """A class change put a critical class at this finding's place (one look saw exposed rebar there, the other
+        corrosion): it waits in pending_review for a human like a critical finding, and `rule` says why. A no-op on
+        a critical finding; criticality only rises."""
+        if not self.critical:
+            self.critical, self.state = True, "pending_review"
+            self.critical_step, self.critical_area_px, self.critical_rule = step, area_px, rule
+
     def to_dict(self, crop: bool = True) -> dict:
         d = asdict(self)
         if not crop:
@@ -150,7 +159,11 @@ def work_order(job_id: str, findings: list[Finding], gaze_path: list[list[int]],
 
 
 def order_status(wo: dict) -> str:
-    return "blocked" if any(f["state"] == "pending_review" for f in wo["findings"]) else "ready"
+    """blocked while a critical finding awaits a person; incomplete while an area is not assessed (a person looks
+    there); ready only when neither is left."""
+    if any(f["state"] == "pending_review" for f in wo["findings"]):
+        return "blocked"
+    return "incomplete" if wo["not_assessed"] else "ready"
 
 
 def _b64(b: bytes) -> str:
@@ -170,8 +183,8 @@ def sign(payload: dict, key: bytes, ttl_s: int = TOKEN_TTL_S) -> str:
 def verify(token: str, key: bytes) -> dict:
     try:
         body, mac = token.split(".")
-        expected = hmac.new(key, body.encode(), hashlib.sha256).digest()
-        if not hmac.compare_digest(expected, _unb64(mac)):
+        expected = _b64(hmac.new(key, body.encode(), hashlib.sha256).digest())
+        if not hmac.compare_digest(expected, mac):  # as text: one spelling per MAC, so one token hash per token
             raise SignatureError("signature does not match")
         data = json.loads(_unb64(body))
     except SignatureError:

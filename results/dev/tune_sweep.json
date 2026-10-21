@@ -1,0 +1,8614 @@
+{
+ "what": "Dev-only sweep of the ws11 tuning knobs for the classical agent (tau_scout, an overview from a finer level, budget use: fill, the stop floor v0 and the survey's share of the stop rule's value), every configuration tried, with one extra existing knob (min_view). Never a held-out set. Nothing adopted: tau_scout 0.7, made the classical-v1 default in 9a6b99c, was reverted after review (decision.not_adopted); every knob stays off by default.",
+ "code": "every row: agent at 03335be (ws11/tune: the knobs, all off by default, and the sal_fine experiment, reverted in 090eb2f); def is the agent at 5f6fac8 (tau 0.5 at every level)",
+ "costs": "fixed: job_ops p50s from results/linux-aarch64/micro.json; governor overrides off (harness.run_drishyam). The fixed table times saliency on the overview level only, so sf1's wall time and $ understate it (its pixels are charged in full); no decision reads that cost",
+ "commands": [
+  "python -m evals.synth dataset --out data/synth_dev --n 60 --seed 4242; python -m evals.synth dataset --clean --out data/synth_clean_dev --n 30 --seed 4243",
+  "python -m evals.dev_sweep clean 0.3,1.0 \"$V\" --workers 6 --out <file>",
+  "python -m evals.dev_sweep synth_dev 0.3,1.0 \"$V\" --baselines --workers 6 --out <file>",
+  "python -m evals.dev_sweep real 0.3,1.0 \"$V\" --workers 6 --codebrim data/codebrim --out <file>  (tiling rows: the same tool with \"def=\" --baselines, same dataset hashes; vs_tiling_L0 of the real rows is the same paired bootstrap computed from those rows' per-image counts)",
+  "V = def=;ts03=tau_scout:0.3;ts04=tau_scout:0.4;ts06=tau_scout:0.6;ts07=tau_scout:0.7;ts08=tau_scout:0.8;ts10=tau_scout:1.0;sf1=sal_fine:1;fill=fill:True;sv=survey_value:False;v0_0=v0:0;v0_1=v0:1;fill_sv=fill:True,survey_value:False;sf1_fill=sal_fine:1,fill:True;fill_ts08=fill:True,tau_scout:0.8;ts10_fill=tau_scout:1.0,fill:True;ts07_fill=tau_scout:0.7,fill:True;mv03=min_view:0.3;ts10_mv03=tau_scout:1.0,min_view:0.3;ts07_mv03=tau_scout:0.7,min_view:0.3"
+ ],
+ "variants": {
+  "def": "the agent at 5f6fac8: tau 0.5 at every level, no fill, survey counted in the stop rule, v0 2, overview from L3 alone; every vs_ref is against it at the same cap",
+  "tsNN": "tau_scout = 0.NN (1.0 for ts10): the entropy threshold of a look at L2 or coarser; tau 0.5 keeps every finer look. 1.0: a coarse look never escalates on entropy (binary entropy is at most 1); an exploration run with 1.01 gave the same rows",
+  "sf1": "sal_fine 1: the overview's edge (Scharr at Sobel's gain) and black-hat maps from L2, max-pooled to L3; the overview is charged L2's pixels (0.0625 of the photo instead of 0.0156)",
+  "fill": "fill: a look that no longer fits under the pixel cap shrinks to what is left (a multiple of 32 px, at least 256) instead of the job halting; the stop rule still decides",
+  "sv": "survey_value False: the survey's finds and cost leave the stop rule's value found per ms",
+  "v0_N": "the stop floor v0 = N (2 is the default)",
+  "mv03": "min_view 0.3, an existing profile knob outside the three items asked for: first and finest looks span at least 0.3 of the long side (L1 only on 2048-px photos; L2 on 4608-px ones)",
+  "a_b": "both switches"
+ },
+ "fields": "recall: GT boxes found (IoU >= 0.3 or the box holds the GT centre; recall_iou_only without the centre rule); chance_recall: the same boxes at random positions; pixels_frac: pixels processed / the photo's; boxes_per_image: per-component boxes (on the clean split every one is a false alarm), findings_per_image one box per class per view, critical_per_image critical boxes; images_with_any: share of photos with any box; halt: halt causes; vs_X / vs_X_ci: recall ratio to X with its paired 95 % bootstrap CI (1000 resamples of photos, seed 0); ref: the def row at the same cap; boxes_vs_ref_ci and images_with_any_vs_ref_ci: paired CIs of the box-count ratio and of the any-box share difference against it; pixels_vs_tiling_L0: pixels over L0 tiling's. chance_recall is one draw, seeded by the row's key (variant@cap), so rows with identical boxes under different names get different chance values (the ts07 boxes rescored as 'tip@0.3' give 0.065 on synth_dev against ts07's 0.020): compare a row's recall with its own chance, never chance across variants; decision.not_adopted ts07 quotes the mean of 30 draws on CODEBRIM dev100",
+ "decision": {
+  "rule": "adopt a change as the classical default only if it improves recall at the 30 % cap on synth_dev without hurting the clean split's false alarms or CODEBRIM dev100; hurting = the paired CI of the clean box ratio above 1, or of the any-box share difference above 0, or CODEBRIM's recall CI below 1",
+  "adopted": "nothing (tau_scout 0.7 was adopted in 9a6b99c and reverted; see not_adopted)",
+  "not_adopted": {
+   "tau_scout 0.7 (ts07)": "adopted in 9a6b99c on point estimates, reverted after review. On synth_dev, the split the rule is about, x1.03 at 0.3 (CI 0.98-1.09: 104 GT boxes found against 101, 3 photos gained and 1 lost) and x1.03 uncapped (1.00-1.06): not a measurable gain. The clean split got 12.40 boxes per photo against 12.13 (CI x1.00-1.07: 8 more boxes, on 2 photos of 30, and no resample with fewer) and some box on 22 photos against 21 (CI +0.00 to +0.10), the same critical boxes. Read with the same CI standard on both sides, it fails the rule. Its one significant gain is on CODEBRIM dev100, the rule's guard: x1.22 at 0.3 (CI 1.09-1.43; 156 GT boxes found against 128, 14 photos gained, none lost), recall 0.153 to 0.186 where the same boxes at random positions find 0.088 and 0.099 (mean of 30 draws, sd 0.007 and 0.009), IoU-only 0.066 to 0.086 against 0.019 and 0.023, at as many boxes (868 and 870 per photo); x1.11 uncapped (1.06-1.19). About a third of the recall gain (0.011 of 0.034) is what the same boxes reach at random positions: its boxes cover more of the photo (mean area x1.07; 709 over 1 % of the photo against 665). It also sent more critical boxes to the human gate there: 242 at 0.3 against 178 (239 and 176 matching no GT box), 358 against 287 uncapped. Any tau_scout in [0.692, 0.703) gives the same dev rows (survey entropies: 0.692 the highest that moved recall, 0.703 the next clean photo's), so held-out clean photos may fall inside the band. As the default it would also change the report's worked example: bridge_03's survey (entropy 0.6931) would draft and verify instead of escalating, so docs/trace-bridge_03.ndjson, report section 10 and the site's 'above 0.5 it zooms in' would no longer hold. Re-adopting it is PROFILES['classical-v1']['tau_scout'] = 0.7, with those docs redone",
+   "lower tau_scout (ts03, ts04)": "lost recall: an escalating coarse look drafts nothing (ts03 x0.94 on synth_dev, CI 0.88-0.99; ts04 x0.88 on CODEBRIM, 0.79-0.95)",
+   "ts08, ts10": "same recall as ts07 on both damaged sets; more clean photos with a box (ts10 +0.13, CI 0.03-0.27)",
+   "sf1": "the finer overview costs one of three looks on synth_dev (x0.91, CI 0.84-0.98) and about three of seventeen on CODEBRIM (x0.89, 0.81-0.97); fewer clean boxes and equal recall uncapped. Reverted from the code",
+   "fill": "uses 0.290 of the pixels at the 30 % cap on synth_dev (0.288 on CODEBRIM) and found x1.03 there (CI 1.00-1.07) but x1.00 on CODEBRIM, with x1.40 clean boxes (16.97 per photo against 12.13): on the clean split its 22 extra looks added 145 boxes, 114 of them from 5 forced verify or escalate looks at L0, which the stop rule never gates",
+   "sv, v0_0, v0_1": "no recall change at the 30 % cap on any split: the cap, not the stop rule, ends most jobs. synth_dev: 4 of 60 stopped on the rule (2 on the floor, 2 on the value term), and the unfound GT boxes inside their remaining candidates held 1 that L0 tiling finds; CODEBRIM dev100: 6 of 100 (3 and 3), holding 3 unfound GT boxes, none of which L0 tiling finds. Uncapped, v0 0 or 1 found x1.02 on synth_dev at more pixels and more clean boxes, as in results/dev/v0_sweep.json; survey_value False found x0.98-0.99 on both sets",
+   "mv03 and its combinations": "outside the three items: on CODEBRIM it matched or beat the agent at half the pixels (x1.18, CI 1.02-1.39, at 0.137 of the pixels; with ts10 x1.26), but uncapped on synth_dev it lost recall (x0.955, 0.91-0.99) and more clean photos had a box; reported for a later decision, not adopted"
+  },
+  "prd_target": "PRD: recall >= 0.90x L0 tiling at <= 0.30 of its pixels. At the 30 % cap (0.156 of tiling's pixels on synth_dev, 0.173 on CODEBRIM dev100): synth_dev def 0.97x (CI 0.86-1.10), ts07 1.00x (0.88-1.13); CODEBRIM dev100 def 0.73x (0.57-0.97), ts07 0.89x (0.71-1.12). Uncapped, ts07 found 0.95x on CODEBRIM (0.77-1.20) but at 0.316 of tiling's pixels, over the PRD's 0.30. So on dev the target is met at the point estimate on synth_dev only (its CI reaches below 0.90) and missed on CODEBRIM dev100. The extra knob min_view 0.3 with ts07 reached 0.92x on CODEBRIM (0.73-1.16) at 0.084 of tiling's pixels, not adopted (see not_adopted). Held-out sets were not run.",
+  "budget_use": "At 2048x1536 a 30 % cap holds the L3 overview and exactly three 512-px looks (0.266 of the pixels); a fourth needs 0.349, so 0.28-0.295 is reachable only with a smaller last look (fill: 0.290 on synth_dev). 56 of 60 synth_dev jobs ended on the cap at 0.260. On CODEBRIM dev100 (mostly 4608 px, about 17 looks) jobs used 0.281, the shortfall from its smaller photos; fill took it to 0.288 and found nothing more. The floor v0 and the value units are not what leaves budget unused at this cap (sv, v0_0, v0_1)"
+ },
+ "raw": "each split's `files` are the dev_sweep --out files these rows were copied from (runs/ is not committed); per-photo counts are left out here, and every paired CI was computed from them",
+ "confirmation": "after the revert, the default agent rerun on all three splits at both caps reproduced the def rows exactly (every field, per-photo counts included, same dataset hashes): it is the agent at 5f6fac8, and python -m evals.trace_sample reproduces docs/trace-bridge_03.ndjson byte for byte. While ts07 was the default (9a6b99c), the same rerun had reproduced the ts07 rows exactly",
+ "splits": {
+  "synth_dev": {
+   "split": "synth_dev",
+   "n": 60,
+   "dataset_gt_sha256": "ab3ea45abb852fa21e2696721060a4952819196b2959085d6f27866726b74bd3",
+   "dataset_images_sha256": "736126cce1714f7fa3823b04d001f0a5f9d913179f959ed34c675f3cd2332777",
+   "caps": [
+    0.3,
+    1.0
+   ],
+   "segmenter": "classical-v1",
+   "micro_arm": "linux-aarch64",
+   "files": [
+    "runs/tune/final_synth.json"
+   ],
+   "rows": {
+    "downscale": {
+     "recall": 0.495,
+     "recall_ci": [
+      0.43,
+      0.5634
+     ],
+     "recall_iou_only": 0.415,
+     "chance_recall": 0.01,
+     "chance_recall_iou_only": 0.005,
+     "precision": 0.1177,
+     "fp_per_image": 12.1167,
+     "boxes_per_image": 13.7333,
+     "pixels_frac": 0.25,
+     "net_pixels_frac": 0.25,
+     "images_with_any": 0.9833,
+     "critical_per_image": 0.6833,
+     "findings_per_image": 2.7333,
+     "per_class": {
+      "crack": 0.541,
+      "spalling": 0.566,
+      "efflorescence": 0.1176,
+      "exposed_rebar": 0.7059,
+      "corrosion": 0.5714
+     },
+     "vs_tiling_L0": 0.9519,
+     "vs_tiling_L0_ci": [
+      0.8446,
+      1.066
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.8542,
+      1.1795
+     ],
+     "pixels_vs_tiling_L0": 0.15
+    },
+    "tiling@L2": {
+     "recall": 0.47,
+     "recall_ci": [
+      0.4,
+      0.5442
+     ],
+     "recall_iou_only": 0.415,
+     "chance_recall": 0.03,
+     "chance_recall_iou_only": 0.025,
+     "precision": 0.1609,
+     "fp_per_image": 8.0833,
+     "boxes_per_image": 9.6333,
+     "pixels_frac": 0.0625,
+     "net_pixels_frac": 0.0625,
+     "images_with_any": 0.9833,
+     "critical_per_image": 0.7833,
+     "findings_per_image": 2.5833,
+     "per_class": {
+      "crack": 0.5902,
+      "spalling": 0.5849,
+      "efflorescence": 0.0,
+      "exposed_rebar": 0.7059,
+      "corrosion": 0.4286
+     },
+     "vs_downscale": 0.9495,
+     "vs_downscale_ci": [
+      0.875,
+      1.0248
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.925,
+      1.0938
+     ],
+     "vs_tiling_L0": 0.9038,
+     "vs_tiling_L0_ci": [
+      0.7822,
+      1.03
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.8354,
+      1.2254
+     ],
+     "pixels_vs_tiling_L0": 0.0375
+    },
+    "tiling@L1": {
+     "recall": 0.555,
+     "recall_ci": [
+      0.4868,
+      0.6286
+     ],
+     "recall_iou_only": 0.455,
+     "chance_recall": 0.015,
+     "chance_recall_iou_only": 0.0,
+     "precision": 0.096,
+     "fp_per_image": 17.2667,
+     "boxes_per_image": 19.1,
+     "pixels_frac": 0.5,
+     "net_pixels_frac": 0.5,
+     "images_with_any": 1.0,
+     "critical_per_image": 1.2,
+     "findings_per_image": 4.6333,
+     "per_class": {
+      "crack": 0.6066,
+      "spalling": 0.7547,
+      "efflorescence": 0.1176,
+      "exposed_rebar": 0.6471,
+      "corrosion": 0.5429
+     },
+     "vs_downscale": 1.1212,
+     "vs_downscale_ci": [
+      1.0337,
+      1.2209
+     ],
+     "vs_downscale_iou_only_ci": [
+      1.0,
+      1.2059
+     ],
+     "vs_tiling_L0": 1.0673,
+     "vs_tiling_L0_ci": [
+      0.9638,
+      1.1876
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.9659,
+      1.2794
+     ],
+     "pixels_vs_tiling_L0": 0.3
+    },
+    "tiling@L0": {
+     "recall": 0.52,
+     "recall_ci": [
+      0.4523,
+      0.5829
+     ],
+     "recall_iou_only": 0.41,
+     "chance_recall": 0.035,
+     "chance_recall_iou_only": 0.01,
+     "precision": 0.0212,
+     "fp_per_image": 78.3667,
+     "boxes_per_image": 80.0667,
+     "pixels_frac": 1.6667,
+     "net_pixels_frac": 1.6667,
+     "images_with_any": 1.0,
+     "critical_per_image": 1.2,
+     "findings_per_image": 15.65,
+     "per_class": {
+      "crack": 0.541,
+      "spalling": 0.717,
+      "efflorescence": 0.2353,
+      "exposed_rebar": 0.2353,
+      "corrosion": 0.6
+     },
+     "vs_downscale": 1.0505,
+     "vs_downscale_ci": [
+      0.9381,
+      1.184
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.8478,
+      1.1707
+     ]
+    },
+    "def@0.3": {
+     "recall": 0.505,
+     "recall_ci": [
+      0.4388,
+      0.5829
+     ],
+     "recall_iou_only": 0.435,
+     "chance_recall": 0.06,
+     "chance_recall_iou_only": 0.04,
+     "precision": 0.094,
+     "fp_per_image": 16.2167,
+     "boxes_per_image": 17.9,
+     "pixels_frac": 0.26,
+     "net_pixels_frac": 0.2444,
+     "images_with_any": 0.9667,
+     "critical_per_image": 1.5833,
+     "findings_per_image": 2.9667,
+     "per_class": {
+      "crack": 0.541,
+      "spalling": 0.6604,
+      "efflorescence": 0.1176,
+      "exposed_rebar": 0.6471,
+      "corrosion": 0.5143
+     },
+     "vs_downscale": 1.0202,
+     "vs_downscale_ci": [
+      0.9189,
+      1.1349
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.9268,
+      1.1858
+     ],
+     "vs_tiling_L0": 0.9712,
+     "vs_tiling_L0_ci": [
+      0.8558,
+      1.0962
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.8999,
+      1.2576
+     ],
+     "pixels_vs_tiling_L0": 0.156,
+     "halt": {
+      "cap-hit": 56,
+      "stop-rule": 4
+     },
+     "looks_mean": 2.9333,
+     "looks_by_level": {
+      "L0": 12,
+      "L1": 104,
+      "L2": 60
+     },
+     "looks_by_action": {
+      "gaze": 105,
+      "verify": 44,
+      "escalate": 27
+     }
+    },
+    "def@1.0": {
+     "recall": 0.555,
+     "recall_ci": [
+      0.488,
+      0.6238
+     ],
+     "recall_iou_only": 0.46,
+     "chance_recall": 0.04,
+     "chance_recall_iou_only": 0.015,
+     "precision": 0.0609,
+     "fp_per_image": 28.55,
+     "boxes_per_image": 30.4,
+     "pixels_frac": 0.4531,
+     "net_pixels_frac": 0.4375,
+     "images_with_any": 0.9833,
+     "critical_per_image": 3.0333,
+     "findings_per_image": 3.9167,
+     "per_class": {
+      "crack": 0.5738,
+      "spalling": 0.717,
+      "efflorescence": 0.1765,
+      "exposed_rebar": 0.7059,
+      "corrosion": 0.5714
+     },
+     "vs_downscale": 1.1212,
+     "vs_downscale_ci": [
+      1.0309,
+      1.2247
+     ],
+     "vs_downscale_iou_only_ci": [
+      1.0089,
+      1.2298
+     ],
+     "vs_tiling_L0": 1.0673,
+     "vs_tiling_L0_ci": [
+      0.964,
+      1.1848
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.9534,
+      1.3108
+     ],
+     "pixels_vs_tiling_L0": 0.2719,
+     "halt": {
+      "stop-rule": 57,
+      "exhausted": 3
+     },
+     "looks_mean": 5.25,
+     "looks_by_level": {
+      "L0": 103,
+      "L1": 152,
+      "L2": 60
+     },
+     "looks_by_action": {
+      "gaze": 153,
+      "verify": 104,
+      "escalate": 58
+     }
+    },
+    "ts03@0.3": {
+     "recall": 0.475,
+     "recall_ci": [
+      0.4074,
+      0.5479
+     ],
+     "recall_iou_only": 0.38,
+     "chance_recall": 0.035,
+     "chance_recall_iou_only": 0.015,
+     "precision": 0.1128,
+     "fp_per_image": 12.45,
+     "boxes_per_image": 14.0333,
+     "pixels_frac": 0.2628,
+     "net_pixels_frac": 0.2472,
+     "images_with_any": 0.9667,
+     "critical_per_image": 1.4,
+     "findings_per_image": 2.85,
+     "per_class": {
+      "crack": 0.4754,
+      "spalling": 0.6604,
+      "efflorescence": 0.1176,
+      "exposed_rebar": 0.5882,
+      "corrosion": 0.4857
+     },
+     "vs_downscale": 0.9596,
+     "vs_downscale_ci": [
+      0.8421,
+      1.0834
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.7801,
+      1.0732
+     ],
+     "vs_tiling_L0": 0.9135,
+     "vs_tiling_L0_ci": [
+      0.7979,
+      1.0459
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.7789,
+      1.0909
+     ],
+     "pixels_vs_tiling_L0": 0.1577,
+     "vs_ref": 0.9406,
+     "vs_ref_ci": [
+      0.8804,
+      0.9902
+     ],
+     "vs_ref_iou_only_ci": [
+      0.7849,
+      0.9506
+     ],
+     "pixels_vs_ref": 1.0107,
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      0.7194,
+      0.8473
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "cap-hit": 58,
+      "stop-rule": 2
+     },
+     "looks_mean": 2.9667,
+     "looks_by_level": {
+      "L0": 12,
+      "L1": 106,
+      "L2": 60
+     },
+     "looks_by_action": {
+      "gaze": 107,
+      "escalate": 56,
+      "verify": 15
+     }
+    },
+    "ts03@1.0": {
+     "recall": 0.54,
+     "recall_ci": [
+      0.4725,
+      0.6105
+     ],
+     "recall_iou_only": 0.42,
+     "chance_recall": 0.02,
+     "chance_recall_iou_only": 0.005,
+     "precision": 0.0668,
+     "fp_per_image": 25.15,
+     "boxes_per_image": 26.95,
+     "pixels_frac": 0.4698,
+     "net_pixels_frac": 0.4542,
+     "images_with_any": 0.9833,
+     "critical_per_image": 2.95,
+     "findings_per_image": 3.7667,
+     "per_class": {
+      "crack": 0.5574,
+      "spalling": 0.717,
+      "efflorescence": 0.1765,
+      "exposed_rebar": 0.6471,
+      "corrosion": 0.5429
+     },
+     "vs_downscale": 1.0909,
+     "vs_downscale_ci": [
+      0.9905,
+      1.1978
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.8876,
+      1.1528
+     ],
+     "vs_tiling_L0": 1.0385,
+     "vs_tiling_L0_ci": [
+      0.9393,
+      1.1482
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.8765,
+      1.1751
+     ],
+     "pixels_vs_tiling_L0": 0.2819,
+     "vs_ref": 0.973,
+     "vs_ref_ci": [
+      0.9407,
+      1.0
+     ],
+     "vs_ref_iou_only_ci": [
+      0.8349,
+      0.9684
+     ],
+     "pixels_vs_ref": 1.0368,
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      0.8402,
+      0.9272
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 57,
+      "exhausted": 3
+     },
+     "looks_mean": 5.45,
+     "looks_by_level": {
+      "L0": 109,
+      "L1": 158,
+      "L2": 60
+     },
+     "looks_by_action": {
+      "gaze": 159,
+      "escalate": 90,
+      "verify": 78
+     }
+    },
+    "ts04@0.3": {
+     "recall": 0.5,
+     "recall_ci": [
+      0.4312,
+      0.5764
+     ],
+     "recall_iou_only": 0.43,
+     "chance_recall": 0.02,
+     "chance_recall_iou_only": 0.015,
+     "precision": 0.1085,
+     "fp_per_image": 13.7,
+     "boxes_per_image": 15.3667,
+     "pixels_frac": 0.2628,
+     "net_pixels_frac": 0.2472,
+     "images_with_any": 0.9667,
+     "critical_per_image": 1.4333,
+     "findings_per_image": 2.8667,
+     "per_class": {
+      "crack": 0.541,
+      "spalling": 0.6604,
+      "efflorescence": 0.1176,
+      "exposed_rebar": 0.5882,
+      "corrosion": 0.5143
+     },
+     "vs_downscale": 1.0101,
+     "vs_downscale_ci": [
+      0.9053,
+      1.125
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.914,
+      1.175
+     ],
+     "vs_tiling_L0": 0.9615,
+     "vs_tiling_L0_ci": [
+      0.8495,
+      1.0893
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.8912,
+      1.2369
+     ],
+     "pixels_vs_tiling_L0": 0.1577,
+     "vs_ref": 0.9901,
+     "vs_ref_ci": [
+      0.9619,
+      1.0
+     ],
+     "vs_ref_iou_only_ci": [
+      0.962,
+      1.0
+     ],
+     "pixels_vs_ref": 1.0107,
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      0.7837,
+      0.9249
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "cap-hit": 58,
+      "stop-rule": 2
+     },
+     "looks_mean": 2.9667,
+     "looks_by_level": {
+      "L0": 12,
+      "L1": 106,
+      "L2": 60
+     },
+     "looks_by_action": {
+      "gaze": 107,
+      "verify": 29,
+      "escalate": 42
+     }
+    },
+    "ts04@1.0": {
+     "recall": 0.55,
+     "recall_ci": [
+      0.4822,
+      0.6188
+     ],
+     "recall_iou_only": 0.455,
+     "chance_recall": 0.045,
+     "chance_recall_iou_only": 0.025,
+     "precision": 0.0648,
+     "fp_per_image": 26.45,
+     "boxes_per_image": 28.2833,
+     "pixels_frac": 0.467,
+     "net_pixels_frac": 0.4514,
+     "images_with_any": 0.9833,
+     "critical_per_image": 2.9833,
+     "findings_per_image": 3.7833,
+     "per_class": {
+      "crack": 0.5738,
+      "spalling": 0.717,
+      "efflorescence": 0.1765,
+      "exposed_rebar": 0.6471,
+      "corrosion": 0.5714
+     },
+     "vs_downscale": 1.1111,
+     "vs_downscale_ci": [
+      1.0202,
+      1.2121
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.9887,
+      1.2152
+     ],
+     "vs_tiling_L0": 1.0577,
+     "vs_tiling_L0_ci": [
+      0.9532,
+      1.1667
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.9479,
+      1.2973
+     ],
+     "pixels_vs_tiling_L0": 0.2802,
+     "vs_ref": 0.991,
+     "vs_ref_ci": [
+      0.9651,
+      1.0
+     ],
+     "vs_ref_iou_only_ci": [
+      0.9643,
+      1.0
+     ],
+     "pixels_vs_ref": 1.0306,
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      0.8847,
+      0.9676
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 57,
+      "exhausted": 3
+     },
+     "looks_mean": 5.4167,
+     "looks_by_level": {
+      "L0": 108,
+      "L1": 157,
+      "L2": 60
+     },
+     "looks_by_action": {
+      "gaze": 158,
+      "verify": 92,
+      "escalate": 75
+     }
+    },
+    "ts06@0.3": {
+     "recall": 0.51,
+     "recall_ci": [
+      0.445,
+      0.5838
+     ],
+     "recall_iou_only": 0.44,
+     "chance_recall": 0.04,
+     "chance_recall_iou_only": 0.02,
+     "precision": 0.0901,
+     "fp_per_image": 17.1667,
+     "boxes_per_image": 18.8667,
+     "pixels_frac": 0.26,
+     "net_pixels_frac": 0.2444,
+     "images_with_any": 0.9667,
+     "critical_per_image": 1.5833,
+     "findings_per_image": 2.9833,
+     "per_class": {
+      "crack": 0.5738,
+      "spalling": 0.6604,
+      "efflorescence": 0.0882,
+      "exposed_rebar": 0.6471,
+      "corrosion": 0.5143
+     },
+     "vs_downscale": 1.0303,
+     "vs_downscale_ci": [
+      0.9278,
+      1.1375
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.9468,
+      1.1945
+     ],
+     "vs_tiling_L0": 0.9808,
+     "vs_tiling_L0_ci": [
+      0.8584,
+      1.1121
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.9012,
+      1.2657
+     ],
+     "pixels_vs_tiling_L0": 0.156,
+     "vs_ref": 1.0099,
+     "vs_ref_ci": [
+      0.9714,
+      1.0673
+     ],
+     "vs_ref_iou_only_ci": [
+      0.967,
+      1.0789
+     ],
+     "pixels_vs_ref": 1.0,
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      1.0075,
+      1.1167
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "cap-hit": 56,
+      "stop-rule": 4
+     },
+     "looks_mean": 2.9333,
+     "looks_by_level": {
+      "L0": 11,
+      "L1": 105,
+      "L2": 60
+     },
+     "looks_by_action": {
+      "gaze": 108,
+      "verify": 52,
+      "escalate": 16
+     }
+    },
+    "ts06@1.0": {
+     "recall": 0.56,
+     "recall_ci": [
+      0.4946,
+      0.6283
+     ],
+     "recall_iou_only": 0.465,
+     "chance_recall": 0.055,
+     "chance_recall_iou_only": 0.02,
+     "precision": 0.0594,
+     "fp_per_image": 29.55,
+     "boxes_per_image": 31.4167,
+     "pixels_frac": 0.4434,
+     "net_pixels_frac": 0.4278,
+     "images_with_any": 0.9833,
+     "critical_per_image": 3.0333,
+     "findings_per_image": 3.9667,
+     "per_class": {
+      "crack": 0.5902,
+      "spalling": 0.717,
+      "efflorescence": 0.1765,
+      "exposed_rebar": 0.7059,
+      "corrosion": 0.5714
+     },
+     "vs_downscale": 1.1313,
+     "vs_downscale_ci": [
+      1.042,
+      1.2334
+     ],
+     "vs_downscale_iou_only_ci": [
+      1.0241,
+      1.2369
+     ],
+     "vs_tiling_L0": 1.0769,
+     "vs_tiling_L0_ci": [
+      0.9734,
+      1.1856
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.9643,
+      1.3205
+     ],
+     "pixels_vs_tiling_L0": 0.266,
+     "vs_ref": 1.009,
+     "vs_ref_ci": [
+      1.0,
+      1.0328
+     ],
+     "vs_ref_iou_only_ci": [
+      1.0,
+      1.04
+     ],
+     "pixels_vs_ref": 0.9785,
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      1.0072,
+      1.0694
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 57,
+      "exhausted": 3
+     },
+     "looks_mean": 5.1333,
+     "looks_by_level": {
+      "L0": 99,
+      "L1": 149,
+      "L2": 60
+     },
+     "looks_by_action": {
+      "gaze": 152,
+      "verify": 112,
+      "escalate": 44
+     }
+    },
+    "ts07@0.3": {
+     "recall": 0.52,
+     "recall_ci": [
+      0.4592,
+      0.59
+     ],
+     "recall_iou_only": 0.445,
+     "chance_recall": 0.02,
+     "chance_recall_iou_only": 0.01,
+     "precision": 0.0887,
+     "fp_per_image": 17.8167,
+     "boxes_per_image": 19.55,
+     "pixels_frac": 0.26,
+     "net_pixels_frac": 0.2444,
+     "images_with_any": 0.9667,
+     "critical_per_image": 1.6333,
+     "findings_per_image": 3.0167,
+     "per_class": {
+      "crack": 0.5902,
+      "spalling": 0.6604,
+      "efflorescence": 0.0882,
+      "exposed_rebar": 0.6471,
+      "corrosion": 0.5429
+     },
+     "vs_downscale": 1.0505,
+     "vs_downscale_ci": [
+      0.9574,
+      1.1584
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.9583,
+      1.2163
+     ],
+     "vs_tiling_L0": 1.0,
+     "vs_tiling_L0_ci": [
+      0.8849,
+      1.1251
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.9247,
+      1.2693
+     ],
+     "pixels_vs_tiling_L0": 0.156,
+     "vs_ref": 1.0297,
+     "vs_ref_ci": [
+      0.9815,
+      1.0941
+     ],
+     "vs_ref_iou_only_ci": [
+      0.975,
+      1.0964
+     ],
+     "pixels_vs_ref": 1.0,
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      1.0335,
+      1.1715
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "cap-hit": 56,
+      "stop-rule": 4
+     },
+     "looks_mean": 2.9333,
+     "looks_by_level": {
+      "L0": 11,
+      "L1": 105,
+      "L2": 60
+     },
+     "looks_by_action": {
+      "gaze": 108,
+      "verify": 56,
+      "escalate": 12
+     }
+    },
+    "ts07@1.0": {
+     "recall": 0.57,
+     "recall_ci": [
+      0.5064,
+      0.6364
+     ],
+     "recall_iou_only": 0.47,
+     "chance_recall": 0.05,
+     "chance_recall_iou_only": 0.025,
+     "precision": 0.0592,
+     "fp_per_image": 30.2,
+     "boxes_per_image": 32.1,
+     "pixels_frac": 0.4406,
+     "net_pixels_frac": 0.425,
+     "images_with_any": 0.9833,
+     "critical_per_image": 3.0833,
+     "findings_per_image": 4.0,
+     "per_class": {
+      "crack": 0.6066,
+      "spalling": 0.717,
+      "efflorescence": 0.1765,
+      "exposed_rebar": 0.7059,
+      "corrosion": 0.6
+     },
+     "vs_downscale": 1.1515,
+     "vs_downscale_ci": [
+      1.0606,
+      1.2529
+     ],
+     "vs_downscale_iou_only_ci": [
+      1.0319,
+      1.2568
+     ],
+     "vs_tiling_L0": 1.0962,
+     "vs_tiling_L0_ci": [
+      0.9911,
+      1.2091
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.9865,
+      1.3251
+     ],
+     "pixels_vs_tiling_L0": 0.2644,
+     "vs_ref": 1.027,
+     "vs_ref_ci": [
+      1.0,
+      1.064
+     ],
+     "vs_ref_iou_only_ci": [
+      1.0,
+      1.061
+     ],
+     "pixels_vs_ref": 0.9724,
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      1.0217,
+      1.099
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 57,
+      "exhausted": 3
+     },
+     "looks_mean": 5.1,
+     "looks_by_level": {
+      "L0": 98,
+      "L1": 148,
+      "L2": 60
+     },
+     "looks_by_action": {
+      "gaze": 151,
+      "verify": 116,
+      "escalate": 39
+     }
+    },
+    "ts08@0.3": {
+     "recall": 0.52,
+     "recall_ci": [
+      0.4592,
+      0.59
+     ],
+     "recall_iou_only": 0.445,
+     "chance_recall": 0.035,
+     "chance_recall_iou_only": 0.015,
+     "precision": 0.0861,
+     "fp_per_image": 18.4,
+     "boxes_per_image": 20.1333,
+     "pixels_frac": 0.26,
+     "net_pixels_frac": 0.2444,
+     "images_with_any": 0.9667,
+     "critical_per_image": 1.75,
+     "findings_per_image": 3.05,
+     "per_class": {
+      "crack": 0.5902,
+      "spalling": 0.6604,
+      "efflorescence": 0.0882,
+      "exposed_rebar": 0.6471,
+      "corrosion": 0.5429
+     },
+     "vs_downscale": 1.0505,
+     "vs_downscale_ci": [
+      0.9574,
+      1.1584
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.9583,
+      1.2163
+     ],
+     "vs_tiling_L0": 1.0,
+     "vs_tiling_L0_ci": [
+      0.8849,
+      1.1251
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.9247,
+      1.2693
+     ],
+     "pixels_vs_tiling_L0": 0.156,
+     "vs_ref": 1.0297,
+     "vs_ref_ci": [
+      0.9815,
+      1.0941
+     ],
+     "vs_ref_iou_only_ci": [
+      0.975,
+      1.0964
+     ],
+     "pixels_vs_ref": 1.0,
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      1.0486,
+      1.2157
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "cap-hit": 56,
+      "stop-rule": 4
+     },
+     "looks_mean": 2.9333,
+     "looks_by_level": {
+      "L0": 11,
+      "L1": 105,
+      "L2": 60
+     },
+     "looks_by_action": {
+      "gaze": 108,
+      "verify": 59,
+      "escalate": 9
+     }
+    },
+    "ts08@1.0": {
+     "recall": 0.57,
+     "recall_ci": [
+      0.5064,
+      0.6364
+     ],
+     "recall_iou_only": 0.47,
+     "chance_recall": 0.06,
+     "chance_recall_iou_only": 0.035,
+     "precision": 0.0584,
+     "fp_per_image": 30.6333,
+     "boxes_per_image": 32.5333,
+     "pixels_frac": 0.4351,
+     "net_pixels_frac": 0.4194,
+     "images_with_any": 0.9833,
+     "critical_per_image": 3.1167,
+     "findings_per_image": 4.0,
+     "per_class": {
+      "crack": 0.6066,
+      "spalling": 0.717,
+      "efflorescence": 0.1765,
+      "exposed_rebar": 0.7059,
+      "corrosion": 0.6
+     },
+     "vs_downscale": 1.1515,
+     "vs_downscale_ci": [
+      1.0606,
+      1.2529
+     ],
+     "vs_downscale_iou_only_ci": [
+      1.0319,
+      1.2568
+     ],
+     "vs_tiling_L0": 1.0962,
+     "vs_tiling_L0_ci": [
+      0.9911,
+      1.2091
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.9865,
+      1.3251
+     ],
+     "pixels_vs_tiling_L0": 0.261,
+     "vs_ref": 1.027,
+     "vs_ref_ci": [
+      1.0,
+      1.064
+     ],
+     "vs_ref_iou_only_ci": [
+      1.0,
+      1.061
+     ],
+     "pixels_vs_ref": 0.9602,
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      1.032,
+      1.1156
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 58,
+      "exhausted": 2
+     },
+     "looks_mean": 5.0333,
+     "looks_by_level": {
+      "L0": 96,
+      "L1": 146,
+      "L2": 60
+     },
+     "looks_by_action": {
+      "gaze": 149,
+      "verify": 118,
+      "escalate": 35
+     }
+    },
+    "ts10@0.3": {
+     "recall": 0.52,
+     "recall_ci": [
+      0.4592,
+      0.59
+     ],
+     "recall_iou_only": 0.445,
+     "chance_recall": 0.045,
+     "chance_recall_iou_only": 0.02,
+     "precision": 0.085,
+     "fp_per_image": 18.65,
+     "boxes_per_image": 20.3833,
+     "pixels_frac": 0.2587,
+     "net_pixels_frac": 0.2431,
+     "images_with_any": 0.9667,
+     "critical_per_image": 1.75,
+     "findings_per_image": 3.1167,
+     "per_class": {
+      "crack": 0.5902,
+      "spalling": 0.6604,
+      "efflorescence": 0.0882,
+      "exposed_rebar": 0.6471,
+      "corrosion": 0.5429
+     },
+     "vs_downscale": 1.0505,
+     "vs_downscale_ci": [
+      0.9574,
+      1.1584
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.9583,
+      1.2163
+     ],
+     "vs_tiling_L0": 1.0,
+     "vs_tiling_L0_ci": [
+      0.8849,
+      1.1251
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.9247,
+      1.2693
+     ],
+     "pixels_vs_tiling_L0": 0.1552,
+     "vs_ref": 1.0297,
+     "vs_ref_ci": [
+      0.9815,
+      1.0941
+     ],
+     "vs_ref_iou_only_ci": [
+      0.975,
+      1.0964
+     ],
+     "pixels_vs_ref": 0.9947,
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      1.0628,
+      1.2264
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "cap-hit": 55,
+      "stop-rule": 5
+     },
+     "looks_mean": 2.9167,
+     "looks_by_level": {
+      "L0": 11,
+      "L1": 104,
+      "L2": 60
+     },
+     "looks_by_action": {
+      "gaze": 107,
+      "verify": 63,
+      "escalate": 5
+     }
+    },
+    "ts10@1.0": {
+     "recall": 0.57,
+     "recall_ci": [
+      0.5064,
+      0.6364
+     ],
+     "recall_iou_only": 0.47,
+     "chance_recall": 0.04,
+     "chance_recall_iou_only": 0.015,
+     "precision": 0.058,
+     "fp_per_image": 30.8833,
+     "boxes_per_image": 32.7833,
+     "pixels_frac": 0.4323,
+     "net_pixels_frac": 0.4167,
+     "images_with_any": 0.9833,
+     "critical_per_image": 3.1167,
+     "findings_per_image": 4.0667,
+     "per_class": {
+      "crack": 0.6066,
+      "spalling": 0.717,
+      "efflorescence": 0.1765,
+      "exposed_rebar": 0.7059,
+      "corrosion": 0.6
+     },
+     "vs_downscale": 1.1515,
+     "vs_downscale_ci": [
+      1.0606,
+      1.2529
+     ],
+     "vs_downscale_iou_only_ci": [
+      1.0319,
+      1.2568
+     ],
+     "vs_tiling_L0": 1.0962,
+     "vs_tiling_L0_ci": [
+      0.9911,
+      1.2091
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.9865,
+      1.3251
+     ],
+     "pixels_vs_tiling_L0": 0.2594,
+     "vs_ref": 1.027,
+     "vs_ref_ci": [
+      1.0,
+      1.064
+     ],
+     "vs_ref_iou_only_ci": [
+      1.0,
+      1.061
+     ],
+     "pixels_vs_ref": 0.954,
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      1.041,
+      1.1222
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 58,
+      "exhausted": 2
+     },
+     "looks_mean": 5.0,
+     "looks_by_level": {
+      "L0": 95,
+      "L1": 145,
+      "L2": 60
+     },
+     "looks_by_action": {
+      "gaze": 148,
+      "verify": 122,
+      "escalate": 30
+     }
+    },
+    "sf1@0.3": {
+     "recall": 0.46,
+     "recall_ci": [
+      0.3902,
+      0.5361
+     ],
+     "recall_iou_only": 0.405,
+     "chance_recall": 0.02,
+     "chance_recall_iou_only": 0.005,
+     "precision": 0.1193,
+     "fp_per_image": 11.3167,
+     "boxes_per_image": 12.85,
+     "pixels_frac": 0.2264,
+     "net_pixels_frac": 0.1639,
+     "images_with_any": 0.9333,
+     "critical_per_image": 1.2667,
+     "findings_per_image": 2.25,
+     "per_class": {
+      "crack": 0.5246,
+      "spalling": 0.6226,
+      "efflorescence": 0.0588,
+      "exposed_rebar": 0.5882,
+      "corrosion": 0.4286
+     },
+     "vs_downscale": 0.9293,
+     "vs_downscale_ci": [
+      0.8421,
+      1.0357
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.869,
+      1.1144
+     ],
+     "vs_tiling_L0": 0.8846,
+     "vs_tiling_L0_ci": [
+      0.7699,
+      1.0105
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.83,
+      1.1691
+     ],
+     "pixels_vs_tiling_L0": 0.1359,
+     "vs_ref": 0.9109,
+     "vs_ref_ci": [
+      0.8444,
+      0.9765
+     ],
+     "vs_ref_iou_only_ci": [
+      0.8605,
+      1.0
+     ],
+     "pixels_vs_ref": 0.8707,
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      0.6369,
+      0.8188
+     ],
+     "images_with_any_vs_ref_ci": [
+      -0.0833,
+      0.0
+     ],
+     "halt": {
+      "cap-hit": 59,
+      "exhausted": 1
+     },
+     "looks_mean": 1.9667,
+     "looks_by_level": {
+      "L0": 13,
+      "L1": 59,
+      "L2": 46
+     },
+     "looks_by_action": {
+      "gaze": 60,
+      "verify": 44,
+      "escalate": 14
+     }
+    },
+    "sf1@1.0": {
+     "recall": 0.555,
+     "recall_ci": [
+      0.4874,
+      0.625
+     ],
+     "recall_iou_only": 0.47,
+     "chance_recall": 0.045,
+     "chance_recall_iou_only": 0.015,
+     "precision": 0.066,
+     "fp_per_image": 26.2,
+     "boxes_per_image": 28.05,
+     "pixels_frac": 0.4181,
+     "net_pixels_frac": 0.3556,
+     "images_with_any": 0.9667,
+     "critical_per_image": 2.4833,
+     "findings_per_image": 3.8833,
+     "per_class": {
+      "crack": 0.5738,
+      "spalling": 0.7547,
+      "efflorescence": 0.1765,
+      "exposed_rebar": 0.6471,
+      "corrosion": 0.5429
+     },
+     "vs_downscale": 1.1212,
+     "vs_downscale_ci": [
+      1.0408,
+      1.2188
+     ],
+     "vs_downscale_iou_only_ci": [
+      1.046,
+      1.2464
+     ],
+     "vs_tiling_L0": 1.0673,
+     "vs_tiling_L0_ci": [
+      0.9711,
+      1.1715
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.9997,
+      1.3226
+     ],
+     "pixels_vs_tiling_L0": 0.2508,
+     "vs_ref": 1.0,
+     "vs_ref_ci": [
+      0.964,
+      1.0374
+     ],
+     "vs_ref_iou_only_ci": [
+      0.9796,
+      1.07
+     ],
+     "pixels_vs_ref": 0.9226,
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      0.838,
+      1.0038
+     ],
+     "images_with_any_vs_ref_ci": [
+      -0.05,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 40,
+      "exhausted": 20
+     },
+     "looks_mean": 4.2667,
+     "looks_by_level": {
+      "L0": 87,
+      "L1": 123,
+      "L2": 46
+     },
+     "looks_by_action": {
+      "gaze": 124,
+      "verify": 100,
+      "escalate": 32
+     }
+    },
+    "fill@0.3": {
+     "recall": 0.52,
+     "recall_ci": [
+      0.4509,
+      0.599
+     ],
+     "recall_iou_only": 0.44,
+     "chance_recall": 0.045,
+     "chance_recall_iou_only": 0.03,
+     "precision": 0.0837,
+     "fp_per_image": 18.9833,
+     "boxes_per_image": 20.7167,
+     "pixels_frac": 0.2899,
+     "net_pixels_frac": 0.2743,
+     "images_with_any": 0.9667,
+     "critical_per_image": 1.6833,
+     "findings_per_image": 3.25,
+     "per_class": {
+      "crack": 0.541,
+      "spalling": 0.6792,
+      "efflorescence": 0.1176,
+      "exposed_rebar": 0.6471,
+      "corrosion": 0.5714
+     },
+     "vs_downscale": 1.0505,
+     "vs_downscale_ci": [
+      0.94,
+      1.1686
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.9375,
+      1.1972
+     ],
+     "vs_tiling_L0": 1.0,
+     "vs_tiling_L0_ci": [
+      0.8785,
+      1.13
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.9111,
+      1.2667
+     ],
+     "pixels_vs_tiling_L0": 0.174,
+     "vs_ref": 1.0297,
+     "vs_ref_ci": [
+      1.0,
+      1.0693
+     ],
+     "vs_ref_iou_only_ci": [
+      1.0,
+      1.0366
+     ],
+     "pixels_vs_ref": 1.1149,
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      1.1006,
+      1.2347
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "cap-hit": 55,
+      "stop-rule": 5
+     },
+     "looks_mean": 3.85,
+     "looks_by_level": {
+      "L0": 55,
+      "L1": 116,
+      "L2": 60
+     },
+     "looks_by_action": {
+      "gaze": 117,
+      "verify": 77,
+      "escalate": 37
+     }
+    },
+    "fill@1.0": {
+     "recall": 0.555,
+     "recall_ci": [
+      0.488,
+      0.6238
+     ],
+     "recall_iou_only": 0.46,
+     "chance_recall": 0.055,
+     "chance_recall_iou_only": 0.025,
+     "precision": 0.0609,
+     "fp_per_image": 28.55,
+     "boxes_per_image": 30.4,
+     "pixels_frac": 0.4531,
+     "net_pixels_frac": 0.4375,
+     "images_with_any": 0.9833,
+     "critical_per_image": 3.0333,
+     "findings_per_image": 3.9167,
+     "per_class": {
+      "crack": 0.5738,
+      "spalling": 0.717,
+      "efflorescence": 0.1765,
+      "exposed_rebar": 0.7059,
+      "corrosion": 0.5714
+     },
+     "vs_downscale": 1.1212,
+     "vs_downscale_ci": [
+      1.0309,
+      1.2247
+     ],
+     "vs_downscale_iou_only_ci": [
+      1.0089,
+      1.2298
+     ],
+     "vs_tiling_L0": 1.0673,
+     "vs_tiling_L0_ci": [
+      0.964,
+      1.1848
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.9534,
+      1.3108
+     ],
+     "pixels_vs_tiling_L0": 0.2719,
+     "vs_ref": 1.0,
+     "vs_ref_ci": [
+      1.0,
+      1.0
+     ],
+     "vs_ref_iou_only_ci": [
+      1.0,
+      1.0
+     ],
+     "pixels_vs_ref": 1.0,
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      1.0,
+      1.0
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 57,
+      "exhausted": 3
+     },
+     "looks_mean": 5.25,
+     "looks_by_level": {
+      "L0": 103,
+      "L1": 152,
+      "L2": 60
+     },
+     "looks_by_action": {
+      "gaze": 153,
+      "verify": 104,
+      "escalate": 58
+     }
+    },
+    "sv@0.3": {
+     "recall": 0.505,
+     "recall_ci": [
+      0.4388,
+      0.5829
+     ],
+     "recall_iou_only": 0.435,
+     "chance_recall": 0.06,
+     "chance_recall_iou_only": 0.035,
+     "precision": 0.094,
+     "fp_per_image": 16.2167,
+     "boxes_per_image": 17.9,
+     "pixels_frac": 0.2559,
+     "net_pixels_frac": 0.2403,
+     "images_with_any": 0.9667,
+     "critical_per_image": 1.5833,
+     "findings_per_image": 2.9667,
+     "per_class": {
+      "crack": 0.541,
+      "spalling": 0.6604,
+      "efflorescence": 0.1176,
+      "exposed_rebar": 0.6471,
+      "corrosion": 0.5143
+     },
+     "vs_downscale": 1.0202,
+     "vs_downscale_ci": [
+      0.9189,
+      1.1349
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.9268,
+      1.1858
+     ],
+     "vs_tiling_L0": 0.9712,
+     "vs_tiling_L0_ci": [
+      0.8558,
+      1.0962
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.8999,
+      1.2576
+     ],
+     "pixels_vs_tiling_L0": 0.1535,
+     "vs_ref": 1.0,
+     "vs_ref_ci": [
+      1.0,
+      1.0
+     ],
+     "vs_ref_iou_only_ci": [
+      1.0,
+      1.0
+     ],
+     "pixels_vs_ref": 0.984,
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      1.0,
+      1.0
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "cap-hit": 53,
+      "stop-rule": 7
+     },
+     "looks_mean": 2.8833,
+     "looks_by_level": {
+      "L0": 12,
+      "L1": 101,
+      "L2": 60
+     },
+     "looks_by_action": {
+      "gaze": 102,
+      "verify": 44,
+      "escalate": 27
+     }
+    },
+    "sv@1.0": {
+     "recall": 0.55,
+     "recall_ci": [
+      0.4828,
+      0.6215
+     ],
+     "recall_iou_only": 0.455,
+     "chance_recall": 0.055,
+     "chance_recall_iou_only": 0.025,
+     "precision": 0.0612,
+     "fp_per_image": 28.1333,
+     "boxes_per_image": 29.9667,
+     "pixels_frac": 0.4281,
+     "net_pixels_frac": 0.4125,
+     "images_with_any": 0.9833,
+     "critical_per_image": 2.8667,
+     "findings_per_image": 3.8667,
+     "per_class": {
+      "crack": 0.5738,
+      "spalling": 0.6981,
+      "efflorescence": 0.1765,
+      "exposed_rebar": 0.7059,
+      "corrosion": 0.5714
+     },
+     "vs_downscale": 1.1111,
+     "vs_downscale_ci": [
+      1.0189,
+      1.2188
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.9901,
+      1.2222
+     ],
+     "vs_tiling_L0": 1.0577,
+     "vs_tiling_L0_ci": [
+      0.96,
+      1.1683
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.9485,
+      1.2907
+     ],
+     "pixels_vs_tiling_L0": 0.2569,
+     "vs_ref": 0.991,
+     "vs_ref_ci": [
+      0.9714,
+      1.0
+     ],
+     "vs_ref_iou_only_ci": [
+      0.9663,
+      1.0
+     ],
+     "pixels_vs_ref": 0.9448,
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      0.9599,
+      1.0102
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 58,
+      "exhausted": 2
+     },
+     "looks_mean": 4.95,
+     "looks_by_level": {
+      "L0": 94,
+      "L1": 143,
+      "L2": 60
+     },
+     "looks_by_action": {
+      "gaze": 144,
+      "verify": 101,
+      "escalate": 52
+     }
+    },
+    "v0_0@0.3": {
+     "recall": 0.505,
+     "recall_ci": [
+      0.4388,
+      0.5829
+     ],
+     "recall_iou_only": 0.435,
+     "chance_recall": 0.045,
+     "chance_recall_iou_only": 0.03,
+     "precision": 0.092,
+     "fp_per_image": 16.6167,
+     "boxes_per_image": 18.3,
+     "pixels_frac": 0.2628,
+     "net_pixels_frac": 0.2472,
+     "images_with_any": 0.9667,
+     "critical_per_image": 1.5833,
+     "findings_per_image": 2.9833,
+     "per_class": {
+      "crack": 0.541,
+      "spalling": 0.6604,
+      "efflorescence": 0.1176,
+      "exposed_rebar": 0.6471,
+      "corrosion": 0.5143
+     },
+     "vs_downscale": 1.0202,
+     "vs_downscale_ci": [
+      0.9189,
+      1.1349
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.9268,
+      1.1858
+     ],
+     "vs_tiling_L0": 0.9712,
+     "vs_tiling_L0_ci": [
+      0.8558,
+      1.0962
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.8999,
+      1.2576
+     ],
+     "pixels_vs_tiling_L0": 0.1577,
+     "vs_ref": 1.0,
+     "vs_ref_ci": [
+      1.0,
+      1.0
+     ],
+     "vs_ref_iou_only_ci": [
+      1.0,
+      1.0
+     ],
+     "pixels_vs_ref": 1.0107,
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      1.0,
+      1.0597
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "cap-hit": 58,
+      "stop-rule": 2
+     },
+     "looks_mean": 2.9667,
+     "looks_by_level": {
+      "L0": 12,
+      "L1": 106,
+      "L2": 60
+     },
+     "looks_by_action": {
+      "gaze": 107,
+      "verify": 44,
+      "escalate": 27
+     }
+    },
+    "v0_0@1.0": {
+     "recall": 0.565,
+     "recall_ci": [
+      0.4976,
+      0.6364
+     ],
+     "recall_iou_only": 0.47,
+     "chance_recall": 0.03,
+     "chance_recall_iou_only": 0.01,
+     "precision": 0.0562,
+     "fp_per_image": 31.6333,
+     "boxes_per_image": 33.5167,
+     "pixels_frac": 0.499,
+     "net_pixels_frac": 0.4833,
+     "images_with_any": 0.9833,
+     "critical_per_image": 3.15,
+     "findings_per_image": 4.0167,
+     "per_class": {
+      "crack": 0.5738,
+      "spalling": 0.7358,
+      "efflorescence": 0.1765,
+      "exposed_rebar": 0.7059,
+      "corrosion": 0.6
+     },
+     "vs_downscale": 1.1414,
+     "vs_downscale_ci": [
+      1.0481,
+      1.2445
+     ],
+     "vs_downscale_iou_only_ci": [
+      1.0323,
+      1.2586
+     ],
+     "vs_tiling_L0": 1.0865,
+     "vs_tiling_L0_ci": [
+      0.9896,
+      1.1945
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.9879,
+      1.3243
+     ],
+     "pixels_vs_tiling_L0": 0.2994,
+     "vs_ref": 1.018,
+     "vs_ref_ci": [
+      1.0,
+      1.0481
+     ],
+     "vs_ref_iou_only_ci": [
+      1.0,
+      1.0625
+     ],
+     "pixels_vs_ref": 1.1011,
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      1.046,
+      1.1729
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 53,
+      "exhausted": 7
+     },
+     "looks_mean": 5.8,
+     "looks_by_level": {
+      "L0": 119,
+      "L1": 169,
+      "L2": 60
+     },
+     "looks_by_action": {
+      "gaze": 170,
+      "verify": 114,
+      "escalate": 64
+     }
+    },
+    "v0_1@0.3": {
+     "recall": 0.505,
+     "recall_ci": [
+      0.4388,
+      0.5829
+     ],
+     "recall_iou_only": 0.435,
+     "chance_recall": 0.03,
+     "chance_recall_iou_only": 0.005,
+     "precision": 0.092,
+     "fp_per_image": 16.6167,
+     "boxes_per_image": 18.3,
+     "pixels_frac": 0.2628,
+     "net_pixels_frac": 0.2472,
+     "images_with_any": 0.9667,
+     "critical_per_image": 1.5833,
+     "findings_per_image": 2.9833,
+     "per_class": {
+      "crack": 0.541,
+      "spalling": 0.6604,
+      "efflorescence": 0.1176,
+      "exposed_rebar": 0.6471,
+      "corrosion": 0.5143
+     },
+     "vs_downscale": 1.0202,
+     "vs_downscale_ci": [
+      0.9189,
+      1.1349
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.9268,
+      1.1858
+     ],
+     "vs_tiling_L0": 0.9712,
+     "vs_tiling_L0_ci": [
+      0.8558,
+      1.0962
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.8999,
+      1.2576
+     ],
+     "pixels_vs_tiling_L0": 0.1577,
+     "vs_ref": 1.0,
+     "vs_ref_ci": [
+      1.0,
+      1.0
+     ],
+     "vs_ref_iou_only_ci": [
+      1.0,
+      1.0
+     ],
+     "pixels_vs_ref": 1.0107,
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      1.0,
+      1.0597
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "cap-hit": 58,
+      "stop-rule": 2
+     },
+     "looks_mean": 2.9667,
+     "looks_by_level": {
+      "L0": 12,
+      "L1": 106,
+      "L2": 60
+     },
+     "looks_by_action": {
+      "gaze": 107,
+      "verify": 44,
+      "escalate": 27
+     }
+    },
+    "v0_1@1.0": {
+     "recall": 0.565,
+     "recall_ci": [
+      0.4976,
+      0.6364
+     ],
+     "recall_iou_only": 0.47,
+     "chance_recall": 0.055,
+     "chance_recall_iou_only": 0.03,
+     "precision": 0.0575,
+     "fp_per_image": 30.85,
+     "boxes_per_image": 32.7333,
+     "pixels_frac": 0.4809,
+     "net_pixels_frac": 0.4653,
+     "images_with_any": 0.9833,
+     "critical_per_image": 3.15,
+     "findings_per_image": 4.0,
+     "per_class": {
+      "crack": 0.5738,
+      "spalling": 0.7358,
+      "efflorescence": 0.1765,
+      "exposed_rebar": 0.7059,
+      "corrosion": 0.6
+     },
+     "vs_downscale": 1.1414,
+     "vs_downscale_ci": [
+      1.0481,
+      1.2445
+     ],
+     "vs_downscale_iou_only_ci": [
+      1.0323,
+      1.2586
+     ],
+     "vs_tiling_L0": 1.0865,
+     "vs_tiling_L0_ci": [
+      0.9896,
+      1.1945
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.9879,
+      1.3243
+     ],
+     "pixels_vs_tiling_L0": 0.2885,
+     "vs_ref": 1.018,
+     "vs_ref_ci": [
+      1.0,
+      1.0481
+     ],
+     "vs_ref_iou_only_ci": [
+      1.0,
+      1.0625
+     ],
+     "pixels_vs_ref": 1.0613,
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      1.0285,
+      1.1409
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 55,
+      "exhausted": 5
+     },
+     "looks_mean": 5.5833,
+     "looks_by_level": {
+      "L0": 113,
+      "L1": 162,
+      "L2": 60
+     },
+     "looks_by_action": {
+      "gaze": 163,
+      "verify": 112,
+      "escalate": 60
+     }
+    },
+    "fill_sv@0.3": {
+     "recall": 0.52,
+     "recall_ci": [
+      0.4509,
+      0.599
+     ],
+     "recall_iou_only": 0.44,
+     "chance_recall": 0.04,
+     "chance_recall_iou_only": 0.02,
+     "precision": 0.0837,
+     "fp_per_image": 18.9833,
+     "boxes_per_image": 20.7167,
+     "pixels_frac": 0.2841,
+     "net_pixels_frac": 0.2685,
+     "images_with_any": 0.9667,
+     "critical_per_image": 1.6833,
+     "findings_per_image": 3.25,
+     "per_class": {
+      "crack": 0.541,
+      "spalling": 0.6792,
+      "efflorescence": 0.1176,
+      "exposed_rebar": 0.6471,
+      "corrosion": 0.5714
+     },
+     "vs_downscale": 1.0505,
+     "vs_downscale_ci": [
+      0.94,
+      1.1686
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.9375,
+      1.1972
+     ],
+     "vs_tiling_L0": 1.0,
+     "vs_tiling_L0_ci": [
+      0.8785,
+      1.13
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.9111,
+      1.2667
+     ],
+     "pixels_vs_tiling_L0": 0.1705,
+     "vs_ref": 1.0297,
+     "vs_ref_ci": [
+      1.0,
+      1.0693
+     ],
+     "vs_ref_iou_only_ci": [
+      1.0,
+      1.0366
+     ],
+     "pixels_vs_ref": 1.0926,
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      1.1006,
+      1.2347
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "cap-hit": 52,
+      "stop-rule": 8
+     },
+     "looks_mean": 3.75,
+     "looks_by_level": {
+      "L0": 52,
+      "L1": 113,
+      "L2": 60
+     },
+     "looks_by_action": {
+      "gaze": 114,
+      "verify": 77,
+      "escalate": 34
+     }
+    },
+    "fill_sv@1.0": {
+     "recall": 0.55,
+     "recall_ci": [
+      0.4828,
+      0.6215
+     ],
+     "recall_iou_only": 0.455,
+     "chance_recall": 0.055,
+     "chance_recall_iou_only": 0.04,
+     "precision": 0.0612,
+     "fp_per_image": 28.1333,
+     "boxes_per_image": 29.9667,
+     "pixels_frac": 0.4281,
+     "net_pixels_frac": 0.4125,
+     "images_with_any": 0.9833,
+     "critical_per_image": 2.8667,
+     "findings_per_image": 3.8667,
+     "per_class": {
+      "crack": 0.5738,
+      "spalling": 0.6981,
+      "efflorescence": 0.1765,
+      "exposed_rebar": 0.7059,
+      "corrosion": 0.5714
+     },
+     "vs_downscale": 1.1111,
+     "vs_downscale_ci": [
+      1.0189,
+      1.2188
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.9901,
+      1.2222
+     ],
+     "vs_tiling_L0": 1.0577,
+     "vs_tiling_L0_ci": [
+      0.96,
+      1.1683
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.9485,
+      1.2907
+     ],
+     "pixels_vs_tiling_L0": 0.2569,
+     "vs_ref": 0.991,
+     "vs_ref_ci": [
+      0.9714,
+      1.0
+     ],
+     "vs_ref_iou_only_ci": [
+      0.9663,
+      1.0
+     ],
+     "pixels_vs_ref": 0.9448,
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      0.9599,
+      1.0102
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 58,
+      "exhausted": 2
+     },
+     "looks_mean": 4.95,
+     "looks_by_level": {
+      "L0": 94,
+      "L1": 143,
+      "L2": 60
+     },
+     "looks_by_action": {
+      "gaze": 144,
+      "verify": 101,
+      "escalate": 52
+     }
+    },
+    "sf1_fill@0.3": {
+     "recall": 0.515,
+     "recall_ci": [
+      0.451,
+      0.5877
+     ],
+     "recall_iou_only": 0.445,
+     "chance_recall": 0.03,
+     "chance_recall_iou_only": 0.01,
+     "precision": 0.1037,
+     "fp_per_image": 14.8333,
+     "boxes_per_image": 16.55,
+     "pixels_frac": 0.2721,
+     "net_pixels_frac": 0.2096,
+     "images_with_any": 0.9667,
+     "critical_per_image": 1.3333,
+     "findings_per_image": 2.85,
+     "per_class": {
+      "crack": 0.541,
+      "spalling": 0.717,
+      "efflorescence": 0.1176,
+      "exposed_rebar": 0.6471,
+      "corrosion": 0.4857
+     },
+     "vs_downscale": 1.0404,
+     "vs_downscale_ci": [
+      0.9495,
+      1.1429
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.9691,
+      1.1954
+     ],
+     "vs_tiling_L0": 0.9904,
+     "vs_tiling_L0_ci": [
+      0.8958,
+      1.099
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.9342,
+      1.262
+     ],
+     "pixels_vs_tiling_L0": 0.1633,
+     "vs_ref": 1.0198,
+     "vs_ref_ci": [
+      0.9674,
+      1.0834
+     ],
+     "vs_ref_iou_only_ci": [
+      0.9785,
+      1.0747
+     ],
+     "pixels_vs_ref": 1.0465,
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      0.8369,
+      1.0308
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "cap-hit": 43,
+      "exhausted": 14,
+      "stop-rule": 3
+     },
+     "looks_mean": 2.6833,
+     "looks_by_level": {
+      "L0": 23,
+      "L1": 92,
+      "L2": 46
+     },
+     "looks_by_action": {
+      "gaze": 93,
+      "verify": 49,
+      "escalate": 19
+     }
+    },
+    "sf1_fill@1.0": {
+     "recall": 0.555,
+     "recall_ci": [
+      0.4874,
+      0.625
+     ],
+     "recall_iou_only": 0.47,
+     "chance_recall": 0.035,
+     "chance_recall_iou_only": 0.02,
+     "precision": 0.066,
+     "fp_per_image": 26.2,
+     "boxes_per_image": 28.05,
+     "pixels_frac": 0.4181,
+     "net_pixels_frac": 0.3556,
+     "images_with_any": 0.9667,
+     "critical_per_image": 2.4833,
+     "findings_per_image": 3.8833,
+     "per_class": {
+      "crack": 0.5738,
+      "spalling": 0.7547,
+      "efflorescence": 0.1765,
+      "exposed_rebar": 0.6471,
+      "corrosion": 0.5429
+     },
+     "vs_downscale": 1.1212,
+     "vs_downscale_ci": [
+      1.0408,
+      1.2188
+     ],
+     "vs_downscale_iou_only_ci": [
+      1.046,
+      1.2464
+     ],
+     "vs_tiling_L0": 1.0673,
+     "vs_tiling_L0_ci": [
+      0.9711,
+      1.1715
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.9997,
+      1.3226
+     ],
+     "pixels_vs_tiling_L0": 0.2508,
+     "vs_ref": 1.0,
+     "vs_ref_ci": [
+      0.964,
+      1.0374
+     ],
+     "vs_ref_iou_only_ci": [
+      0.9796,
+      1.07
+     ],
+     "pixels_vs_ref": 0.9226,
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      0.838,
+      1.0038
+     ],
+     "images_with_any_vs_ref_ci": [
+      -0.05,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 40,
+      "exhausted": 20
+     },
+     "looks_mean": 4.2667,
+     "looks_by_level": {
+      "L0": 87,
+      "L1": 123,
+      "L2": 46
+     },
+     "looks_by_action": {
+      "gaze": 124,
+      "verify": 100,
+      "escalate": 32
+     }
+    },
+    "fill_ts08@0.3": {
+     "recall": 0.535,
+     "recall_ci": [
+      0.4709,
+      0.6064
+     ],
+     "recall_iou_only": 0.45,
+     "chance_recall": 0.025,
+     "chance_recall_iou_only": 0.01,
+     "precision": 0.0774,
+     "fp_per_image": 21.2667,
+     "boxes_per_image": 23.05,
+     "pixels_frac": 0.2899,
+     "net_pixels_frac": 0.2743,
+     "images_with_any": 0.9833,
+     "critical_per_image": 1.85,
+     "findings_per_image": 3.3167,
+     "per_class": {
+      "crack": 0.5902,
+      "spalling": 0.6792,
+      "efflorescence": 0.0882,
+      "exposed_rebar": 0.6471,
+      "corrosion": 0.6
+     },
+     "vs_downscale": 1.0808,
+     "vs_downscale_ci": [
+      0.9794,
+      1.1895
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.9655,
+      1.2308
+     ],
+     "vs_tiling_L0": 1.0288,
+     "vs_tiling_L0_ci": [
+      0.92,
+      1.1563
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.9348,
+      1.2817
+     ],
+     "pixels_vs_tiling_L0": 0.174,
+     "vs_ref": 1.0594,
+     "vs_ref_ci": [
+      1.0,
+      1.1327
+     ],
+     "vs_ref_iou_only_ci": [
+      0.9785,
+      1.1099
+     ],
+     "pixels_vs_ref": 1.1149,
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      1.1801,
+      1.4271
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.05
+     ],
+     "halt": {
+      "cap-hit": 55,
+      "stop-rule": 5
+     },
+     "looks_mean": 3.85,
+     "looks_by_level": {
+      "L0": 55,
+      "L1": 116,
+      "L2": 60
+     },
+     "looks_by_action": {
+      "gaze": 119,
+      "verify": 92,
+      "escalate": 20
+     }
+    },
+    "fill_ts08@1.0": {
+     "recall": 0.57,
+     "recall_ci": [
+      0.5064,
+      0.6364
+     ],
+     "recall_iou_only": 0.47,
+     "chance_recall": 0.06,
+     "chance_recall_iou_only": 0.02,
+     "precision": 0.0584,
+     "fp_per_image": 30.6333,
+     "boxes_per_image": 32.5333,
+     "pixels_frac": 0.4351,
+     "net_pixels_frac": 0.4194,
+     "images_with_any": 0.9833,
+     "critical_per_image": 3.1167,
+     "findings_per_image": 4.0,
+     "per_class": {
+      "crack": 0.6066,
+      "spalling": 0.717,
+      "efflorescence": 0.1765,
+      "exposed_rebar": 0.7059,
+      "corrosion": 0.6
+     },
+     "vs_downscale": 1.1515,
+     "vs_downscale_ci": [
+      1.0606,
+      1.2529
+     ],
+     "vs_downscale_iou_only_ci": [
+      1.0319,
+      1.2568
+     ],
+     "vs_tiling_L0": 1.0962,
+     "vs_tiling_L0_ci": [
+      0.9911,
+      1.2091
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.9865,
+      1.3251
+     ],
+     "pixels_vs_tiling_L0": 0.261,
+     "vs_ref": 1.027,
+     "vs_ref_ci": [
+      1.0,
+      1.064
+     ],
+     "vs_ref_iou_only_ci": [
+      1.0,
+      1.061
+     ],
+     "pixels_vs_ref": 0.9602,
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      1.032,
+      1.1156
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 58,
+      "exhausted": 2
+     },
+     "looks_mean": 5.0333,
+     "looks_by_level": {
+      "L0": 96,
+      "L1": 146,
+      "L2": 60
+     },
+     "looks_by_action": {
+      "gaze": 149,
+      "verify": 118,
+      "escalate": 35
+     }
+    },
+    "ts10_fill@0.3": {
+     "recall": 0.535,
+     "recall_ci": [
+      0.4709,
+      0.6064
+     ],
+     "recall_iou_only": 0.45,
+     "chance_recall": 0.045,
+     "chance_recall_iou_only": 0.015,
+     "precision": 0.0765,
+     "fp_per_image": 21.5167,
+     "boxes_per_image": 23.3,
+     "pixels_frac": 0.288,
+     "net_pixels_frac": 0.2724,
+     "images_with_any": 0.9833,
+     "critical_per_image": 1.85,
+     "findings_per_image": 3.3833,
+     "per_class": {
+      "crack": 0.5902,
+      "spalling": 0.6792,
+      "efflorescence": 0.0882,
+      "exposed_rebar": 0.6471,
+      "corrosion": 0.6
+     },
+     "vs_downscale": 1.0808,
+     "vs_downscale_ci": [
+      0.9794,
+      1.1895
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.9655,
+      1.2308
+     ],
+     "vs_tiling_L0": 1.0288,
+     "vs_tiling_L0_ci": [
+      0.92,
+      1.1563
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.9348,
+      1.2817
+     ],
+     "pixels_vs_tiling_L0": 0.1728,
+     "vs_ref": 1.0594,
+     "vs_ref_ci": [
+      1.0,
+      1.1327
+     ],
+     "vs_ref_iou_only_ci": [
+      0.9785,
+      1.1099
+     ],
+     "pixels_vs_ref": 1.1075,
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      1.1904,
+      1.4381
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.05
+     ],
+     "halt": {
+      "cap-hit": 54,
+      "stop-rule": 6
+     },
+     "looks_mean": 3.8167,
+     "looks_by_level": {
+      "L0": 54,
+      "L1": 115,
+      "L2": 60
+     },
+     "looks_by_action": {
+      "gaze": 118,
+      "verify": 96,
+      "escalate": 15
+     }
+    },
+    "ts10_fill@1.0": {
+     "recall": 0.57,
+     "recall_ci": [
+      0.5064,
+      0.6364
+     ],
+     "recall_iou_only": 0.47,
+     "chance_recall": 0.075,
+     "chance_recall_iou_only": 0.04,
+     "precision": 0.058,
+     "fp_per_image": 30.8833,
+     "boxes_per_image": 32.7833,
+     "pixels_frac": 0.4323,
+     "net_pixels_frac": 0.4167,
+     "images_with_any": 0.9833,
+     "critical_per_image": 3.1167,
+     "findings_per_image": 4.0667,
+     "per_class": {
+      "crack": 0.6066,
+      "spalling": 0.717,
+      "efflorescence": 0.1765,
+      "exposed_rebar": 0.7059,
+      "corrosion": 0.6
+     },
+     "vs_downscale": 1.1515,
+     "vs_downscale_ci": [
+      1.0606,
+      1.2529
+     ],
+     "vs_downscale_iou_only_ci": [
+      1.0319,
+      1.2568
+     ],
+     "vs_tiling_L0": 1.0962,
+     "vs_tiling_L0_ci": [
+      0.9911,
+      1.2091
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.9865,
+      1.3251
+     ],
+     "pixels_vs_tiling_L0": 0.2594,
+     "vs_ref": 1.027,
+     "vs_ref_ci": [
+      1.0,
+      1.064
+     ],
+     "vs_ref_iou_only_ci": [
+      1.0,
+      1.061
+     ],
+     "pixels_vs_ref": 0.954,
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      1.041,
+      1.1222
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 58,
+      "exhausted": 2
+     },
+     "looks_mean": 5.0,
+     "looks_by_level": {
+      "L0": 95,
+      "L1": 145,
+      "L2": 60
+     },
+     "looks_by_action": {
+      "gaze": 148,
+      "verify": 122,
+      "escalate": 30
+     }
+    },
+    "ts07_fill@0.3": {
+     "recall": 0.535,
+     "recall_ci": [
+      0.4709,
+      0.6064
+     ],
+     "recall_iou_only": 0.45,
+     "chance_recall": 0.025,
+     "chance_recall_iou_only": 0.015,
+     "precision": 0.0794,
+     "fp_per_image": 20.6833,
+     "boxes_per_image": 22.4667,
+     "pixels_frac": 0.2899,
+     "net_pixels_frac": 0.2743,
+     "images_with_any": 0.9833,
+     "critical_per_image": 1.7333,
+     "findings_per_image": 3.3,
+     "per_class": {
+      "crack": 0.5902,
+      "spalling": 0.6792,
+      "efflorescence": 0.0882,
+      "exposed_rebar": 0.6471,
+      "corrosion": 0.6
+     },
+     "vs_downscale": 1.0808,
+     "vs_downscale_ci": [
+      0.9794,
+      1.1895
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.9655,
+      1.2308
+     ],
+     "vs_tiling_L0": 1.0288,
+     "vs_tiling_L0_ci": [
+      0.92,
+      1.1563
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.9348,
+      1.2817
+     ],
+     "pixels_vs_tiling_L0": 0.174,
+     "vs_ref": 1.0594,
+     "vs_ref_ci": [
+      1.0,
+      1.1327
+     ],
+     "vs_ref_iou_only_ci": [
+      0.9785,
+      1.1099
+     ],
+     "pixels_vs_ref": 1.1149,
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      1.1665,
+      1.3674
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.05
+     ],
+     "halt": {
+      "cap-hit": 55,
+      "stop-rule": 5
+     },
+     "looks_mean": 3.85,
+     "looks_by_level": {
+      "L0": 55,
+      "L1": 116,
+      "L2": 60
+     },
+     "looks_by_action": {
+      "gaze": 119,
+      "verify": 89,
+      "escalate": 23
+     }
+    },
+    "ts07_fill@1.0": {
+     "recall": 0.57,
+     "recall_ci": [
+      0.5064,
+      0.6364
+     ],
+     "recall_iou_only": 0.47,
+     "chance_recall": 0.055,
+     "chance_recall_iou_only": 0.02,
+     "precision": 0.0592,
+     "fp_per_image": 30.2,
+     "boxes_per_image": 32.1,
+     "pixels_frac": 0.4406,
+     "net_pixels_frac": 0.425,
+     "images_with_any": 0.9833,
+     "critical_per_image": 3.0833,
+     "findings_per_image": 4.0,
+     "per_class": {
+      "crack": 0.6066,
+      "spalling": 0.717,
+      "efflorescence": 0.1765,
+      "exposed_rebar": 0.7059,
+      "corrosion": 0.6
+     },
+     "vs_downscale": 1.1515,
+     "vs_downscale_ci": [
+      1.0606,
+      1.2529
+     ],
+     "vs_downscale_iou_only_ci": [
+      1.0319,
+      1.2568
+     ],
+     "vs_tiling_L0": 1.0962,
+     "vs_tiling_L0_ci": [
+      0.9911,
+      1.2091
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.9865,
+      1.3251
+     ],
+     "pixels_vs_tiling_L0": 0.2644,
+     "vs_ref": 1.027,
+     "vs_ref_ci": [
+      1.0,
+      1.064
+     ],
+     "vs_ref_iou_only_ci": [
+      1.0,
+      1.061
+     ],
+     "pixels_vs_ref": 0.9724,
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      1.0217,
+      1.099
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 57,
+      "exhausted": 3
+     },
+     "looks_mean": 5.1,
+     "looks_by_level": {
+      "L0": 98,
+      "L1": 148,
+      "L2": 60
+     },
+     "looks_by_action": {
+      "gaze": 151,
+      "verify": 116,
+      "escalate": 39
+     }
+    },
+    "mv03@0.3": {
+     "recall": 0.51,
+     "recall_ci": [
+      0.4387,
+      0.5895
+     ],
+     "recall_iou_only": 0.44,
+     "chance_recall": 0.025,
+     "chance_recall_iou_only": 0.02,
+     "precision": 0.095,
+     "fp_per_image": 16.2,
+     "boxes_per_image": 17.9,
+     "pixels_frac": 0.26,
+     "net_pixels_frac": 0.2444,
+     "images_with_any": 1.0,
+     "critical_per_image": 1.7333,
+     "findings_per_image": 3.2833,
+     "per_class": {
+      "crack": 0.541,
+      "spalling": 0.6792,
+      "efflorescence": 0.0882,
+      "exposed_rebar": 0.6471,
+      "corrosion": 0.5429
+     },
+     "vs_downscale": 1.0303,
+     "vs_downscale_ci": [
+      0.9258,
+      1.1445
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.9375,
+      1.1972
+     ],
+     "vs_tiling_L0": 0.9808,
+     "vs_tiling_L0_ci": [
+      0.8598,
+      1.1089
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.9111,
+      1.2667
+     ],
+     "pixels_vs_tiling_L0": 0.156,
+     "vs_ref": 1.0099,
+     "vs_ref_ci": [
+      0.9789,
+      1.0471
+     ],
+     "vs_ref_iou_only_ci": [
+      1.0,
+      1.0366
+     ],
+     "pixels_vs_ref": 1.0,
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      0.9449,
+      1.052
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0833
+     ],
+     "halt": {
+      "cap-hit": 56,
+      "stop-rule": 4
+     },
+     "looks_mean": 2.9333,
+     "looks_by_level": {
+      "L1": 116,
+      "L2": 60
+     },
+     "looks_by_action": {
+      "gaze": 117,
+      "verify": 38,
+      "escalate": 21
+     }
+    },
+    "mv03@1.0": {
+     "recall": 0.53,
+     "recall_ci": [
+      0.4554,
+      0.61
+     ],
+     "recall_iou_only": 0.455,
+     "chance_recall": 0.035,
+     "chance_recall_iou_only": 0.015,
+     "precision": 0.0855,
+     "fp_per_image": 18.9,
+     "boxes_per_image": 20.6667,
+     "pixels_frac": 0.3073,
+     "net_pixels_frac": 0.2917,
+     "images_with_any": 1.0,
+     "critical_per_image": 2.2167,
+     "findings_per_image": 3.6333,
+     "per_class": {
+      "crack": 0.5738,
+      "spalling": 0.6981,
+      "efflorescence": 0.1176,
+      "exposed_rebar": 0.6471,
+      "corrosion": 0.5429
+     },
+     "vs_downscale": 1.0707,
+     "vs_downscale_ci": [
+      0.9745,
+      1.1786
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.9855,
+      1.2237
+     ],
+     "vs_tiling_L0": 1.0192,
+     "vs_tiling_L0_ci": [
+      0.9,
+      1.1489
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.934,
+      1.3077
+     ],
+     "pixels_vs_tiling_L0": 0.1844,
+     "vs_ref": 0.955,
+     "vs_ref_ci": [
+      0.9057,
+      0.9921
+     ],
+     "vs_ref_iou_only_ci": [
+      0.9642,
+      1.0
+     ],
+     "pixels_vs_ref": 0.6782,
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      0.6181,
+      0.7448
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.05
+     ],
+     "halt": {
+      "stop-rule": 57,
+      "exhausted": 3
+     },
+     "looks_mean": 3.5,
+     "looks_by_level": {
+      "L1": 150,
+      "L2": 60
+     },
+     "looks_by_action": {
+      "gaze": 151,
+      "verify": 38,
+      "escalate": 21
+     }
+    },
+    "ts10_mv03@0.3": {
+     "recall": 0.53,
+     "recall_ci": [
+      0.465,
+      0.6029
+     ],
+     "recall_iou_only": 0.455,
+     "chance_recall": 0.025,
+     "chance_recall_iou_only": 0.01,
+     "precision": 0.0865,
+     "fp_per_image": 18.6667,
+     "boxes_per_image": 20.4333,
+     "pixels_frac": 0.2587,
+     "net_pixels_frac": 0.2431,
+     "images_with_any": 1.0,
+     "critical_per_image": 1.9,
+     "findings_per_image": 3.45,
+     "per_class": {
+      "crack": 0.5902,
+      "spalling": 0.6792,
+      "efflorescence": 0.0882,
+      "exposed_rebar": 0.6471,
+      "corrosion": 0.5714
+     },
+     "vs_downscale": 1.0707,
+     "vs_downscale_ci": [
+      0.976,
+      1.1758
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.9753,
+      1.2353
+     ],
+     "vs_tiling_L0": 1.0192,
+     "vs_tiling_L0_ci": [
+      0.9114,
+      1.1429
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.9425,
+      1.2969
+     ],
+     "pixels_vs_tiling_L0": 0.1552,
+     "vs_ref": 1.0495,
+     "vs_ref_ci": [
+      1.0,
+      1.1196
+     ],
+     "vs_ref_iou_only_ci": [
+      1.0,
+      1.1177
+     ],
+     "pixels_vs_ref": 0.9947,
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      1.0447,
+      1.2472
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0833
+     ],
+     "halt": {
+      "cap-hit": 55,
+      "stop-rule": 5
+     },
+     "looks_mean": 2.9167,
+     "looks_by_level": {
+      "L1": 115,
+      "L2": 60
+     },
+     "looks_by_action": {
+      "gaze": 118,
+      "verify": 57
+     }
+    },
+    "ts10_mv03@1.0": {
+     "recall": 0.545,
+     "recall_ci": [
+      0.4771,
+      0.6207
+     ],
+     "recall_iou_only": 0.465,
+     "chance_recall": 0.04,
+     "chance_recall_iou_only": 0.02,
+     "precision": 0.0787,
+     "fp_per_image": 21.2667,
+     "boxes_per_image": 23.0833,
+     "pixels_frac": 0.2948,
+     "net_pixels_frac": 0.2792,
+     "images_with_any": 1.0,
+     "critical_per_image": 2.3167,
+     "findings_per_image": 3.8333,
+     "per_class": {
+      "crack": 0.6066,
+      "spalling": 0.6981,
+      "efflorescence": 0.1176,
+      "exposed_rebar": 0.6471,
+      "corrosion": 0.5714
+     },
+     "vs_downscale": 1.101,
+     "vs_downscale_ci": [
+      1.0103,
+      1.2043
+     ],
+     "vs_downscale_iou_only_ci": [
+      1.0,
+      1.2533
+     ],
+     "vs_tiling_L0": 1.0481,
+     "vs_tiling_L0_ci": [
+      0.938,
+      1.1721
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.9592,
+      1.3243
+     ],
+     "pixels_vs_tiling_L0": 0.1769,
+     "vs_ref": 0.982,
+     "vs_ref_ci": [
+      0.9386,
+      1.028
+     ],
+     "vs_ref_iou_only_ci": [
+      0.9775,
+      1.0568
+     ],
+     "pixels_vs_ref": 0.6506,
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      0.6974,
+      0.827
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.05
+     ],
+     "halt": {
+      "stop-rule": 58,
+      "exhausted": 2
+     },
+     "looks_mean": 3.35,
+     "looks_by_level": {
+      "L1": 141,
+      "L2": 60
+     },
+     "looks_by_action": {
+      "gaze": 144,
+      "verify": 57
+     }
+    },
+    "ts07_mv03@0.3": {
+     "recall": 0.53,
+     "recall_ci": [
+      0.465,
+      0.6029
+     ],
+     "recall_iou_only": 0.455,
+     "chance_recall": 0.025,
+     "chance_recall_iou_only": 0.015,
+     "precision": 0.0901,
+     "fp_per_image": 17.8333,
+     "boxes_per_image": 19.6,
+     "pixels_frac": 0.26,
+     "net_pixels_frac": 0.2444,
+     "images_with_any": 1.0,
+     "critical_per_image": 1.7833,
+     "findings_per_image": 3.35,
+     "per_class": {
+      "crack": 0.5902,
+      "spalling": 0.6792,
+      "efflorescence": 0.0882,
+      "exposed_rebar": 0.6471,
+      "corrosion": 0.5714
+     },
+     "vs_downscale": 1.0707,
+     "vs_downscale_ci": [
+      0.976,
+      1.1758
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.9753,
+      1.2353
+     ],
+     "vs_tiling_L0": 1.0192,
+     "vs_tiling_L0_ci": [
+      0.9114,
+      1.1429
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.9425,
+      1.2969
+     ],
+     "pixels_vs_tiling_L0": 0.156,
+     "vs_ref": 1.0495,
+     "vs_ref_ci": [
+      1.0,
+      1.1196
+     ],
+     "vs_ref_iou_only_ci": [
+      1.0,
+      1.1177
+     ],
+     "pixels_vs_ref": 1.0,
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      1.0128,
+      1.1926
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0833
+     ],
+     "halt": {
+      "cap-hit": 56,
+      "stop-rule": 4
+     },
+     "looks_mean": 2.9333,
+     "looks_by_level": {
+      "L1": 116,
+      "L2": 60
+     },
+     "looks_by_action": {
+      "gaze": 119,
+      "verify": 50,
+      "escalate": 7
+     }
+    },
+    "ts07_mv03@1.0": {
+     "recall": 0.545,
+     "recall_ci": [
+      0.4771,
+      0.6207
+     ],
+     "recall_iou_only": 0.465,
+     "chance_recall": 0.04,
+     "chance_recall_iou_only": 0.025,
+     "precision": 0.0812,
+     "fp_per_image": 20.55,
+     "boxes_per_image": 22.3667,
+     "pixels_frac": 0.3004,
+     "net_pixels_frac": 0.2847,
+     "images_with_any": 1.0,
+     "critical_per_image": 2.2667,
+     "findings_per_image": 3.7333,
+     "per_class": {
+      "crack": 0.6066,
+      "spalling": 0.6981,
+      "efflorescence": 0.1176,
+      "exposed_rebar": 0.6471,
+      "corrosion": 0.5714
+     },
+     "vs_downscale": 1.101,
+     "vs_downscale_ci": [
+      1.0103,
+      1.2043
+     ],
+     "vs_downscale_iou_only_ci": [
+      1.0,
+      1.2533
+     ],
+     "vs_tiling_L0": 1.0481,
+     "vs_tiling_L0_ci": [
+      0.938,
+      1.1721
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.9592,
+      1.3243
+     ],
+     "pixels_vs_tiling_L0": 0.1802,
+     "vs_ref": 0.982,
+     "vs_ref_ci": [
+      0.9386,
+      1.028
+     ],
+     "vs_ref_iou_only_ci": [
+      0.9775,
+      1.0568
+     ],
+     "pixels_vs_ref": 0.6628,
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      0.6701,
+      0.8087
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.05
+     ],
+     "halt": {
+      "stop-rule": 57,
+      "exhausted": 3
+     },
+     "looks_mean": 3.4167,
+     "looks_by_level": {
+      "L1": 145,
+      "L2": 60
+     },
+     "looks_by_action": {
+      "gaze": 148,
+      "verify": 50,
+      "escalate": 7
+     }
+    }
+   }
+  },
+  "clean": {
+   "split": "clean",
+   "n": 30,
+   "dataset_gt_sha256": "6007a8bf12e5641f297a1630e2f4dc3f2f335ca1806f8dea3b4daad693df2ecc",
+   "dataset_images_sha256": "eaac718e380bfc6eef0571a2c91f21a4019c82f4232866d45624be1f4fa3c373",
+   "caps": [
+    0.3,
+    1.0
+   ],
+   "segmenter": "classical-v1",
+   "micro_arm": "linux-aarch64",
+   "files": [
+    "runs/tune/final_clean.json"
+   ],
+   "rows": {
+    "downscale": {
+     "recall": null,
+     "recall_ci": [
+      null,
+      null
+     ],
+     "recall_iou_only": null,
+     "chance_recall": null,
+     "chance_recall_iou_only": null,
+     "precision": 0.0,
+     "fp_per_image": 5.2667,
+     "boxes_per_image": 5.2667,
+     "pixels_frac": 0.25,
+     "net_pixels_frac": 0.25,
+     "images_with_any": 0.8,
+     "critical_per_image": 0.0333,
+     "findings_per_image": 1.3333,
+     "per_class": {
+      "crack": null,
+      "spalling": null,
+      "efflorescence": null,
+      "exposed_rebar": null,
+      "corrosion": null
+     }
+    },
+    "def@0.3": {
+     "recall": null,
+     "recall_ci": [
+      null,
+      null
+     ],
+     "recall_iou_only": null,
+     "chance_recall": null,
+     "chance_recall_iou_only": null,
+     "precision": 0.0,
+     "fp_per_image": 12.1333,
+     "boxes_per_image": 12.1333,
+     "pixels_frac": 0.2545,
+     "net_pixels_frac": 0.2389,
+     "images_with_any": 0.7,
+     "critical_per_image": 0.6333,
+     "findings_per_image": 1.4333,
+     "per_class": {
+      "crack": null,
+      "spalling": null,
+      "efflorescence": null,
+      "exposed_rebar": null,
+      "corrosion": null
+     },
+     "halt": {
+      "cap-hit": 26,
+      "exhausted": 2,
+      "stop-rule": 2
+     },
+     "looks_mean": 2.8667,
+     "looks_by_level": {
+      "L0": 23,
+      "L1": 35,
+      "L2": 28
+     },
+     "looks_by_action": {
+      "gaze": 40,
+      "verify": 23,
+      "escalate": 23
+     }
+    },
+    "def@1.0": {
+     "recall": null,
+     "recall_ci": [
+      null,
+      null
+     ],
+     "recall_iou_only": null,
+     "chance_recall": null,
+     "chance_recall_iou_only": null,
+     "precision": 0.0,
+     "fp_per_image": 15.8333,
+     "boxes_per_image": 15.8333,
+     "pixels_frac": 0.4129,
+     "net_pixels_frac": 0.3972,
+     "images_with_any": 0.8,
+     "critical_per_image": 1.0,
+     "findings_per_image": 2.0667,
+     "per_class": {
+      "crack": null,
+      "spalling": null,
+      "efflorescence": null,
+      "exposed_rebar": null,
+      "corrosion": null
+     },
+     "halt": {
+      "stop-rule": 24,
+      "exhausted": 5,
+      "cap-hit": 1
+     },
+     "looks_mean": 4.7667,
+     "looks_by_level": {
+      "L0": 53,
+      "L1": 62,
+      "L2": 28
+     },
+     "looks_by_action": {
+      "gaze": 67,
+      "verify": 30,
+      "escalate": 46
+     }
+    },
+    "ts03@0.3": {
+     "recall": null,
+     "recall_ci": [
+      null,
+      null
+     ],
+     "recall_iou_only": null,
+     "chance_recall": null,
+     "chance_recall_iou_only": null,
+     "precision": 0.0,
+     "fp_per_image": 10.4,
+     "boxes_per_image": 10.4,
+     "pixels_frac": 0.2545,
+     "net_pixels_frac": 0.2389,
+     "images_with_any": 0.6,
+     "critical_per_image": 0.6333,
+     "findings_per_image": 1.3,
+     "per_class": {
+      "crack": null,
+      "spalling": null,
+      "efflorescence": null,
+      "exposed_rebar": null,
+      "corrosion": null
+     },
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      0.7714,
+      0.9654
+     ],
+     "images_with_any_vs_ref_ci": [
+      -0.2333,
+      0.0
+     ],
+     "halt": {
+      "cap-hit": 26,
+      "exhausted": 2,
+      "stop-rule": 2
+     },
+     "looks_mean": 2.8667,
+     "looks_by_level": {
+      "L0": 23,
+      "L1": 35,
+      "L2": 28
+     },
+     "looks_by_action": {
+      "gaze": 40,
+      "verify": 16,
+      "escalate": 30
+     }
+    },
+    "ts03@1.0": {
+     "recall": null,
+     "recall_ci": [
+      null,
+      null
+     ],
+     "recall_iou_only": null,
+     "chance_recall": null,
+     "chance_recall_iou_only": null,
+     "precision": 0.0,
+     "fp_per_image": 14.1,
+     "boxes_per_image": 14.1,
+     "pixels_frac": 0.4129,
+     "net_pixels_frac": 0.3972,
+     "images_with_any": 0.7667,
+     "critical_per_image": 1.0,
+     "findings_per_image": 1.9333,
+     "per_class": {
+      "crack": null,
+      "spalling": null,
+      "efflorescence": null,
+      "exposed_rebar": null,
+      "corrosion": null
+     },
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      0.8116,
+      0.9765
+     ],
+     "images_with_any_vs_ref_ci": [
+      -0.1,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 24,
+      "exhausted": 5,
+      "cap-hit": 1
+     },
+     "looks_mean": 4.7667,
+     "looks_by_level": {
+      "L0": 53,
+      "L1": 62,
+      "L2": 28
+     },
+     "looks_by_action": {
+      "gaze": 67,
+      "verify": 23,
+      "escalate": 53
+     }
+    },
+    "ts04@0.3": {
+     "recall": null,
+     "recall_ci": [
+      null,
+      null
+     ],
+     "recall_iou_only": null,
+     "chance_recall": null,
+     "chance_recall_iou_only": null,
+     "precision": 0.0,
+     "fp_per_image": 11.3,
+     "boxes_per_image": 11.3,
+     "pixels_frac": 0.2545,
+     "net_pixels_frac": 0.2389,
+     "images_with_any": 0.6333,
+     "critical_per_image": 0.6333,
+     "findings_per_image": 1.3667,
+     "per_class": {
+      "crack": null,
+      "spalling": null,
+      "efflorescence": null,
+      "exposed_rebar": null,
+      "corrosion": null
+     },
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      0.8415,
+      1.0
+     ],
+     "images_with_any_vs_ref_ci": [
+      -0.1667,
+      0.0
+     ],
+     "halt": {
+      "cap-hit": 26,
+      "exhausted": 2,
+      "stop-rule": 2
+     },
+     "looks_mean": 2.8667,
+     "looks_by_level": {
+      "L0": 23,
+      "L1": 35,
+      "L2": 28
+     },
+     "looks_by_action": {
+      "gaze": 40,
+      "verify": 20,
+      "escalate": 26
+     }
+    },
+    "ts04@1.0": {
+     "recall": null,
+     "recall_ci": [
+      null,
+      null
+     ],
+     "recall_iou_only": null,
+     "chance_recall": null,
+     "chance_recall_iou_only": null,
+     "precision": 0.0,
+     "fp_per_image": 15.0,
+     "boxes_per_image": 15.0,
+     "pixels_frac": 0.4129,
+     "net_pixels_frac": 0.3972,
+     "images_with_any": 0.7667,
+     "critical_per_image": 1.0,
+     "findings_per_image": 2.0,
+     "per_class": {
+      "crack": null,
+      "spalling": null,
+      "efflorescence": null,
+      "exposed_rebar": null,
+      "corrosion": null
+     },
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      0.8734,
+      1.0
+     ],
+     "images_with_any_vs_ref_ci": [
+      -0.1,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 24,
+      "exhausted": 5,
+      "cap-hit": 1
+     },
+     "looks_mean": 4.7667,
+     "looks_by_level": {
+      "L0": 53,
+      "L1": 62,
+      "L2": 28
+     },
+     "looks_by_action": {
+      "gaze": 67,
+      "verify": 27,
+      "escalate": 49
+     }
+    },
+    "ts06@0.3": {
+     "recall": null,
+     "recall_ci": [
+      null,
+      null
+     ],
+     "recall_iou_only": null,
+     "chance_recall": null,
+     "chance_recall_iou_only": null,
+     "precision": 0.0,
+     "fp_per_image": 12.4,
+     "boxes_per_image": 12.4,
+     "pixels_frac": 0.2545,
+     "net_pixels_frac": 0.2389,
+     "images_with_any": 0.7333,
+     "critical_per_image": 0.6333,
+     "findings_per_image": 1.5333,
+     "per_class": {
+      "crack": null,
+      "spalling": null,
+      "efflorescence": null,
+      "exposed_rebar": null,
+      "corrosion": null
+     },
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      1.0,
+      1.0727
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.1
+     ],
+     "halt": {
+      "cap-hit": 26,
+      "exhausted": 2,
+      "stop-rule": 2
+     },
+     "looks_mean": 2.8667,
+     "looks_by_level": {
+      "L0": 23,
+      "L1": 35,
+      "L2": 28
+     },
+     "looks_by_action": {
+      "gaze": 40,
+      "verify": 26,
+      "escalate": 20
+     }
+    },
+    "ts06@1.0": {
+     "recall": null,
+     "recall_ci": [
+      null,
+      null
+     ],
+     "recall_iou_only": null,
+     "chance_recall": null,
+     "chance_recall_iou_only": null,
+     "precision": 0.0,
+     "fp_per_image": 16.1,
+     "boxes_per_image": 16.1,
+     "pixels_frac": 0.4129,
+     "net_pixels_frac": 0.3972,
+     "images_with_any": 0.8,
+     "critical_per_image": 1.0,
+     "findings_per_image": 2.1667,
+     "per_class": {
+      "crack": null,
+      "spalling": null,
+      "efflorescence": null,
+      "exposed_rebar": null,
+      "corrosion": null
+     },
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      1.0,
+      1.0496
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 24,
+      "exhausted": 5,
+      "cap-hit": 1
+     },
+     "looks_mean": 4.7667,
+     "looks_by_level": {
+      "L0": 53,
+      "L1": 62,
+      "L2": 28
+     },
+     "looks_by_action": {
+      "gaze": 67,
+      "verify": 33,
+      "escalate": 43
+     }
+    },
+    "ts07@0.3": {
+     "recall": null,
+     "recall_ci": [
+      null,
+      null
+     ],
+     "recall_iou_only": null,
+     "chance_recall": null,
+     "chance_recall_iou_only": null,
+     "precision": 0.0,
+     "fp_per_image": 12.4,
+     "boxes_per_image": 12.4,
+     "pixels_frac": 0.2545,
+     "net_pixels_frac": 0.2389,
+     "images_with_any": 0.7333,
+     "critical_per_image": 0.6333,
+     "findings_per_image": 1.5333,
+     "per_class": {
+      "crack": null,
+      "spalling": null,
+      "efflorescence": null,
+      "exposed_rebar": null,
+      "corrosion": null
+     },
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      1.0,
+      1.0727
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.1
+     ],
+     "halt": {
+      "cap-hit": 26,
+      "exhausted": 2,
+      "stop-rule": 2
+     },
+     "looks_mean": 2.8667,
+     "looks_by_level": {
+      "L0": 23,
+      "L1": 35,
+      "L2": 28
+     },
+     "looks_by_action": {
+      "gaze": 40,
+      "verify": 26,
+      "escalate": 20
+     }
+    },
+    "ts07@1.0": {
+     "recall": null,
+     "recall_ci": [
+      null,
+      null
+     ],
+     "recall_iou_only": null,
+     "chance_recall": null,
+     "chance_recall_iou_only": null,
+     "precision": 0.0,
+     "fp_per_image": 16.1,
+     "boxes_per_image": 16.1,
+     "pixels_frac": 0.4129,
+     "net_pixels_frac": 0.3972,
+     "images_with_any": 0.8,
+     "critical_per_image": 1.0,
+     "findings_per_image": 2.1667,
+     "per_class": {
+      "crack": null,
+      "spalling": null,
+      "efflorescence": null,
+      "exposed_rebar": null,
+      "corrosion": null
+     },
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      1.0,
+      1.0496
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 24,
+      "exhausted": 5,
+      "cap-hit": 1
+     },
+     "looks_mean": 4.7667,
+     "looks_by_level": {
+      "L0": 53,
+      "L1": 62,
+      "L2": 28
+     },
+     "looks_by_action": {
+      "gaze": 67,
+      "verify": 33,
+      "escalate": 43
+     }
+    },
+    "ts08@0.3": {
+     "recall": null,
+     "recall_ci": [
+      null,
+      null
+     ],
+     "recall_iou_only": null,
+     "chance_recall": null,
+     "chance_recall_iou_only": null,
+     "precision": 0.0,
+     "fp_per_image": 12.5,
+     "boxes_per_image": 12.5,
+     "pixels_frac": 0.2545,
+     "net_pixels_frac": 0.2389,
+     "images_with_any": 0.8333,
+     "critical_per_image": 0.6333,
+     "findings_per_image": 1.6333,
+     "per_class": {
+      "crack": null,
+      "spalling": null,
+      "efflorescence": null,
+      "exposed_rebar": null,
+      "corrosion": null
+     },
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      1.0027,
+      1.0866
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0333,
+      0.2667
+     ],
+     "halt": {
+      "cap-hit": 26,
+      "exhausted": 2,
+      "stop-rule": 2
+     },
+     "looks_mean": 2.8667,
+     "looks_by_level": {
+      "L0": 23,
+      "L1": 35,
+      "L2": 28
+     },
+     "looks_by_action": {
+      "gaze": 40,
+      "verify": 29,
+      "escalate": 17
+     }
+    },
+    "ts08@1.0": {
+     "recall": null,
+     "recall_ci": [
+      null,
+      null
+     ],
+     "recall_iou_only": null,
+     "chance_recall": null,
+     "chance_recall_iou_only": null,
+     "precision": 0.0,
+     "fp_per_image": 16.2,
+     "boxes_per_image": 16.2,
+     "pixels_frac": 0.4129,
+     "net_pixels_frac": 0.3972,
+     "images_with_any": 0.8333,
+     "critical_per_image": 1.0,
+     "findings_per_image": 2.2667,
+     "per_class": {
+      "crack": null,
+      "spalling": null,
+      "efflorescence": null,
+      "exposed_rebar": null,
+      "corrosion": null
+     },
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      1.0023,
+      1.0603
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.1
+     ],
+     "halt": {
+      "stop-rule": 24,
+      "exhausted": 5,
+      "cap-hit": 1
+     },
+     "looks_mean": 4.7667,
+     "looks_by_level": {
+      "L0": 53,
+      "L1": 62,
+      "L2": 28
+     },
+     "looks_by_action": {
+      "gaze": 67,
+      "verify": 36,
+      "escalate": 40
+     }
+    },
+    "ts10@0.3": {
+     "recall": null,
+     "recall_ci": [
+      null,
+      null
+     ],
+     "recall_iou_only": null,
+     "chance_recall": null,
+     "chance_recall_iou_only": null,
+     "precision": 0.0,
+     "fp_per_image": 12.5,
+     "boxes_per_image": 12.5,
+     "pixels_frac": 0.2545,
+     "net_pixels_frac": 0.2389,
+     "images_with_any": 0.8333,
+     "critical_per_image": 0.6333,
+     "findings_per_image": 1.6333,
+     "per_class": {
+      "crack": null,
+      "spalling": null,
+      "efflorescence": null,
+      "exposed_rebar": null,
+      "corrosion": null
+     },
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      1.0027,
+      1.0866
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0333,
+      0.2667
+     ],
+     "halt": {
+      "cap-hit": 26,
+      "exhausted": 2,
+      "stop-rule": 2
+     },
+     "looks_mean": 2.8667,
+     "looks_by_level": {
+      "L0": 23,
+      "L1": 35,
+      "L2": 28
+     },
+     "looks_by_action": {
+      "gaze": 41,
+      "verify": 29,
+      "escalate": 16
+     }
+    },
+    "ts10@1.0": {
+     "recall": null,
+     "recall_ci": [
+      null,
+      null
+     ],
+     "recall_iou_only": null,
+     "chance_recall": null,
+     "chance_recall_iou_only": null,
+     "precision": 0.0,
+     "fp_per_image": 16.2,
+     "boxes_per_image": 16.2,
+     "pixels_frac": 0.424,
+     "net_pixels_frac": 0.4083,
+     "images_with_any": 0.8333,
+     "critical_per_image": 1.0,
+     "findings_per_image": 2.2667,
+     "per_class": {
+      "crack": null,
+      "spalling": null,
+      "efflorescence": null,
+      "exposed_rebar": null,
+      "corrosion": null
+     },
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      1.0023,
+      1.0603
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.1
+     ],
+     "halt": {
+      "stop-rule": 24,
+      "exhausted": 5,
+      "cap-hit": 1
+     },
+     "looks_mean": 4.9,
+     "looks_by_level": {
+      "L0": 55,
+      "L1": 64,
+      "L2": 28
+     },
+     "looks_by_action": {
+      "gaze": 70,
+      "verify": 36,
+      "escalate": 41
+     }
+    },
+    "sf1@0.3": {
+     "recall": null,
+     "recall_ci": [
+      null,
+      null
+     ],
+     "recall_iou_only": null,
+     "chance_recall": null,
+     "chance_recall_iou_only": null,
+     "precision": 0.0,
+     "fp_per_image": 7.9667,
+     "boxes_per_image": 7.9667,
+     "pixels_frac": 0.2153,
+     "net_pixels_frac": 0.1528,
+     "images_with_any": 0.6,
+     "critical_per_image": 0.0667,
+     "findings_per_image": 1.0667,
+     "per_class": {
+      "crack": null,
+      "spalling": null,
+      "efflorescence": null,
+      "exposed_rebar": null,
+      "corrosion": null
+     },
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      0.4872,
+      0.8401
+     ],
+     "images_with_any_vs_ref_ci": [
+      -0.2,
+      0.0
+     ],
+     "halt": {
+      "cap-hit": 27,
+      "exhausted": 3
+     },
+     "looks_mean": 1.8333,
+     "looks_by_level": {
+      "L0": 6,
+      "L1": 28,
+      "L2": 21
+     },
+     "looks_by_action": {
+      "gaze": 30,
+      "verify": 16,
+      "escalate": 9
+     }
+    },
+    "sf1@1.0": {
+     "recall": null,
+     "recall_ci": [
+      null,
+      null
+     ],
+     "recall_iou_only": null,
+     "chance_recall": null,
+     "chance_recall_iou_only": null,
+     "precision": 0.0,
+     "fp_per_image": 14.4,
+     "boxes_per_image": 14.4,
+     "pixels_frac": 0.3458,
+     "net_pixels_frac": 0.2833,
+     "images_with_any": 0.7,
+     "critical_per_image": 1.0,
+     "findings_per_image": 1.6333,
+     "per_class": {
+      "crack": null,
+      "spalling": null,
+      "efflorescence": null,
+      "exposed_rebar": null,
+      "corrosion": null
+     },
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      0.7743,
+      1.0426
+     ],
+     "images_with_any_vs_ref_ci": [
+      -0.2333,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 19,
+      "exhausted": 11
+     },
+     "looks_mean": 3.4,
+     "looks_by_level": {
+      "L0": 36,
+      "L1": 45,
+      "L2": 21
+     },
+     "looks_by_action": {
+      "gaze": 47,
+      "verify": 25,
+      "escalate": 30
+     }
+    },
+    "fill@0.3": {
+     "recall": null,
+     "recall_ci": [
+      null,
+      null
+     ],
+     "recall_iou_only": null,
+     "chance_recall": null,
+     "chance_recall_iou_only": null,
+     "precision": 0.0,
+     "fp_per_image": 16.9667,
+     "boxes_per_image": 16.9667,
+     "pixels_frac": 0.2784,
+     "net_pixels_frac": 0.2628,
+     "images_with_any": 0.7,
+     "critical_per_image": 0.6667,
+     "findings_per_image": 1.7,
+     "per_class": {
+      "crack": null,
+      "spalling": null,
+      "efflorescence": null,
+      "exposed_rebar": null,
+      "corrosion": null
+     },
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      1.0948,
+      2.0741
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "exhausted": 3,
+      "cap-hit": 22,
+      "stop-rule": 5
+     },
+     "looks_mean": 3.6,
+     "looks_by_level": {
+      "L0": 28,
+      "L1": 52,
+      "L2": 28
+     },
+     "looks_by_action": {
+      "gaze": 57,
+      "verify": 26,
+      "escalate": 25
+     }
+    },
+    "fill@1.0": {
+     "recall": null,
+     "recall_ci": [
+      null,
+      null
+     ],
+     "recall_iou_only": null,
+     "chance_recall": null,
+     "chance_recall_iou_only": null,
+     "precision": 0.0,
+     "fp_per_image": 15.8333,
+     "boxes_per_image": 15.8333,
+     "pixels_frac": 0.4129,
+     "net_pixels_frac": 0.3972,
+     "images_with_any": 0.8,
+     "critical_per_image": 1.0,
+     "findings_per_image": 2.0667,
+     "per_class": {
+      "crack": null,
+      "spalling": null,
+      "efflorescence": null,
+      "exposed_rebar": null,
+      "corrosion": null
+     },
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      1.0,
+      1.0
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 25,
+      "exhausted": 5
+     },
+     "looks_mean": 4.7667,
+     "looks_by_level": {
+      "L0": 53,
+      "L1": 62,
+      "L2": 28
+     },
+     "looks_by_action": {
+      "gaze": 67,
+      "verify": 30,
+      "escalate": 46
+     }
+    },
+    "sv@0.3": {
+     "recall": null,
+     "recall_ci": [
+      null,
+      null
+     ],
+     "recall_iou_only": null,
+     "chance_recall": null,
+     "chance_recall_iou_only": null,
+     "precision": 0.0,
+     "fp_per_image": 12.1333,
+     "boxes_per_image": 12.1333,
+     "pixels_frac": 0.2545,
+     "net_pixels_frac": 0.2389,
+     "images_with_any": 0.7,
+     "critical_per_image": 0.6333,
+     "findings_per_image": 1.4333,
+     "per_class": {
+      "crack": null,
+      "spalling": null,
+      "efflorescence": null,
+      "exposed_rebar": null,
+      "corrosion": null
+     },
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      1.0,
+      1.0
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "cap-hit": 26,
+      "exhausted": 2,
+      "stop-rule": 2
+     },
+     "looks_mean": 2.8667,
+     "looks_by_level": {
+      "L0": 23,
+      "L1": 35,
+      "L2": 28
+     },
+     "looks_by_action": {
+      "gaze": 40,
+      "verify": 23,
+      "escalate": 23
+     }
+    },
+    "sv@1.0": {
+     "recall": null,
+     "recall_ci": [
+      null,
+      null
+     ],
+     "recall_iou_only": null,
+     "chance_recall": null,
+     "chance_recall_iou_only": null,
+     "precision": 0.0,
+     "fp_per_image": 15.8333,
+     "boxes_per_image": 15.8333,
+     "pixels_frac": 0.4129,
+     "net_pixels_frac": 0.3972,
+     "images_with_any": 0.8,
+     "critical_per_image": 1.0,
+     "findings_per_image": 2.0667,
+     "per_class": {
+      "crack": null,
+      "spalling": null,
+      "efflorescence": null,
+      "exposed_rebar": null,
+      "corrosion": null
+     },
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      1.0,
+      1.0
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 24,
+      "exhausted": 5,
+      "cap-hit": 1
+     },
+     "looks_mean": 4.7667,
+     "looks_by_level": {
+      "L0": 53,
+      "L1": 62,
+      "L2": 28
+     },
+     "looks_by_action": {
+      "gaze": 67,
+      "verify": 30,
+      "escalate": 46
+     }
+    },
+    "v0_0@0.3": {
+     "recall": null,
+     "recall_ci": [
+      null,
+      null
+     ],
+     "recall_iou_only": null,
+     "chance_recall": null,
+     "chance_recall_iou_only": null,
+     "precision": 0.0,
+     "fp_per_image": 12.4667,
+     "boxes_per_image": 12.4667,
+     "pixels_frac": 0.2573,
+     "net_pixels_frac": 0.2417,
+     "images_with_any": 0.7,
+     "critical_per_image": 0.6333,
+     "findings_per_image": 1.4333,
+     "per_class": {
+      "crack": null,
+      "spalling": null,
+      "efflorescence": null,
+      "exposed_rebar": null,
+      "corrosion": null
+     },
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      1.0,
+      1.0981
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "cap-hit": 27,
+      "exhausted": 2,
+      "stop-rule": 1
+     },
+     "looks_mean": 2.9,
+     "looks_by_level": {
+      "L0": 23,
+      "L1": 36,
+      "L2": 28
+     },
+     "looks_by_action": {
+      "gaze": 41,
+      "verify": 23,
+      "escalate": 23
+     }
+    },
+    "v0_0@1.0": {
+     "recall": null,
+     "recall_ci": [
+      null,
+      null
+     ],
+     "recall_iou_only": null,
+     "chance_recall": null,
+     "chance_recall_iou_only": null,
+     "precision": 0.0,
+     "fp_per_image": 20.3333,
+     "boxes_per_image": 20.3333,
+     "pixels_frac": 0.5379,
+     "net_pixels_frac": 0.5222,
+     "images_with_any": 0.8,
+     "critical_per_image": 1.0333,
+     "findings_per_image": 2.4,
+     "per_class": {
+      "crack": null,
+      "spalling": null,
+      "efflorescence": null,
+      "exposed_rebar": null,
+      "corrosion": null
+     },
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      1.0408,
+      1.654
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 13,
+      "exhausted": 16,
+      "cap-hit": 1
+     },
+     "looks_mean": 6.2667,
+     "looks_by_level": {
+      "L0": 73,
+      "L1": 87,
+      "L2": 28
+     },
+     "looks_by_action": {
+      "gaze": 92,
+      "verify": 34,
+      "escalate": 62
+     }
+    },
+    "v0_1@0.3": {
+     "recall": null,
+     "recall_ci": [
+      null,
+      null
+     ],
+     "recall_iou_only": null,
+     "chance_recall": null,
+     "chance_recall_iou_only": null,
+     "precision": 0.0,
+     "fp_per_image": 12.4667,
+     "boxes_per_image": 12.4667,
+     "pixels_frac": 0.2573,
+     "net_pixels_frac": 0.2417,
+     "images_with_any": 0.7,
+     "critical_per_image": 0.6333,
+     "findings_per_image": 1.4333,
+     "per_class": {
+      "crack": null,
+      "spalling": null,
+      "efflorescence": null,
+      "exposed_rebar": null,
+      "corrosion": null
+     },
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      1.0,
+      1.0981
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "cap-hit": 27,
+      "exhausted": 2,
+      "stop-rule": 1
+     },
+     "looks_mean": 2.9,
+     "looks_by_level": {
+      "L0": 23,
+      "L1": 36,
+      "L2": 28
+     },
+     "looks_by_action": {
+      "gaze": 41,
+      "verify": 23,
+      "escalate": 23
+     }
+    },
+    "v0_1@1.0": {
+     "recall": null,
+     "recall_ci": [
+      null,
+      null
+     ],
+     "recall_iou_only": null,
+     "chance_recall": null,
+     "chance_recall_iou_only": null,
+     "precision": 0.0,
+     "fp_per_image": 20.3333,
+     "boxes_per_image": 20.3333,
+     "pixels_frac": 0.4573,
+     "net_pixels_frac": 0.4417,
+     "images_with_any": 0.8,
+     "critical_per_image": 1.0333,
+     "findings_per_image": 2.4,
+     "per_class": {
+      "crack": null,
+      "spalling": null,
+      "efflorescence": null,
+      "exposed_rebar": null,
+      "corrosion": null
+     },
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      1.0408,
+      1.654
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 23,
+      "exhausted": 6,
+      "cap-hit": 1
+     },
+     "looks_mean": 5.3,
+     "looks_by_level": {
+      "L0": 61,
+      "L1": 70,
+      "L2": 28
+     },
+     "looks_by_action": {
+      "gaze": 75,
+      "verify": 34,
+      "escalate": 50
+     }
+    },
+    "fill_sv@0.3": {
+     "recall": null,
+     "recall_ci": [
+      null,
+      null
+     ],
+     "recall_iou_only": null,
+     "chance_recall": null,
+     "chance_recall_iou_only": null,
+     "precision": 0.0,
+     "fp_per_image": 16.9667,
+     "boxes_per_image": 16.9667,
+     "pixels_frac": 0.2784,
+     "net_pixels_frac": 0.2628,
+     "images_with_any": 0.7,
+     "critical_per_image": 0.6667,
+     "findings_per_image": 1.7,
+     "per_class": {
+      "crack": null,
+      "spalling": null,
+      "efflorescence": null,
+      "exposed_rebar": null,
+      "corrosion": null
+     },
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      1.0948,
+      2.0741
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "exhausted": 3,
+      "cap-hit": 22,
+      "stop-rule": 5
+     },
+     "looks_mean": 3.6,
+     "looks_by_level": {
+      "L0": 28,
+      "L1": 52,
+      "L2": 28
+     },
+     "looks_by_action": {
+      "gaze": 57,
+      "verify": 26,
+      "escalate": 25
+     }
+    },
+    "fill_sv@1.0": {
+     "recall": null,
+     "recall_ci": [
+      null,
+      null
+     ],
+     "recall_iou_only": null,
+     "chance_recall": null,
+     "chance_recall_iou_only": null,
+     "precision": 0.0,
+     "fp_per_image": 15.8333,
+     "boxes_per_image": 15.8333,
+     "pixels_frac": 0.4129,
+     "net_pixels_frac": 0.3972,
+     "images_with_any": 0.8,
+     "critical_per_image": 1.0,
+     "findings_per_image": 2.0667,
+     "per_class": {
+      "crack": null,
+      "spalling": null,
+      "efflorescence": null,
+      "exposed_rebar": null,
+      "corrosion": null
+     },
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      1.0,
+      1.0
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 25,
+      "exhausted": 5
+     },
+     "looks_mean": 4.7667,
+     "looks_by_level": {
+      "L0": 53,
+      "L1": 62,
+      "L2": 28
+     },
+     "looks_by_action": {
+      "gaze": 67,
+      "verify": 30,
+      "escalate": 46
+     }
+    },
+    "sf1_fill@0.3": {
+     "recall": null,
+     "recall_ci": [
+      null,
+      null
+     ],
+     "recall_iou_only": null,
+     "chance_recall": null,
+     "chance_recall_iou_only": null,
+     "precision": 0.0,
+     "fp_per_image": 10.9333,
+     "boxes_per_image": 10.9333,
+     "pixels_frac": 0.2557,
+     "net_pixels_frac": 0.1932,
+     "images_with_any": 0.6333,
+     "critical_per_image": 0.7,
+     "findings_per_image": 1.3,
+     "per_class": {
+      "crack": null,
+      "spalling": null,
+      "efflorescence": null,
+      "exposed_rebar": null,
+      "corrosion": null
+     },
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      0.8239,
+      0.9906
+     ],
+     "images_with_any_vs_ref_ci": [
+      -0.1667,
+      0.0
+     ],
+     "halt": {
+      "cap-hit": 19,
+      "exhausted": 9,
+      "stop-rule": 2
+     },
+     "looks_mean": 2.4667,
+     "looks_by_level": {
+      "L0": 22,
+      "L1": 31,
+      "L2": 21
+     },
+     "looks_by_action": {
+      "gaze": 33,
+      "verify": 20,
+      "escalate": 21
+     }
+    },
+    "sf1_fill@1.0": {
+     "recall": null,
+     "recall_ci": [
+      null,
+      null
+     ],
+     "recall_iou_only": null,
+     "chance_recall": null,
+     "chance_recall_iou_only": null,
+     "precision": 0.0,
+     "fp_per_image": 14.4,
+     "boxes_per_image": 14.4,
+     "pixels_frac": 0.3458,
+     "net_pixels_frac": 0.2833,
+     "images_with_any": 0.7,
+     "critical_per_image": 1.0,
+     "findings_per_image": 1.6333,
+     "per_class": {
+      "crack": null,
+      "spalling": null,
+      "efflorescence": null,
+      "exposed_rebar": null,
+      "corrosion": null
+     },
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      0.7743,
+      1.0426
+     ],
+     "images_with_any_vs_ref_ci": [
+      -0.2333,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 19,
+      "exhausted": 11
+     },
+     "looks_mean": 3.4,
+     "looks_by_level": {
+      "L0": 36,
+      "L1": 45,
+      "L2": 21
+     },
+     "looks_by_action": {
+      "gaze": 47,
+      "verify": 25,
+      "escalate": 30
+     }
+    },
+    "fill_ts08@0.3": {
+     "recall": null,
+     "recall_ci": [
+      null,
+      null
+     ],
+     "recall_iou_only": null,
+     "chance_recall": null,
+     "chance_recall_iou_only": null,
+     "precision": 0.0,
+     "fp_per_image": 17.3333,
+     "boxes_per_image": 17.3333,
+     "pixels_frac": 0.2784,
+     "net_pixels_frac": 0.2628,
+     "images_with_any": 0.8333,
+     "critical_per_image": 0.6667,
+     "findings_per_image": 1.9,
+     "per_class": {
+      "crack": null,
+      "spalling": null,
+      "efflorescence": null,
+      "exposed_rebar": null,
+      "corrosion": null
+     },
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      1.1154,
+      2.0989
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0333,
+      0.2667
+     ],
+     "halt": {
+      "exhausted": 3,
+      "cap-hit": 22,
+      "stop-rule": 5
+     },
+     "looks_mean": 3.6,
+     "looks_by_level": {
+      "L0": 28,
+      "L1": 52,
+      "L2": 28
+     },
+     "looks_by_action": {
+      "gaze": 57,
+      "verify": 32,
+      "escalate": 19
+     }
+    },
+    "fill_ts08@1.0": {
+     "recall": null,
+     "recall_ci": [
+      null,
+      null
+     ],
+     "recall_iou_only": null,
+     "chance_recall": null,
+     "chance_recall_iou_only": null,
+     "precision": 0.0,
+     "fp_per_image": 16.2,
+     "boxes_per_image": 16.2,
+     "pixels_frac": 0.4129,
+     "net_pixels_frac": 0.3972,
+     "images_with_any": 0.8333,
+     "critical_per_image": 1.0,
+     "findings_per_image": 2.2667,
+     "per_class": {
+      "crack": null,
+      "spalling": null,
+      "efflorescence": null,
+      "exposed_rebar": null,
+      "corrosion": null
+     },
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      1.0023,
+      1.0603
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.1
+     ],
+     "halt": {
+      "stop-rule": 25,
+      "exhausted": 5
+     },
+     "looks_mean": 4.7667,
+     "looks_by_level": {
+      "L0": 53,
+      "L1": 62,
+      "L2": 28
+     },
+     "looks_by_action": {
+      "gaze": 67,
+      "verify": 36,
+      "escalate": 40
+     }
+    },
+    "ts10_fill@0.3": {
+     "recall": null,
+     "recall_ci": [
+      null,
+      null
+     ],
+     "recall_iou_only": null,
+     "chance_recall": null,
+     "chance_recall_iou_only": null,
+     "precision": 0.0,
+     "fp_per_image": 17.3333,
+     "boxes_per_image": 17.3333,
+     "pixels_frac": 0.2784,
+     "net_pixels_frac": 0.2628,
+     "images_with_any": 0.8333,
+     "critical_per_image": 0.6667,
+     "findings_per_image": 1.9,
+     "per_class": {
+      "crack": null,
+      "spalling": null,
+      "efflorescence": null,
+      "exposed_rebar": null,
+      "corrosion": null
+     },
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      1.1154,
+      2.0989
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0333,
+      0.2667
+     ],
+     "halt": {
+      "exhausted": 3,
+      "cap-hit": 22,
+      "stop-rule": 5
+     },
+     "looks_mean": 3.6,
+     "looks_by_level": {
+      "L0": 28,
+      "L1": 52,
+      "L2": 28
+     },
+     "looks_by_action": {
+      "gaze": 58,
+      "verify": 32,
+      "escalate": 18
+     }
+    },
+    "ts10_fill@1.0": {
+     "recall": null,
+     "recall_ci": [
+      null,
+      null
+     ],
+     "recall_iou_only": null,
+     "chance_recall": null,
+     "chance_recall_iou_only": null,
+     "precision": 0.0,
+     "fp_per_image": 16.2,
+     "boxes_per_image": 16.2,
+     "pixels_frac": 0.424,
+     "net_pixels_frac": 0.4083,
+     "images_with_any": 0.8333,
+     "critical_per_image": 1.0,
+     "findings_per_image": 2.2667,
+     "per_class": {
+      "crack": null,
+      "spalling": null,
+      "efflorescence": null,
+      "exposed_rebar": null,
+      "corrosion": null
+     },
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      1.0023,
+      1.0603
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.1
+     ],
+     "halt": {
+      "stop-rule": 25,
+      "exhausted": 5
+     },
+     "looks_mean": 4.9,
+     "looks_by_level": {
+      "L0": 55,
+      "L1": 64,
+      "L2": 28
+     },
+     "looks_by_action": {
+      "gaze": 70,
+      "verify": 36,
+      "escalate": 41
+     }
+    },
+    "ts07_fill@0.3": {
+     "recall": null,
+     "recall_ci": [
+      null,
+      null
+     ],
+     "recall_iou_only": null,
+     "chance_recall": null,
+     "chance_recall_iou_only": null,
+     "precision": 0.0,
+     "fp_per_image": 17.2333,
+     "boxes_per_image": 17.2333,
+     "pixels_frac": 0.2784,
+     "net_pixels_frac": 0.2628,
+     "images_with_any": 0.7333,
+     "critical_per_image": 0.6667,
+     "findings_per_image": 1.8,
+     "per_class": {
+      "crack": null,
+      "spalling": null,
+      "efflorescence": null,
+      "exposed_rebar": null,
+      "corrosion": null
+     },
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      1.106,
+      2.0857
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.1
+     ],
+     "halt": {
+      "exhausted": 3,
+      "cap-hit": 22,
+      "stop-rule": 5
+     },
+     "looks_mean": 3.6,
+     "looks_by_level": {
+      "L0": 28,
+      "L1": 52,
+      "L2": 28
+     },
+     "looks_by_action": {
+      "gaze": 57,
+      "verify": 29,
+      "escalate": 22
+     }
+    },
+    "ts07_fill@1.0": {
+     "recall": null,
+     "recall_ci": [
+      null,
+      null
+     ],
+     "recall_iou_only": null,
+     "chance_recall": null,
+     "chance_recall_iou_only": null,
+     "precision": 0.0,
+     "fp_per_image": 16.1,
+     "boxes_per_image": 16.1,
+     "pixels_frac": 0.4129,
+     "net_pixels_frac": 0.3972,
+     "images_with_any": 0.8,
+     "critical_per_image": 1.0,
+     "findings_per_image": 2.1667,
+     "per_class": {
+      "crack": null,
+      "spalling": null,
+      "efflorescence": null,
+      "exposed_rebar": null,
+      "corrosion": null
+     },
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      1.0,
+      1.0496
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 25,
+      "exhausted": 5
+     },
+     "looks_mean": 4.7667,
+     "looks_by_level": {
+      "L0": 53,
+      "L1": 62,
+      "L2": 28
+     },
+     "looks_by_action": {
+      "gaze": 67,
+      "verify": 33,
+      "escalate": 43
+     }
+    },
+    "mv03@0.3": {
+     "recall": null,
+     "recall_ci": [
+      null,
+      null
+     ],
+     "recall_iou_only": null,
+     "chance_recall": null,
+     "chance_recall_iou_only": null,
+     "precision": 0.0,
+     "fp_per_image": 11.9667,
+     "boxes_per_image": 11.9667,
+     "pixels_frac": 0.2351,
+     "net_pixels_frac": 0.2194,
+     "images_with_any": 0.8,
+     "critical_per_image": 0.3333,
+     "findings_per_image": 1.5667,
+     "per_class": {
+      "crack": null,
+      "spalling": null,
+      "efflorescence": null,
+      "exposed_rebar": null,
+      "corrosion": null
+     },
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      0.8792,
+      1.1209
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.2
+     ],
+     "halt": {
+      "stop-rule": 7,
+      "exhausted": 2,
+      "cap-hit": 21
+     },
+     "looks_mean": 2.6333,
+     "looks_by_level": {
+      "L1": 51,
+      "L2": 28
+     },
+     "looks_by_action": {
+      "gaze": 56,
+      "verify": 16,
+      "escalate": 7
+     }
+    },
+    "mv03@1.0": {
+     "recall": null,
+     "recall_ci": [
+      null,
+      null
+     ],
+     "recall_iou_only": null,
+     "chance_recall": null,
+     "chance_recall_iou_only": null,
+     "precision": 0.0,
+     "fp_per_image": 12.9333,
+     "boxes_per_image": 12.9333,
+     "pixels_frac": 0.2628,
+     "net_pixels_frac": 0.2472,
+     "images_with_any": 0.8,
+     "critical_per_image": 0.4667,
+     "findings_per_image": 1.6667,
+     "per_class": {
+      "crack": null,
+      "spalling": null,
+      "efflorescence": null,
+      "exposed_rebar": null,
+      "corrosion": null
+     },
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      0.7056,
+      0.9342
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 26,
+      "exhausted": 4
+     },
+     "looks_mean": 2.9667,
+     "looks_by_level": {
+      "L1": 61,
+      "L2": 28
+     },
+     "looks_by_action": {
+      "gaze": 66,
+      "verify": 16,
+      "escalate": 7
+     }
+    },
+    "ts10_mv03@0.3": {
+     "recall": null,
+     "recall_ci": [
+      null,
+      null
+     ],
+     "recall_iou_only": null,
+     "chance_recall": null,
+     "chance_recall_iou_only": null,
+     "precision": 0.0,
+     "fp_per_image": 12.5667,
+     "boxes_per_image": 12.5667,
+     "pixels_frac": 0.2378,
+     "net_pixels_frac": 0.2222,
+     "images_with_any": 0.8667,
+     "critical_per_image": 0.3333,
+     "findings_per_image": 1.8333,
+     "per_class": {
+      "crack": null,
+      "spalling": null,
+      "efflorescence": null,
+      "exposed_rebar": null,
+      "corrosion": null
+     },
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      0.9397,
+      1.1776
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0333,
+      0.3
+     ],
+     "halt": {
+      "stop-rule": 6,
+      "exhausted": 2,
+      "cap-hit": 22
+     },
+     "looks_mean": 2.6667,
+     "looks_by_level": {
+      "L1": 52,
+      "L2": 28
+     },
+     "looks_by_action": {
+      "gaze": 58,
+      "verify": 22
+     }
+    },
+    "ts10_mv03@1.0": {
+     "recall": null,
+     "recall_ci": [
+      null,
+      null
+     ],
+     "recall_iou_only": null,
+     "chance_recall": null,
+     "chance_recall_iou_only": null,
+     "precision": 0.0,
+     "fp_per_image": 13.5333,
+     "boxes_per_image": 13.5333,
+     "pixels_frac": 0.2656,
+     "net_pixels_frac": 0.25,
+     "images_with_any": 0.8667,
+     "critical_per_image": 0.4667,
+     "findings_per_image": 1.9,
+     "per_class": {
+      "crack": null,
+      "spalling": null,
+      "efflorescence": null,
+      "exposed_rebar": null,
+      "corrosion": null
+     },
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      0.753,
+      0.965
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.1667
+     ],
+     "halt": {
+      "stop-rule": 26,
+      "exhausted": 4
+     },
+     "looks_mean": 3.0,
+     "looks_by_level": {
+      "L1": 62,
+      "L2": 28
+     },
+     "looks_by_action": {
+      "gaze": 68,
+      "verify": 22
+     }
+    },
+    "ts07_mv03@0.3": {
+     "recall": null,
+     "recall_ci": [
+      null,
+      null
+     ],
+     "recall_iou_only": null,
+     "chance_recall": null,
+     "chance_recall_iou_only": null,
+     "precision": 0.0,
+     "fp_per_image": 12.4333,
+     "boxes_per_image": 12.4333,
+     "pixels_frac": 0.2351,
+     "net_pixels_frac": 0.2194,
+     "images_with_any": 0.8,
+     "critical_per_image": 0.3333,
+     "findings_per_image": 1.7,
+     "per_class": {
+      "crack": null,
+      "spalling": null,
+      "efflorescence": null,
+      "exposed_rebar": null,
+      "corrosion": null
+     },
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      0.9315,
+      1.1588
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.2
+     ],
+     "halt": {
+      "stop-rule": 7,
+      "exhausted": 2,
+      "cap-hit": 21
+     },
+     "looks_mean": 2.6333,
+     "looks_by_level": {
+      "L1": 51,
+      "L2": 28
+     },
+     "looks_by_action": {
+      "gaze": 56,
+      "verify": 19,
+      "escalate": 4
+     }
+    },
+    "ts07_mv03@1.0": {
+     "recall": null,
+     "recall_ci": [
+      null,
+      null
+     ],
+     "recall_iou_only": null,
+     "chance_recall": null,
+     "chance_recall_iou_only": null,
+     "precision": 0.0,
+     "fp_per_image": 13.4,
+     "boxes_per_image": 13.4,
+     "pixels_frac": 0.2601,
+     "net_pixels_frac": 0.2444,
+     "images_with_any": 0.8,
+     "critical_per_image": 0.4667,
+     "findings_per_image": 1.7667,
+     "per_class": {
+      "crack": null,
+      "spalling": null,
+      "efflorescence": null,
+      "exposed_rebar": null,
+      "corrosion": null
+     },
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      0.7426,
+      0.9504
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 26,
+      "exhausted": 4
+     },
+     "looks_mean": 2.9333,
+     "looks_by_level": {
+      "L1": 60,
+      "L2": 28
+     },
+     "looks_by_action": {
+      "gaze": 65,
+      "verify": 19,
+      "escalate": 4
+     }
+    }
+   }
+  },
+  "real": {
+   "split": "real",
+   "n": 100,
+   "dataset_gt_sha256": "b5b6a2b442f558285ec31a7a97747cb5c918a0db4a189b2ddfca9fab710c4cd3",
+   "dataset_images_sha256": "445cf8082075eaeccdff012920c475801e3b3200831cfe76c37a972b1fa9a477",
+   "caps": [
+    0.3,
+    1.0
+   ],
+   "segmenter": "classical-v1",
+   "micro_arm": "linux-aarch64",
+   "files": [
+    "runs/tune/final_real.json",
+    "runs/tune/base_real.json"
+   ],
+   "rows": {
+    "downscale": {
+     "recall": 0.1637,
+     "recall_ci": [
+      0.1247,
+      0.203
+     ],
+     "recall_iou_only": 0.0765,
+     "chance_recall": 0.0693,
+     "chance_recall_iou_only": 0.0096,
+     "precision": 0.0072,
+     "fp_per_image": 157.35,
+     "boxes_per_image": 158.49,
+     "pixels_frac": 0.0759,
+     "net_pixels_frac": 0.0759,
+     "images_with_any": 1.0,
+     "critical_per_image": 1.51,
+     "findings_per_image": 2.85,
+     "per_class": {
+      "crack": 0.2226,
+      "spalling": 0.0108,
+      "efflorescence": 0.061,
+      "exposed_rebar": 0.0,
+      "corrosion": 0.4884
+     },
+     "vs_tiling_L0": 0.7784,
+     "vs_tiling_L0_ci": [
+      0.5871,
+      1.0093
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.7412,
+      1.772
+     ],
+     "pixels_vs_tiling_L0": 0.0466
+    },
+    "def@0.3": {
+     "recall": 0.1529,
+     "recall_ci": [
+      0.1192,
+      0.1884
+     ],
+     "recall_iou_only": 0.0657,
+     "chance_recall": 0.086,
+     "chance_recall_iou_only": 0.0131,
+     "precision": 0.0014,
+     "fp_per_image": 866.73,
+     "boxes_per_image": 867.94,
+     "pixels_frac": 0.2815,
+     "net_pixels_frac": 0.2658,
+     "images_with_any": 0.99,
+     "critical_per_image": 1.78,
+     "findings_per_image": 16.17,
+     "per_class": {
+      "crack": 0.2093,
+      "spalling": 0.0054,
+      "efflorescence": 0.0366,
+      "exposed_rebar": 0.0144,
+      "corrosion": 0.4574
+     },
+     "vs_downscale": 0.9343,
+     "vs_downscale_ci": [
+      0.7443,
+      1.1482
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.5735,
+      1.2449
+     ],
+     "halt": {
+      "stop-rule": 6,
+      "cap-hit": 91,
+      "exhausted": 3
+     },
+     "looks_mean": 14.95,
+     "looks_by_level": {
+      "L0": 597,
+      "L1": 710,
+      "L2": 93,
+      "L3": 95
+     },
+     "looks_by_action": {
+      "gaze": 767,
+      "verify": 465,
+      "escalate": 263
+     },
+     "vs_tiling_L0": 0.7273,
+     "vs_tiling_L0_ci": [
+      0.5699,
+      0.9672
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.6988,
+      1.5429
+     ],
+     "pixels_vs_tiling_L0": 0.173
+    },
+    "def@1.0": {
+     "recall": 0.1804,
+     "recall_ci": [
+      0.1421,
+      0.2178
+     ],
+     "recall_iou_only": 0.0884,
+     "chance_recall": 0.1087,
+     "chance_recall_iou_only": 0.0263,
+     "precision": 0.001,
+     "fp_per_image": 1485.77,
+     "boxes_per_image": 1487.23,
+     "pixels_frac": 0.5187,
+     "net_pixels_frac": 0.5031,
+     "images_with_any": 0.99,
+     "critical_per_image": 2.87,
+     "findings_per_image": 28.69,
+     "per_class": {
+      "crack": 0.2525,
+      "spalling": 0.0108,
+      "efflorescence": 0.0366,
+      "exposed_rebar": 0.0144,
+      "corrosion": 0.5271
+     },
+     "vs_downscale": 1.1022,
+     "vs_downscale_ci": [
+      0.9178,
+      1.3137
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.8953,
+      1.5668
+     ],
+     "halt": {
+      "stop-rule": 93,
+      "exhausted": 5,
+      "cap-hit": 2
+     },
+     "looks_mean": 26.5,
+     "looks_by_level": {
+      "L0": 1192,
+      "L1": 1270,
+      "L2": 93,
+      "L3": 95
+     },
+     "looks_by_action": {
+      "gaze": 1327,
+      "verify": 817,
+      "escalate": 506
+     },
+     "vs_tiling_L0": 0.858,
+     "vs_tiling_L0_ci": [
+      0.6949,
+      1.0822
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      1.0159,
+      1.9214
+     ],
+     "pixels_vs_tiling_L0": 0.3187
+    },
+    "ts03@0.3": {
+     "recall": 0.1171,
+     "recall_ci": [
+      0.088,
+      0.1481
+     ],
+     "recall_iou_only": 0.0502,
+     "chance_recall": 0.0538,
+     "chance_recall_iou_only": 0.0084,
+     "precision": 0.0011,
+     "fp_per_image": 809.85,
+     "boxes_per_image": 810.78,
+     "pixels_frac": 0.2817,
+     "net_pixels_frac": 0.2661,
+     "images_with_any": 0.99,
+     "critical_per_image": 1.58,
+     "findings_per_image": 15.61,
+     "per_class": {
+      "crack": 0.1495,
+      "spalling": 0.0054,
+      "efflorescence": 0.0,
+      "exposed_rebar": 0.0144,
+      "corrosion": 0.3876
+     },
+     "vs_downscale": 0.7153,
+     "vs_downscale_ci": [
+      0.5642,
+      0.901
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.4267,
+      0.9822
+     ],
+     "vs_ref": 0.7656,
+     "vs_ref_ci": [
+      0.6781,
+      0.8572
+     ],
+     "vs_ref_iou_only_ci": [
+      0.6229,
+      0.9232
+     ],
+     "pixels_vs_ref": 1.001,
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      0.9099,
+      0.9587
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 6,
+      "cap-hit": 91,
+      "exhausted": 3
+     },
+     "looks_mean": 14.97,
+     "looks_by_level": {
+      "L0": 594,
+      "L1": 715,
+      "L2": 93,
+      "L3": 95
+     },
+     "looks_by_action": {
+      "gaze": 742,
+      "escalate": 352,
+      "verify": 403
+     },
+     "vs_tiling_L0": 0.5568,
+     "vs_tiling_L0_ci": [
+      0.4261,
+      0.7738
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.528,
+      1.2001
+     ],
+     "pixels_vs_tiling_L0": 0.1731
+    },
+    "ts03@1.0": {
+     "recall": 0.1577,
+     "recall_ci": [
+      0.1212,
+      0.1943
+     ],
+     "recall_iou_only": 0.0753,
+     "chance_recall": 0.0956,
+     "chance_recall_iou_only": 0.0155,
+     "precision": 0.0009,
+     "fp_per_image": 1431.41,
+     "boxes_per_image": 1432.71,
+     "pixels_frac": 0.5229,
+     "net_pixels_frac": 0.5073,
+     "images_with_any": 0.99,
+     "critical_per_image": 2.61,
+     "findings_per_image": 28.28,
+     "per_class": {
+      "crack": 0.2193,
+      "spalling": 0.0108,
+      "efflorescence": 0.0,
+      "exposed_rebar": 0.0144,
+      "corrosion": 0.4806
+     },
+     "vs_downscale": 0.9635,
+     "vs_downscale_ci": [
+      0.8051,
+      1.1437
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.7413,
+      1.3514
+     ],
+     "vs_ref": 0.8742,
+     "vs_ref_ci": [
+      0.8027,
+      0.9409
+     ],
+     "vs_ref_iou_only_ci": [
+      0.7612,
+      0.9367
+     ],
+     "pixels_vs_ref": 1.0081,
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      0.9443,
+      0.9845
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 92,
+      "exhausted": 6,
+      "cap-hit": 2
+     },
+     "looks_mean": 26.74,
+     "looks_by_level": {
+      "L0": 1198,
+      "L1": 1288,
+      "L2": 93,
+      "L3": 95
+     },
+     "looks_by_action": {
+      "gaze": 1315,
+      "escalate": 599,
+      "verify": 760
+     },
+     "vs_tiling_L0": 0.75,
+     "vs_tiling_L0_ci": [
+      0.584,
+      0.9762
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.8536,
+      1.6002
+     ],
+     "pixels_vs_tiling_L0": 0.3213
+    },
+    "ts04@0.3": {
+     "recall": 0.135,
+     "recall_ci": [
+      0.1002,
+      0.1708
+     ],
+     "recall_iou_only": 0.0585,
+     "chance_recall": 0.08,
+     "chance_recall_iou_only": 0.0119,
+     "precision": 0.0013,
+     "fp_per_image": 844.27,
+     "boxes_per_image": 845.35,
+     "pixels_frac": 0.2817,
+     "net_pixels_frac": 0.2661,
+     "images_with_any": 0.99,
+     "critical_per_image": 1.61,
+     "findings_per_image": 16.04,
+     "per_class": {
+      "crack": 0.1894,
+      "spalling": 0.0054,
+      "efflorescence": 0.0122,
+      "exposed_rebar": 0.0144,
+      "corrosion": 0.4031
+     },
+     "vs_downscale": 0.8248,
+     "vs_downscale_ci": [
+      0.65,
+      1.0287
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.5161,
+      1.1251
+     ],
+     "vs_ref": 0.8828,
+     "vs_ref_ci": [
+      0.7939,
+      0.9542
+     ],
+     "vs_ref_iou_only_ci": [
+      0.7759,
+      1.0
+     ],
+     "pixels_vs_ref": 1.001,
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      0.9558,
+      0.9931
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 6,
+      "cap-hit": 91,
+      "exhausted": 3
+     },
+     "looks_mean": 14.97,
+     "looks_by_level": {
+      "L0": 596,
+      "L1": 713,
+      "L2": 93,
+      "L3": 95
+     },
+     "looks_by_action": {
+      "gaze": 755,
+      "escalate": 321,
+      "verify": 421
+     },
+     "vs_tiling_L0": 0.642,
+     "vs_tiling_L0_ci": [
+      0.5112,
+      0.8636
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.6326,
+      1.355
+     ],
+     "pixels_vs_tiling_L0": 0.1731
+    },
+    "ts04@1.0": {
+     "recall": 0.1673,
+     "recall_ci": [
+      0.1301,
+      0.2066
+     ],
+     "recall_iou_only": 0.0789,
+     "chance_recall": 0.0908,
+     "chance_recall_iou_only": 0.0215,
+     "precision": 0.0009,
+     "fp_per_image": 1466.04,
+     "boxes_per_image": 1467.41,
+     "pixels_frac": 0.5229,
+     "net_pixels_frac": 0.5073,
+     "images_with_any": 0.99,
+     "critical_per_image": 2.69,
+     "findings_per_image": 28.69,
+     "per_class": {
+      "crack": 0.2359,
+      "spalling": 0.0108,
+      "efflorescence": 0.0122,
+      "exposed_rebar": 0.0144,
+      "corrosion": 0.4961
+     },
+     "vs_downscale": 1.0219,
+     "vs_downscale_ci": [
+      0.844,
+      1.2244
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.7749,
+      1.4334
+     ],
+     "vs_ref": 0.9272,
+     "vs_ref_ci": [
+      0.872,
+      0.9752
+     ],
+     "vs_ref_iou_only_ci": [
+      0.8133,
+      0.9583
+     ],
+     "pixels_vs_ref": 1.008,
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      0.9698,
+      1.0047
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 92,
+      "exhausted": 6,
+      "cap-hit": 2
+     },
+     "looks_mean": 26.7,
+     "looks_by_level": {
+      "L0": 1199,
+      "L1": 1283,
+      "L2": 93,
+      "L3": 95
+     },
+     "looks_by_action": {
+      "gaze": 1325,
+      "escalate": 564,
+      "verify": 781
+     },
+     "vs_tiling_L0": 0.7955,
+     "vs_tiling_L0_ci": [
+      0.648,
+      1.0066
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.9205,
+      1.6667
+     ],
+     "pixels_vs_tiling_L0": 0.3213
+    },
+    "ts06@0.3": {
+     "recall": 0.184,
+     "recall_ci": [
+      0.1471,
+      0.2205
+     ],
+     "recall_iou_only": 0.086,
+     "chance_recall": 0.1016,
+     "chance_recall_iou_only": 0.0251,
+     "precision": 0.0017,
+     "fp_per_image": 863.35,
+     "boxes_per_image": 864.82,
+     "pixels_frac": 0.2815,
+     "net_pixels_frac": 0.2658,
+     "images_with_any": 0.99,
+     "critical_per_image": 2.31,
+     "findings_per_image": 16.15,
+     "per_class": {
+      "crack": 0.2525,
+      "spalling": 0.0108,
+      "efflorescence": 0.0732,
+      "exposed_rebar": 0.0144,
+      "corrosion": 0.5271
+     },
+     "vs_downscale": 1.1241,
+     "vs_downscale_ci": [
+      0.9675,
+      1.3195
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.8688,
+      1.4667
+     ],
+     "vs_ref": 1.2031,
+     "vs_ref_ci": [
+      1.0738,
+      1.4152
+     ],
+     "vs_ref_iou_only_ci": [
+      1.0625,
+      1.7334
+     ],
+     "pixels_vs_ref": 1.0,
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      0.9537,
+      1.0333
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 6,
+      "cap-hit": 91,
+      "exhausted": 3
+     },
+     "looks_mean": 14.95,
+     "looks_by_level": {
+      "L0": 598,
+      "L1": 709,
+      "L2": 93,
+      "L3": 95
+     },
+     "looks_by_action": {
+      "gaze": 769,
+      "verify": 498,
+      "escalate": 228
+     },
+     "vs_tiling_L0": 0.875,
+     "vs_tiling_L0_ci": [
+      0.6951,
+      1.1076
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.9508,
+      1.8576
+     ],
+     "pixels_vs_tiling_L0": 0.173
+    },
+    "ts06@1.0": {
+     "recall": 0.1983,
+     "recall_ci": [
+      0.1592,
+      0.237
+     ],
+     "recall_iou_only": 0.1004,
+     "chance_recall": 0.1207,
+     "chance_recall_iou_only": 0.0287,
+     "precision": 0.0011,
+     "fp_per_image": 1473.67,
+     "boxes_per_image": 1475.28,
+     "pixels_frac": 0.5162,
+     "net_pixels_frac": 0.5006,
+     "images_with_any": 0.99,
+     "critical_per_image": 3.47,
+     "findings_per_image": 28.54,
+     "per_class": {
+      "crack": 0.2857,
+      "spalling": 0.0161,
+      "efflorescence": 0.0732,
+      "exposed_rebar": 0.0144,
+      "corrosion": 0.5349
+     },
+     "vs_downscale": 1.2117,
+     "vs_downscale_ci": [
+      1.0325,
+      1.4286
+     ],
+     "vs_downscale_iou_only_ci": [
+      1.0149,
+      1.7354
+     ],
+     "vs_ref": 1.0993,
+     "vs_ref_ci": [
+      1.0455,
+      1.1701
+     ],
+     "vs_ref_iou_only_ci": [
+      1.0422,
+      1.2553
+     ],
+     "pixels_vs_ref": 0.9951,
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      0.9634,
+      1.013
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 94,
+      "exhausted": 5,
+      "cap-hit": 1
+     },
+     "looks_mean": 26.41,
+     "looks_by_level": {
+      "L0": 1189,
+      "L1": 1264,
+      "L2": 93,
+      "L3": 95
+     },
+     "looks_by_action": {
+      "gaze": 1324,
+      "verify": 850,
+      "escalate": 467
+     },
+     "vs_tiling_L0": 0.9432,
+     "vs_tiling_L0_ci": [
+      0.7621,
+      1.1875
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      1.1357,
+      2.143
+     ],
+     "pixels_vs_tiling_L0": 0.3172
+    },
+    "ts07@0.3": {
+     "recall": 0.1864,
+     "recall_ci": [
+      0.15,
+      0.2223
+     ],
+     "recall_iou_only": 0.086,
+     "chance_recall": 0.1039,
+     "chance_recall_iou_only": 0.0215,
+     "precision": 0.0017,
+     "fp_per_image": 868.94,
+     "boxes_per_image": 870.43,
+     "pixels_frac": 0.2815,
+     "net_pixels_frac": 0.2658,
+     "images_with_any": 0.99,
+     "critical_per_image": 2.42,
+     "findings_per_image": 16.14,
+     "per_class": {
+      "crack": 0.2558,
+      "spalling": 0.0108,
+      "efflorescence": 0.0732,
+      "exposed_rebar": 0.0144,
+      "corrosion": 0.5349
+     },
+     "vs_downscale": 1.1387,
+     "vs_downscale_ci": [
+      0.9869,
+      1.3333
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.8688,
+      1.4667
+     ],
+     "vs_ref": 1.2188,
+     "vs_ref_ci": [
+      1.0915,
+      1.434
+     ],
+     "vs_ref_iou_only_ci": [
+      1.0625,
+      1.7334
+     ],
+     "pixels_vs_ref": 1.0,
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      0.9542,
+      1.0421
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 6,
+      "cap-hit": 91,
+      "exhausted": 3
+     },
+     "looks_mean": 14.95,
+     "looks_by_level": {
+      "L0": 598,
+      "L1": 709,
+      "L2": 93,
+      "L3": 95
+     },
+     "looks_by_action": {
+      "gaze": 771,
+      "verify": 509,
+      "escalate": 215
+     },
+     "vs_tiling_L0": 0.8864,
+     "vs_tiling_L0_ci": [
+      0.708,
+      1.1219
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.9508,
+      1.8576
+     ],
+     "pixels_vs_tiling_L0": 0.173
+    },
+    "ts07@1.0": {
+     "recall": 0.2007,
+     "recall_ci": [
+      0.1622,
+      0.2394
+     ],
+     "recall_iou_only": 0.1004,
+     "chance_recall": 0.1099,
+     "chance_recall_iou_only": 0.0287,
+     "precision": 0.0011,
+     "fp_per_image": 1471.43,
+     "boxes_per_image": 1473.06,
+     "pixels_frac": 0.5147,
+     "net_pixels_frac": 0.4991,
+     "images_with_any": 0.99,
+     "critical_per_image": 3.58,
+     "findings_per_image": 28.43,
+     "per_class": {
+      "crack": 0.289,
+      "spalling": 0.0161,
+      "efflorescence": 0.0732,
+      "exposed_rebar": 0.0144,
+      "corrosion": 0.5426
+     },
+     "vs_downscale": 1.2263,
+     "vs_downscale_ci": [
+      1.053,
+      1.4404
+     ],
+     "vs_downscale_iou_only_ci": [
+      1.0149,
+      1.7354
+     ],
+     "vs_ref": 1.1126,
+     "vs_ref_ci": [
+      1.0562,
+      1.1882
+     ],
+     "vs_ref_iou_only_ci": [
+      1.0422,
+      1.2553
+     ],
+     "pixels_vs_ref": 0.9922,
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      0.9611,
+      1.0134
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 94,
+      "exhausted": 5,
+      "cap-hit": 1
+     },
+     "looks_mean": 26.32,
+     "looks_by_level": {
+      "L0": 1184,
+      "L1": 1260,
+      "L2": 93,
+      "L3": 95
+     },
+     "looks_by_action": {
+      "gaze": 1322,
+      "verify": 857,
+      "escalate": 453
+     },
+     "vs_tiling_L0": 0.9545,
+     "vs_tiling_L0_ci": [
+      0.7704,
+      1.2
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      1.1357,
+      2.143
+     ],
+     "pixels_vs_tiling_L0": 0.3162
+    },
+    "ts08@0.3": {
+     "recall": 0.1864,
+     "recall_ci": [
+      0.15,
+      0.2223
+     ],
+     "recall_iou_only": 0.086,
+     "chance_recall": 0.092,
+     "chance_recall_iou_only": 0.0203,
+     "precision": 0.0017,
+     "fp_per_image": 869.86,
+     "boxes_per_image": 871.35,
+     "pixels_frac": 0.2815,
+     "net_pixels_frac": 0.2658,
+     "images_with_any": 0.99,
+     "critical_per_image": 2.57,
+     "findings_per_image": 16.16,
+     "per_class": {
+      "crack": 0.2558,
+      "spalling": 0.0108,
+      "efflorescence": 0.0732,
+      "exposed_rebar": 0.0216,
+      "corrosion": 0.5271
+     },
+     "vs_downscale": 1.1387,
+     "vs_downscale_ci": [
+      0.9869,
+      1.3333
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.8688,
+      1.4667
+     ],
+     "vs_ref": 1.2188,
+     "vs_ref_ci": [
+      1.0915,
+      1.434
+     ],
+     "vs_ref_iou_only_ci": [
+      1.0625,
+      1.7334
+     ],
+     "pixels_vs_ref": 1.0,
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      0.9565,
+      1.0431
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 6,
+      "cap-hit": 91,
+      "exhausted": 3
+     },
+     "looks_mean": 14.95,
+     "looks_by_level": {
+      "L0": 598,
+      "L1": 709,
+      "L2": 93,
+      "L3": 95
+     },
+     "looks_by_action": {
+      "gaze": 772,
+      "verify": 516,
+      "escalate": 207
+     },
+     "vs_tiling_L0": 0.8864,
+     "vs_tiling_L0_ci": [
+      0.708,
+      1.1219
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.9508,
+      1.8576
+     ],
+     "pixels_vs_tiling_L0": 0.173
+    },
+    "ts08@1.0": {
+     "recall": 0.2007,
+     "recall_ci": [
+      0.1622,
+      0.2394
+     ],
+     "recall_iou_only": 0.1004,
+     "chance_recall": 0.1159,
+     "chance_recall_iou_only": 0.0311,
+     "precision": 0.0011,
+     "fp_per_image": 1469.78,
+     "boxes_per_image": 1471.41,
+     "pixels_frac": 0.5144,
+     "net_pixels_frac": 0.4988,
+     "images_with_any": 0.99,
+     "critical_per_image": 3.73,
+     "findings_per_image": 28.42,
+     "per_class": {
+      "crack": 0.289,
+      "spalling": 0.0161,
+      "efflorescence": 0.0732,
+      "exposed_rebar": 0.0216,
+      "corrosion": 0.5349
+     },
+     "vs_downscale": 1.2263,
+     "vs_downscale_ci": [
+      1.053,
+      1.4404
+     ],
+     "vs_downscale_iou_only_ci": [
+      1.0149,
+      1.7354
+     ],
+     "vs_ref": 1.1126,
+     "vs_ref_ci": [
+      1.0562,
+      1.1882
+     ],
+     "vs_ref_iou_only_ci": [
+      1.0422,
+      1.2553
+     ],
+     "pixels_vs_ref": 0.9916,
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      0.9602,
+      1.0118
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 94,
+      "exhausted": 5,
+      "cap-hit": 1
+     },
+     "looks_mean": 26.3,
+     "looks_by_level": {
+      "L0": 1183,
+      "L1": 1259,
+      "L2": 93,
+      "L3": 95
+     },
+     "looks_by_action": {
+      "gaze": 1322,
+      "verify": 862,
+      "escalate": 446
+     },
+     "vs_tiling_L0": 0.9545,
+     "vs_tiling_L0_ci": [
+      0.7704,
+      1.2
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      1.1357,
+      2.143
+     ],
+     "pixels_vs_tiling_L0": 0.316
+    },
+    "ts10@0.3": {
+     "recall": 0.1864,
+     "recall_ci": [
+      0.15,
+      0.2223
+     ],
+     "recall_iou_only": 0.086,
+     "chance_recall": 0.1016,
+     "chance_recall_iou_only": 0.0227,
+     "precision": 0.0017,
+     "fp_per_image": 869.86,
+     "boxes_per_image": 871.35,
+     "pixels_frac": 0.2815,
+     "net_pixels_frac": 0.2658,
+     "images_with_any": 0.99,
+     "critical_per_image": 2.57,
+     "findings_per_image": 16.16,
+     "per_class": {
+      "crack": 0.2558,
+      "spalling": 0.0108,
+      "efflorescence": 0.0732,
+      "exposed_rebar": 0.0216,
+      "corrosion": 0.5271
+     },
+     "vs_downscale": 1.1387,
+     "vs_downscale_ci": [
+      0.9869,
+      1.3333
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.8688,
+      1.4667
+     ],
+     "vs_ref": 1.2188,
+     "vs_ref_ci": [
+      1.0915,
+      1.434
+     ],
+     "vs_ref_iou_only_ci": [
+      1.0625,
+      1.7334
+     ],
+     "pixels_vs_ref": 1.0,
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      0.9565,
+      1.0431
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 6,
+      "cap-hit": 91,
+      "exhausted": 3
+     },
+     "looks_mean": 14.95,
+     "looks_by_level": {
+      "L0": 598,
+      "L1": 709,
+      "L2": 93,
+      "L3": 95
+     },
+     "looks_by_action": {
+      "gaze": 772,
+      "verify": 516,
+      "escalate": 207
+     },
+     "vs_tiling_L0": 0.8864,
+     "vs_tiling_L0_ci": [
+      0.708,
+      1.1219
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.9508,
+      1.8576
+     ],
+     "pixels_vs_tiling_L0": 0.173
+    },
+    "ts10@1.0": {
+     "recall": 0.2007,
+     "recall_ci": [
+      0.1622,
+      0.2394
+     ],
+     "recall_iou_only": 0.1004,
+     "chance_recall": 0.1231,
+     "chance_recall_iou_only": 0.0263,
+     "precision": 0.0011,
+     "fp_per_image": 1469.78,
+     "boxes_per_image": 1471.41,
+     "pixels_frac": 0.5144,
+     "net_pixels_frac": 0.4988,
+     "images_with_any": 0.99,
+     "critical_per_image": 3.73,
+     "findings_per_image": 28.42,
+     "per_class": {
+      "crack": 0.289,
+      "spalling": 0.0161,
+      "efflorescence": 0.0732,
+      "exposed_rebar": 0.0216,
+      "corrosion": 0.5349
+     },
+     "vs_downscale": 1.2263,
+     "vs_downscale_ci": [
+      1.053,
+      1.4404
+     ],
+     "vs_downscale_iou_only_ci": [
+      1.0149,
+      1.7354
+     ],
+     "vs_ref": 1.1126,
+     "vs_ref_ci": [
+      1.0562,
+      1.1882
+     ],
+     "vs_ref_iou_only_ci": [
+      1.0422,
+      1.2553
+     ],
+     "pixels_vs_ref": 0.9916,
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      0.9602,
+      1.0118
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 94,
+      "exhausted": 5,
+      "cap-hit": 1
+     },
+     "looks_mean": 26.3,
+     "looks_by_level": {
+      "L0": 1183,
+      "L1": 1259,
+      "L2": 93,
+      "L3": 95
+     },
+     "looks_by_action": {
+      "gaze": 1322,
+      "verify": 862,
+      "escalate": 446
+     },
+     "vs_tiling_L0": 0.9545,
+     "vs_tiling_L0_ci": [
+      0.7704,
+      1.2
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      1.1357,
+      2.143
+     ],
+     "pixels_vs_tiling_L0": 0.316
+    },
+    "sf1@0.3": {
+     "recall": 0.1362,
+     "recall_ci": [
+      0.1034,
+      0.1699
+     ],
+     "recall_iou_only": 0.0585,
+     "chance_recall": 0.0908,
+     "chance_recall_iou_only": 0.0167,
+     "precision": 0.0015,
+     "fp_per_image": 702.88,
+     "boxes_per_image": 703.94,
+     "pixels_frac": 0.2832,
+     "net_pixels_frac": 0.2207,
+     "images_with_any": 0.98,
+     "critical_per_image": 1.93,
+     "findings_per_image": 13.47,
+     "per_class": {
+      "crack": 0.1728,
+      "spalling": 0.0,
+      "efflorescence": 0.0366,
+      "exposed_rebar": 0.0144,
+      "corrosion": 0.4419
+     },
+     "vs_downscale": 0.8321,
+     "vs_downscale_ci": [
+      0.6516,
+      1.0326
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.5075,
+      1.125
+     ],
+     "vs_ref": 0.8906,
+     "vs_ref_ci": [
+      0.8067,
+      0.9697
+     ],
+     "vs_ref_iou_only_ci": [
+      0.7407,
+      1.0209
+     ],
+     "pixels_vs_ref": 1.0063,
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      0.7789,
+      0.844
+     ],
+     "images_with_any_vs_ref_ci": [
+      -0.03,
+      0.0
+     ],
+     "halt": {
+      "cap-hit": 96,
+      "stop-rule": 2,
+      "exhausted": 2
+     },
+     "looks_mean": 12.48,
+     "looks_by_level": {
+      "L0": 486,
+      "L1": 575,
+      "L2": 93,
+      "L3": 94
+     },
+     "looks_by_action": {
+      "gaze": 628,
+      "verify": 388,
+      "escalate": 232
+     },
+     "vs_tiling_L0": 0.6477,
+     "vs_tiling_L0_ci": [
+      0.4871,
+      0.8832
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.6153,
+      1.3431
+     ],
+     "pixels_vs_tiling_L0": 0.174
+    },
+    "sf1@1.0": {
+     "recall": 0.1828,
+     "recall_ci": [
+      0.1417,
+      0.2206
+     ],
+     "recall_iou_only": 0.0872,
+     "chance_recall": 0.1051,
+     "chance_recall_iou_only": 0.0335,
+     "precision": 0.001,
+     "fp_per_image": 1478.12,
+     "boxes_per_image": 1479.61,
+     "pixels_frac": 0.5578,
+     "net_pixels_frac": 0.4953,
+     "images_with_any": 0.99,
+     "critical_per_image": 3.35,
+     "findings_per_image": 28.83,
+     "per_class": {
+      "crack": 0.2425,
+      "spalling": 0.0108,
+      "efflorescence": 0.0366,
+      "exposed_rebar": 0.0144,
+      "corrosion": 0.5659
+     },
+     "vs_downscale": 1.1168,
+     "vs_downscale_ci": [
+      0.9293,
+      1.3414
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.8333,
+      1.6667
+     ],
+     "vs_ref": 1.0132,
+     "vs_ref_ci": [
+      0.9264,
+      1.0914
+     ],
+     "vs_ref_iou_only_ci": [
+      0.8317,
+      1.1493
+     ],
+     "pixels_vs_ref": 1.0753,
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      0.9664,
+      1.025
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 90,
+      "exhausted": 9,
+      "cap-hit": 1
+     },
+     "looks_mean": 26.36,
+     "looks_by_level": {
+      "L0": 1186,
+      "L1": 1262,
+      "L2": 94,
+      "L3": 94
+     },
+     "looks_by_action": {
+      "gaze": 1315,
+      "verify": 814,
+      "escalate": 507
+     },
+     "vs_tiling_L0": 0.8693,
+     "vs_tiling_L0_ci": [
+      0.7236,
+      1.0793
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      1.0422,
+      1.8214
+     ],
+     "pixels_vs_tiling_L0": 0.3427
+    },
+    "fill@0.3": {
+     "recall": 0.1529,
+     "recall_ci": [
+      0.1192,
+      0.1884
+     ],
+     "recall_iou_only": 0.0657,
+     "chance_recall": 0.0896,
+     "chance_recall_iou_only": 0.0155,
+     "precision": 0.0013,
+     "fp_per_image": 935.74,
+     "boxes_per_image": 936.95,
+     "pixels_frac": 0.2883,
+     "net_pixels_frac": 0.2727,
+     "images_with_any": 0.99,
+     "critical_per_image": 1.9,
+     "findings_per_image": 16.94,
+     "per_class": {
+      "crack": 0.2093,
+      "spalling": 0.0054,
+      "efflorescence": 0.0366,
+      "exposed_rebar": 0.0144,
+      "corrosion": 0.4574
+     },
+     "vs_downscale": 0.9343,
+     "vs_downscale_ci": [
+      0.7443,
+      1.1482
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.5735,
+      1.2449
+     ],
+     "vs_ref": 1.0,
+     "vs_ref_ci": [
+      1.0,
+      1.0
+     ],
+     "vs_ref_iou_only_ci": [
+      1.0,
+      1.0
+     ],
+     "pixels_vs_ref": 1.0245,
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      1.0624,
+      1.1004
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 6,
+      "cap-hit": 91,
+      "exhausted": 3
+     },
+     "looks_mean": 15.73,
+     "looks_by_level": {
+      "L0": 651,
+      "L1": 734,
+      "L2": 93,
+      "L3": 95
+     },
+     "looks_by_action": {
+      "gaze": 791,
+      "verify": 499,
+      "escalate": 283
+     },
+     "vs_tiling_L0": 0.7273,
+     "vs_tiling_L0_ci": [
+      0.5699,
+      0.9672
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.6988,
+      1.5429
+     ],
+     "pixels_vs_tiling_L0": 0.1771
+    },
+    "fill@1.0": {
+     "recall": 0.1804,
+     "recall_ci": [
+      0.1421,
+      0.2178
+     ],
+     "recall_iou_only": 0.0884,
+     "chance_recall": 0.1123,
+     "chance_recall_iou_only": 0.0203,
+     "precision": 0.001,
+     "fp_per_image": 1485.77,
+     "boxes_per_image": 1487.23,
+     "pixels_frac": 0.5187,
+     "net_pixels_frac": 0.5031,
+     "images_with_any": 0.99,
+     "critical_per_image": 2.87,
+     "findings_per_image": 28.69,
+     "per_class": {
+      "crack": 0.2525,
+      "spalling": 0.0108,
+      "efflorescence": 0.0366,
+      "exposed_rebar": 0.0144,
+      "corrosion": 0.5271
+     },
+     "vs_downscale": 1.1022,
+     "vs_downscale_ci": [
+      0.9178,
+      1.3137
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.8953,
+      1.5668
+     ],
+     "vs_ref": 1.0,
+     "vs_ref_ci": [
+      1.0,
+      1.0
+     ],
+     "vs_ref_iou_only_ci": [
+      1.0,
+      1.0
+     ],
+     "pixels_vs_ref": 1.0,
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      1.0,
+      1.0
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 95,
+      "exhausted": 5
+     },
+     "looks_mean": 26.5,
+     "looks_by_level": {
+      "L0": 1192,
+      "L1": 1270,
+      "L2": 93,
+      "L3": 95
+     },
+     "looks_by_action": {
+      "gaze": 1327,
+      "verify": 817,
+      "escalate": 506
+     },
+     "vs_tiling_L0": 0.858,
+     "vs_tiling_L0_ci": [
+      0.6949,
+      1.0822
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      1.0159,
+      1.9214
+     ],
+     "pixels_vs_tiling_L0": 0.3187
+    },
+    "sv@0.3": {
+     "recall": 0.1505,
+     "recall_ci": [
+      0.1154,
+      0.1858
+     ],
+     "recall_iou_only": 0.0657,
+     "chance_recall": 0.0789,
+     "chance_recall_iou_only": 0.0155,
+     "precision": 0.0014,
+     "fp_per_image": 858.37,
+     "boxes_per_image": 859.56,
+     "pixels_frac": 0.2789,
+     "net_pixels_frac": 0.2633,
+     "images_with_any": 0.99,
+     "critical_per_image": 1.78,
+     "findings_per_image": 16.07,
+     "per_class": {
+      "crack": 0.2027,
+      "spalling": 0.0054,
+      "efflorescence": 0.0366,
+      "exposed_rebar": 0.0144,
+      "corrosion": 0.4574
+     },
+     "vs_downscale": 0.9197,
+     "vs_downscale_ci": [
+      0.7259,
+      1.143
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.5735,
+      1.2449
+     ],
+     "vs_ref": 0.9844,
+     "vs_ref_ci": [
+      0.9455,
+      1.0
+     ],
+     "vs_ref_iou_only_ci": [
+      1.0,
+      1.0
+     ],
+     "pixels_vs_ref": 0.991,
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      0.9734,
+      1.0
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 7,
+      "cap-hit": 90,
+      "exhausted": 3
+     },
+     "looks_mean": 14.8,
+     "looks_by_level": {
+      "L0": 590,
+      "L1": 702,
+      "L2": 93,
+      "L3": 95
+     },
+     "looks_by_action": {
+      "gaze": 759,
+      "verify": 458,
+      "escalate": 263
+     },
+     "vs_tiling_L0": 0.7159,
+     "vs_tiling_L0_ci": [
+      0.5578,
+      0.9518
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.6988,
+      1.5429
+     ],
+     "pixels_vs_tiling_L0": 0.1714
+    },
+    "sv@1.0": {
+     "recall": 0.178,
+     "recall_ci": [
+      0.14,
+      0.2142
+     ],
+     "recall_iou_only": 0.0884,
+     "chance_recall": 0.0896,
+     "chance_recall_iou_only": 0.0167,
+     "precision": 0.001,
+     "fp_per_image": 1470.9,
+     "boxes_per_image": 1472.34,
+     "pixels_frac": 0.5136,
+     "net_pixels_frac": 0.498,
+     "images_with_any": 0.99,
+     "critical_per_image": 2.87,
+     "findings_per_image": 28.51,
+     "per_class": {
+      "crack": 0.2458,
+      "spalling": 0.0108,
+      "efflorescence": 0.0366,
+      "exposed_rebar": 0.0144,
+      "corrosion": 0.5271
+     },
+     "vs_downscale": 1.0876,
+     "vs_downscale_ci": [
+      0.9091,
+      1.3051
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.8953,
+      1.5668
+     ],
+     "vs_ref": 0.9868,
+     "vs_ref_ci": [
+      0.9531,
+      1.0
+     ],
+     "vs_ref_iou_only_ci": [
+      1.0,
+      1.0
+     ],
+     "pixels_vs_ref": 0.9901,
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      0.976,
+      0.9998
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 94,
+      "exhausted": 4,
+      "cap-hit": 2
+     },
+     "looks_mean": 26.27,
+     "looks_by_level": {
+      "L0": 1182,
+      "L1": 1257,
+      "L2": 93,
+      "L3": 95
+     },
+     "looks_by_action": {
+      "gaze": 1314,
+      "verify": 808,
+      "escalate": 505
+     },
+     "vs_tiling_L0": 0.8466,
+     "vs_tiling_L0_ci": [
+      0.6851,
+      1.0685
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      1.0159,
+      1.9214
+     ],
+     "pixels_vs_tiling_L0": 0.3156
+    },
+    "v0_0@0.3": {
+     "recall": 0.1529,
+     "recall_ci": [
+      0.1192,
+      0.1884
+     ],
+     "recall_iou_only": 0.0657,
+     "chance_recall": 0.0872,
+     "chance_recall_iou_only": 0.0203,
+     "precision": 0.0014,
+     "fp_per_image": 868.66,
+     "boxes_per_image": 869.87,
+     "pixels_frac": 0.2819,
+     "net_pixels_frac": 0.2663,
+     "images_with_any": 0.99,
+     "critical_per_image": 1.78,
+     "findings_per_image": 16.18,
+     "per_class": {
+      "crack": 0.2093,
+      "spalling": 0.0054,
+      "efflorescence": 0.0366,
+      "exposed_rebar": 0.0144,
+      "corrosion": 0.4574
+     },
+     "vs_downscale": 0.9343,
+     "vs_downscale_ci": [
+      0.7443,
+      1.1482
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.5735,
+      1.2449
+     ],
+     "vs_ref": 1.0,
+     "vs_ref_ci": [
+      1.0,
+      1.0
+     ],
+     "vs_ref_iou_only_ci": [
+      1.0,
+      1.0
+     ],
+     "pixels_vs_ref": 1.0017,
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      1.0,
+      1.008
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "cap-hit": 92,
+      "stop-rule": 5,
+      "exhausted": 3
+     },
+     "looks_mean": 14.96,
+     "looks_by_level": {
+      "L0": 597,
+      "L1": 711,
+      "L2": 93,
+      "L3": 95
+     },
+     "looks_by_action": {
+      "gaze": 768,
+      "verify": 465,
+      "escalate": 263
+     },
+     "vs_tiling_L0": 0.7273,
+     "vs_tiling_L0_ci": [
+      0.5699,
+      0.9672
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.6988,
+      1.5429
+     ],
+     "pixels_vs_tiling_L0": 0.1732
+    },
+    "v0_0@1.0": {
+     "recall": 0.1804,
+     "recall_ci": [
+      0.1421,
+      0.2178
+     ],
+     "recall_iou_only": 0.0884,
+     "chance_recall": 0.098,
+     "chance_recall_iou_only": 0.0227,
+     "precision": 0.001,
+     "fp_per_image": 1510.05,
+     "boxes_per_image": 1511.51,
+     "pixels_frac": 0.5284,
+     "net_pixels_frac": 0.5128,
+     "images_with_any": 0.99,
+     "critical_per_image": 2.88,
+     "findings_per_image": 28.9,
+     "per_class": {
+      "crack": 0.2525,
+      "spalling": 0.0108,
+      "efflorescence": 0.0366,
+      "exposed_rebar": 0.0144,
+      "corrosion": 0.5271
+     },
+     "vs_downscale": 1.1022,
+     "vs_downscale_ci": [
+      0.9178,
+      1.3137
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.8953,
+      1.5668
+     ],
+     "vs_ref": 1.0,
+     "vs_ref_ci": [
+      1.0,
+      1.0
+     ],
+     "vs_ref_iou_only_ci": [
+      1.0,
+      1.0
+     ],
+     "pixels_vs_ref": 1.0187,
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      1.0045,
+      1.0351
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 92,
+      "exhausted": 6,
+      "cap-hit": 2
+     },
+     "looks_mean": 26.79,
+     "looks_by_level": {
+      "L0": 1206,
+      "L1": 1285,
+      "L2": 93,
+      "L3": 95
+     },
+     "looks_by_action": {
+      "gaze": 1342,
+      "verify": 825,
+      "escalate": 512
+     },
+     "vs_tiling_L0": 0.858,
+     "vs_tiling_L0_ci": [
+      0.6949,
+      1.0822
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      1.0159,
+      1.9214
+     ],
+     "pixels_vs_tiling_L0": 0.3246
+    },
+    "v0_1@0.3": {
+     "recall": 0.1529,
+     "recall_ci": [
+      0.1192,
+      0.1884
+     ],
+     "recall_iou_only": 0.0657,
+     "chance_recall": 0.08,
+     "chance_recall_iou_only": 0.0191,
+     "precision": 0.0014,
+     "fp_per_image": 868.66,
+     "boxes_per_image": 869.87,
+     "pixels_frac": 0.2819,
+     "net_pixels_frac": 0.2663,
+     "images_with_any": 0.99,
+     "critical_per_image": 1.78,
+     "findings_per_image": 16.18,
+     "per_class": {
+      "crack": 0.2093,
+      "spalling": 0.0054,
+      "efflorescence": 0.0366,
+      "exposed_rebar": 0.0144,
+      "corrosion": 0.4574
+     },
+     "vs_downscale": 0.9343,
+     "vs_downscale_ci": [
+      0.7443,
+      1.1482
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.5735,
+      1.2449
+     ],
+     "vs_ref": 1.0,
+     "vs_ref_ci": [
+      1.0,
+      1.0
+     ],
+     "vs_ref_iou_only_ci": [
+      1.0,
+      1.0
+     ],
+     "pixels_vs_ref": 1.0017,
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      1.0,
+      1.008
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "cap-hit": 92,
+      "stop-rule": 5,
+      "exhausted": 3
+     },
+     "looks_mean": 14.96,
+     "looks_by_level": {
+      "L0": 597,
+      "L1": 711,
+      "L2": 93,
+      "L3": 95
+     },
+     "looks_by_action": {
+      "gaze": 768,
+      "verify": 465,
+      "escalate": 263
+     },
+     "vs_tiling_L0": 0.7273,
+     "vs_tiling_L0_ci": [
+      0.5699,
+      0.9672
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.6988,
+      1.5429
+     ],
+     "pixels_vs_tiling_L0": 0.1732
+    },
+    "v0_1@1.0": {
+     "recall": 0.1804,
+     "recall_ci": [
+      0.1421,
+      0.2178
+     ],
+     "recall_iou_only": 0.0884,
+     "chance_recall": 0.1027,
+     "chance_recall_iou_only": 0.0239,
+     "precision": 0.001,
+     "fp_per_image": 1508.15,
+     "boxes_per_image": 1509.61,
+     "pixels_frac": 0.5277,
+     "net_pixels_frac": 0.512,
+     "images_with_any": 0.99,
+     "critical_per_image": 2.88,
+     "findings_per_image": 28.89,
+     "per_class": {
+      "crack": 0.2525,
+      "spalling": 0.0108,
+      "efflorescence": 0.0366,
+      "exposed_rebar": 0.0144,
+      "corrosion": 0.5271
+     },
+     "vs_downscale": 1.1022,
+     "vs_downscale_ci": [
+      0.9178,
+      1.3137
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.8953,
+      1.5668
+     ],
+     "vs_ref": 1.0,
+     "vs_ref_ci": [
+      1.0,
+      1.0
+     ],
+     "vs_ref_iou_only_ci": [
+      1.0,
+      1.0
+     ],
+     "pixels_vs_ref": 1.0172,
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      1.0041,
+      1.0339
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 93,
+      "exhausted": 5,
+      "cap-hit": 2
+     },
+     "looks_mean": 26.74,
+     "looks_by_level": {
+      "L0": 1204,
+      "L1": 1282,
+      "L2": 93,
+      "L3": 95
+     },
+     "looks_by_action": {
+      "gaze": 1339,
+      "verify": 825,
+      "escalate": 510
+     },
+     "vs_tiling_L0": 0.858,
+     "vs_tiling_L0_ci": [
+      0.6949,
+      1.0822
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      1.0159,
+      1.9214
+     ],
+     "pixels_vs_tiling_L0": 0.3242
+    },
+    "fill_sv@0.3": {
+     "recall": 0.1505,
+     "recall_ci": [
+      0.1154,
+      0.1858
+     ],
+     "recall_iou_only": 0.0657,
+     "chance_recall": 0.0729,
+     "chance_recall_iou_only": 0.0215,
+     "precision": 0.0013,
+     "fp_per_image": 927.37,
+     "boxes_per_image": 928.56,
+     "pixels_frac": 0.2858,
+     "net_pixels_frac": 0.2701,
+     "images_with_any": 0.99,
+     "critical_per_image": 1.9,
+     "findings_per_image": 16.83,
+     "per_class": {
+      "crack": 0.2027,
+      "spalling": 0.0054,
+      "efflorescence": 0.0366,
+      "exposed_rebar": 0.0144,
+      "corrosion": 0.4574
+     },
+     "vs_downscale": 0.9197,
+     "vs_downscale_ci": [
+      0.7259,
+      1.143
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.5735,
+      1.2449
+     ],
+     "vs_ref": 0.9844,
+     "vs_ref_ci": [
+      0.9455,
+      1.0
+     ],
+     "vs_ref_iou_only_ci": [
+      1.0,
+      1.0
+     ],
+     "pixels_vs_ref": 1.0154,
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      1.0443,
+      1.0948
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 7,
+      "cap-hit": 90,
+      "exhausted": 3
+     },
+     "looks_mean": 15.57,
+     "looks_by_level": {
+      "L0": 643,
+      "L1": 726,
+      "L2": 93,
+      "L3": 95
+     },
+     "looks_by_action": {
+      "gaze": 783,
+      "verify": 491,
+      "escalate": 283
+     },
+     "vs_tiling_L0": 0.7159,
+     "vs_tiling_L0_ci": [
+      0.5578,
+      0.9518
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.6988,
+      1.5429
+     ],
+     "pixels_vs_tiling_L0": 0.1756
+    },
+    "fill_sv@1.0": {
+     "recall": 0.178,
+     "recall_ci": [
+      0.14,
+      0.2142
+     ],
+     "recall_iou_only": 0.0884,
+     "chance_recall": 0.1123,
+     "chance_recall_iou_only": 0.0191,
+     "precision": 0.001,
+     "fp_per_image": 1470.9,
+     "boxes_per_image": 1472.34,
+     "pixels_frac": 0.5136,
+     "net_pixels_frac": 0.498,
+     "images_with_any": 0.99,
+     "critical_per_image": 2.87,
+     "findings_per_image": 28.51,
+     "per_class": {
+      "crack": 0.2458,
+      "spalling": 0.0108,
+      "efflorescence": 0.0366,
+      "exposed_rebar": 0.0144,
+      "corrosion": 0.5271
+     },
+     "vs_downscale": 1.0876,
+     "vs_downscale_ci": [
+      0.9091,
+      1.3051
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.8953,
+      1.5668
+     ],
+     "vs_ref": 0.9868,
+     "vs_ref_ci": [
+      0.9531,
+      1.0
+     ],
+     "vs_ref_iou_only_ci": [
+      1.0,
+      1.0
+     ],
+     "pixels_vs_ref": 0.9901,
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      0.976,
+      0.9998
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 96,
+      "exhausted": 4
+     },
+     "looks_mean": 26.27,
+     "looks_by_level": {
+      "L0": 1182,
+      "L1": 1257,
+      "L2": 93,
+      "L3": 95
+     },
+     "looks_by_action": {
+      "gaze": 1314,
+      "verify": 808,
+      "escalate": 505
+     },
+     "vs_tiling_L0": 0.8466,
+     "vs_tiling_L0_ci": [
+      0.6851,
+      1.0685
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      1.0159,
+      1.9214
+     ],
+     "pixels_vs_tiling_L0": 0.3156
+    },
+    "sf1_fill@0.3": {
+     "recall": 0.1386,
+     "recall_ci": [
+      0.1056,
+      0.1712
+     ],
+     "recall_iou_only": 0.0585,
+     "chance_recall": 0.0741,
+     "chance_recall_iou_only": 0.0215,
+     "precision": 0.0014,
+     "fp_per_image": 766.44,
+     "boxes_per_image": 767.52,
+     "pixels_frac": 0.2939,
+     "net_pixels_frac": 0.2314,
+     "images_with_any": 0.99,
+     "critical_per_image": 1.94,
+     "findings_per_image": 14.58,
+     "per_class": {
+      "crack": 0.1794,
+      "spalling": 0.0,
+      "efflorescence": 0.0366,
+      "exposed_rebar": 0.0144,
+      "corrosion": 0.4419
+     },
+     "vs_downscale": 0.8467,
+     "vs_downscale_ci": [
+      0.6771,
+      1.0484
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.5075,
+      1.125
+     ],
+     "vs_ref": 0.9062,
+     "vs_ref_ci": [
+      0.8272,
+      0.9831
+     ],
+     "vs_ref_iou_only_ci": [
+      0.7407,
+      1.0209
+     ],
+     "pixels_vs_ref": 1.0444,
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      0.8506,
+      0.9216
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 3,
+      "cap-hit": 94,
+      "exhausted": 3
+     },
+     "looks_mean": 13.37,
+     "looks_by_level": {
+      "L0": 519,
+      "L1": 631,
+      "L2": 93,
+      "L3": 94
+     },
+     "looks_by_action": {
+      "gaze": 684,
+      "verify": 414,
+      "escalate": 239
+     },
+     "vs_tiling_L0": 0.6591,
+     "vs_tiling_L0_ci": [
+      0.5,
+      0.903
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.6153,
+      1.3431
+     ],
+     "pixels_vs_tiling_L0": 0.1806
+    },
+    "sf1_fill@1.0": {
+     "recall": 0.1828,
+     "recall_ci": [
+      0.1417,
+      0.2206
+     ],
+     "recall_iou_only": 0.0872,
+     "chance_recall": 0.0956,
+     "chance_recall_iou_only": 0.0191,
+     "precision": 0.001,
+     "fp_per_image": 1478.86,
+     "boxes_per_image": 1480.35,
+     "pixels_frac": 0.5579,
+     "net_pixels_frac": 0.4954,
+     "images_with_any": 0.99,
+     "critical_per_image": 3.35,
+     "findings_per_image": 28.84,
+     "per_class": {
+      "crack": 0.2425,
+      "spalling": 0.0108,
+      "efflorescence": 0.0366,
+      "exposed_rebar": 0.0144,
+      "corrosion": 0.5659
+     },
+     "vs_downscale": 1.1168,
+     "vs_downscale_ci": [
+      0.9293,
+      1.3414
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.8333,
+      1.6667
+     ],
+     "vs_ref": 1.0132,
+     "vs_ref_ci": [
+      0.9264,
+      1.0914
+     ],
+     "vs_ref_iou_only_ci": [
+      0.8317,
+      1.1493
+     ],
+     "pixels_vs_ref": 1.0755,
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      0.9666,
+      1.025
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 90,
+      "exhausted": 9,
+      "cap-hit": 1
+     },
+     "looks_mean": 26.37,
+     "looks_by_level": {
+      "L0": 1187,
+      "L1": 1262,
+      "L2": 94,
+      "L3": 94
+     },
+     "looks_by_action": {
+      "gaze": 1315,
+      "verify": 814,
+      "escalate": 508
+     },
+     "vs_tiling_L0": 0.8693,
+     "vs_tiling_L0_ci": [
+      0.7236,
+      1.0793
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      1.0422,
+      1.8214
+     ],
+     "pixels_vs_tiling_L0": 0.3428
+    },
+    "fill_ts08@0.3": {
+     "recall": 0.1864,
+     "recall_ci": [
+      0.15,
+      0.2223
+     ],
+     "recall_iou_only": 0.086,
+     "chance_recall": 0.0896,
+     "chance_recall_iou_only": 0.0167,
+     "precision": 0.0016,
+     "fp_per_image": 938.71,
+     "boxes_per_image": 940.2,
+     "pixels_frac": 0.2883,
+     "net_pixels_frac": 0.2727,
+     "images_with_any": 0.99,
+     "critical_per_image": 2.69,
+     "findings_per_image": 17.01,
+     "per_class": {
+      "crack": 0.2558,
+      "spalling": 0.0108,
+      "efflorescence": 0.0732,
+      "exposed_rebar": 0.0216,
+      "corrosion": 0.5271
+     },
+     "vs_downscale": 1.1387,
+     "vs_downscale_ci": [
+      0.9869,
+      1.3333
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.8688,
+      1.4667
+     ],
+     "vs_ref": 1.2188,
+     "vs_ref_ci": [
+      1.0915,
+      1.434
+     ],
+     "vs_ref_iou_only_ci": [
+      1.0625,
+      1.7334
+     ],
+     "pixels_vs_ref": 1.0245,
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      1.0282,
+      1.1339
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 6,
+      "cap-hit": 91,
+      "exhausted": 3
+     },
+     "looks_mean": 15.73,
+     "looks_by_level": {
+      "L0": 650,
+      "L1": 735,
+      "L2": 93,
+      "L3": 95
+     },
+     "looks_by_action": {
+      "gaze": 798,
+      "verify": 550,
+      "escalate": 225
+     },
+     "vs_tiling_L0": 0.8864,
+     "vs_tiling_L0_ci": [
+      0.708,
+      1.1219
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.9508,
+      1.8576
+     ],
+     "pixels_vs_tiling_L0": 0.1771
+    },
+    "fill_ts08@1.0": {
+     "recall": 0.2007,
+     "recall_ci": [
+      0.1622,
+      0.2394
+     ],
+     "recall_iou_only": 0.1004,
+     "chance_recall": 0.1254,
+     "chance_recall_iou_only": 0.0346,
+     "precision": 0.0011,
+     "fp_per_image": 1469.78,
+     "boxes_per_image": 1471.41,
+     "pixels_frac": 0.5144,
+     "net_pixels_frac": 0.4988,
+     "images_with_any": 0.99,
+     "critical_per_image": 3.73,
+     "findings_per_image": 28.42,
+     "per_class": {
+      "crack": 0.289,
+      "spalling": 0.0161,
+      "efflorescence": 0.0732,
+      "exposed_rebar": 0.0216,
+      "corrosion": 0.5349
+     },
+     "vs_downscale": 1.2263,
+     "vs_downscale_ci": [
+      1.053,
+      1.4404
+     ],
+     "vs_downscale_iou_only_ci": [
+      1.0149,
+      1.7354
+     ],
+     "vs_ref": 1.1126,
+     "vs_ref_ci": [
+      1.0562,
+      1.1882
+     ],
+     "vs_ref_iou_only_ci": [
+      1.0422,
+      1.2553
+     ],
+     "pixels_vs_ref": 0.9916,
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      0.9602,
+      1.0118
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 95,
+      "exhausted": 5
+     },
+     "looks_mean": 26.3,
+     "looks_by_level": {
+      "L0": 1183,
+      "L1": 1259,
+      "L2": 93,
+      "L3": 95
+     },
+     "looks_by_action": {
+      "gaze": 1322,
+      "verify": 862,
+      "escalate": 446
+     },
+     "vs_tiling_L0": 0.9545,
+     "vs_tiling_L0_ci": [
+      0.7704,
+      1.2
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      1.1357,
+      2.143
+     ],
+     "pixels_vs_tiling_L0": 0.316
+    },
+    "ts10_fill@0.3": {
+     "recall": 0.1864,
+     "recall_ci": [
+      0.15,
+      0.2223
+     ],
+     "recall_iou_only": 0.086,
+     "chance_recall": 0.0884,
+     "chance_recall_iou_only": 0.0239,
+     "precision": 0.0016,
+     "fp_per_image": 938.71,
+     "boxes_per_image": 940.2,
+     "pixels_frac": 0.2883,
+     "net_pixels_frac": 0.2727,
+     "images_with_any": 0.99,
+     "critical_per_image": 2.69,
+     "findings_per_image": 17.01,
+     "per_class": {
+      "crack": 0.2558,
+      "spalling": 0.0108,
+      "efflorescence": 0.0732,
+      "exposed_rebar": 0.0216,
+      "corrosion": 0.5271
+     },
+     "vs_downscale": 1.1387,
+     "vs_downscale_ci": [
+      0.9869,
+      1.3333
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.8688,
+      1.4667
+     ],
+     "vs_ref": 1.2188,
+     "vs_ref_ci": [
+      1.0915,
+      1.434
+     ],
+     "vs_ref_iou_only_ci": [
+      1.0625,
+      1.7334
+     ],
+     "pixels_vs_ref": 1.0245,
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      1.0282,
+      1.1339
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 6,
+      "cap-hit": 91,
+      "exhausted": 3
+     },
+     "looks_mean": 15.73,
+     "looks_by_level": {
+      "L0": 650,
+      "L1": 735,
+      "L2": 93,
+      "L3": 95
+     },
+     "looks_by_action": {
+      "gaze": 798,
+      "verify": 550,
+      "escalate": 225
+     },
+     "vs_tiling_L0": 0.8864,
+     "vs_tiling_L0_ci": [
+      0.708,
+      1.1219
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.9508,
+      1.8576
+     ],
+     "pixels_vs_tiling_L0": 0.1771
+    },
+    "ts10_fill@1.0": {
+     "recall": 0.2007,
+     "recall_ci": [
+      0.1622,
+      0.2394
+     ],
+     "recall_iou_only": 0.1004,
+     "chance_recall": 0.1135,
+     "chance_recall_iou_only": 0.0311,
+     "precision": 0.0011,
+     "fp_per_image": 1469.78,
+     "boxes_per_image": 1471.41,
+     "pixels_frac": 0.5144,
+     "net_pixels_frac": 0.4988,
+     "images_with_any": 0.99,
+     "critical_per_image": 3.73,
+     "findings_per_image": 28.42,
+     "per_class": {
+      "crack": 0.289,
+      "spalling": 0.0161,
+      "efflorescence": 0.0732,
+      "exposed_rebar": 0.0216,
+      "corrosion": 0.5349
+     },
+     "vs_downscale": 1.2263,
+     "vs_downscale_ci": [
+      1.053,
+      1.4404
+     ],
+     "vs_downscale_iou_only_ci": [
+      1.0149,
+      1.7354
+     ],
+     "vs_ref": 1.1126,
+     "vs_ref_ci": [
+      1.0562,
+      1.1882
+     ],
+     "vs_ref_iou_only_ci": [
+      1.0422,
+      1.2553
+     ],
+     "pixels_vs_ref": 0.9916,
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      0.9602,
+      1.0118
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 95,
+      "exhausted": 5
+     },
+     "looks_mean": 26.3,
+     "looks_by_level": {
+      "L0": 1183,
+      "L1": 1259,
+      "L2": 93,
+      "L3": 95
+     },
+     "looks_by_action": {
+      "gaze": 1322,
+      "verify": 862,
+      "escalate": 446
+     },
+     "vs_tiling_L0": 0.9545,
+     "vs_tiling_L0_ci": [
+      0.7704,
+      1.2
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      1.1357,
+      2.143
+     ],
+     "pixels_vs_tiling_L0": 0.316
+    },
+    "ts07_fill@0.3": {
+     "recall": 0.1864,
+     "recall_ci": [
+      0.15,
+      0.2223
+     ],
+     "recall_iou_only": 0.086,
+     "chance_recall": 0.0968,
+     "chance_recall_iou_only": 0.0227,
+     "precision": 0.0016,
+     "fp_per_image": 938.23,
+     "boxes_per_image": 939.72,
+     "pixels_frac": 0.2883,
+     "net_pixels_frac": 0.2727,
+     "images_with_any": 0.99,
+     "critical_per_image": 2.54,
+     "findings_per_image": 16.98,
+     "per_class": {
+      "crack": 0.2558,
+      "spalling": 0.0108,
+      "efflorescence": 0.0732,
+      "exposed_rebar": 0.0144,
+      "corrosion": 0.5349
+     },
+     "vs_downscale": 1.1387,
+     "vs_downscale_ci": [
+      0.9869,
+      1.3333
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.8688,
+      1.4667
+     ],
+     "vs_ref": 1.2188,
+     "vs_ref_ci": [
+      1.0915,
+      1.434
+     ],
+     "vs_ref_iou_only_ci": [
+      1.0625,
+      1.7334
+     ],
+     "pixels_vs_ref": 1.0245,
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      1.0271,
+      1.1331
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 6,
+      "cap-hit": 91,
+      "exhausted": 3
+     },
+     "looks_mean": 15.73,
+     "looks_by_level": {
+      "L0": 650,
+      "L1": 735,
+      "L2": 93,
+      "L3": 95
+     },
+     "looks_by_action": {
+      "gaze": 797,
+      "verify": 543,
+      "escalate": 233
+     },
+     "vs_tiling_L0": 0.8864,
+     "vs_tiling_L0_ci": [
+      0.708,
+      1.1219
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      0.9508,
+      1.8576
+     ],
+     "pixels_vs_tiling_L0": 0.1771
+    },
+    "ts07_fill@1.0": {
+     "recall": 0.2007,
+     "recall_ci": [
+      0.1622,
+      0.2394
+     ],
+     "recall_iou_only": 0.1004,
+     "chance_recall": 0.1147,
+     "chance_recall_iou_only": 0.0215,
+     "precision": 0.0011,
+     "fp_per_image": 1471.43,
+     "boxes_per_image": 1473.06,
+     "pixels_frac": 0.5147,
+     "net_pixels_frac": 0.4991,
+     "images_with_any": 0.99,
+     "critical_per_image": 3.58,
+     "findings_per_image": 28.43,
+     "per_class": {
+      "crack": 0.289,
+      "spalling": 0.0161,
+      "efflorescence": 0.0732,
+      "exposed_rebar": 0.0144,
+      "corrosion": 0.5426
+     },
+     "vs_downscale": 1.2263,
+     "vs_downscale_ci": [
+      1.053,
+      1.4404
+     ],
+     "vs_downscale_iou_only_ci": [
+      1.0149,
+      1.7354
+     ],
+     "vs_ref": 1.1126,
+     "vs_ref_ci": [
+      1.0562,
+      1.1882
+     ],
+     "vs_ref_iou_only_ci": [
+      1.0422,
+      1.2553
+     ],
+     "pixels_vs_ref": 0.9922,
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      0.9611,
+      1.0134
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "halt": {
+      "stop-rule": 95,
+      "exhausted": 5
+     },
+     "looks_mean": 26.32,
+     "looks_by_level": {
+      "L0": 1184,
+      "L1": 1260,
+      "L2": 93,
+      "L3": 95
+     },
+     "looks_by_action": {
+      "gaze": 1322,
+      "verify": 857,
+      "escalate": 453
+     },
+     "vs_tiling_L0": 0.9545,
+     "vs_tiling_L0_ci": [
+      0.7704,
+      1.2
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      1.1357,
+      2.143
+     ],
+     "pixels_vs_tiling_L0": 0.3162
+    },
+    "mv03@0.3": {
+     "recall": 0.1804,
+     "recall_ci": [
+      0.144,
+      0.2151
+     ],
+     "recall_iou_only": 0.0848,
+     "chance_recall": 0.0944,
+     "chance_recall_iou_only": 0.0239,
+     "precision": 0.0039,
+     "fp_per_image": 364.13,
+     "boxes_per_image": 365.55,
+     "pixels_frac": 0.1374,
+     "net_pixels_frac": 0.1217,
+     "images_with_any": 0.95,
+     "critical_per_image": 2.33,
+     "findings_per_image": 9.12,
+     "per_class": {
+      "crack": 0.2558,
+      "spalling": 0.0161,
+      "efflorescence": 0.0488,
+      "exposed_rebar": 0.0144,
+      "corrosion": 0.5039
+     },
+     "vs_downscale": 1.1022,
+     "vs_downscale_ci": [
+      0.9351,
+      1.3134
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.8444,
+      1.5654
+     ],
+     "vs_ref": 1.1797,
+     "vs_ref_ci": [
+      1.0219,
+      1.3909
+     ],
+     "vs_ref_iou_only_ci": [
+      0.9996,
+      1.6923
+     ],
+     "pixels_vs_ref": 0.488,
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      0.384,
+      0.4599
+     ],
+     "images_with_any_vs_ref_ci": [
+      -0.08,
+      -0.01
+     ],
+     "halt": {
+      "stop-rule": 77,
+      "cap-hit": 17,
+      "exhausted": 6
+     },
+     "looks_mean": 5.61,
+     "looks_by_level": {
+      "L1": 42,
+      "L2": 424,
+      "L3": 95
+     },
+     "looks_by_action": {
+      "gaze": 465,
+      "verify": 64,
+      "escalate": 32
+     },
+     "vs_tiling_L0": 0.858,
+     "vs_tiling_L0_ci": [
+      0.6823,
+      1.0904
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      1.0,
+      1.7756
+     ],
+     "pixels_vs_tiling_L0": 0.0844
+    },
+    "mv03@1.0": {
+     "recall": 0.1876,
+     "recall_ci": [
+      0.1495,
+      0.2231
+     ],
+     "recall_iou_only": 0.0908,
+     "chance_recall": 0.1087,
+     "chance_recall_iou_only": 0.0215,
+     "precision": 0.0038,
+     "fp_per_image": 386.01,
+     "boxes_per_image": 387.49,
+     "pixels_frac": 0.1603,
+     "net_pixels_frac": 0.1447,
+     "images_with_any": 0.95,
+     "critical_per_image": 2.39,
+     "findings_per_image": 9.8,
+     "per_class": {
+      "crack": 0.2691,
+      "spalling": 0.0215,
+      "efflorescence": 0.0488,
+      "exposed_rebar": 0.0144,
+      "corrosion": 0.5116
+     },
+     "vs_downscale": 1.146,
+     "vs_downscale_ci": [
+      0.9664,
+      1.3672
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.9012,
+      1.6747
+     ],
+     "vs_ref": 1.0397,
+     "vs_ref_ci": [
+      0.9448,
+      1.1522
+     ],
+     "vs_ref_iou_only_ci": [
+      0.8571,
+      1.1832
+     ],
+     "pixels_vs_ref": 0.309,
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      0.2346,
+      0.2892
+     ],
+     "images_with_any_vs_ref_ci": [
+      -0.08,
+      -0.01
+     ],
+     "halt": {
+      "stop-rule": 92,
+      "exhausted": 8
+     },
+     "looks_mean": 5.97,
+     "looks_by_level": {
+      "L0": 1,
+      "L1": 77,
+      "L2": 424,
+      "L3": 95
+     },
+     "looks_by_action": {
+      "gaze": 500,
+      "verify": 65,
+      "escalate": 32
+     },
+     "vs_tiling_L0": 0.892,
+     "vs_tiling_L0_ci": [
+      0.7054,
+      1.1232
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      1.0606,
+      1.9091
+     ],
+     "pixels_vs_tiling_L0": 0.0985
+    },
+    "ts10_mv03@0.3": {
+     "recall": 0.1924,
+     "recall_ci": [
+      0.1525,
+      0.232
+     ],
+     "recall_iou_only": 0.0944,
+     "chance_recall": 0.1147,
+     "chance_recall_iou_only": 0.0263,
+     "precision": 0.004,
+     "fp_per_image": 374.12,
+     "boxes_per_image": 375.64,
+     "pixels_frac": 0.1369,
+     "net_pixels_frac": 0.1212,
+     "images_with_any": 0.95,
+     "critical_per_image": 2.82,
+     "findings_per_image": 9.1,
+     "per_class": {
+      "crack": 0.2824,
+      "spalling": 0.0161,
+      "efflorescence": 0.0732,
+      "exposed_rebar": 0.0216,
+      "corrosion": 0.4961
+     },
+     "vs_downscale": 1.1752,
+     "vs_downscale_ci": [
+      0.9866,
+      1.4113
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.935,
+      1.7164
+     ],
+     "vs_ref": 1.2578,
+     "vs_ref_ci": [
+      1.0719,
+      1.5301
+     ],
+     "vs_ref_iou_only_ci": [
+      1.0713,
+      1.9796
+     ],
+     "pixels_vs_ref": 0.4863,
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      0.3898,
+      0.4753
+     ],
+     "images_with_any_vs_ref_ci": [
+      -0.08,
+      -0.01
+     ],
+     "halt": {
+      "stop-rule": 77,
+      "cap-hit": 17,
+      "exhausted": 6
+     },
+     "looks_mean": 5.58,
+     "looks_by_level": {
+      "L1": 42,
+      "L2": 421,
+      "L3": 95
+     },
+     "looks_by_action": {
+      "gaze": 462,
+      "verify": 96
+     },
+     "vs_tiling_L0": 0.9148,
+     "vs_tiling_L0_ci": [
+      0.7286,
+      1.1613
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      1.085,
+      2.0007
+     ],
+     "pixels_vs_tiling_L0": 0.0841
+    },
+    "ts10_mv03@1.0": {
+     "recall": 0.1959,
+     "recall_ci": [
+      0.1549,
+      0.2354
+     ],
+     "recall_iou_only": 0.098,
+     "chance_recall": 0.1147,
+     "chance_recall_iou_only": 0.0215,
+     "precision": 0.0039,
+     "fp_per_image": 394.88,
+     "boxes_per_image": 396.43,
+     "pixels_frac": 0.1589,
+     "net_pixels_frac": 0.1433,
+     "images_with_any": 0.95,
+     "critical_per_image": 2.88,
+     "findings_per_image": 9.77,
+     "per_class": {
+      "crack": 0.289,
+      "spalling": 0.0215,
+      "efflorescence": 0.0732,
+      "exposed_rebar": 0.0216,
+      "corrosion": 0.4961
+     },
+     "vs_downscale": 1.1971,
+     "vs_downscale_ci": [
+      1.0,
+      1.4352
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.9692,
+      1.7758
+     ],
+     "vs_ref": 1.0861,
+     "vs_ref_ci": [
+      0.9781,
+      1.2164
+     ],
+     "vs_ref_iou_only_ci": [
+      0.9135,
+      1.3
+     ],
+     "pixels_vs_ref": 0.3063,
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      0.2392,
+      0.2979
+     ],
+     "images_with_any_vs_ref_ci": [
+      -0.08,
+      -0.01
+     ],
+     "halt": {
+      "stop-rule": 92,
+      "exhausted": 8
+     },
+     "looks_mean": 5.92,
+     "looks_by_level": {
+      "L0": 1,
+      "L1": 75,
+      "L2": 421,
+      "L3": 95
+     },
+     "looks_by_action": {
+      "gaze": 495,
+      "verify": 97
+     },
+     "vs_tiling_L0": 0.9318,
+     "vs_tiling_L0_ci": [
+      0.7423,
+      1.1806
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      1.1249,
+      2.091
+     ],
+     "pixels_vs_tiling_L0": 0.0976
+    },
+    "ts07_mv03@0.3": {
+     "recall": 0.1935,
+     "recall_ci": [
+      0.1542,
+      0.2321
+     ],
+     "recall_iou_only": 0.0944,
+     "chance_recall": 0.0992,
+     "chance_recall_iou_only": 0.0155,
+     "precision": 0.0041,
+     "fp_per_image": 374.43,
+     "boxes_per_image": 375.96,
+     "pixels_frac": 0.1369,
+     "net_pixels_frac": 0.1212,
+     "images_with_any": 0.95,
+     "critical_per_image": 2.67,
+     "findings_per_image": 9.11,
+     "per_class": {
+      "crack": 0.2824,
+      "spalling": 0.0161,
+      "efflorescence": 0.0732,
+      "exposed_rebar": 0.0144,
+      "corrosion": 0.5116
+     },
+     "vs_downscale": 1.1825,
+     "vs_downscale_ci": [
+      0.9943,
+      1.4235
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.935,
+      1.7164
+     ],
+     "vs_ref": 1.2656,
+     "vs_ref_ci": [
+      1.0815,
+      1.5435
+     ],
+     "vs_ref_iou_only_ci": [
+      1.0713,
+      1.9796
+     ],
+     "pixels_vs_ref": 0.4863,
+     "ref": "def@0.3",
+     "boxes_vs_ref_ci": [
+      0.3902,
+      0.4757
+     ],
+     "images_with_any_vs_ref_ci": [
+      -0.08,
+      -0.01
+     ],
+     "halt": {
+      "stop-rule": 77,
+      "cap-hit": 17,
+      "exhausted": 6
+     },
+     "looks_mean": 5.58,
+     "looks_by_level": {
+      "L1": 42,
+      "L2": 421,
+      "L3": 95
+     },
+     "looks_by_action": {
+      "gaze": 462,
+      "verify": 93,
+      "escalate": 3
+     },
+     "vs_tiling_L0": 0.9205,
+     "vs_tiling_L0_ci": [
+      0.7304,
+      1.164
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      1.085,
+      2.0007
+     ],
+     "pixels_vs_tiling_L0": 0.0841
+    },
+    "ts07_mv03@1.0": {
+     "recall": 0.1971,
+     "recall_ci": [
+      0.1563,
+      0.2355
+     ],
+     "recall_iou_only": 0.098,
+     "chance_recall": 0.1159,
+     "chance_recall_iou_only": 0.0299,
+     "precision": 0.0039,
+     "fp_per_image": 395.19,
+     "boxes_per_image": 396.75,
+     "pixels_frac": 0.1589,
+     "net_pixels_frac": 0.1433,
+     "images_with_any": 0.95,
+     "critical_per_image": 2.73,
+     "findings_per_image": 9.78,
+     "per_class": {
+      "crack": 0.289,
+      "spalling": 0.0215,
+      "efflorescence": 0.0732,
+      "exposed_rebar": 0.0144,
+      "corrosion": 0.5116
+     },
+     "vs_downscale": 1.2044,
+     "vs_downscale_ci": [
+      1.0138,
+      1.44
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.9692,
+      1.7758
+     ],
+     "vs_ref": 1.0927,
+     "vs_ref_ci": [
+      0.9814,
+      1.2308
+     ],
+     "vs_ref_iou_only_ci": [
+      0.9135,
+      1.3
+     ],
+     "pixels_vs_ref": 0.3063,
+     "ref": "def@1.0",
+     "boxes_vs_ref_ci": [
+      0.2394,
+      0.2976
+     ],
+     "images_with_any_vs_ref_ci": [
+      -0.08,
+      -0.01
+     ],
+     "halt": {
+      "stop-rule": 92,
+      "exhausted": 8
+     },
+     "looks_mean": 5.92,
+     "looks_by_level": {
+      "L0": 1,
+      "L1": 75,
+      "L2": 421,
+      "L3": 95
+     },
+     "looks_by_action": {
+      "gaze": 495,
+      "verify": 94,
+      "escalate": 3
+     },
+     "vs_tiling_L0": 0.9375,
+     "vs_tiling_L0_ci": [
+      0.7436,
+      1.1876
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      1.1249,
+      2.091
+     ],
+     "pixels_vs_tiling_L0": 0.0976
+    },
+    "tiling@L2": {
+     "recall": 0.2031,
+     "recall_ci": [
+      0.1626,
+      0.2426
+     ],
+     "recall_iou_only": 0.0944,
+     "chance_recall": 0.08,
+     "chance_recall_iou_only": 0.0167,
+     "precision": 0.0063,
+     "fp_per_image": 238.0,
+     "boxes_per_image": 239.51,
+     "pixels_frac": 0.1024,
+     "net_pixels_frac": 0.1024,
+     "images_with_any": 1.0,
+     "per_class": {
+      "crack": 0.3223,
+      "spalling": 0.0269,
+      "efflorescence": 0.0366,
+      "exposed_rebar": 0.0072,
+      "corrosion": 0.4961
+     },
+     "vs_downscale": 1.2409,
+     "vs_downscale_ci": [
+      1.0789,
+      1.4453
+     ],
+     "vs_downscale_iou_only_ci": [
+      1.0,
+      1.6605
+     ],
+     "vs_tiling_L0": 0.9659,
+     "vs_tiling_L0_ci": [
+      0.7666,
+      1.2106
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      1.0895,
+      2.0
+     ],
+     "pixels_vs_tiling_L0": 0.0629
+    },
+    "tiling@L1": {
+     "recall": 0.2139,
+     "recall_ci": [
+      0.17,
+      0.2553
+     ],
+     "recall_iou_only": 0.092,
+     "chance_recall": 0.086,
+     "chance_recall_iou_only": 0.0131,
+     "precision": 0.0019,
+     "fp_per_image": 924.38,
+     "boxes_per_image": 926.13,
+     "pixels_frac": 0.4161,
+     "net_pixels_frac": 0.4161,
+     "images_with_any": 1.0,
+     "per_class": {
+      "crack": 0.3522,
+      "spalling": 0.0108,
+      "efflorescence": 0.0122,
+      "exposed_rebar": 0.0216,
+      "corrosion": 0.5194
+     },
+     "vs_downscale": 1.3066,
+     "vs_downscale_ci": [
+      1.1141,
+      1.5557
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.9411,
+      1.643
+     ],
+     "vs_tiling_L0": 1.017,
+     "vs_tiling_L0_ci": [
+      0.8634,
+      1.2044
+     ],
+     "vs_tiling_L0_iou_only_ci": [
+      1.0804,
+      1.8921
+     ],
+     "pixels_vs_tiling_L0": 0.2557
+    },
+    "tiling@L0": {
+     "recall": 0.2103,
+     "recall_ci": [
+      0.1537,
+      0.273
+     ],
+     "recall_iou_only": 0.0657,
+     "chance_recall": 0.0621,
+     "chance_recall_iou_only": 0.0155,
+     "precision": 0.0005,
+     "fp_per_image": 3174.48,
+     "boxes_per_image": 3176.22,
+     "pixels_frac": 1.6276,
+     "net_pixels_frac": 1.6276,
+     "images_with_any": 1.0,
+     "per_class": {
+      "crack": 0.3355,
+      "spalling": 0.0323,
+      "efflorescence": 0.0122,
+      "exposed_rebar": 0.0,
+      "corrosion": 0.5271
+     },
+     "vs_downscale": 1.2847,
+     "vs_downscale_ci": [
+      0.9908,
+      1.7031
+     ],
+     "vs_downscale_iou_only_ci": [
+      0.5643,
+      1.3493
+     ]
+    }
+   }
+  }
+ }
+}

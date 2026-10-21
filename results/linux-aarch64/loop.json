@@ -1,0 +1,280 @@
+{
+ "arm": "linux-aarch64",
+ "segmenter": "classical-v1",
+ "config": {
+  "pixel_cap": 0.3,
+  "thumbs": false,
+  "governor": false,
+  "t_hat_ms": {
+   "warp": 2.0,
+   "segment": 60.0
+  },
+  "seconds_cap": 120.0,
+  "prefetch_k": 2,
+  "threads": [
+   1,
+   2,
+   4
+  ],
+  "all_threads": 4,
+  "rounds": 1,
+  "photos": [
+   "bridge_01",
+   "bridge_02",
+   "bridge_03",
+   "bridge_04",
+   "bridge_05",
+   "bridge_06",
+   "bridge_07",
+   "bridge_08",
+   "synth_9100",
+   "synth_9101",
+   "synth_9102",
+   "synth_9103",
+   "synth_9104",
+   "synth_9105",
+   "synth_9106",
+   "synth_9107"
+  ]
+ },
+ "provenance": {
+  "cv2": "5.0.0",
+  "build_info_sha256": "4460ffe25568d7f496997f0593f568f4d91ee4740c97f057b2986c237e8a386c",
+  "cv2_baseline": "NEON FP16",
+  "cv2_dispatch": "NEON_DOTPROD NEON_FP16 NEON_BF16",
+  "cv2_parallel_framework": "pthreads",
+  "cv2_custom_hal": "YES (carotene (ver 0.0.1) KleidiCV (ver 26.03))",
+  "cv2_file": "/home/runner/work/drishyam/drishyam/.venv/lib/python3.13/site-packages/cv2/__init__.py",
+  "under_opt_cool": false,
+  "build": "stock (not COOL)",
+  "machine": "Linux 6.17.0-1022-azure aarch64",
+  "platform": "Linux-6.17.0-1022-azure-aarch64-with-glibc2.39",
+  "cpu": "Neoverse-N2",
+  "logical_cpus": 4,
+  "cv2_threads": 4,
+  "python": "3.13.16",
+  "numpy": "2.5.4",
+  "timestamp": "2026-10-19T08:12:26Z",
+  "load_avg": [
+   1.41,
+   0.58,
+   0.22
+  ],
+  "label": "GitHub ubuntu-24.04-arm runner, not Lambda"
+ },
+ "load_avg_end": [
+  1.35,
+  0.66,
+  0.26
+ ],
+ "decisions_identical_across_threads": true,
+ "results": [
+  {
+   "threads": 1,
+   "variant": "off",
+   "jobs": 16,
+   "steps": 71,
+   "jobs_per_s": 3.972,
+   "job_ms": {
+    "p50": 173.2,
+    "p95": 415.8
+   },
+   "step_ms": {
+    "p50": 53.0,
+    "p95": 59.9
+   },
+   "cpu_s_per_job": 0.252,
+   "prefetch": {
+    "warp_hit_rate": null
+   },
+   "decisions_identical": true
+  },
+  {
+   "threads": 1,
+   "variant": "warp",
+   "jobs": 16,
+   "steps": 71,
+   "jobs_per_s": 3.9886,
+   "job_ms": {
+    "p50": 174.1,
+    "p95": 414.1
+   },
+   "step_ms": {
+    "p50": 52.7,
+    "p95": 59.4
+   },
+   "cpu_s_per_job": 0.257,
+   "prefetch": {
+    "warp_miss": 52,
+    "submitted": 58,
+    "warp_hit": 19,
+    "dropped": 14,
+    "warp_hit_rate": 0.268
+   },
+   "decisions_identical": true
+  },
+  {
+   "threads": 1,
+   "variant": "warp+segment",
+   "jobs": 16,
+   "steps": 71,
+   "jobs_per_s": 4.7843,
+   "job_ms": {
+    "p50": 181.8,
+    "p95": 347.2
+   },
+   "step_ms": {
+    "p50": 53.9,
+    "p95": 61.2
+   },
+   "cpu_s_per_job": 0.372,
+   "prefetch": {
+    "warp_miss": 52,
+    "submitted": 58,
+    "warp_hit": 19,
+    "seg_hit": 19,
+    "dropped": 14,
+    "warp_hit_rate": 0.268
+   },
+   "decisions_identical": true
+  },
+  {
+   "threads": 2,
+   "variant": "off",
+   "jobs": 16,
+   "steps": 71,
+   "jobs_per_s": 4.5324,
+   "job_ms": {
+    "p50": 152.0,
+    "p95": 366.9
+   },
+   "step_ms": {
+    "p50": 47.0,
+    "p95": 52.7
+   },
+   "cpu_s_per_job": 0.288,
+   "prefetch": {
+    "warp_hit_rate": null
+   },
+   "decisions_identical": true
+  },
+  {
+   "threads": 2,
+   "variant": "warp",
+   "jobs": 16,
+   "steps": 71,
+   "jobs_per_s": 4.4751,
+   "job_ms": {
+    "p50": 154.3,
+    "p95": 368.7
+   },
+   "step_ms": {
+    "p50": 47.4,
+    "p95": 53.4
+   },
+   "cpu_s_per_job": 0.296,
+   "prefetch": {
+    "warp_miss": 52,
+    "submitted": 58,
+    "warp_hit": 19,
+    "dropped": 14,
+    "warp_hit_rate": 0.268
+   },
+   "decisions_identical": true
+  },
+  {
+   "threads": 2,
+   "variant": "warp+segment",
+   "jobs": 16,
+   "steps": 71,
+   "jobs_per_s": 5.4619,
+   "job_ms": {
+    "p50": 158.3,
+    "p95": 302.7
+   },
+   "step_ms": {
+    "p50": 48.1,
+    "p95": 55.2
+   },
+   "cpu_s_per_job": 0.406,
+   "prefetch": {
+    "warp_miss": 52,
+    "submitted": 58,
+    "warp_hit": 19,
+    "seg_hit": 19,
+    "dropped": 14,
+    "warp_hit_rate": 0.268
+   },
+   "decisions_identical": true
+  },
+  {
+   "threads": 4,
+   "variant": "off",
+   "jobs": 16,
+   "steps": 71,
+   "jobs_per_s": 4.8832,
+   "job_ms": {
+    "p50": 139.5,
+    "p95": 341.6
+   },
+   "step_ms": {
+    "p50": 43.6,
+    "p95": 49.7
+   },
+   "cpu_s_per_job": 0.349,
+   "prefetch": {
+    "warp_hit_rate": null
+   },
+   "decisions_identical": true
+  },
+  {
+   "threads": 4,
+   "variant": "warp",
+   "jobs": 16,
+   "steps": 71,
+   "jobs_per_s": 4.8602,
+   "job_ms": {
+    "p50": 141.4,
+    "p95": 341.6
+   },
+   "step_ms": {
+    "p50": 44.1,
+    "p95": 50.5
+   },
+   "cpu_s_per_job": 0.356,
+   "prefetch": {
+    "warp_miss": 52,
+    "submitted": 58,
+    "warp_hit": 19,
+    "dropped": 14,
+    "warp_hit_rate": 0.268
+   },
+   "decisions_identical": true
+  },
+  {
+   "threads": 4,
+   "variant": "warp+segment",
+   "jobs": 16,
+   "steps": 71,
+   "jobs_per_s": 5.6612,
+   "job_ms": {
+    "p50": 154.1,
+    "p95": 285.7
+   },
+   "step_ms": {
+    "p50": 46.8,
+    "p95": 52.9
+   },
+   "cpu_s_per_job": 0.489,
+   "prefetch": {
+    "warp_miss": 52,
+    "submitted": 58,
+    "warp_hit": 19,
+    "seg_hit": 19,
+    "dropped": 14,
+    "warp_hit_rate": 0.268
+   },
+   "decisions_identical": true
+  }
+ ]
+}

@@ -5,11 +5,13 @@ import { countUp } from './fx.js';
 
 const SERIES = [
   ['downscale', 'downscale once', 'downscale', 'rect'],
-  ['tiling', 'exhaustive tiling', 'tiling', 'diamond'],
+  ['tiling', 'tiling (L2, L1, L0 grids)', 'tiling', 'diamond'],
   ['drishyam', 'Drishyam', 'drishyam', 'circle'],
 ];
-// The trained segmenter's Drishyam curve (evals.model_eval --publish), drawn only once its summary is published.
-const MODEL = ['model', 'Drishyam, dacl10k model', 'model', 'circle'];
+// v1's Drishyam curve on the same images (evals.model_eval --publish): the segmenter the live demo runs since 2026-10-21.
+const MODEL = ['model', 'Drishyam, v1 (the live engine)', 'model', 'circle'];
+// evals.harness.BUDGETS: the pixel caps of a summary's policies.drishyam points, in order
+const CAPS = [0.05, 0.1, 0.2, 0.3, 0.5, 1.0];
 
 const pending = (what, file, by = 'the evaluation harness') => h('div', { class: 'pending' },
   h('p', { class: 'pending__title' }, `${what} pending`),
@@ -25,6 +27,32 @@ const points = (list) => (Array.isArray(list) ? list.filter((p) => num(p?.pixels
 const interval = (r) => (Array.isArray(r) && r.length === 2 && r.every(num) ? r : null);
 const dec = (v, d = 2) => (num(v) ? v.toFixed(d) : '–');
 const pct = (v) => `${Math.round(v * 100)} %`;
+
+/** Drishyam's point at the summary's headline pixel cap (30 %), picked by cap: v1 never reads 30 % of the pixels. */
+const atCap = (s) => s?.policies?.drishyam?.[CAPS.indexOf(s?.headline_stats?.budget)];
+/** At that cap: critical boxes per photo (exposed rebar, or spalling of 40,000 px² or more), and recall of one class. */
+const critical = (s) => s?.agent_metrics?.false_accept_critical?.[`drishyam@${s?.headline_stats?.budget}`]?.critical_predictions / s?.n_images;
+const classRecall = (s, cls) => s?.per_class?.[`drishyam@${s?.headline_stats?.budget}`]?.[cls];
+
+/** v1 held out, against the classical engine on the same photos (`cl`), with every number stated before the runs
+ * beside the favourable one: chance, IoU-only, the critical boxes a person must check, and on the synthetic photos
+ * (`v1s`, `cls`) the classes it misses. Null without v1's point. */
+function v1Facts(v1, cl, v1s, cls) {
+  const p = atCap(v1);
+  const c = atCap(cl);
+  if (!p || !num(p.recall)) return null;
+  const ci = interval(p.recall_ci);
+  const out = [`recall ${dec(p.recall)}${ci ? ` (95 % CI ${dec(ci[0])}–${dec(ci[1])})` : ''} at the ${pct(v1.headline_stats.budget)} pixel cap${num(c?.recall) ? `, against the classical engine’s ${dec(c.recall)}` : ''}.`];
+  if (num(p.chance_recall)) out.push(` Its boxes at random places score ${dec(p.chance_recall)}${num(p.recall_iou_only) && num(p.chance_recall_iou_only) ? `, and with IoU-only matching it finds ${dec(p.recall_iou_only)} against ${dec(p.chance_recall_iou_only)} by chance` : ''}.`);
+  if (num(critical(v1))) out.push(` It sends ${dec(critical(v1))} critical boxes per photo to a person${num(critical(cl)) ? `, against the classical engine’s ${dec(critical(cl))}` : ''}.`);
+  const [er, ef] = ['exposed_rebar', 'efflorescence'].map((k) => classRecall(v1s, k));
+  if (num(er) && num(ef)) {
+    const [cer, cef] = ['exposed_rebar', 'efflorescence'].map((k) => classRecall(cls, k));
+    out.push(` On the synthetic photos it finds ${dec(er)} of the exposed rebar and ${dec(ef)} of the efflorescence${num(cer) && num(cef) ? `, where the classical engine finds ${dec(cer)} and ${dec(cef)}` : ''}.`);
+  }
+  out.push(' Measured with the governor off, the 512-px FP32 net on every look; live, the v1 engine keeps that net unless a step takes over 1.5 s.');
+  return out.join('');
+}
 
 function marker(kind, x, y, cls) {
   const a = { class: `mk mk--${cls}` };
@@ -69,12 +97,14 @@ function chart(policies, series = SERIES, iou = false) {
     svg('text', { class: 'chart__title', x: (L + W - R) / 2, y: H - 10, 'text-anchor': 'middle' }, NARROW.matches ? 'full-res pixels processed' : 'fraction of full-resolution pixels processed'),
     svg('text', { class: 'chart__title', transform: `translate(${NARROW.matches ? 12 : 14} ${(T + H - B) / 2}) rotate(-90)`, 'text-anchor': 'middle' }, 'defect recall'));
   const plot = svg('g', { class: 'chart__plot' });
+  const lines = svg('g');  // every line under every marker, so a later series' halo never hides an earlier point
+  plot.append(lines);
   root.append(plot);
   for (const [key, name, cls, kind] of series) {
     const pts = points(policies[key]);
     if (pts.length > 1) {
       const d = pts.map((p, i) => `${i ? 'L' : 'M'}${X(p.pixels_frac)} ${Y(p.recall)}`).join(' ');
-      plot.append(svg('path', { class: 'chart__halo', d }), svg('path', { class: `chart__line chart__line--${cls}`, d }));
+      lines.append(svg('path', { class: 'chart__halo', d }), svg('path', { class: `chart__line chart__line--${cls}`, d }));
     }
     for (const p of pts) {
       const x = X(p.pixels_frac);
@@ -155,8 +185,8 @@ function versusDownscale(hs) {
 }
 
 /** Hero chips, each a measured fact with its caveat, every pixel figure a share of the image's own pixels.
- * `real` (CODEBRIM) fills #stat-real when the page has that slot. */
-function heroChips(sum, real) {
+ * #stat-real holds v1 on CODEBRIM (`v1`: {real, synth}, its summaries) when published, else `real` (the classical runs). */
+function heroChips(sum, real, v1) {
   // Exhaustive tiling (the most pixels) is the PRD's reference point for the headline ratio.
   const tiling = points(sum.policies?.tiling).pop();
   const hs = sum.headline_stats ?? {};
@@ -178,13 +208,17 @@ function heroChips(sum, real) {
     const target = hs.target?.recall_ratio;
     const ds = interval(hs.recall_ratio_vs_downscale_ci);
     const vsDown = !ds ? '' : ds[0] > 1 ? ' It beats one downscaled pass' : ds[1] < 1 ? ' One downscaled pass does better' : ' One downscaled pass does about as well';
-    fill('stat-recall', `Synthetic test set${num(sum.n_images) ? ` (${sum.n_images} photos)` : ''}`, Math.round(100 * ratio), { suffix: ' %' },
-      `of what checking every tile finds, reading ${pct(drishyam.pixels_frac)} of the image's pixels (tiling reads ${pct(tiling.pixels_frac)}${tiling.pixels_frac > 1 ? ': its tiles overlap' : ''}).`
+    fill('stat-recall', `Classical engine, synthetic test set${num(sum.n_images) ? ` (${sum.n_images} photos)` : ''}`, Math.round(100 * ratio), { suffix: ' %' },
+      `of what checking every tile finds, reading ${pct(drishyam.pixels_frac)} of the image's pixels${num(hs.budget) ? ` under the ${pct(hs.budget)} pixel cap` : ''} (tiling reads ${pct(tiling.pixels_frac)}${tiling.pixels_frac > 1 ? ': its tiles overlap' : ''}).`
       + `${num(target) ? ` Target was ${pct(target)}: ${ratio >= target ? 'met' : 'missed'}.` : ''}`
       + `${vsDown ? `${vsDown} (${dec(hs.recall_ratio_vs_downscale)}×, 95 % CI ${dec(ds[0])}–${dec(ds[1])}).` : ''}`);
   }
+  const facts = v1Facts(v1?.real, real, v1?.synth, sum);
   const rd = headline(real?.policies);
-  if (rd) {
+  if (facts) {
+    fill('stat-real', `Live engine (v1), real bridge photos (CODEBRIM${num(v1.real.n_images) ? `, ${v1.real.n_images}` : ''})`,
+      atCap(v1.real).recall, { decimals: 2, prefix: 'recall ' }, facts[0].toUpperCase() + facts.slice(1));
+  } else if (rd) {
     const others = [...points(real.policies.downscale), ...points(real.policies.tiling)].map((p) => p.recall);
     const [lo, hi] = [Math.min(rd.recall, ...others), Math.max(rd.recall, ...others)];
     const mid = (lo + hi) / 2;
@@ -198,17 +232,24 @@ function heroChips(sum, real) {
     if (plain) fill('stat-real', key, Math.round(1 / mid), { prefix: 'about 1 in ' }, `defects found by every method, ours included.${chance}${strict}${why}`);
     else fill('stat-real', key, rd.recall, { decimals: 2, prefix: 'recall ' }, `ours; the other methods ${dec(Math.min(...others))}–${dec(Math.max(...others))}.${chance}${strict}${why}`);
   }
-  // The uncapped run: where the stop rule (value per ms) ended the job by itself, and how often the headline cap binds first.
+  // Two caps, each named: at a 100 % pixel cap (none below the whole image) the stop rule (value per ms) ends the job
+  // by itself; at the headline's cap, the cap binds first. by_budget is keyed by the pixel cap ("1.0", "0.3").
   const am = sum.agent_metrics ?? {};
   const uncapped = points(sum.policies?.drishyam).pop();
   const total = (halts) => Object.values(halts).reduce((a, b) => a + b, 0);
   const halts = am.by_budget?.['1.0']?.halt_causes;
   const capped = am.by_budget?.[String(hs.budget)]?.halt_causes;
+  // every halt cause is counted, so the numbers add up: "exhausted" is a job that had looked at every candidate
+  const other = (h) => Object.entries(h).filter(([k, n]) => n && !['stop-rule', 'cap-hit'].includes(k))
+    .map(([k, n]) => `${n} ${k === 'exhausted' ? 'had looked at every candidate' : `stopped on ${k}`}`);
   if (uncapped && halts) {
     const stops = halts['stop-rule'] ?? 0;
-    fill('stat-cost', stops * 2 >= total(halts) ? 'Stops on its own' : 'Uncapped run', stops, { suffix: ` of ${total(halts)} jobs` },
-      `uncapped, at ${pct(uncapped.pixels_frac)} of the image's pixels on average, the stop rule ended them when the next look was worth less than it cost`
-      + `${capped ? `; under the ${pct(hs.budget)} cap the cap binds first (${capped['cap-hit'] ?? 0} of ${total(capped)})` : ''}`);
+    const rest = [halts['cap-hit'] && `${halts['cap-hit']} hit a time, $ or step cap`, ...other(halts)].filter(Boolean);
+    const at = capped && [`a cap ended ${capped['cap-hit'] ?? 0} of ${total(capped)} first`, `the stop rule ${capped['stop-rule'] ?? 0}`, ...other(capped)];
+    fill('stat-cost', `Classical engine, no pixel cap (100 %): ${stops * 2 >= total(halts) ? 'stops on its own' : 'the stop rule'}`, stops, { suffix: ` of ${total(halts)} jobs` },
+      `the stop rule ended them when the next look was worth less than it cost, at ${pct(uncapped.pixels_frac)} of the image's pixels on average`
+      + `${rest.length ? `; the other ${rest.join(', ')}` : ''}.`
+      + `${at ? ` At the ${pct(hs.budget)} pixel cap of the headline: ${at.slice(0, -1).join(', ')}, and ${at.at(-1)}.` : ''}`);
   }
   // Agentic evidence: injected planner and governor faults, and how many the agent recovered from.
   const fired = (am.planner_recovery?.timeout?.fired ?? 0) + (am.planner_recovery?.malformed?.fired ?? 0) + (am.governor_response?.fired ?? 0);
@@ -225,26 +266,29 @@ const busy = (prov) => {
   return Array.isArray(prov?.load_avg) && cpus > 0 && prov.load_avg[0] >= cpus;
 };
 
-/** Where a summary's timings were taken, in plain words. The published runs are from a busy x86 laptop, not Graviton. */
+/** Where a summary's jobs ran, in plain words. The published runs ran on a busy x86 laptop, charged the fixed costs
+ * (and showing the micro-benchmarks) of GitHub's arm64 runner; neither is Graviton. */
 function place(prov) {
   const machine = String(prov?.machine ?? '');
   if (!/^Darwin .*x86_64/.test(machine)) return machine;
   const cpu = String(prov.cpu ?? '').replace(/\((R|TM)\)| Core| CPU.*$/g, '');  // "Intel(R) Core(TM) i9-9880H CPU @ 2.30GHz" -> "Intel i9-9880H"
-  return `local x86 laptop${cpu ? ` (${cpu})` : ''}${busy(prov) ? ', under load' : ''}`;
+  const arm = /micro arm linux-aarch64/.test(machine) ? '; costs and micro-benchmarks from GitHub’s arm64 runner' : '';
+  return `local x86 laptop${cpu ? ` (${cpu})` : ''}${busy(prov) ? ', under load' : ''}${arm}`;
 }
 
-/** `extra` (optional) adds lines to the folded provenance block. */
+/** `model` (optional): {sum, text}, v1's summary on the same images, drawn dashed, and what its note says.
+ * `extra` (optional) adds lines to the folded provenance block. */
 function renderBench(sum, id, file, note, model, iou = false, extra = null) {
   const root = $(`#${id}`);
   if (!sum?.policies) return root.replaceChildren(pending('benchmarks', file));
   const prov = Object.entries(sum.provenance ?? {});
   const micro = Array.isArray(sum.micro) && sum.micro.length;
   const where = place(sum.provenance);
-  const withModel = points(model?.policies?.drishyam).length > 0;
+  const withModel = points(model?.sum?.policies?.drishyam).length > 0;
   const series = withModel ? [...SERIES, MODEL] : SERIES;
-  const policies = withModel ? { ...sum.policies, model: model.policies.drishyam } : sum.policies;
+  const policies = withModel ? { ...sum.policies, model: model.sum.policies.drishyam } : sum.policies;
   const plot = h('div', {}, chart(policies, series, iou), legend(series), marks(policies, series, iou), dataTable(policies, series),
-    withModel ? h('p', { class: 'note' }, `Dashed red: Drishyam with the trained segmenter (${String(model.segmenter ?? 'ONNX')}) on the same images; the other lines use the classical one.`) : null);
+    withModel ? h('p', { class: 'note' }, `Dashed red: Drishyam with v1, the dacl10k-trained segmenter the live demo runs since 2026-10-21, on the same images; the other lines use the classical engine.${model.text ? ` v1 held out: ${model.text}` : ''}`) : null);
   NARROW.addEventListener('change', () => plot.firstElementChild.replaceWith(chart(policies, series, iou)));
   root.replaceChildren(h('div', { class: 'stack' },
     h('p', { class: 'dataset' }, h('span', { class: 'dataset__k' }, 'dataset'), h('b', {}, String(sum.dataset ?? 'unlabelled'))),
@@ -269,10 +313,10 @@ function realNote(sum) {
   const all = SERIES.flatMap(([key]) => points(sum.policies[key]));
   const top = (f) => Math.max(...all.map((p) => p[f]).filter(num));
   const chance = top('chance_recall');
-  return h('p', { class: 'note' }, `The best recall of any policy on these photos is ${best.toFixed(2)}`,
+  return h('p', { class: 'note' }, `With the classical segmenter, the best recall of any policy on these photos is ${best.toFixed(2)}`,
     strict.length ? ` (${Math.max(...strict).toFixed(2)} when a match needs IoU ≥ 0.3, the stricter rule, reported alongside)` : '',
     Number.isFinite(chance) ? `; each policy’s own boxes at random places already score up to ${chance.toFixed(2)} (${top('chance_recall_iou_only').toFixed(2)} with IoU only), so much of the lenient score is chance` : '',
-    '. Here the classical segmenter, tuned on synthetic images, limits recall more than where the agent looks; a trained model is the next step.');
+    '. Here that segmenter, tuned on synthetic images, limits recall more than where the agent looks.');
 }
 
 /** FIG. 4.1's footnotes: the CODEBRIM-sized synthetic set and the run on measured wall time, when published. */
@@ -364,12 +408,15 @@ function realFailures(real, n) {
 }
 
 export async function initResults() {
-  // The trained segmenter's summaries (results/synth_dacl10k, results/codebrim_dacl10k) are not published yet; pass
-  // them as renderBench's `model` once they are. COOL was not run, so FIG. 4.3 is static text.
-  const [sum, real, fails, realFails, large, live] = await Promise.all(
+  // v1's held-out summaries on the same images are drawn as the dashed model line. COOL was not run, so FIG. 4.3 is
+  // static text.
+  const [sum, real, fails, realFails, large, live, v1synth, v1real] = await Promise.all(
     ['results/summary.json', 'results/codebrim/summary.json', 'results/failures.json',
-      'results/codebrim/failures_text.json', 'results/large/summary.json', 'results/live/summary.json'].map(getJSON));
-  if (renderBench(sum, 'bench', 'results/summary.json', () => synthNotes(large, live), null, false, liveLoad(live))) heroChips(sum, real);
-  renderBench(real, 'bench-real', 'results/codebrim/summary.json', realNote, null, true);
+      'results/codebrim/failures_text.json', 'results/large/summary.json', 'results/live/summary.json',
+      'results/synth_dacl10k/summary.json', 'results/codebrim_dacl10k/summary.json'].map(getJSON));
+  const v1 = { synth: v1synth, real: v1real };
+  if (renderBench(sum, 'bench', 'results/summary.json', () => synthNotes(large, live), { sum: v1synth, text: v1Facts(v1synth, sum, v1synth, sum) },
+    false, liveLoad(live))) heroChips(sum, real, v1);
+  renderBench(real, 'bench-real', 'results/codebrim/summary.json', realNote, { sum: v1real, text: v1Facts(v1real, real, v1synth, sum) }, true);
   renderFailures(fails, realFails);
 }

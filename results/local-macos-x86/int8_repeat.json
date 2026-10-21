@@ -1,0 +1,279 @@
+{
+ "arm": "local-macos-x86",
+ "config": {
+  "calibration_crops": 8,
+  "eval_crops": 20,
+  "repeats": 20,
+  "crops": "bench.parity.make_crops (evals.synth seeds 9000-9027, 512 px)",
+  "all_threads": 16
+ },
+ "provenance": {
+  "cv2": "5.0.0",
+  "build_info_sha256": "fe5f9337dbc8663639ee7bcb2deb09359893fc8d2aa5b6a447cee2a0117d2ec7",
+  "cv2_baseline": "SSE SSE2 SSE3 SSSE3 SSE4_1",
+  "cv2_dispatch": "SSE4_2 AVX FP16 AVX2 AVX512_SKX",
+  "cv2_parallel_framework": "GCD",
+  "cv2_custom_hal": "YES (ipp (ver 0.0.1))",
+  "cv2_file": "/Users/mac/Documents/Projects/opencv/.claude/worktrees/wf_63705f18-04c-2/.venv/lib/python3.13/site-packages/cv2/__init__.py",
+  "under_opt_cool": false,
+  "build": "stock (not COOL)",
+  "machine": "Darwin 25.6.0 x86_64",
+  "platform": "macOS-26.7.1-x86_64-i386-64bit-Mach-O",
+  "cpu": "Intel(R) Core(TM) i9-9880H CPU @ 2.30GHz",
+  "logical_cpus": 16,
+  "cv2_threads": 16,
+  "python": "3.13.16",
+  "numpy": "2.5.4",
+  "timestamp": "2026-10-19T06:47:55Z",
+  "load_avg": [
+   15.43,
+   12.87,
+   12.11
+  ]
+ },
+ "load_avg_end": [
+  12.35,
+  12.34,
+  12.06
+ ],
+ "models": {
+  "fp32/new": {
+   "how": "the trained model",
+   "path": "/Users/mac/Documents/Projects/opencv/models/drishyam_dacl10k.onnx",
+   "bytes": 26810816,
+   "op_types": {
+    "Conv": 73,
+    "Relu": 29,
+    "HardSwish": 20,
+    "Gather": 15,
+    "Unsqueeze": 10,
+    "Concat": 10,
+    "Add": 10,
+    "Mul": 9,
+    "ReduceMean": 8,
+    "HardSigmoid": 8,
+    "Shape": 5,
+    "Resize": 5
+   },
+   "engine": "new",
+   "runs": true,
+   "forward512_threads1": {
+    "n": 20,
+    "p50_ms": 786.631,
+    "p95_ms": 871.261,
+    "mean_ms": 788.622
+   },
+   "forward512_threads16": {
+    "n": 20,
+    "p50_ms": 203.727,
+    "p95_ms": 220.661,
+    "mean_ms": 204.878
+   },
+   "vs_fp32_new": "reference"
+  },
+  "fp32/classic": {
+   "how": "the trained model",
+   "path": "/Users/mac/Documents/Projects/opencv/models/drishyam_dacl10k.onnx",
+   "bytes": 26810816,
+   "op_types": {
+    "Conv": 73,
+    "Relu": 29,
+    "HardSwish": 20,
+    "Gather": 15,
+    "Unsqueeze": 10,
+    "Concat": 10,
+    "Add": 10,
+    "Mul": 9,
+    "ReduceMean": 8,
+    "HardSigmoid": 8,
+    "Shape": 5,
+    "Resize": 5
+   },
+   "engine": "classic",
+   "runs": false,
+   "error": "OpenCV(5.0.0) /Users/macmini_16g/GHA-Actions-Opencv-Python/_work/opencv-python/opencv-python/opencv/modules/dnn/src/onnx/onnx_importer.cpp:1114: error: (-2:Unspecified error) in function 'handleNode'\n> Node [Shape@ai.onnx]:(onnx_node!/net/decoder/Shape) parse error: OpenCV(5.0.0) /Users/macmini_16g/GHA-Actions-Opencv-Python/_work/opencv-python/opencv-python/opencv/modules/dnn/src/onnx/onnx_importer.cpp:2591: error: (-215:Assertion failed) !isDynamicShape in function 'parseShape'\n>"
+  },
+  "dynamic/new": {
+   "how": "quantize_dynamic, int8 weights (per tensor)",
+   "path": "/private/tmp/claude-501/-Users-mac-Documents-Projects-opencv/0ed93332-e823-4881-ae9a-69d6f46d2a07/scratchpad/int8rep/work/int8_dynamic.onnx",
+   "bytes": 6988054,
+   "op_types": {
+    "Mul": 155,
+    "Add": 83,
+    "DynamicQuantizeLinear": 73,
+    "Reshape": 73,
+    "ConvInteger": 73,
+    "Cast": 73,
+    "Relu": 29,
+    "HardSwish": 20,
+    "Gather": 15,
+    "Unsqueeze": 10,
+    "Concat": 10,
+    "ReduceMean": 8
+   },
+   "engine": "new",
+   "runs": false,
+   "error": "OpenCV(5.0.0) /Users/macmini_16g/GHA-Actions-Opencv-Python/_work/opencv-python/opencv-python/opencv/modules/dnn/src/net.cpp:80: error: (-215:Assertion failed) !empty() in function 'forward'"
+  },
+  "dynamic/classic": {
+   "how": "quantize_dynamic, int8 weights (per tensor)",
+   "path": "/private/tmp/claude-501/-Users-mac-Documents-Projects-opencv/0ed93332-e823-4881-ae9a-69d6f46d2a07/scratchpad/int8rep/work/int8_dynamic.onnx",
+   "bytes": 6988054,
+   "op_types": {
+    "Mul": 155,
+    "Add": 83,
+    "DynamicQuantizeLinear": 73,
+    "Reshape": 73,
+    "ConvInteger": 73,
+    "Cast": 73,
+    "Relu": 29,
+    "HardSwish": 20,
+    "Gather": 15,
+    "Unsqueeze": 10,
+    "Concat": 10,
+    "ReduceMean": 8
+   },
+   "engine": "classic",
+   "runs": false,
+   "error": "OpenCV(5.0.0) /Users/macmini_16g/GHA-Actions-Opencv-Python/_work/opencv-python/opencv-python/opencv/modules/dnn/src/onnx/onnx_importer.cpp:1114: error: (-2:Unspecified error) in function 'handleNode'\n> Node [DynamicQuantizeLinear@ai.onnx]:(onnx_node!input_QuantizeLinear) parse error: OpenCV(5.0.0) /Users/macmini_16g/GHA-Actions-Opencv-Python/_work/opencv-python/opencv-python/opencv/modules/dnn/src/net_impl.hpp:187: error: (-2:Unspecified error) Can't create layer \"onnx_node!input_QuantizeLinear\" of type \"DynamicQuantizeLinear\" in function 'getLayerInstance'\n>"
+  },
+  "static_qdq/new": {
+   "how": "quantize_static QDQ, int8 weights per channel, uint8 activations",
+   "path": "/private/tmp/claude-501/-Users-mac-Documents-Projects-opencv/0ed93332-e823-4881-ae9a-69d6f46d2a07/scratchpad/int8rep/work/int8_static_qdq.onnx",
+   "bytes": 7251679,
+   "op_types": {
+    "DequantizeLinear": 317,
+    "QuantizeLinear": 170,
+    "Conv": 73,
+    "Mul": 29,
+    "HardSigmoid": 28,
+    "Gather": 15,
+    "Unsqueeze": 10,
+    "Concat": 10,
+    "Add": 10,
+    "ReduceMean": 8,
+    "Shape": 5,
+    "Resize": 5
+   },
+   "engine": "new",
+   "runs": true,
+   "forward512_threads1": {
+    "n": 20,
+    "p50_ms": 1894.647,
+    "p95_ms": 2000.139,
+    "mean_ms": 1872.431
+   },
+   "forward512_threads16": {
+    "n": 20,
+    "p50_ms": 664.764,
+    "p95_ms": 780.595,
+    "mean_ms": 673.369
+   },
+   "vs_fp32_new": {
+    "crops": 20,
+    "pixel_agreement": 0.99289,
+    "worst_crop_agreement": 0.962959,
+    "class_iou": {
+     "background": 0.993109,
+     "crack": 0.369812,
+     "spalling": 0.829852,
+     "efflorescence": null,
+     "exposed_rebar": null,
+     "corrosion": 0.87103
+    },
+    "identical_crops": 3
+   }
+  },
+  "static_qdq/classic": {
+   "how": "quantize_static QDQ, int8 weights per channel, uint8 activations",
+   "path": "/private/tmp/claude-501/-Users-mac-Documents-Projects-opencv/0ed93332-e823-4881-ae9a-69d6f46d2a07/scratchpad/int8rep/work/int8_static_qdq.onnx",
+   "bytes": 7251679,
+   "op_types": {
+    "DequantizeLinear": 317,
+    "QuantizeLinear": 170,
+    "Conv": 73,
+    "Mul": 29,
+    "HardSigmoid": 28,
+    "Gather": 15,
+    "Unsqueeze": 10,
+    "Concat": 10,
+    "Add": 10,
+    "ReduceMean": 8,
+    "Shape": 5,
+    "Resize": 5
+   },
+   "engine": "classic",
+   "runs": false,
+   "error": "OpenCV(5.0.0) /Users/macmini_16g/GHA-Actions-Opencv-Python/_work/opencv-python/opencv-python/opencv/modules/dnn/src/onnx/onnx_importer.cpp:1114: error: (-2:Unspecified error) in function 'handleNode'\n> Node [Shape@ai.onnx]:(onnx_node!/net/decoder/Shape) parse error: OpenCV(5.0.0) /Users/macmini_16g/GHA-Actions-Opencv-Python/_work/opencv-python/opencv-python/opencv/modules/dnn/src/onnx/onnx_importer.cpp:2591: error: (-215:Assertion failed) !isDynamicShape in function 'parseShape'\n>"
+  },
+  "static_qoperator/new": {
+   "how": "quantize_static QOperator, int8 weights per tensor, uint8 activations",
+   "path": "/private/tmp/claude-501/-Users-mac-Documents-Projects-opencv/0ed93332-e823-4881-ae9a-69d6f46d2a07/scratchpad/int8rep/work/int8_static_qoperator.onnx",
+   "bytes": 6920788,
+   "op_types": {
+    "QLinearConv": 73,
+    "QuantizeLinear": 43,
+    "DequantizeLinear": 42,
+    "QLinearMul": 29,
+    "HardSigmoid": 28,
+    "Gather": 15,
+    "Unsqueeze": 10,
+    "QLinearAdd": 10,
+    "ReduceMean": 8,
+    "Shape": 5,
+    "Concat": 5,
+    "Resize": 5
+   },
+   "engine": "new",
+   "runs": true,
+   "forward512_threads1": {
+    "n": 20,
+    "p50_ms": 2098.983,
+    "p95_ms": 2435.044,
+    "mean_ms": 2103.612
+   },
+   "forward512_threads16": {
+    "n": 20,
+    "p50_ms": 630.653,
+    "p95_ms": 717.248,
+    "mean_ms": 651.106
+   },
+   "vs_fp32_new": {
+    "crops": 20,
+    "pixel_agreement": 0.969652,
+    "worst_crop_agreement": 0.912849,
+    "class_iou": {
+     "background": 0.969572,
+     "crack": 0.517557,
+     "spalling": 0.137086,
+     "efflorescence": null,
+     "exposed_rebar": null,
+     "corrosion": 0.140837
+    },
+    "identical_crops": 3
+   }
+  },
+  "static_qoperator/classic": {
+   "how": "quantize_static QOperator, int8 weights per tensor, uint8 activations",
+   "path": "/private/tmp/claude-501/-Users-mac-Documents-Projects-opencv/0ed93332-e823-4881-ae9a-69d6f46d2a07/scratchpad/int8rep/work/int8_static_qoperator.onnx",
+   "bytes": 6920788,
+   "op_types": {
+    "QLinearConv": 73,
+    "QuantizeLinear": 43,
+    "DequantizeLinear": 42,
+    "QLinearMul": 29,
+    "HardSigmoid": 28,
+    "Gather": 15,
+    "Unsqueeze": 10,
+    "QLinearAdd": 10,
+    "ReduceMean": 8,
+    "Shape": 5,
+    "Concat": 5,
+    "Resize": 5
+   },
+   "engine": "classic",
+   "runs": false,
+   "error": "OpenCV(5.0.0) /Users/macmini_16g/GHA-Actions-Opencv-Python/_work/opencv-python/opencv-python/opencv/modules/dnn/src/onnx/onnx_importer.cpp:1114: error: (-2:Unspecified error) in function 'handleNode'\n> Node [Shape@ai.onnx]:(onnx_node!/net/decoder/Shape) parse error: OpenCV(5.0.0) /Users/macmini_16g/GHA-Actions-Opencv-Python/_work/opencv-python/opencv-python/opencv/modules/dnn/src/onnx/onnx_importer.cpp:2591: error: (-215:Assertion failed) !isDynamicShape in function 'parseShape'\n>"
+  }
+ }
+}

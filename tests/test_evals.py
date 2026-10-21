@@ -252,8 +252,12 @@ def test_ablations_assert_each_variant_ran_its_switches(tmp_path):
     doc = json.loads((tmp_path / "pub" / "ablations.json").read_text())
     assert doc["datasets"] == {"abl": json.loads(json.dumps(entry))} and "NaN" not in json.dumps(doc)
     rows = entry["by_cap"]["1.0"]
-    assert set(rows) == set(harness.ABLATIONS) == set(entry["variants"]) and len(harness.ABLATIONS) == 8  # full + 7
+    assert set(rows) == set(harness.ABLATIONS) == set(entry["variants"]) and len(harness.ABLATIONS) == 12  # full + 11
     assert rows["full"]["ratio_vs_full"] == 1.0 and rows["full"]["vs_full"] == "no measurable difference"
+    # a score term moves the stop floor too: its floor-free twin is scored against no-floor, and every row says how it ended
+    for v in ("no-seed+no-floor", "no-uncertainty+no-floor"):
+        assert rows[v]["ref"] == "no-floor" and len(rows[v]["ratio_vs_ref_ci"]) == 2 and "vs_ref" in rows[v]
+    assert all(sum(r["halt_causes"].values()) == 1 for r in rows.values()) and "no-floor" in entry["coupling"]
     assert rows["no-verify"]["verify_looks"] == rows["no-survey"]["survey_looks"] == 0
     assert set(rows["no-survey"]["model_usage"]) == {"accurate"} and len(rows["full"]["ratio_vs_full_ci"]) == 2
     assert entry["variants"]["random-order-s2"] == {**harness.switches("full"), "order": "random", "seed": 2}
@@ -270,6 +274,29 @@ def test_ablations_assert_each_variant_ran_its_switches(tmp_path):
     cfg["trace"].insert(0, {"action": "gaze", "cause": "survey"})  # right switches, but the trace has a survey look
     with pytest.raises(SystemExit, match="trace shows a look"):
         harness.check_variants(saved, (1.0,))
+    cfg["trace"].pop(0)
+    harness.check_variants(saved, (1.0,))
+    saved[0]["configs"]["no-seed@1.0"]["trace"][0]["seeded"] = 2  # labelled no-seed, but a look seeded candidates
+    with pytest.raises(SystemExit, match="trace shows a look"):
+        harness.check_variants(saved, (1.0,))
+
+
+def test_no_seed_and_no_floor_ablations_switch_one_term_off_and_change_the_run(scene):
+    """'no-seed' (no look seeds an unvisited candidate) and 'no-floor' (v0 = 0: lambda is 0 until something is found)
+    each flip one switch, and each changes what the agent does: without seeds the argmax order changes; without the
+    floor a photo with nothing to find runs on to its cap or until every candidate is looked at."""
+    from drishyam.agent import JobConfig
+
+    full = harness.switches("full")
+    assert harness.switches("no-seed") == {**full, "seed_from_looks": False} and full["seed_from_looks"] is True
+    assert harness.switches("no-floor") == {**full, "v0": 0.0} and full["v0"] == JobConfig().v0 > 0
+    looks = lambda out: [(t["action"], t["x"], t["y"], t["level"]) for t in out["trace"]]
+    full_run, no_seed = (harness.run_drishyam(scene, 1.0, **harness.ABLATIONS[v]) for v in ("full", "no-seed"))
+    assert no_seed["switches"] == harness.switches("no-seed") and looks(no_seed) != looks(full_run)
+    clean = synth.render(2, 1600, 1200, {"distractors": ["water_stain"]})[0]  # nothing to find
+    full_run, no_floor = (harness.run_drishyam(clean, 1.0, **harness.ABLATIONS[v]) for v in ("full", "no-floor"))
+    assert no_floor["switches"] == harness.switches("no-floor") and full_run["halt_cause"] == "stop-rule"
+    assert len(looks(no_floor)) > len(looks(full_run)) and no_floor["halt_cause"] != "stop-rule"
 
 
 def test_random_order_matches_only_inside_the_margin():
@@ -566,6 +593,8 @@ def test_model_eval_refuses_a_mislabelled_confounded_or_other_data_arm(tmp_path)
         model_eval.check(slow, "onnx:m.onnx", "runs/model-eval/onnx-synth")
     assert model_eval.same_data(ok, {**ok}) and not model_eval.same_data(ok, {**ok, "provenance": {**data, "dataset_gt_sha256": "c"}})
     assert not model_eval.same_data({"provenance": {}}, {"provenance": {}})  # unhashed summaries never match
+    arm64 = {"cost_model": {"kind": "fixed", "source": "results/linux-aarch64/micro.json job_ops (p50 ms per call)"}}
+    assert model_eval.same_costs(arm64, "linux-aarch64") and not model_eval.same_costs(arm64, "local-macos-x86")
     leak = tmp_path / "leakage.json"
     leak.write_text(json.dumps({"skipped": "no dacl10k images under x"}))
     with pytest.raises(SystemExit, match="refusing to publish a CODEBRIM number"):
@@ -580,6 +609,103 @@ def test_model_eval_refuses_a_mislabelled_confounded_or_other_data_arm(tmp_path)
     (cb / "eval200.txt").write_text("image_0000001.jpg\n")
     with pytest.raises(SystemExit, match="needs the dacl10k leakage check"):  # refused before anything runs
         model_eval.main(["--onnx", str(onnx), "--codebrim", str(cb), "--publish"])
+
+
+def test_model_eval_costs_charges_the_committed_table_and_scores_classical_once(tmp_path, monkeypatch):
+    """--costs ARM times nothing (the committed table is not overwritten) and charges ARM; the classical side runs on
+    this machine's classical table once, and the next model reuses it; another machine's or another net's table is refused."""
+    from evals import model_eval
+
+    data = {"dataset_gt_sha256": "a" * 64, "dataset_images_sha256": "b" * 64}
+    for m, t in (("dacl10k", "mac-dacl10k-retime"), ("dacl10k_v2a", "mac-dacl10k_v2a")):
+        (tmp_path / "models" / f"drishyam_{m}.onnx").parent.mkdir(exist_ok=True)
+        (tmp_path / "models" / f"drishyam_{m}.onnx").write_bytes(b"")
+        (tmp_path / "results" / t).mkdir(parents=True)
+        (tmp_path / "results" / t / "micro.json").write_text(
+            json.dumps({"job_ops": {"segmenter": f"onnx:drishyam_{m}.onnx"}}))
+    (tmp_path / "public" / "results").mkdir(parents=True)  # the published classical run was charged the arm64 table
+    pub = {"segmenter": "classical-v1", "n_images": 3, "cost_model": {"kind": "fixed", "source": "results/linux-aarch64/micro.json"}}
+    (tmp_path / "public" / "results" / "summary.json").write_text(json.dumps(pub))
+    calls = []
+
+    def run(cmd, env, cwd, check):
+        calls.append(cmd)
+        arm, out = cmd[cmd.index("--micro-arm") + 1], Path(cmd[cmd.index("--out") + 1])
+        out.mkdir(parents=True, exist_ok=True)
+        seg = f"onnx:{Path(env['DRISHYAM_ONNX']).name}" if "DRISHYAM_ONNX" in env else "classical-v1"
+        (out / "summary.json").write_text(json.dumps({
+            "segmenter": seg, "n_images": 3, "provenance": data, "agent_config": {"governor": False},
+            "cost_model": {"kind": "fixed", "source": f"results/{arm}/micro.json job_ops (p50 ms per call)"}}))
+
+    monkeypatch.setattr(model_eval, "REPO", tmp_path)
+    monkeypatch.setattr(model_eval.subprocess, "run", run)
+    monkeypatch.setattr(model_eval, "table", lambda *a: None)
+    argv = ["--codebrim", str(tmp_path / "none"), "--n", "3", "--micro-arm", "mac", "--workers", "6"]
+    model_eval.main(["--onnx", "models/drishyam_dacl10k.onnx", "--costs", "mac-dacl10k-retime", *argv])
+    model_eval.main(["--onnx", "models/drishyam_dacl10k_v2a.onnx", "--costs", "mac-dacl10k_v2a", *argv])
+    assert not any("bench.micro" in c for c in calls)
+    assert [(Path(c[c.index("--out") + 1]).name, c[c.index("--micro-arm") + 1]) for c in calls] == [
+        ("onnx-synth", "mac-dacl10k-retime"), ("classical-synth", "mac"), ("onnx-v2a-synth", "mac-dacl10k_v2a")]
+    with pytest.raises(SystemExit, match="must be a mac table that timed onnx:drishyam_dacl10k_v2a.onnx"):  # another net's
+        model_eval.main(["--onnx", "models/drishyam_dacl10k_v2a.onnx", "--costs", "mac-dacl10k-retime", *argv])
+    with pytest.raises(SystemExit, match="must be a linux table"):  # the classical side would be charged another machine
+        model_eval.main(["--onnx", "models/drishyam_dacl10k.onnx", "--costs", "mac-dacl10k-retime", *argv[:4], "--micro-arm", "linux"])
+    assert len(calls) == 3
+
+
+def test_heldout_reads_each_pair_in_both_directions_by_the_dev_criterion():
+    """A ratio CI wholly below 1 is A's loss, wholly above B's (inverted); on the clean set a difference CI wholly above
+    0 is A's harm; critical boxes and ms are costs where higher is worse; a CI that touches the null is no verdict."""
+    from evals import heldout
+
+    pairs = {"codebrim@0.3: v1 / v2a": {"recall": [1.2, [1.1, 1.3]], "iou_only": [1.0, [0.9, 1.1]],
+                                        "critical": [1.5, [1.2, 1.8]], "ms": [0.9, [0.8, 0.95]]},
+             "synth@0.3: v1 / v2a": {"recall": [0.95, [0.9, 1.0]], "iou_only": [1.0, [0.9, 1.1]]},
+             "clean@0.3: v1 / v2a": {"boxes_per_photo_diff": [-0.5, [-0.9, -0.1]], "any_box_share_diff": [0.0, [-0.1, 0.1]],
+                                     "critical": [9.0, [2.0, 20.0]], "ms": [1.0, [0.9, 1.1]]}}
+    assert heldout.verdicts(pairs) == {"v1 vs v2a": {"codebrim": "better", "synth": "same", "clean_harm": False},
+                                       "v2a vs v1": {"codebrim": "worse", "synth": "same", "clean_harm": True}}
+    crit, other = heldout.losses(pairs)
+    assert crit["v1"] == [] and crit["v2a"] == ["codebrim@0.3 recall x0.833 (CI 0.77-0.91) against v1",
+                                                "clean@0.3 +0.500 boxes per clean photo (CI +0.100 to +0.900) against v1"]
+    assert other["v1"] == ["codebrim@0.3 critical boxes per photo x1.500 (CI 1.20-1.80) against v2a"]  # not on the clean set
+    assert other["v2a"] == ["codebrim@0.3 modelled ms per job x1.111 (CI 1.05-1.25) against v1"]
+
+
+def test_heldout_docs_quote_the_json():
+    """docs/report.md holds the held-out tables and verdict as evals.heldout renders them from
+    results/heldout_models.json, and the numbers its prose and README.md quote are the JSON's."""
+    from evals import heldout
+
+    out = json.loads((heldout.REPO / "results" / "heldout_models.json").read_text())
+    report, readme = ((heldout.REPO / f).read_text() for f in ("docs/report.md", "README.md"))
+    assert all(t in report for t in heldout.markdown(out).split("\n\n")) and out["dev_choice"]["statement"] in report
+    assert out["dev_choice"]["confirms"] is True and "Held-out confirms the dev choice" in readme
+    t, p, ci = out["table"], out["pairs"], lambda c: f"{c[0]:.2f}–{c[1]:.2f}"
+    v1, cl = t["codebrim@0.3"]["v1"], t["codebrim@0.3"]["classical-v1"]
+    r, s = p["codebrim@0.3: v1 / classical-v1"]["recall"], (lambda m: p[f"synth@0.3: v1 / {m}"]["recall"])
+    crit = [t["codebrim@0.3"][m]["critical_per_image"] for m in ("v1", "v2a", "v2b")]
+    clean = {m: round(t["clean@0.3"][m]["images_with_any"] * 51) for m in ("v1", "v2a", "v2b")}
+    leak = out["leakage"]
+    assert f"{r[0]:.2f}× its recall on CODEBRIM ({v1['recall']:.3f} against {cl['recall']:.3f}, 95 % CI {ci(r[1])}" in report
+    assert f"{r[0]:.2f}× ({ci(r[1])}" in readme and f"{v1['recall']:.2f} of the 200 CODEBRIM photos' defects (95 % CI {ci(v1['recall_ci'])})" in readme
+    assert f"({s('v2a')[0]:.2f}×, {ci(s('v2a')[1])}; {s('v2b')[0]:.2f}×, {ci(s('v2b')[1])})" in report
+    assert f"v1 is {s('v2a')[0]:.2f}× and {s('v2b')[0]:.2f}× them" in readme
+    assert all(f"({crit[0]:.2f} against {crit[1]:.2f} and {crit[2]:.2f}" in d for d in (report, readme))
+    assert clean == {"v1": 0, "v2a": 9, "v2b": 9} and "a box on 9 of the 51 clean photos" in report
+    assert leak["candidates"] == 0 and f"0 candidates of {leak['eval_images']} against {leak['train_images']:,}" in readme
+    # v2c, scored last: its losses are quoted as plainly as v1's gains
+    c, cl = t["codebrim@0.3"]["v2c"], t["clean@0.3"]["v2c"]
+    sv = lambda m: p[f"synth@0.3: {m} / v2c"]["recall"]
+    d, crit_v1 = p["clean@0.3: v1 / v2c"]["boxes_per_photo_diff"], p["codebrim@0.3: v1 / v2c"]["critical"]
+    assert round(cl["images_with_any"] * 51) == 22 and all("a box on 22 of the 51" in x for x in (report, readme))
+    assert (f"({t['synth@0.3']['v2c']['recall']:.3f}; v1 ÷ v2c {sv('v1')[0]:.2f}×, {ci(sv('v1')[1])}; v2a ÷ v2c "
+            f"{sv('v2a')[0]:.2f}×, {ci(sv('v2a')[1])};") in report
+    assert f"v1 is {sv('v1')[0]:.2f}× it" in readme and f"{cl['boxes_per_image']:.2f} per photo" in readme
+    assert f"(v2c − v1 {-d[0]:+.2f}, CI {-d[1][1]:+.2f} to" in report and f"{-d[1][0]:+.2f}), though fewer" in report
+    assert f"{c['critical_per_image']:.2f} critical boxes per CODEBRIM photo" in report and f"({c['critical_per_image']:.2f} per CODEBRIM photo)" in readme
+    assert f"(v1 sends {crit_v1[0]:.2f}× as many, CI {ci(crit_v1[1])})" in report
+    assert out["verdicts"]["v1 vs v2c"] == {"codebrim": "same", "synth": "better", "clean_harm": False}
 
 
 # ---------------------------------------------------------------- parity
@@ -599,3 +725,42 @@ def test_parity_compare_saved_files(tmp_path):
     assert res["class_iou"]["crack"] == pytest.approx(48 / 64) and res["class_iou"]["spalling"] is None
     with pytest.raises(ValueError):
         parity.compare(a, b[:1])
+
+
+def test_codebrim_dev_split_is_disjoint_from_the_held_out_list():
+    """Tuning reads evals/codebrim_dev100.txt only: 100 images, none of them in the held-out eval200 list."""
+    evals_dir = Path(codebrim.__file__).parent
+    dev = (evals_dir / "codebrim_dev100.txt").read_text().split()
+    held = set((evals_dir / "codebrim_eval200.txt").read_text().split())
+    assert len(dev) == len(set(dev)) == 100 and not held & set(dev)
+    records = [{"id": f"image_{i}", "path": f"/x/image_{i}.jpg", "boxes": []} for i in range(10)]
+    picked = codebrim.select_dev(records, ["image_1.jpg", "image_2.jpg"], n=5, seed=3)
+    assert len(picked) == 5 and not {"image_1", "image_2"} & {r["id"] for r in picked}
+    assert picked == codebrim.select_dev(records, ["image_1.jpg", "image_2.jpg"], n=5, seed=3)
+
+
+def test_dev_sweep_reads_variants_and_only_dev_splits():
+    from evals import dev_sweep
+
+    assert dev_sweep.parse("a=v0:2,seed_from_looks:False;b=") == {"a": {"v0": 2.0, "seed_from_looks": False}, "b": {}}
+    assert type(dev_sweep.parse("a=first_level:2,tau:0.5")["a"]["first_level"]) is int  # a level indexes lists
+    assert {d for d, _, _ in dev_sweep.SPLITS.values()} == {"data/synth_dev", "data/synth_clean_dev"}  # never held out
+
+
+def test_dev_sweep_runs_end_to_end_and_writes_its_rows(tmp_path, monkeypatch):
+    from evals import dev_sweep
+
+    synth.build_dataset(tmp_path / "tiny", n=2, seed=3, width=640, height=480)
+    monkeypatch.setitem(dev_sweep.SPLITS, "tiny", (tmp_path / "tiny", 2, 3))
+    out = tmp_path / "rows.json"
+    dev_sweep.main(["tiny", "1.0,0.3", "a=v0:0;b=v0:2", "--workers", "1", "--out", str(out)])
+    rows = json.loads(out.read_text())
+    assert rows["split"] == "tiny" and rows["n"] == 2
+    records, _ = harness.load_records(tmp_path / "tiny", 2, seed=3)  # the rows say which data they scored
+    assert {k: rows[k] for k in ("dataset_gt_sha256", "dataset_images_sha256")} == harness.dataset_sha256(records)
+    assert set(rows["rows"]) == {"downscale", "a@1.0", "a@0.3", "b@1.0", "b@0.3"}
+    agents = [r for k, r in rows["rows"].items() if "@" in k]
+    assert all(0 < r["pixels_frac"] <= 1 and sum(r["halt"].values()) == 2 for r in agents)
+    assert all(len(r["per_image"]) == 2 and "vs_downscale_ci" in r for r in agents)
+    # every variant after the first is compared, paired, with the first at its own cap
+    assert [rows["rows"][k].get("ref") for k in ("a@1.0", "a@0.3", "b@1.0", "b@0.3")] == [None, None, "a@1.0", "a@0.3"]

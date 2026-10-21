@@ -4,7 +4,8 @@
 
 Writes results/<arm>/micro.json with a provenance block. `results` holds single OpenCV calls; `job_ops` holds
 the agent's own timed ops under the names its trace uses (segment:* on `default_segmenter()`, so DRISHYAM_ONNX
-selects the engine), which `python -m evals.harness --cost-model fixed` charges per call. `--job-ops-only`
+selects the engine, and segment:confirm on the cascade's confirm net when DRISHYAM_ONNX_CONFIRM names one, with its
+name under `confirm`), which `python -m evals.harness --cost-model fixed` charges per call. `--job-ops-only`
 re-times just those, keeping `results`. `dnn` holds bare OpenCV DNN forwards: the NanoDet-Plus privacy detector
 on its 416x416 input, and the segmentation ONNX that DRISHYAM_ONNX (FP32) and DRISHYAM_ONNX_FP16 name, read with
 ENGINE_NEW at 256 and 512; every run times them, and `--dnn-only` re-times only them. Also home of `provenance()`, which the other benchmarks and the
@@ -33,6 +34,7 @@ import cv2
 import numpy as np
 
 from drishyam import imaging, privacy
+from drishyam.cascade import default_confirm
 from drishyam.segment import default_segmenter, segment_view
 
 SIZES = ((1024, 768), (2048, 1536), (4000, 3000))
@@ -166,9 +168,10 @@ def ops(w: int, h: int) -> dict:
     }
 
 
-def job_ops(w: int, h: int, seg) -> dict:
+def job_ops(w: int, h: int, seg, confirm=None) -> dict:
     """The agent's timed ops on one w x h frame, keyed by the names in its trace (`Job._timed`), plus the
-    downscale baseline's resize. Per-look ops read the 512x512 view the agent asks for."""
+    downscale baseline's resize. Per-look ops read the 512x512 view the agent asks for. With a cascade's `confirm`
+    net (drishyam.cascade), also its segment:confirm, on the same view."""
     img = test_image(w, h)
     pyr = imaging.build_pyramid(img)
     crop, _ = imaging.gaze(pyr, w // 2, h // 2, 0, size=512)
@@ -181,6 +184,7 @@ def job_ops(w: int, h: int, seg) -> dict:
         "quality": lambda: imaging.quality(crop),
         "segment:accurate": lambda: segment_view(seg, crop, "accurate", valid),
         "segment:fast": lambda: segment_view(seg, crop, "fast", valid),
+        **({"segment:confirm": lambda: segment_view(confirm, crop, "accurate", valid)} if confirm else {}),
         "downscale": lambda: cv2.resize(img, (round(w * k), round(h * k)), interpolation=cv2.INTER_AREA),
     }
 
@@ -245,9 +249,9 @@ def run(arm: str, repeats: int = 50, threads: int = 1, out_dir="results", sizes=
         out.write_text(json.dumps(doc, indent=1))
         print(f"wrote {out}")
         return doc
-    seg = default_segmenter()
-    jobs = {"segmenter": seg.name, "cv2_threads": actual, "provenance": provenance(),
-            "results": _time_all(lambda w, h: job_ops(w, h, seg), sizes, repeats)}
+    seg, confirm = default_segmenter(), default_confirm()
+    jobs = {"segmenter": seg.name, **({"confirm": confirm.name} if confirm else {}), "cv2_threads": actual,
+            "provenance": provenance(), "results": _time_all(lambda w, h: job_ops(w, h, seg, confirm), sizes, repeats)}
     if job_ops_only and out.exists():
         doc = {**json.loads(out.read_text()), "job_ops": jobs, "dnn": time_dnn(repeats)}
     else:

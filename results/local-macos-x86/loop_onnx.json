@@ -1,0 +1,205 @@
+{
+ "arm": "local-macos-x86",
+ "segmenter": "onnx:drishyam_dacl10k.onnx",
+ "config": {
+  "pixel_cap": 0.3,
+  "thumbs": false,
+  "governor": false,
+  "t_hat_ms": {
+   "warp": 2.0,
+   "segment": 60.0
+  },
+  "seconds_cap": 120.0,
+  "prefetch_k": 2,
+  "threads": [
+   1,
+   16
+  ],
+  "all_threads": 16,
+  "rounds": 2,
+  "photos": [
+   "bridge_01",
+   "bridge_02",
+   "bridge_03",
+   "bridge_04",
+   "bridge_05",
+   "bridge_06",
+   "bridge_07",
+   "bridge_08",
+   "synth_9100",
+   "synth_9101"
+  ]
+ },
+ "provenance": {
+  "cv2": "5.0.0",
+  "build_info_sha256": "fe5f9337dbc8663639ee7bcb2deb09359893fc8d2aa5b6a447cee2a0117d2ec7",
+  "cv2_baseline": "SSE SSE2 SSE3 SSSE3 SSE4_1",
+  "cv2_dispatch": "SSE4_2 AVX FP16 AVX2 AVX512_SKX",
+  "cv2_parallel_framework": "GCD",
+  "cv2_custom_hal": "YES (ipp (ver 0.0.1))",
+  "cv2_file": "/Users/mac/Documents/Projects/opencv/.claude/worktrees/wf_63705f18-04c-2/.venv/lib/python3.13/site-packages/cv2/__init__.py",
+  "under_opt_cool": false,
+  "build": "stock (not COOL)",
+  "machine": "Darwin 25.6.0 x86_64",
+  "platform": "macOS-26.7.1-x86_64-i386-64bit-Mach-O",
+  "cpu": "Intel(R) Core(TM) i9-9880H CPU @ 2.30GHz",
+  "logical_cpus": 16,
+  "cv2_threads": 16,
+  "python": "3.13.16",
+  "numpy": "2.5.4",
+  "timestamp": "2026-10-19T06:40:50Z",
+  "load_avg": [
+   10.59,
+   10.97,
+   11.72
+  ]
+ },
+ "load_avg_end": [
+  18.65,
+  12.56,
+  11.95
+ ],
+ "decisions_identical_across_threads": true,
+ "results": [
+  {
+   "threads": 1,
+   "variant": "off",
+   "jobs": 20,
+   "steps": 78,
+   "jobs_per_s": 0.2774,
+   "job_ms": {
+    "p50": 2996.8,
+    "p95": 6821.9
+   },
+   "step_ms": {
+    "p50": 873.8,
+    "p95": 1132.4
+   },
+   "cpu_s_per_job": 3.557,
+   "prefetch": {
+    "warp_hit_rate": null
+   },
+   "decisions_identical": true
+  },
+  {
+   "threads": 1,
+   "variant": "warp",
+   "jobs": 20,
+   "steps": 78,
+   "jobs_per_s": 0.2834,
+   "job_ms": {
+    "p50": 3105.7,
+    "p95": 6378.7
+   },
+   "step_ms": {
+    "p50": 868.4,
+    "p95": 1030.3
+   },
+   "cpu_s_per_job": 3.503,
+   "prefetch": {
+    "warp_miss": 36,
+    "submitted": 80,
+    "dropped": 10,
+    "warp_hit": 42,
+    "warp_hit_rate": 0.538
+   },
+   "decisions_identical": true
+  },
+  {
+   "threads": 1,
+   "variant": "warp+segment",
+   "jobs": 20,
+   "steps": 78,
+   "jobs_per_s": 0.3683,
+   "job_ms": {
+    "p50": 2344.7,
+    "p95": 4659.0
+   },
+   "step_ms": {
+    "p50": 844.7,
+    "p95": 1137.3
+   },
+   "cpu_s_per_job": 4.988,
+   "prefetch": {
+    "warp_miss": 38,
+    "submitted": 80,
+    "dropped": 10,
+    "warp_hit": 40,
+    "seg_hit": 40,
+    "late": 2,
+    "warp_hit_rate": 0.513
+   },
+   "decisions_identical": true
+  },
+  {
+   "threads": 16,
+   "variant": "off",
+   "jobs": 20,
+   "steps": 78,
+   "jobs_per_s": 0.8561,
+   "job_ms": {
+    "p50": 1097.4,
+    "p95": 2054.6
+   },
+   "step_ms": {
+    "p50": 282.2,
+    "p95": 369.3
+   },
+   "cpu_s_per_job": 7.725,
+   "prefetch": {
+    "warp_hit_rate": null
+   },
+   "decisions_identical": true
+  },
+  {
+   "threads": 16,
+   "variant": "warp",
+   "jobs": 20,
+   "steps": 78,
+   "jobs_per_s": 0.8619,
+   "job_ms": {
+    "p50": 1094.6,
+    "p95": 1968.3
+   },
+   "step_ms": {
+    "p50": 281.8,
+    "p95": 361.3
+   },
+   "cpu_s_per_job": 7.804,
+   "prefetch": {
+    "warp_miss": 36,
+    "submitted": 80,
+    "dropped": 10,
+    "warp_hit": 42,
+    "warp_hit_rate": 0.538
+   },
+   "decisions_identical": true
+  },
+  {
+   "threads": 16,
+   "variant": "warp+segment",
+   "jobs": 20,
+   "steps": 78,
+   "jobs_per_s": 0.8868,
+   "job_ms": {
+    "p50": 1046.2,
+    "p95": 1713.3
+   },
+   "step_ms": {
+    "p50": 303.6,
+    "p95": 578.5
+   },
+   "cpu_s_per_job": 9.867,
+   "prefetch": {
+    "warp_miss": 38,
+    "submitted": 80,
+    "dropped": 10,
+    "warp_hit": 40,
+    "seg_hit": 40,
+    "late": 2,
+    "warp_hit_rate": 0.513
+   },
+   "decisions_identical": true
+  }
+ ]
+}

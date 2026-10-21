@@ -84,6 +84,22 @@ def clock():
     return FakeClock()
 
 
+@pytest.fixture(scope="module")
+def tiny_onnx(tmp_path_factory):
+    onnx = pytest.importorskip("onnx")
+    from onnx import TensorProto, helper, numpy_helper
+
+    rng = np.random.default_rng(0)
+    w = numpy_helper.from_array(rng.normal(0, 0.5, (6, 3, 1, 1)).astype(np.float32), "w")
+    node = helper.make_node("Conv", ["x", "w"], ["y"])
+    graph = helper.make_graph([node], "seg", [helper.make_tensor_value_info("x", TensorProto.FLOAT, [1, 3, "h", "w"])],
+                              [helper.make_tensor_value_info("y", TensorProto.FLOAT, [1, 6, "h", "w"])], [w])
+    model = helper.make_model(graph, opset_imports=[helper.make_opsetid("", 17)])
+    path = tmp_path_factory.mktemp("m") / "tiny.onnx"
+    onnx.save(model, path)
+    return str(path)
+
+
 @pytest.fixture(scope="session")
 def scene():
     img = concrete(1500, 2000, seed=4)

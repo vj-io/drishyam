@@ -48,9 +48,16 @@ else
 fi
 CLOUDFRONT=$(grep -qi '^x-amz-cf-id:' "$TMP/headers" && echo 1 || echo 0)
 
+# A job holds its Lambda environment while it streams, so a request sent meanwhile starts another one. The browser
+# does this at every job start (public/js/api.js), so a later KILL finds that environment warm. warm FILE: once FILE
+# (a job's stream) is not empty, GET /api/health.
+warm() { for _ in $(seq 600); do [ -s "$1" ] && break; sleep 0.1; done; curl -sS --max-time 60 -o /dev/null "$URL/api/health" || true; }
+
 IMG=public/samples/bridge_03.jpg
+warm "$TMP/job.ndjson" & warm_pid=$!
 code=$(post "/api/jobs?pixel_cap=0.3" image/jpeg "$IMG" -N --max-time 90 -o "$TMP/job.ndjson" \
   -w '%{http_code} %{time_starttransfer} %{time_total}') || true
+wait "$warm_pid" || true
 done_ev=$(grep '"type":"done"' "$TMP/job.ndjson" || true)
 if [ "${code%% *}" = 200 ] && [ -n "$done_ev" ]; then
   read -r _ t1 tt <<<"$code"
@@ -71,12 +78,14 @@ fi
 # KILL: start a paced job (pace_ms is ignored by a server without it), wait for step 2, send the kill token.
 post "/api/jobs?pixel_cap=0.3&pace_ms=1000" image/jpeg "$IMG" -N --max-time 90 -o "$TMP/kill.ndjson" &
 job_pid=$!
+warm "$TMP/kill.ndjson" & warm_pid=$!
 for _ in $(seq 600); do
   n=$(grep -c '"type":"step"' "$TMP/kill.ndjson" 2>/dev/null) || true
   [ "${n:-0}" -ge 2 ] && break
   kill -0 "$job_pid" 2>/dev/null || break
   sleep 0.1
 done
+wait "$warm_pid" || true
 head -n 1 "$TMP/kill.ndjson" | jq -c '{job, kill_token}' >"$TMP/kill.json" 2>/dev/null || echo '{}' >"$TMP/kill.json"
 kill_code=$(post /api/kill application/json "$TMP/kill.json" -o /dev/null -w '%{http_code}' --max-time 30) || true
 wait "$job_pid" || true

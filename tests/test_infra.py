@@ -17,7 +17,7 @@ from aws_cdk import assertions
 from aws_cdk import aws_lambda as lambda_
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "infra"))
-from drishyam_stack import DrishyamStack
+from drishyam_stack import DrishyamStack, refuse_standin
 
 ACCOUNT = "123456789012"
 ROOT = Path(__file__).resolve().parents[1]
@@ -68,6 +68,8 @@ def test_function_is_arm64_streaming_behind_iam(template):
     assert env["DRISHYAM_COMMIT"] == "abc123" and "DRISHYAM_SERVE_STATIC" not in env  # static files come from S3
     assert set(env) >= {"DRISHYAM_KILL_TABLE", "DRISHYAM_SIGNING_KEY_SECRET_ARN"}
     assert "DRISHYAM_ONNX" not in env and "DRISHYAM_ONNX_FP16" not in env  # classical-v1 unless asked
+    assert "DRISHYAM_ONNX_CONFIRM" not in env  # and no cascade (drishyam.cascade): the web API never runs one
+    assert env["DRISHYAM_CV_THREADS"] == "2" and fn["MemorySize"] == 3008  # 3008 / 1769 = 1.7 vCPU (docs/bench.md)
     url = one(template, "AWS::Lambda::Url")
     assert url["AuthType"] == "AWS_IAM" and url["InvokeMode"] == "RESPONSE_STREAM"
 
@@ -135,6 +137,7 @@ def test_waf_rate_limits_per_ip(template):
     assert "30 kill and review" in bodies["kill-and-review"]["Content"]
     assert "300 requests" in bodies["all-requests"]["Content"]
     assert one(template, "AWS::CloudFront::Distribution")["DistributionConfig"]["WebACLId"]["Fn::GetAtt"][0] == "Waf"
+    assert one(template, "AWS::CloudFront::Distribution")["DistributionConfig"]["IPV6Enabled"] is False  # per-IP limits hold
 
 
 def test_api_behaviour_is_uncached_and_forwards_the_body_hash(template):
@@ -219,3 +222,16 @@ def test_onnx_context_sets_the_segmenter_env(tmp_path):
     assert fp32["DRISHYAM_ONNX"] == "/var/task/models/drishyam_dacl10k.onnx" and "DRISHYAM_ONNX_FP16" not in fp32
     both = env("b", onnx="models/m.onnx", onnx_fp16="models/m.fp16.onnx")
     assert (both["DRISHYAM_ONNX"], both["DRISHYAM_ONNX_FP16"]) == ("/var/task/models/m.onnx", "/var/task/models/m.fp16.onnx")
+
+
+def test_a_standin_film_is_refused(tmp_path):
+    (tmp_path / "video").mkdir()
+    (tmp_path / "video" / "drishyam.mp4").write_bytes(b"\0\0\0\x18ftypisom" + b"moov" * 4)
+    refuse_standin(tmp_path)  # a plain film passes
+    (tmp_path / "video" / "drishyam.mp4").write_bytes(b"\0\0\0\x18ftypisom" + b"\xa9cmt" + b"STAND-IN DATA, NOT FOR PUBLICATION")
+    with pytest.raises(SystemExit):  # renamed to the public name, the metadata still gives it away
+        refuse_standin(tmp_path)
+    (tmp_path / "video" / "drishyam.mp4").unlink()
+    (tmp_path / "video" / "drishyam-standin.mp4").write_bytes(b"\0\0\0\x18ftypisom")
+    with pytest.raises(SystemExit):
+        refuse_standin(tmp_path)

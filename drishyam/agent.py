@@ -12,13 +12,14 @@ import random
 import secrets
 import time
 from collections import deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import cv2
 import numpy as np
 
 from . import imaging
-from .findings import IOU_AGREE, SEVERITY, Finding, now_iso, work_order
+from .cascade import confirm_look, ms_hat  # cascade
+from .findings import IOU_AGREE, SEVERITY, Finding, critical_rule, is_critical, now_iso, work_order
 from .governor import MIN_GAZE, USD_PER_HOUR, Budget, RuntimeStats, Settings, check
 from .measure import measure
 from .planner import TIMEOUT_S, ChaosPlanner, consult
@@ -27,6 +28,7 @@ from .segment import (
     DEFECT_PX_BG_MAX,
     MIN_BLOB_PX,
     PORE_CAUSE,
+    _entropy,
     default_segmenter,
     elongated,
     rejected_lines,
@@ -34,13 +36,94 @@ from .segment import (
 )
 
 SPIKE_STEP = 4  # chaos p95_spike lands here; the governor reacts on the next step
-SPIKE_MS = 900.0
+SPIKE_X = 1.8  # chaos p95_spike records a look at 1.8x the job's governor limit (900 ms at the default 500 ms)
 PLANNER_TIMEOUT_STEP = 3
 PLANNER_MALFORMED_STEP = 6
 REPLAY_ACTIONS = ("gaze", "escalate", "verify")
 DOMINATED_BY = {"corrosion": ("exposed_rebar",), "crack": ("spalling", "exposed_rebar"),
                 "efflorescence": ("spalling", "exposed_rebar")}
 MAX_REPLAY = 200
+# JobConfig.v0 default: the largest v0 tried (0-4) that lost no recall at the 30 % cap on the dev splits (synth_dev,
+# codebrim_dev100). Uncapped it costs recall on synth_dev (0.555 against 0.565 for v0 <= 1, at 0.45 of the pixels
+# instead of 0.48-0.50) and saves false alarms on the clean dev split (15.8 boxes per photo instead of 20.3);
+# results/dev/v0_sweep.json.
+V0 = 2.0
+# Where each segmenter is reliable, by its name (JobConfig knobs left None take its values; a value set explicitly
+# always wins): min_view, the smallest share of the photo's long side a look may span, which bounds the first look and
+# every escalation and verify look; absorb, whether a crack or rust inside a spall's or bar's finding joins it;
+# tau_scout, the entropy threshold of a look at L2 or coarser (tau keeps every finer look; unset, tau everywhere).
+# classical-v1, and any segmenter not listed, keeps the agent as published: any level, absorption on.
+# The dacl10k ONNX values were chosen on the dev splits only (results/dev/onnx_profile_sweep.json, 30 % cap, paired
+# 95 % CIs). On CODEBRIM dev100 photos (mostly 4608 px) L1 looks (0.22 of the side) add boxes, not recall: L2 as
+# first and finest level found 0.397 at 33 boxes per photo against 0.403 at 85 for L1; with absorption off, 0.473
+# against 0.415 for the original levels (L1 first, L0 finest; x1.14, CI 1.07-1.22). Absorption had dropped real
+# cracks the model segmented beside a spall (x1.19 with it off, CI 1.11-1.31). On synth_dev (2048 px) L1 looks (0.5
+# of the side) do add recall: L2 alone found x0.88 of the old agent's (CI 0.82-0.93). Any share above 0.222 (L1 at
+# 4608 px) up to 0.341 (L2 at 6000 px) keeps L2 the finest level on those photos and allows L1 on 2048-px ones, but
+# other dev100 sizes have breakpoints inside that range (L0 of 2272 px spans 0.225, L0 of 2048 px 0.25, L1 of 3648 px
+# 0.281, L0 of 1600 px 0.32), so the value still moves levels: 0.3 makes L2 the finest on the 3 photos of 3648 px and
+# L1 on the 2048- and 2272-px ones, and allows L0 on the 2 of 1600 px. 0.3 found x1.18 a 1024-px downscale on
+# CODEBRIM (CI 1.07-1.31) and x1.03 the old agent on synth_dev (CI 0.98-1.07), at no more false alarms on the clean
+# split. 0.25 (L1 on the 3648-px photos, L0 on the 2048-px ones) showed no measurable difference on either at the
+# 30 % cap; uncapped, its L0 looks found a little more on synth_dev (0.3 against it: x0.98, CI 0.95-1.00).
+# A mask first drafted at the finest level gets no verify look (no finer level to confirm it at; its verify_iou stays
+# null, and the step's rationale says so): the dev numbers above ran that way, and a verify at the same level (a
+# shifted window) was not built or measured.
+# tau_scout was measured for classical-v1 on the dev splits and not adopted (results/dev/tune_sweep.json, fixed costs,
+# paired 95 % CIs, against tau 0.5 at every level). A coarse look that escalates drafts nothing of what it saw; with
+# 0.7 a survey whose entropy is in (0.5, 0.7] drafts and is verified one level finer instead. At the 30 % cap that
+# found x1.03 on synth_dev (CI 0.98-1.09, not a measurable gain) and x1.22 on CODEBRIM dev100 (1.09-1.43): 0.153 to
+# 0.186, where the same boxes at random positions find 0.088 and 0.099 (mean of 30 draws; IoU-only 0.066 to 0.086
+# against 0.019 and 0.023). It sent 242 critical boxes to the human gate on CODEBRIM dev100 instead of 178 (239 and 176
+# matching no ground truth), put 8 more boxes on 2 clean photos of 30 (12.40 per photo against 12.13), and any value in
+# [0.692, 0.703) gives the same dev rows, the upper edge a clean dev survey's entropy. Lower values lost recall (0.3:
+# x0.94 on synth_dev, CI 0.88-0.99); above 0.7 no dev recall moved and more clean photos held a box.
+# The retrained v2a model (drishyam_dacl10k_v2a.onnx) keeps v1's values: no candidate passed the rule stated before its
+# sweep (results/dev/onnx_v2a_profile_sweep.json: a recall gain over them at the 30 % cap on synth_dev and on CODEBRIM
+# dev100, each paired 95 % CI above 1, with no more clean false alarms by the same standard). Against them, any level
+# (min_view 0) found x1.01 on synth_dev (CI 0.97-1.05) and x0.79 on CODEBRIM (0.70-0.88); 0.15 x1.01 and x1.02
+# (0.95-1.10) at 2.2x the boxes on CODEBRIM; absorption on x0.98 (0.94-1.00) and x0.89 (0.82-0.95).
+# The v2b model (drishyam_dacl10k_v2b.onnx, an EfficientNet-B2 UNet) keeps them too, under the same rule stated before
+# its sweep (results/dev/onnx_v2b_profile_sweep.json): no candidate found more on synth_dev (x1.00, CI 0.97-1.03 or
+# narrower). On CODEBRIM any level found x0.66 (0.56-0.77), absorption on x0.84 (0.75-0.91), 0.15 x0.98 (0.90-1.06) at
+# 2.4x the boxes.
+# The v2c model (drishyam_dacl10k_v2c.onnx, v2a's MobileNetV3-Large UNet trained with rare classes weighted harder)
+# keeps them too, under the same rule stated before its sweep (results/dev/onnx_v2c_profile_sweep.json): no candidate
+# found more on synth_dev (x0.98, CI 0.95-1.02; absorption on 0.95-1.00; old 0.92-1.01). On CODEBRIM 0.15 found x1.09
+# (1.01-1.20) at 2.3x the boxes, a gain on that split alone, which the rule does not take; any level lost recall
+# (x0.92, 0.85-0.99), as did absorption on (x0.88, 0.82-0.93).
+PROFILES = {
+    "classical-v1": {"min_view": 0.0, "absorb": True},
+    "onnx:drishyam_dacl10k.onnx": {"min_view": 0.3, "absorb": False},
+    "onnx:drishyam_dacl10k_v2a.onnx": {"min_view": 0.3, "absorb": False},
+    "onnx:drishyam_dacl10k_v2b.onnx": {"min_view": 0.3, "absorb": False},
+    "onnx:drishyam_dacl10k_v2c.onnx": {"min_view": 0.3, "absorb": False},
+}
+
+
+# The weights each ONNX profile was chosen with (the file's sha256): the same file name with other weights (a retrained
+# model installed as models/drishyam_dacl10k.onnx) was not measured, so it gets classical-v1.
+WEIGHTS = {"onnx:drishyam_dacl10k.onnx": "c49416c10087f3c1baa8443b53fc839a3d8eb227ff27a1b4f7be1da964d6ed4a",
+           "onnx:drishyam_dacl10k_v2a.onnx": "95b503c2d205567c09b19154ff77a5117889b7aba0b19733ed1c178dc4ab1ad1",
+           "onnx:drishyam_dacl10k_v2b.onnx": "47e4b687d179efc9d221ef05eca441d24b0f025f9ab252c0a60c64455ff99207",
+           "onnx:drishyam_dacl10k_v2c.onnx": "24b4d561fb012cb525131e16fa211b528a2e30c90fd9b9e76d98e29edbf18d21"}
+
+
+# The governor's limit on the segmenter's p95 per look (`governor.check`), per profile; any other profile gets SLA_MS.
+# Not a dev-chosen value: on Lambda arm64 one v1 look (512 px, FP32) measured 0.56-1.14 s at p95 over the smoke runs
+# of 2026-10-21 (docs/aws.md), so at 500 ms every live v1 job left the 512-px net the held-out runs measured (governor
+# off) for the 256-px FP16 net after its first looks. 1500 ms is that p95 plus headroom, set once from latency, never
+# from recall; a slower step than that still switches.
+SLA_MS = 500.0
+SLA_MS_BY_PROFILE = {"onnx:drishyam_dacl10k.onnx": 1500.0}
+
+
+def profile_for(segmenter) -> str:
+    """The PROFILES key of a segmenter (its `name`), or classical-v1 for one not calibrated: a name not listed, or
+    weights (its `sha256`) other than those the profile was chosen with (WEIGHTS)."""
+    name = getattr(segmenter, "name", None)
+    ok = name in PROFILES and WEIGHTS.get(name) in (None, getattr(segmenter, "sha256", None))
+    return name if ok else "classical-v1"
 
 
 @dataclass
@@ -50,10 +133,14 @@ class JobConfig:
     seconds_cap: float = 20.0
     size: int = 512
     first_level: int = 1
-    tau: float = 0.5  # entropy above this escalates
+    min_level: int = 0  # the finest level an escalation or a verify look may go to (min_view may raise it)
+    min_view: float | None = None  # a look spans at least this share of the photo's long side (0: any); None: profile's
+    profile: str | None = None  # a PROFILES key; None: the segmenter's own (`profile_for`)
+    tau: float = 0.5  # entropy above this escalates (at L2 or coarser too, unless tau_scout is set)
+    tau_scout: float | None = None  # the same for a look at L2 or coarser; None: the profile's (PROFILES), else tau
     a_min: int = 64  # crop px; a smaller mask escalates
     eps: float = 0.25  # stop-rule slope factor
-    sla_ms: float = 500.0
+    sla_ms: float | None = None  # the governor's segment p95 limit; None: SLA_MS_BY_PROFILE's for the profile, else SLA_MS
     max_candidates: int = 20
     chaos: tuple[str, ...] = ()
     planner_every: int = 5
@@ -63,14 +150,41 @@ class JobConfig:
     max_steps: int = 200
     # Ablation switches (FR-21); the defaults are the agent as published.
     use_uncertainty: bool = True  # the (1 + entropy) term of a region's score
+    seed_from_looks: bool = True  # every look sets the entropy and class of the unvisited candidates it shows
+    # The value of a look that finds nothing, in severity units: the stop threshold never falls below eps x v0 per
+    # look, so a photo with nothing to find can stop on the rule (0: no floor, the rule as first published).
+    v0: float = V0
     survey: bool = True  # one coarse look that covers every candidate before zooming
     verify: bool = True  # verify looks: a new mask, or a finer look that disagrees with the coarser one
+    absorb: bool | None = None  # a crack or rust mostly inside a spall's or bar's finding joins it (DOMINATED_BY)
     order: str = "score"  # "random": a seeded random pick among unseen candidates instead of the argmax
     seed: int = 0
     governor: bool = True  # False: kill switch and caps only; no model, level, gaze-size or critical-only override
+    # When the next look no longer fits under the pixel cap, it shrinks to the largest gaze (a multiple of 32 px, at
+    # least MIN_GAZE) that does, instead of the job halting on cap-hit; the stop rule still decides whether it is taken.
+    fill: bool = False
+    # Whether the survey's finds (and its cost) count toward the stop rule's value found per ms. It sees the whole photo,
+    # so its value is not what a look at one candidate yields; False: only looks at candidates set that term.
+    survey_value: bool = True
     # A fixed predicted cost per look, {"warp": ms, "segment": ms, "segment:<model>": ms}, instead of live p95s:
     # scores and the stop rule then do not move with machine load. The caps still run on the real clock.
     t_hat_ms: dict | None = None
+    # cascade: with a confirm net (Job(confirm=...), drishyam.cascade; none by default), the scout entropy band, both
+    # cascade: ends included, in which the confirm net segments a look again. Not tuned: it straddles tau.
+    tau_confirm_lo: float = 0.35  # cascade
+    tau_confirm_hi: float = 0.65  # cascade
+
+
+@dataclass
+class Look:
+    level: int
+    labels: np.ndarray  # class index per crop pixel, as segment_view left it (nothing past the image, no straight line)
+    to_l0: np.ndarray
+    cls: str | None  # the look's best class
+    finding: str | None = None  # the finding that class's evidence went to (new, update or absorbed)
+
+    def mask(self, cls: str) -> np.ndarray:
+        return (self.labels == CLASSES.index(cls)).astype(np.uint8)
 
 
 @dataclass
@@ -80,9 +194,11 @@ class Region:
     cy: int
     prior: float
     next_level: int
-    entropy: float = 0.0
-    cls: str | None = None
-    looks: list = field(default_factory=list)  # (level, class mask, to_l0, class of that mask or None)
+    entropy: float = 0.0  # a look's entropy here: its own look's, or a seed's (`Job._seed`) while it has none
+    cls: str | None = None  # likewise the most severe class seen here
+    box: tuple | None = None  # its overview box (candidates only; None for the survey and replayed regions)
+    shown_level: int | None = None  # level of the finest look that has shown it (and seeded it); None: none has
+    looks: list = field(default_factory=list)  # Look per look at this region
     done: bool = False
     verified: bool = False
     extra_used: bool = False
@@ -100,11 +216,17 @@ def _rect_on(shape, window, level_scale):
 class Job:
     def __init__(self, image: np.ndarray, config: JobConfig | None = None, *, job_id: str | None = None,
                  segmenter=None, planner=None, kill=lambda: False, clock=time.perf_counter,
+                 confirm=None,  # cascade: the confirm net (drishyam.cascade); None, the default: no cascade
                  replay: list | None = None) -> None:
         self.image = image
-        self.cfg = config or JobConfig()
-        self.id = job_id or "j_" + secrets.token_hex(3)
         self.segmenter = segmenter or default_segmenter()
+        self.confirm = confirm  # cascade
+        cfg = config or JobConfig()
+        name = cfg.profile or profile_for(self.segmenter)
+        self.cfg = replace(cfg, profile=name, **{k: v for k, v in PROFILES[name].items() if getattr(cfg, k) is None})
+        if self.cfg.sla_ms is None:
+            self.cfg = replace(self.cfg, sla_ms=SLA_MS_BY_PROFILE.get(name, SLA_MS))
+        self.id = job_id or "j_" + secrets.token_hex(3)
         self.planner = planner
         self.kill = kill
         self.clock = clock
@@ -114,9 +236,11 @@ class Job:
         self.trace: list[dict] = []
 
     # ---- helpers -------------------------------------------------------------------------------
+    prefetch = None  # off; bench/loop.py sets a drishyam.prefetch.Prefetcher, which serves warps and segmentations
+
     def _timed(self, op, fn, *args, **kw):
         t0 = self.clock()
-        out = fn(*args, **kw)
+        out = fn(*args, **kw) if self.prefetch is None else self.prefetch(self, op, fn, args, kw)
         ms = (self.clock() - t0) * 1000
         self.stats.record(op, ms)
         return out, ms
@@ -141,13 +265,49 @@ class Job:
         seg_prior = self.stats.median("segment") or 30.0
         return self.stats.p("warp", 95, 5.0) + self.stats.p(f"segment:{self.settings.model}", 95, seg_prior)
 
-    def _score(self, r: Region):
+    def _first_look(self, r: Region) -> tuple[int, list]:
+        """(level, L0 window) of the look the argmax would send to unvisited region r now."""
         level = min(r.next_level + self.settings.level_bias, self.max_level)
-        _, _, win = self._window(r.cx, r.cy, level, self.settings.size)
+        return level, self._window(r.cx, r.cy, level, self.settings.size)[2]
+
+    def _score(self, r: Region):
+        """(score, expected value, unseen fraction, severity, uncertainty): ev = prior x severity x (1 + u) x unseen."""
+        level, win = self._first_look(r)
         a = self._unseen(win, level)
         u = r.entropy if self.cfg.use_uncertainty else 0.0
-        ev = r.prior * SEVERITY.get(r.cls, 1.0) * (1 + u) * a
-        return ev / max(self._t_hat(), 1e-3), ev, a
+        s = SEVERITY.get(r.cls, 1.0)
+        ev = r.prior * s * (1 + u) * a
+        return ev / max(self._t_hat(), 1e-3), ev, a, s, u
+
+    def _seed(self, seg, to_l0, valid, level) -> list[dict]:
+        """After a look the quality gate passed: every unvisited candidate whose own first-look window
+        (`_first_look`, clamped to the image as that look will be) lies at least half inside the look's valid
+        footprint has been shown (the stop floor needs that), and takes its uncertainty and class from what the look
+        saw inside that window: the binary damage-vs-background entropy over that sub-window
+        (`segment._entropy`, as a look reports it) and the most severe class whose area there would clear A_min at
+        the candidate's own first-look level (None if none). A look that sees less of the window (a finer look
+        covers at most a quarter of it) neither shows nor seeds it. A finer look overwrites a coarser seed, never
+        the reverse; a seed is not a look (the candidate stays unvisited). seed_from_looks=False: shown, not seeded."""
+        inv, size, out = np.linalg.inv(to_l0), valid.shape[0], []
+        for r in self.regions.values():
+            if r.looks or r.done or r.box is None or (r.shown_level is not None and level > r.shown_level):
+                continue
+            first, (x, y, w, h) = self._first_look(r)
+            c = imaging.map_points(inv, [[x, y], [x + w, y + h]])
+            lo, hi = np.floor(c.min(0)), np.ceil(c.max(0))
+            (x0, y0), (x1, y1) = np.clip(lo, 0, size).astype(int), np.clip(hi, 0, size).astype(int)
+            if np.count_nonzero(valid[y0:y1, x0:x1]) < 0.5 * float(np.prod(hi - lo)):
+                continue
+            r.shown_level = level
+            if not self.cfg.seed_from_looks:
+                continue
+            labels = seg.labels[y0:y1, x0:x1]
+            min_area = max(MIN_BLOB_PX, self.cfg.a_min * 4.0 ** (first - level))
+            cls = max((k for k in CLASSES[1:] if np.count_nonzero(labels == CLASSES.index(k)) >= min_area),
+                      key=SEVERITY.get, default=None)
+            r.entropy, r.cls = _entropy(seg.probs[:, y0:y1, x0:x1]), cls
+            out.append({"region": r.id, "entropy": r.entropy, "cls": cls, "from_level": level})
+        return out
 
     def digest(self) -> dict:
         """Numbers and fixed names only: what the optional LLM planner is allowed to see."""
@@ -174,8 +334,10 @@ class Job:
         cfg, planner = self.cfg, None
         if "planner_timeout" in cfg.chaos and self.step == PLANNER_TIMEOUT_STEP:
             planner = ChaosPlanner("timeout")
+            self.drills.add("planner_timeout")
         elif "planner_malformed" in cfg.chaos and self.step == PLANNER_MALFORMED_STEP:
             planner = ChaosPlanner("malformed")
+            self.drills.add("planner_malformed")
         elif self.planner and self.step and self.step % cfg.planner_every == 0:
             planner = self.planner
         if planner is None:
@@ -195,10 +357,12 @@ class Job:
             self.settings.batch = True
         elif strategy in ("change_level", "reverify"):
             r = self.regions[p["region_id"]]
-            level = p.get("level", max(0, (r.looks[-1][0] if r.looks else r.next_level) - 1))
+            asked = p.get("level", (r.looks[-1].level if r.looks else r.next_level) - 1)
+            level = max(self.min_level, asked)
+            why = proposal["rationale"][:120] + (f" (L{asked} is finer than this segmenter's finest L{level})"
+                                                 if level > asked else "")
             r.done = False
-            self.forced.appendleft(("verify" if strategy == "reverify" else "gaze", r, level,
-                                    f"planner:{strategy}", proposal["rationale"][:120]))
+            self.forced.appendleft(("verify" if strategy == "reverify" else "gaze", r, level, f"planner:{strategy}", why))
         elif strategy == "stop":
             return event, True
         # change_level / reverify queue their own look, which carries planner:<strategy> as its cause.
@@ -227,11 +391,10 @@ class Job:
         cv2.drawContours(view, cs, -1, (87, 200, 255), max(2, view.shape[0] // 64))  # BGR callout amber #FFC857, ~2 px at card size
         thumb = imaging.jpeg_b64(view, 256) if self.cfg.thumbs else None
         conf = seg.confidence[cls]
-        # One physical defect, one finding: rust on exposed bars is the bar, a spall's rim is the spall.
-        if dom := next((f for f in self.findings if f.cls in DOMINATED_BY.get(cls, ()) and _inside(box, f.box) >= 0.5),
-                       None):
-            if verify_iou is not None:  # the check was of this defect, seen as the class it absorbed
-                dom.set_verify(verify_iou)
+        # One physical defect, one finding: rust on exposed bars is the bar, a spall's rim is the spall. A check of the
+        # absorbed class is not a check of the dominating finding's class, so it leaves that finding's verify alone.
+        if self.cfg.absorb and (dom := next((f for f in self.findings if f.cls in DOMINATED_BY.get(cls, ())
+                                             and _inside(box, f.box) >= 0.5), None)):
             return dom, "absorbed"
         same = [f for f in self.findings if f.cls == cls and (f.region == r.id or imaging.box_iou(f.box, box) > 0.3)]
         if same:
@@ -244,6 +407,72 @@ class Job:
         self.findings.append(f)
         return f, "new"
 
+    def _settle(self, r, chk, level, best, target, now_f, critical, drafted, new_events, areas):
+        """After a look that queued no escalation: settle its comparison with the coarser look (`chk`, from
+        `compare`), queue the next look at this region or mark it done. Returns the follow-up look or None.
+        `target`: the finding of the compared class itself (never one that absorbed it); `now_f`: this look's
+        finding of its best class; `critical`: this look's first critical finding of its own class (a human reviews
+        this region anyway); `drafted`: whether this look drafted anything; `areas` (class changes only): the area in
+        L0 px of the compared class at the coarser look and of this look's best class, each its largest component as
+        a finding measures it, which say whether a class change is critical.
+        Returns (the follow-up look or None, a note for this look's rationale: a verify the rules call for that the
+        profile's finest level rules out, else "")."""
+        cfg = self.cfg
+        # A verify look goes one level finer; at the profile's finest level (min_view) there is none to go to.
+        finest = (f"L{level} is the finest level for {cfg.profile} (min_view {cfg.min_view:g})"
+                  if 0 < level == self.min_level else None)
+        if chk is None:
+            note = ""
+            if drafted and not self.settings.batch and not r.verified and cfg.verify:
+                if level > self.min_level:
+                    return ("verify", r, level - 1, "verify-new-mask",
+                            f"new {best} mask at L{level}; confirming at L{level - 1}"), ""
+                if finest:
+                    note = f"; new {best} mask not verified: {finest}, no finer look"
+            r.done = True
+            return None, note
+        k, a, iou = chk["class"], chk["against_level"], chk["iou"]
+        if chk["kind"] == "agree":
+            r.verified = r.done = True
+            return None, ""
+        if chk["kind"] == "class-change":
+            # The finer look sees the same place as another class: it keeps that class, the coarser one is recorded
+            # (the step's verify.class; the coarser finding is unconfirmed). A human decides when either CLASS is
+            # critical, also when the coarser look drafted nothing (it escalated): the request then names the finer
+            # look's finding. When no finding named is critical, that finding is held for the human like a critical
+            # one (`Finding.hold`), so the work order waits for the decision. Neither look drafted anything (both
+            # masks under A_min): no finding, no request.
+            r.done = True
+            now = chk["class_now"]
+            named = [f for f in (target, now_f) if f is not None]
+            crit_cls = next(((c, lv, ar) for c, lv, ar in ((k, a, areas[0]), (now, level, areas[1]))
+                             if is_critical(c, ar)), None)
+            if named and (any(f.critical for f in named) or crit_cls):
+                crit = next((f for f in named if f.critical), None)
+                if crit is None:
+                    crit, (c, lv, ar) = named[0], crit_cls
+                    crit.hold(self.step, ar, f"class change: {c} at L{lv} here ({critical_rule(c, ar)})")
+                    new_events.append({"type": "finding", "finding": crit.to_dict()})
+                new_events.append(review(crit.id, f"class change: {k} at L{a}, {now} at L{level} (same place, iou "
+                                         f"{chk['iou_any']:g})", level, [k, now], chk["iou_any"], a, kind="class-change"))
+            return None, ""
+        disagree = f"iou {iou:g} < {IOU_AGREE} between L{a} and L{level}"
+        note = ""
+        if target is not None and target.critical:  # a critical finding goes to a human at once
+            new_events.append(review(target.id, disagree, level, [k, k], iou, a, kind="disagree"))
+            r.done = True
+        elif not r.extra_used and level > self.min_level and cfg.verify and critical is None:  # (a critical finding here: a human
+            r.extra_used = True  # reviews this region anyway, so no look is spent to settle the disagreement)
+            return ("verify", r, level - 1, "iou<0.5", disagree), ""
+        else:
+            r.done = True
+            if not r.extra_used and finest and cfg.verify and critical is None:
+                note = f"; {disagree} not settled: {finest}, no finer look"
+            if target is not None:  # no further look will settle it
+                new_events.append(review(target.id, f"unconfirmed: {disagree}", level, [k, k], iou, a,
+                                         kind="unconfirmed"))
+        return None, note
+
     # ---- the loop ------------------------------------------------------------------------------
     def run(self):
         cfg, clock = self.cfg, self.clock
@@ -254,7 +483,15 @@ class Job:
         self.max_level = min(3, len(pyr) - 1)
         self.budget = Budget(int(cfg.pixel_cap * W * H), cfg.usd_cap, cfg.seconds_cap, usd_per_hour=cfg.usd_per_hour)
         self.settings = Settings(size=cfg.size)
-        first = max(0, min(cfg.first_level, int(math.log2(max(W, H) / cfg.size)) if max(W, H) > cfg.size else 0))
+        fits = int(math.log2(max(W, H) / cfg.size)) if max(W, H) > cfg.size else 0  # coarsest level a look fits in
+        first = max(0, min(cfg.first_level, fits))
+        # min_view: no look the rules or a planner choose, first or follow-up, is finer than the finest level whose
+        # window spans that share of the long side (0: any level), capped where a look still fits in the photo. A
+        # replayed look keeps its recorded level, and a gaze the governor shrank (warp-spike) keeps its level.
+        wide = min(fits, self.max_level, max(0, math.ceil(math.log2(cfg.min_view * max(W, H) / cfg.size)))) \
+            if cfg.min_view else 0
+        first = max(first, wide)
+        self.min_level = max(wide, min(cfg.min_level, first))
         yield {"type": "job", "job": self.id, "width": W, "height": H,
                "levels": [[p.shape[1], p.shape[0]] for p in pyr],
                "budget": {"pixel_cap_frac": cfg.pixel_cap, "pixels_cap": self.budget.pixels_cap,
@@ -270,8 +507,9 @@ class Job:
                "candidates": [{"id": c.id, "box": list(c.box), "prior": c.prior} for c in cands],
                "pixels_used": self.budget.pixels_used, "pixels_frac": round(self.budget.pixels_used / (W * H), 4)}
 
-        self.regions = {c.id: Region(c.id, c.cx, c.cy, c.prior, first) for c in cands}
+        self.regions = {c.id: Region(c.id, c.cx, c.cy, c.prior, first, box=c.box) for c in cands}
         self.seen = [np.zeros(sal.shape, bool) for _ in range(len(pyr))]
+        self.looked = np.zeros(sal.shape, bool)  # seen by a look other than the survey: coverage_looked
         self.forced: deque = deque()
         replay_meta: deque = deque()  # (x, y, size) of each replayed look, applied when it runs
         prev_r = None
@@ -295,14 +533,22 @@ class Job:
         govs: list = []  # governor overrides not yet written to the trace (PRD rule 5: every override writes a cause)
         rng = random.Random(cfg.seed)  # only the order="random" ablation draws from it
         self.not_assessed = imaging.unseen_areas(pyr[ov], self.ov_scale, (W, H))  # too large to spend looks on
+        if not cands and not self.replay:  # nothing proposed is not a clean photo: no look will run, so a person looks
+            self.not_assessed.append({"step": 0, "box": [0, 0, W, H], "reason": "no candidate region was proposed",
+                                      "action": "check-by-eye"})
         asked: set = set()  # (finding id, class) pairs already sent to review as ambiguous
         self.followups = 0  # events that follow the step record just yielded (its findings and review requests)
+        self.drills: set = set()  # the chaos drills that fired (each on its fixed step)
         self.step = 0
 
         while self.step < cfg.max_steps:
             self.step += 1
             step_t0 = clock()
             replaying = n_replay > 0
+            left, fill = self.budget.pixels_cap - self.budget.pixels_used, ""
+            if cfg.fill and not replaying and self.settings.size ** 2 > left >= MIN_GAZE ** 2:
+                self.settings.size = math.isqrt(left) // 32 * 32
+                fill = f"; gaze {self.settings.size} px: what the pixel cap leaves ({left} px)"
             # 1. governor first: it may halt, or change the model, level or gaze size, before a look is chosen
             verdict = check(self.budget, self.stats, self.settings, self.settings.size ** 2, cfg.sla_ms, self.kill(),
                             overrides=cfg.governor)
@@ -326,21 +572,34 @@ class Job:
                 if not scored:
                     halt_cause, halt_why = "exhausted", "every candidate has been looked at"
                     break
-                (best, _, a), r = scored[0]
-                lam = cfg.eps * value / cost_ms if cost_ms else 0.0
+                (best, _, a, sev, u), r = scored[0]
+                # lambda: eps x the value found per ms so far, but never below eps x v0 per look (the floor), so a
+                # photo with nothing to find can still stop on the rule rather than spend its whole budget. The floor
+                # holds only once, for EVERY candidate still worth a look (unseen > 0), a look at least as fine as its
+                # own first look has shown it (a seed): while one has not, its value is unknown, not small. A coarser
+                # look (the survey) cannot resolve what that look would (a hairline crack at L3), so the job never
+                # stops on a saliency prior and a coarse view alone (nor before it has seen anything).
+                lam_found = cfg.eps * value / cost_ms if cost_ms else 0.0
+                fine = all(c.shown_level is not None and c.shown_level <= self._first_look(c)[0] for _, c in scored)
+                lam_floor = cfg.eps * cfg.v0 / max(self._t_hat(), 1e-3) if fine else 0.0
+                lam = max(lam_found, lam_floor)
                 if best < lam:
                     halt_cause = "stop-rule"
-                    halt_why = f"best score {best:.2e} < lambda {lam:.2e} (eps x value/cost)"
+                    term = "floor: eps x v0 / t_hat" if lam_floor >= lam_found else "eps x value/cost"
+                    halt_why = f"best score {best:.2e} < lambda {lam:.2e} ({term})"
                     break
                 pick, cause = "argmax", "best-score"
                 if cfg.order == "random":  # ablation: any unseen candidate; the stop rule still reads the best score
-                    (best, _, a), r = rng.choice(scored)
+                    (best, _, a, sev, u), r = rng.choice(scored)
                     pick, cause = f"random pick (seed {cfg.seed}),", "random-order"
                 action, level = "gaze", r.next_level
-                why = (f"{pick} score {best:.2e}: prior {r.prior:.2f}, unseen {a:.2f}, t_hat {self._t_hat():.0f} ms; "
-                       f"lambda {lam:.2e}")
+                seen_as = ("not seen yet" if r.shown_level is None else "seeding off" if not cfg.seed_from_looks
+                           else f"{r.cls or 'no class'} seen at L{r.shown_level}")
+                why = (f"{pick} score {best:.2e}: prior {r.prior:.2f}, severity {sev:g} ({seen_as}), uncertainty {u:.2f}, "
+                       f"unseen {a:.2f}, t_hat {self._t_hat():.0f} ms; lambda {lam:.2e}")
             if not replaying:
                 level = min(level + self.settings.level_bias, self.max_level)
+            why += fill
             if self.settings.critical_only and action == "verify" and not any(
                     f.critical and f.region == r.id for f in self.findings):
                 r.done = True
@@ -368,81 +627,99 @@ class Job:
             valid = imaging.footprint(to_l0, (W, H), size)
             seg, seg_ms = self._timed(f"segment:{model}", segment_view, self.segmenter, crop, model, valid, 2**level)
             self.stats.record("segment", seg_ms)
+            # cascade: the confirm net looks again at an unsure or critical look, if the caps leave room for it
+            seg, confirmed = (confirm_look(self, seg, crop, level, valid, clock() - t_start)  # cascade
+                              if self.confirm is not None and q["ok"] else (seg, None))  # cascade
+            ran = confirmed is not None and "skipped" not in confirmed  # cascade
             # Crack components segment_view dropped as straight lines (formwork, joints): logged, never drafted.
             rejected = rejected_lines(seg, to_l0, (W, H))
             injected = None
             if "p95_spike" in cfg.chaos and self.step == SPIKE_STEP:
-                self.stats.record(f"segment:{model}", SPIKE_MS)
-                self.stats.record("segment", SPIKE_MS)
+                self.stats.record(f"segment:{model}", SPIKE_X * cfg.sla_ms)
+                self.stats.record("segment", SPIKE_X * cfg.sla_ms)
                 injected = "p95_spike"
+                self.drills.add(injected)
             y0, y1, x0, x1 = _rect_on(self.seen[level].shape, window, self.ov_scale)
             self.seen[level][y0:y1, x0:x1] = True
+            if cause != "survey" and not (cause == "replay" and self.step == 1 and level > first):  # nor its replay
+                self.looked[y0:y1, x0:x1] = True
             sal_max = round(float(sal[y0:y1, x0:x1].max()), 4) if y1 > y0 and x1 > x0 else 0.0
 
             # 5. what the measurements say to do next
             best = seg.best if q["ok"] else None
             area = seg.areas[best] if best else 0
+            tau = cfg.tau if level < 2 or cfg.tau_scout is None else cfg.tau_scout
             r.entropy = seg.entropy
-            mask = seg.mask(best) if best else np.zeros(seg.labels.shape, np.uint8)
-            prev = next((lk for lk in reversed(r.looks) if lk[1].any()), None)
-            iou = look_iou(prev[1], prev[2], mask, to_l0) if (prev is not None and best) else None
-            prev_level, prev_cls = (prev[0], prev[3]) if prev is not None else (None, None)
-            r.looks.append((level, mask, to_l0, best))
-            new_events, follow = [], None
+            # The finer look against the last coarser look that saw a class here, class by class (PRD rule 3).
+            prev = next((lk for lk in reversed(r.looks) if lk.cls), None) if q["ok"] else None
+            chk = compare(prev, seg, to_l0) if prev is not None else None
+            look = Look(level, seg.labels, to_l0, best)
+            r.looks.append(look)
+            seeded = self._seed(seg, to_l0, valid, level) if q["ok"] else []
+            new_events, follow, drafted, critical = [], None, {}, None
             batch = self.settings.batch
             if not q["ok"]:
                 r.done = True
                 self.not_assessed.append({"step": self.step, "box": imaging.l0_box((0, 0, size, size), to_l0, (W, H)),
                                           "reason": q["reason"], "action": "re-shoot"})
-            elif level > 0 and not batch and seg.entropy > cfg.tau:
-                follow = ("escalate", r, level - 1, "entropy>tau", f"entropy {seg.entropy:.2f} > {cfg.tau} at L{level}")
-            elif level > 0 and not batch and best and area < cfg.a_min:
+            elif level > self.min_level and not batch and seg.entropy > tau:
+                follow = ("escalate", r, level - 1, "entropy>tau", f"entropy {seg.entropy:.2f} > {tau} at L{level}")
+            elif level > self.min_level and not batch and best and area < cfg.a_min:
                 follow = ("escalate", r, level - 1, "area<A_min", f"{best} area {area} px < {cfg.a_min} at L{level}")
-            elif best and (present := self._present(seg, to_l0, level, rejected)):
-                # Every class with a confident mask becomes evidence, most severe first.
-                r.cls = present[0]
-                critical = checked = None
-                # Realised value of the look, in the same units as a region's expected value
-                # (one class's severity), so the stop rule compares like with like.
-                value += max(SEVERITY[c] * seg.confidence[c] for c in present)
-                for c in present:
-                    # The IoU compares this look's `best` mask with the last look's: it is evidence about that finding.
-                    f, kind = self._log_finding(r, c, seg, crop, to_l0, level, iou if c == best else None)
-                    checked = f if c == best else checked
-                    if kind == "absorbed":
-                        if c == best and iou is not None:  # the absorbing finding now carries this look's check
-                            new_events.append({"type": "finding", "finding": f.to_dict()})
-                        # Review on ambiguity: two classes clear A_min on one spot and the agent kept one of them.
-                        if (f.id, c) not in asked:
-                            asked.add((f.id, c))
-                            new_events.append(review(f.id, (
-                                f"ambiguous: {c} {seg.areas[c]} px (>= A_min {cfg.a_min}) is mostly inside {f.cls} {f.id}; "
-                                f"recorded as {f.cls} only"), level, [f.cls, c]))
-                        continue
-                    new_events.append({"type": "finding", "finding": f.to_dict()})
-                    if f.critical:
-                        critical = critical or f
-                        if kind == "new":
-                            new_events.append(review(f.id, f"{c} is critical", level, [c]))
-                disagree = f"iou {iou:g} < {IOU_AGREE} between L{prev_level} and L{level}" if iou is not None else ""
-                if iou is not None and iou < IOU_AGREE and critical:
-                    f = checked if checked and checked.critical else critical  # the finding whose mask was compared
-                    new_events.append(review(f.id, disagree, level, [prev_cls, best], iou, prev_level))
-                    r.done = True
-                elif iou is not None and iou < IOU_AGREE and not r.extra_used and level > 0 and cfg.verify:
-                    r.extra_used = True
-                    follow = ("verify", r, level - 1, "iou<0.5", disagree)
-                elif iou is None and level > 0 and not batch and not r.verified and cfg.verify:
-                    follow = ("verify", r, level - 1, "verify-new-mask",
-                              f"new {best} mask at L{level}; confirming at L{level - 1}")
-                else:
-                    r.verified = iou is not None and iou >= IOU_AGREE
-                    r.done = True
-                    if iou is not None and iou < IOU_AGREE and checked:  # no further look will settle it
-                        new_events.append(review(checked.id, f"unconfirmed: {disagree}", level, [prev_cls, best], iou,
-                                                 prev_level))
             else:
-                r.done = True
+                present = self._present(seg, to_l0, level, rejected) if best else []
+                if 0 < level == self.min_level and not batch and (seg.entropy > tau or (best and area < cfg.a_min)):
+                    # the escalation the rules call for, held: what this look saw, and what it drafted of it
+                    saw = (f"entropy {seg.entropy:.2f} > {tau}" if seg.entropy > tau
+                           else f"{best} area {area} px < A_min {cfg.a_min}")
+                    kept = f"{', '.join(present)} drafted here" if present else f"{best} not drafted" if best else "no class"
+                    why += (f"; L{level} is the finest level for {cfg.profile} (min_view {cfg.min_view:g}): {saw}, "
+                            f"{kept}; no finer look")
+                if present:
+                    # Every class with a confident mask becomes evidence, most severe first.
+                    r.cls = present[0]
+                    # Realised value of the look, in the same units as a region's expected value
+                    # (one class's severity), so the stop rule compares like with like.
+                    if cause != "survey" or cfg.survey_value:
+                        value += max(SEVERITY[c] * seg.confidence[c] for c in present)
+                    for c in present:
+                        # The check compared class chk["class"] across the two looks: evidence about that class's finding.
+                        f, kind = self._log_finding(r, c, seg, crop, to_l0, level,
+                                                    chk["iou"] if chk and c == chk["class"] else None)
+                        drafted[c] = f
+                        if c == best:
+                            look.finding = f.id
+                        if kind == "absorbed":
+                            # Review on ambiguity: two classes clear A_min on one spot and the agent kept one of them.
+                            if (f.id, c) not in asked:
+                                asked.add((f.id, c))
+                                new_events.append(review(f.id, (
+                                    f"ambiguous: {c} {seg.areas[c]} px (>= A_min {cfg.a_min}) is mostly inside {f.cls} "
+                                    f"{f.id}; recorded as {f.cls} only"), level, [f.cls, c], kind="ambiguous"))
+                            continue
+                        new_events.append({"type": "finding", "finding": f.to_dict()})
+                        if f.critical:
+                            critical = critical or f
+                            if f.critical_step == self.step:  # new, or an update that made it critical
+                                new_events.append(review(f.id, f"{c} is critical", level, [c], kind="critical"))
+                # The finding the check is about: a finding OF the compared class, the one this look drafted it into,
+                # else the one the coarser look drafted it into (the class is gone, too small or absorbed here: it
+                # still gets this verdict). A finding that absorbed the class holds another class: never its verdict.
+                target, areas = None, (0, 0)
+                if chk:
+                    k = chk["class"]
+                    target = drafted.get(k) if k in drafted and drafted[k].cls == k else None
+                    if target is None and (target := next((f for f in self.findings
+                                                           if f.id == prev.finding and f.cls == k), None)):
+                        target.set_verify(chk["iou"])
+                        new_events.append({"type": "finding", "finding": target.to_dict()})
+                    if chk["kind"] == "class-change":  # in L0 px, by the rule findings use: the largest component
+                        areas = (measure(prev.mask(k), 2**prev.level, linear=False)["area_px"],
+                                 measure(seg.mask(best), 2**level, linear=False)["area_px"])
+                follow, note = self._settle(r, chk, level, best, target, drafted.get(best), critical, bool(drafted),
+                                            new_events, areas)
+                why += note
+
             # While replaying, the trace already holds the follow-ups; only the last replayed look may queue one.
             if follow and (not replaying or n_replay == 0):
                 r.cx, r.cy = _focus(seg, to_l0, (cx, cy))
@@ -452,9 +729,12 @@ class Job:
 
             # 6. account and log
             step_s = clock() - step_t0
-            cost_ms += self._t_hat() if cfg.t_hat_ms else step_s * 1000
+            if cause != "survey" or cfg.survey_value:
+                cost_ms += self._t_hat() if cfg.t_hat_ms else step_s * 1000
+                cost_ms += ms_hat(self) if ran and cfg.t_hat_ms else 0.0  # cascade: step_s holds it otherwise
             usd_before = self.budget.usd_used
             self.budget.pixels_used += size * size
+            self.budget.pixels_used += size * size if ran else 0  # cascade: the confirm read the crop again
             self.budget.seconds_used = clock() - t_start
             self.gaze_path.append([cx, cy, level])
             rec = {
@@ -471,15 +751,20 @@ class Job:
                 "cause": cause,
                 "planner": "llm" if cause.startswith("planner:") or (planner_status or {}).get("strategy") in (
                     "switch_model", "batch_remaining") else "rule",
-                "model": model, "latency_ms": round(warp_ms + seg_ms, 1),
+                "model": model, "profile": cfg.profile, "latency_ms": round(warp_ms + seg_ms, 1),
                 "cost_usd": round(self.budget.usd_used - usd_before, 8),
                 "pixels_used": self.budget.pixels_used,
                 "pixels_frac": round(self.budget.pixels_used / (W * H), 4),
                 "usd_used": round(self.budget.usd_used, 6), "seconds_used": round(self.budget.seconds_used, 3),
                 "injected": injected,
             }
-            if iou is not None:
-                rec["verify"] = {"iou": iou, "against_level": prev_level}
+            if confirmed:  # cascade
+                rec |= {"confirm": confirmed,  # cascade
+                        "latency_ms": round(warp_ms + seg_ms + confirmed.get("latency_ms", 0.0), 1)}  # cascade
+            if chk:
+                rec["verify"] = {k: chk[k] for k in ("iou", "class", "against_level", "class_now", "iou_any")}
+            if seeded:
+                rec["seeded"] = seeded
             if rejected:
                 rec["rejected"] = rejected
             if planner_status:
@@ -501,7 +786,8 @@ class Job:
         halted = halt_cause in ("cap-hit", "kill-switch")
         rec = {"type": "step", "job": self.id, "step": self.step, "t": now_iso(), "region": None,
                "decision": {"action": "halt", "args": {}}, "rationale": halt_why, "cause": halt_cause,
-               "planner": "rule", "model": self.settings.model, "pixels_used": self.budget.pixels_used,
+               "planner": "rule", "model": self.settings.model, "profile": cfg.profile,
+               "pixels_used": self.budget.pixels_used,
                "pixels_frac": round(self.budget.pixels_used / (W * H), 4),
                "usd_used": round(self.budget.usd_used, 6), "seconds_used": round(self.budget.seconds_used, 3),
                "runtime": self.stats.snapshot(self.budget.usd_used)}
@@ -514,14 +800,26 @@ class Job:
         status = "halted" if halted else ("awaiting_review" if pending else "completed")
         seen_any = np.logical_or.reduce(self.seen)
         coverage = float((sal * seen_any).sum() / max(sal.sum(), 1e-6))
+        if halted:  # a candidate the halt left without a look of its own is not assessed, never clean
+            self.not_assessed += [{"step": self.step, "box": imaging.l0_box(r.box, np.eye(3), (W, H)),
+                                   "reason": f"not looked at: {halt_cause} halted the job first",
+                                   "action": "check-by-eye", "region": r.id}
+                                  for r in self.regions.values() if not r.looks and r.box is not None]
         self.work_order = work_order(self.id, self.findings, self.gaze_path, self.not_assessed)
+        self.work_order["profile"] = cfg.profile  # the levels it looked at were this segmenter's (PROFILES)
+        self.work_order["weights_sha256"] = getattr(self.segmenter, "sha256", None)  # the model that looked (WEIGHTS)
+        if self.confirm is not None:  # cascade
+            self.work_order["confirm_sha256"] = getattr(self.confirm, "sha256", None)  # cascade
         yield {"type": "done", "status": status, "cause": halt_cause,
                "summary": {"steps": len(self.gaze_path), "pixels_used": self.budget.pixels_used,
                            "pixels_frac": round(self.budget.pixels_used / (W * H), 4),
                            "usd": round(self.budget.usd_used, 6), "seconds": round(self.budget.seconds_used, 3),
                            "findings": len(self.findings), "critical_pending": pending},
-               "coverage": round(coverage, 4),
+               "coverage": round(coverage, 4),  # seen at any level, the survey included
+               "coverage_looked": round(float((sal * self.looked).sum() / max(sal.sum(), 1e-6)), 4),
                "unvisited": [r.id for r in self.regions.values() if not r.looks],
+               # requested drills whose step the job never reached (it ended first): they tested nothing
+               "drills_not_reached": [d for d in cfg.chaos if d not in self.drills],
                "work_order": self.work_order}
 
 
@@ -538,14 +836,35 @@ def survey_look(cands, l0_size, size, first, max_level, looks) -> tuple[int, int
     return ((x0 + x1) // 2, (y0 + y1) // 2, level) if level > first else None
 
 
+REVIEW_KINDS = ("critical", "ambiguous", "disagree", "class-change", "unconfirmed")
+
+
 def review(finding_id: str, reason: str, level: int, classes: list, iou: float | None = None,
-           level_a: int | None = None) -> dict:
+           level_a: int | None = None, kind: str = "critical") -> dict:
     """A review_request event. `reason` is the sentence traces and MCP clients read; the rest says the same in
-    fields: level_b is the look that asked, level_a the coarser look it was compared with (iou: their mask IoU),
-    and `classes` is [class at level_a, class at level_b] for a comparison, [kept, absorbed] for an ambiguity,
-    [class] for a new critical finding."""
-    return {"type": "review_request", "finding_id": finding_id, "reason": reason, "iou": iou, "level_a": level_a,
-            "level_b": level, "classes": classes}
+    fields: `kind` (REVIEW_KINDS), level_b the look that asked, level_a the coarser look it was compared with (iou:
+    their same-class mask IoU, or for a class change the IoU of the two looks' best masks), and `classes` is
+    [class at level_a, class at level_b] for a comparison, [kept, absorbed] for an ambiguity, [class] for a new
+    critical finding."""
+    assert kind in REVIEW_KINDS, kind
+    return {"type": "review_request", "finding_id": finding_id, "kind": kind, "reason": reason, "iou": iou,
+            "level_a": level_a, "level_b": level, "classes": classes}
+
+
+def compare(prev: Look, seg, to_l0: np.ndarray) -> dict | None:
+    """A finer look against the coarser look `prev`, class by class: `iou` compares prev's class mask with this
+    look's mask of the SAME class (gone here: 0), `iou_any` the two looks' best masks whatever their classes. `kind`:
+    agree (iou >= IOU_AGREE); class-change (the same place, seen as another class: iou_any >= IOU_AGREE); else
+    disagree. None when the two cannot be compared: no pixel of prev's mask lies inside this view."""
+    k, now = prev.cls, seg.best
+    iou = look_iou(prev.mask(k), prev.to_l0, seg.mask(k), to_l0)
+    if iou is None:
+        return None
+    now_mask = seg.mask(now) if now else np.zeros(seg.labels.shape, np.uint8)  # this look may see no defect at all
+    iou_any = look_iou(prev.mask(k), prev.to_l0, now_mask, to_l0) if now != k else iou
+    kind = ("agree" if iou >= IOU_AGREE else "class-change" if now and iou_any is not None and iou_any >= IOU_AGREE
+            else "disagree")
+    return {"iou": iou, "class": k, "against_level": prev.level, "class_now": now, "iou_any": iou_any, "kind": kind}
 
 
 def _inside(a, b) -> float:
@@ -555,17 +874,21 @@ def _inside(a, b) -> float:
     return iw * ih / max(1, a[2] * a[3])
 
 
-def look_iou(prev_mask: np.ndarray, prev_to_l0: np.ndarray, cur_mask: np.ndarray, cur_to_l0: np.ndarray) -> float:
-    """Agreement of two looks' masks, compared in the finer (current) look's frame with a 2-px tolerance."""
+def look_iou(prev_mask: np.ndarray, prev_to_l0: np.ndarray, cur_mask: np.ndarray, cur_to_l0: np.ndarray) -> float | None:
+    """Agreement of two looks' masks, compared in the finer (current) look's frame with a 2-px tolerance. None when
+    the coarser mask has no pixel in this view (it lies outside it): nothing was compared, so nothing agrees or
+    disagrees, whatever this look shows elsewhere."""
     size = cur_mask.shape[::-1]
     m = np.linalg.inv(cur_to_l0) @ prev_to_l0
     warped = cv2.warpPerspective(prev_mask, m, size, flags=cv2.INTER_NEAREST)
+    if not warped.any():
+        return None
     footprint = cv2.warpPerspective(np.ones_like(prev_mask), m, size, flags=cv2.INTER_NEAREST) > 0
     k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
     a = cv2.dilate(cur_mask, k).astype(bool) & footprint
     b = cv2.dilate(warped, k).astype(bool)
     union = np.count_nonzero(a | b)
-    return round(np.count_nonzero(a & b) / union, 3) if union else 1.0
+    return round(float(np.count_nonzero(a & b) / union), 3) if union else None
 
 
 def _focus(seg, to_l0, fallback: tuple[int, int]) -> tuple[int, int]:

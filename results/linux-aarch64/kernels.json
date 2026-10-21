@@ -1,0 +1,617 @@
+{
+ "arm": "linux-aarch64",
+ "config": {
+  "repeats": 30,
+  "warmup": 3,
+  "threads": [
+   1,
+   4
+  ],
+  "all_threads": 4,
+  "sizes": [
+   "1024x768",
+   "2048x1536",
+   "4000x3000"
+  ],
+  "frames": "evals.synth.generate(9000, w, h)",
+  "min_contour_points": 50,
+  "frame_facts": {
+   "1024x768": {
+    "contours": 6,
+    "mask_frac": 0.0087
+   },
+   "2048x1536": {
+    "contours": 9,
+    "mask_frac": 0.008
+   },
+   "4000x3000": {
+    "contours": 29,
+    "mask_frac": 0.0094
+   }
+  }
+ },
+ "provenance": {
+  "cv2": "5.0.0",
+  "build_info_sha256": "4460ffe25568d7f496997f0593f568f4d91ee4740c97f057b2986c237e8a386c",
+  "cv2_baseline": "NEON FP16",
+  "cv2_dispatch": "NEON_DOTPROD NEON_FP16 NEON_BF16",
+  "cv2_parallel_framework": "pthreads",
+  "cv2_custom_hal": "YES (carotene (ver 0.0.1) KleidiCV (ver 26.03))",
+  "cv2_file": "/home/runner/work/drishyam/drishyam/.venv/lib/python3.13/site-packages/cv2/__init__.py",
+  "under_opt_cool": false,
+  "build": "stock (not COOL)",
+  "machine": "Linux 6.17.0-1022-azure aarch64",
+  "platform": "Linux-6.17.0-1022-azure-aarch64-with-glibc2.39",
+  "cpu": "Neoverse-N2",
+  "logical_cpus": 4,
+  "cv2_threads": 4,
+  "python": "3.13.16",
+  "numpy": "2.5.4",
+  "timestamp": "2026-10-19T08:11:49Z",
+  "load_avg": [
+   0.91,
+   0.41,
+   0.15
+  ],
+  "label": "GitHub ubuntu-24.04-arm runner, not Lambda"
+ },
+ "results": [
+  {
+   "kernel": "pyramid",
+   "size": "1024x768",
+   "threads": 1,
+   "n": 30,
+   "p50_ms": 0.873,
+   "p95_ms": 0.882,
+   "mean_ms": 0.873,
+   "min_ms": 0.858,
+   "ops_per_s": 1145.48
+  },
+  {
+   "kernel": "clahe_lab",
+   "size": "1024x768",
+   "threads": 1,
+   "n": 30,
+   "p50_ms": 9.125,
+   "p95_ms": 9.147,
+   "mean_ms": 9.125,
+   "min_ms": 9.108,
+   "ops_per_s": 109.59
+  },
+  {
+   "kernel": "scharr_tensor",
+   "size": "1024x768",
+   "threads": 1,
+   "n": 30,
+   "p50_ms": 7.955,
+   "p95_ms": 7.999,
+   "mean_ms": 7.957,
+   "min_ms": 7.919,
+   "ops_per_s": 125.68
+  },
+  {
+   "kernel": "blackhat_tophat",
+   "size": "1024x768",
+   "threads": 1,
+   "n": 30,
+   "p50_ms": 9.726,
+   "p95_ms": 9.745,
+   "mean_ms": 9.725,
+   "min_ms": 9.694,
+   "ops_per_s": 102.83
+  },
+  {
+   "kernel": "canny",
+   "size": "1024x768",
+   "threads": 1,
+   "n": 30,
+   "p50_ms": 1.891,
+   "p95_ms": 1.914,
+   "mean_ms": 1.893,
+   "min_ms": 1.877,
+   "ops_per_s": 528.26
+  },
+  {
+   "kernel": "components_contours",
+   "size": "1024x768",
+   "threads": 1,
+   "n": 30,
+   "p50_ms": 4.435,
+   "p95_ms": 4.477,
+   "mean_ms": 4.44,
+   "min_ms": 4.406,
+   "ops_per_s": 225.23
+  },
+  {
+   "kernel": "warp_gaze",
+   "size": "1024x768",
+   "threads": 1,
+   "n": 30,
+   "p50_ms": 1.651,
+   "p95_ms": 1.661,
+   "mean_ms": 1.651,
+   "min_ms": 1.638,
+   "ops_per_s": 605.69
+  },
+  {
+   "kernel": "blob",
+   "size": "1024x768",
+   "threads": 1,
+   "n": 30,
+   "p50_ms": 0.769,
+   "p95_ms": 0.776,
+   "mean_ms": 0.766,
+   "min_ms": 0.749,
+   "ops_per_s": 1305.48
+  },
+  {
+   "kernel": "pyramid",
+   "size": "2048x1536",
+   "threads": 1,
+   "n": 30,
+   "p50_ms": 3.502,
+   "p95_ms": 3.644,
+   "mean_ms": 3.517,
+   "min_ms": 3.435,
+   "ops_per_s": 284.33
+  },
+  {
+   "kernel": "clahe_lab",
+   "size": "2048x1536",
+   "threads": 1,
+   "n": 30,
+   "p50_ms": 36.529,
+   "p95_ms": 36.758,
+   "mean_ms": 36.547,
+   "min_ms": 36.386,
+   "ops_per_s": 27.36
+  },
+  {
+   "kernel": "scharr_tensor",
+   "size": "2048x1536",
+   "threads": 1,
+   "n": 30,
+   "p50_ms": 44.646,
+   "p95_ms": 45.182,
+   "mean_ms": 44.586,
+   "min_ms": 43.728,
+   "ops_per_s": 22.43
+  },
+  {
+   "kernel": "blackhat_tophat",
+   "size": "2048x1536",
+   "threads": 1,
+   "n": 30,
+   "p50_ms": 38.573,
+   "p95_ms": 38.808,
+   "mean_ms": 38.565,
+   "min_ms": 38.248,
+   "ops_per_s": 25.93
+  },
+  {
+   "kernel": "canny",
+   "size": "2048x1536",
+   "threads": 1,
+   "n": 30,
+   "p50_ms": 7.913,
+   "p95_ms": 7.994,
+   "mean_ms": 7.914,
+   "min_ms": 7.813,
+   "ops_per_s": 126.36
+  },
+  {
+   "kernel": "components_contours",
+   "size": "2048x1536",
+   "threads": 1,
+   "n": 30,
+   "p50_ms": 15.869,
+   "p95_ms": 16.025,
+   "mean_ms": 15.886,
+   "min_ms": 15.698,
+   "ops_per_s": 62.95
+  },
+  {
+   "kernel": "warp_gaze",
+   "size": "2048x1536",
+   "threads": 1,
+   "n": 30,
+   "p50_ms": 1.643,
+   "p95_ms": 1.66,
+   "mean_ms": 1.645,
+   "min_ms": 1.631,
+   "ops_per_s": 607.9
+  },
+  {
+   "kernel": "blob",
+   "size": "2048x1536",
+   "threads": 1,
+   "n": 30,
+   "p50_ms": 1.796,
+   "p95_ms": 1.832,
+   "mean_ms": 1.798,
+   "min_ms": 1.757,
+   "ops_per_s": 556.17
+  },
+  {
+   "kernel": "pyramid",
+   "size": "4000x3000",
+   "threads": 1,
+   "n": 30,
+   "p50_ms": 14.586,
+   "p95_ms": 14.738,
+   "mean_ms": 14.599,
+   "min_ms": 14.495,
+   "ops_per_s": 68.5
+  },
+  {
+   "kernel": "clahe_lab",
+   "size": "4000x3000",
+   "threads": 1,
+   "n": 30,
+   "p50_ms": 143.669,
+   "p95_ms": 144.427,
+   "mean_ms": 143.775,
+   "min_ms": 143.013,
+   "ops_per_s": 6.96
+  },
+  {
+   "kernel": "scharr_tensor",
+   "size": "4000x3000",
+   "threads": 1,
+   "n": 30,
+   "p50_ms": 141.853,
+   "p95_ms": 142.851,
+   "mean_ms": 141.844,
+   "min_ms": 140.097,
+   "ops_per_s": 7.05
+  },
+  {
+   "kernel": "blackhat_tophat",
+   "size": "4000x3000",
+   "threads": 1,
+   "n": 30,
+   "p50_ms": 150.777,
+   "p95_ms": 151.47,
+   "mean_ms": 150.964,
+   "min_ms": 150.549,
+   "ops_per_s": 6.62
+  },
+  {
+   "kernel": "canny",
+   "size": "4000x3000",
+   "threads": 1,
+   "n": 30,
+   "p50_ms": 44.515,
+   "p95_ms": 45.112,
+   "mean_ms": 44.473,
+   "min_ms": 43.517,
+   "ops_per_s": 22.49
+  },
+  {
+   "kernel": "components_contours",
+   "size": "4000x3000",
+   "threads": 1,
+   "n": 30,
+   "p50_ms": 54.824,
+   "p95_ms": 55.169,
+   "mean_ms": 54.828,
+   "min_ms": 54.399,
+   "ops_per_s": 18.24
+  },
+  {
+   "kernel": "warp_gaze",
+   "size": "4000x3000",
+   "threads": 1,
+   "n": 30,
+   "p50_ms": 1.645,
+   "p95_ms": 1.651,
+   "mean_ms": 1.643,
+   "min_ms": 1.625,
+   "ops_per_s": 608.64
+  },
+  {
+   "kernel": "blob",
+   "size": "4000x3000",
+   "threads": 1,
+   "n": 30,
+   "p50_ms": 1.78,
+   "p95_ms": 1.815,
+   "mean_ms": 1.781,
+   "min_ms": 1.752,
+   "ops_per_s": 561.48
+  },
+  {
+   "kernel": "pyramid",
+   "size": "1024x768",
+   "threads": 4,
+   "n": 30,
+   "p50_ms": 0.248,
+   "p95_ms": 0.261,
+   "mean_ms": 0.251,
+   "min_ms": 0.246,
+   "ops_per_s": 3984.06
+  },
+  {
+   "kernel": "clahe_lab",
+   "size": "1024x768",
+   "threads": 4,
+   "n": 30,
+   "p50_ms": 2.775,
+   "p95_ms": 2.789,
+   "mean_ms": 2.777,
+   "min_ms": 2.765,
+   "ops_per_s": 360.1
+  },
+  {
+   "kernel": "scharr_tensor",
+   "size": "1024x768",
+   "threads": 4,
+   "n": 30,
+   "p50_ms": 8.03,
+   "p95_ms": 8.066,
+   "mean_ms": 8.029,
+   "min_ms": 7.981,
+   "ops_per_s": 124.55
+  },
+  {
+   "kernel": "blackhat_tophat",
+   "size": "1024x768",
+   "threads": 4,
+   "n": 30,
+   "p50_ms": 9.615,
+   "p95_ms": 9.652,
+   "mean_ms": 9.614,
+   "min_ms": 9.56,
+   "ops_per_s": 104.01
+  },
+  {
+   "kernel": "canny",
+   "size": "1024x768",
+   "threads": 4,
+   "n": 30,
+   "p50_ms": 0.621,
+   "p95_ms": 1.096,
+   "mean_ms": 0.717,
+   "min_ms": 0.601,
+   "ops_per_s": 1394.7
+  },
+  {
+   "kernel": "components_contours",
+   "size": "1024x768",
+   "threads": 4,
+   "n": 30,
+   "p50_ms": 3.141,
+   "p95_ms": 3.163,
+   "mean_ms": 3.141,
+   "min_ms": 3.118,
+   "ops_per_s": 318.37
+  },
+  {
+   "kernel": "warp_gaze",
+   "size": "1024x768",
+   "threads": 4,
+   "n": 30,
+   "p50_ms": 0.46,
+   "p95_ms": 0.47,
+   "mean_ms": 0.459,
+   "min_ms": 0.442,
+   "ops_per_s": 2178.65
+  },
+  {
+   "kernel": "blob",
+   "size": "1024x768",
+   "threads": 4,
+   "n": 30,
+   "p50_ms": 0.49,
+   "p95_ms": 0.501,
+   "mean_ms": 0.489,
+   "min_ms": 0.468,
+   "ops_per_s": 2044.99
+  },
+  {
+   "kernel": "pyramid",
+   "size": "2048x1536",
+   "threads": 4,
+   "n": 30,
+   "p50_ms": 0.914,
+   "p95_ms": 0.928,
+   "mean_ms": 0.915,
+   "min_ms": 0.903,
+   "ops_per_s": 1092.9
+  },
+  {
+   "kernel": "clahe_lab",
+   "size": "2048x1536",
+   "threads": 4,
+   "n": 30,
+   "p50_ms": 10.59,
+   "p95_ms": 10.641,
+   "mean_ms": 10.599,
+   "min_ms": 10.554,
+   "ops_per_s": 94.35
+  },
+  {
+   "kernel": "scharr_tensor",
+   "size": "2048x1536",
+   "threads": 4,
+   "n": 30,
+   "p50_ms": 10.219,
+   "p95_ms": 10.435,
+   "mean_ms": 10.253,
+   "min_ms": 10.004,
+   "ops_per_s": 97.53
+  },
+  {
+   "kernel": "blackhat_tophat",
+   "size": "2048x1536",
+   "threads": 4,
+   "n": 30,
+   "p50_ms": 13.416,
+   "p95_ms": 13.5,
+   "mean_ms": 13.422,
+   "min_ms": 13.367,
+   "ops_per_s": 74.5
+  },
+  {
+   "kernel": "canny",
+   "size": "2048x1536",
+   "threads": 4,
+   "n": 30,
+   "p50_ms": 2.59,
+   "p95_ms": 2.633,
+   "mean_ms": 2.599,
+   "min_ms": 2.564,
+   "ops_per_s": 384.76
+  },
+  {
+   "kernel": "components_contours",
+   "size": "2048x1536",
+   "threads": 4,
+   "n": 30,
+   "p50_ms": 10.068,
+   "p95_ms": 10.545,
+   "mean_ms": 10.137,
+   "min_ms": 10.005,
+   "ops_per_s": 98.65
+  },
+  {
+   "kernel": "warp_gaze",
+   "size": "2048x1536",
+   "threads": 4,
+   "n": 30,
+   "p50_ms": 0.599,
+   "p95_ms": 0.618,
+   "mean_ms": 0.6,
+   "min_ms": 0.583,
+   "ops_per_s": 1666.67
+  },
+  {
+   "kernel": "blob",
+   "size": "2048x1536",
+   "threads": 4,
+   "n": 30,
+   "p50_ms": 1.067,
+   "p95_ms": 1.095,
+   "mean_ms": 1.0,
+   "min_ms": 0.719,
+   "ops_per_s": 1000.0
+  },
+  {
+   "kernel": "pyramid",
+   "size": "4000x3000",
+   "threads": 4,
+   "n": 30,
+   "p50_ms": 3.41,
+   "p95_ms": 3.459,
+   "mean_ms": 3.411,
+   "min_ms": 3.352,
+   "ops_per_s": 293.17
+  },
+  {
+   "kernel": "clahe_lab",
+   "size": "4000x3000",
+   "threads": 4,
+   "n": 30,
+   "p50_ms": 41.632,
+   "p95_ms": 42.338,
+   "mean_ms": 41.732,
+   "min_ms": 41.384,
+   "ops_per_s": 23.96
+  },
+  {
+   "kernel": "scharr_tensor",
+   "size": "4000x3000",
+   "threads": 4,
+   "n": 30,
+   "p50_ms": 47.801,
+   "p95_ms": 48.644,
+   "mean_ms": 47.787,
+   "min_ms": 46.868,
+   "ops_per_s": 20.93
+  },
+  {
+   "kernel": "blackhat_tophat",
+   "size": "4000x3000",
+   "threads": 4,
+   "n": 30,
+   "p50_ms": 51.602,
+   "p95_ms": 52.11,
+   "mean_ms": 51.635,
+   "min_ms": 51.238,
+   "ops_per_s": 19.37
+  },
+  {
+   "kernel": "canny",
+   "size": "4000x3000",
+   "threads": 4,
+   "n": 30,
+   "p50_ms": 11.292,
+   "p95_ms": 16.985,
+   "mean_ms": 11.974,
+   "min_ms": 10.783,
+   "ops_per_s": 83.51
+  },
+  {
+   "kernel": "components_contours",
+   "size": "4000x3000",
+   "threads": 4,
+   "n": 30,
+   "p50_ms": 30.841,
+   "p95_ms": 31.366,
+   "mean_ms": 31.022,
+   "min_ms": 30.445,
+   "ops_per_s": 32.24
+  },
+  {
+   "kernel": "warp_gaze",
+   "size": "4000x3000",
+   "threads": 4,
+   "n": 30,
+   "p50_ms": 0.595,
+   "p95_ms": 0.608,
+   "mean_ms": 0.595,
+   "min_ms": 0.583,
+   "ops_per_s": 1680.67
+  },
+  {
+   "kernel": "blob",
+   "size": "4000x3000",
+   "threads": 4,
+   "n": 30,
+   "p50_ms": 0.895,
+   "p95_ms": 1.084,
+   "mean_ms": 0.9,
+   "min_ms": 0.713,
+   "ops_per_s": 1111.11
+  }
+ ],
+ "dnn": [
+  {
+   "model": "nanodet",
+   "size": "416x416",
+   "threads": 1,
+   "n": 30,
+   "p50_ms": 40.458,
+   "p95_ms": 40.752,
+   "mean_ms": 40.503,
+   "min_ms": 40.329,
+   "ops_per_s": 24.69
+  },
+  {
+   "model": "nanodet",
+   "size": "416x416",
+   "threads": 4,
+   "n": 30,
+   "p50_ms": 13.059,
+   "p95_ms": 13.264,
+   "mean_ms": 13.072,
+   "min_ms": 12.943,
+   "ops_per_s": 76.5
+  }
+ ],
+ "load_avg_end": [
+  1.41,
+  0.58,
+  0.22
+ ]
+}

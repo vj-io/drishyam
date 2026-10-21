@@ -4,21 +4,62 @@ The web demo (the FastAPI app and the static site) runs on AWS only, as one CDK 
 `us-east-1`: the API on Lambda arm64 (Graviton) and the static site in a private S3 bucket, both reached
 only through CloudFront and AWS WAF.
 
-**Status: deployed** on 2026-10-18 (India time) to `us-east-1` and smoke-tested. The smoke run
-(`scripts/aws.sh smoke`, checks 1 to 5 under [Smoke](#smoke)) passed: `/api/health` answered from
-`aws-lambda` on `aarch64` with OpenCV 5.0.0 (`stock (not COOL)`), a job on `bridge_03.jpg` streamed to
-`done` (`awaiting_review`, 6 steps), KILL halted a second job at step 3, an unsigned `POST` through
-CloudFront got 403, the raw Function URL got 403, and the step p95 was 88 ms over that job's 6 steps. Its
-summary line, copied here because `runs/aws-smoke.log` is git-ignored (the timestamp is UTC):
+**Status: deployed** on 2026-10-21 (India time) to `us-east-1`, last from commit f12f50f (below). The v1 deploy
+itself came from commit dda3080, with the v1 segmenter
+(`ONNX=models/drishyam_dacl10k.onnx ONNX_FP16=models/drishyam_dacl10k.fp16.onnx RESERVED=none scripts/aws.sh deploy`)
+and the submission film in the site bucket (`video/drishyam.mp4`, served with byte ranges). The smoke run
+(`scripts/aws.sh smoke` with `WAF_LOOP=1`: checks 1 to 5 and 7 under [Smoke](#smoke)) passed: `/api/health` answered
+from `aws-lambda` on `aarch64` with OpenCV 5.0.0 (`stock (not COOL)`), segmenter `onnx:drishyam_dacl10k.onnx` and
+commit dda3080, a job on `bridge_03.jpg` streamed to `done` (`awaiting_review`, 6 steps), KILL halted a second job
+after 3 steps, an unsigned `POST` through CloudFront got 403, the raw Function URL got 403, and the WAF answered 429
+at the 18th empty-bodied job start. The startup log has `DRISHYAM_CV_THREADS=2: cv2.getNumThreads() = 2`. The step
+p95 was 1138.9 ms over 6 steps: with v1 a step costs 0.52 to 1.14 s at p95 over the eleven smoke runs since the v1
+deploy, against 67.7 to 88.0 ms for the classical engine. At that deploy the governor's 500 ms target sent most
+later looks to the fast FP16 net; the v1 limit is now 1500 ms (below). The summary line, copied here because `runs/aws-smoke.log` is git-ignored (UTC; earlier lines are
+in `video/live/aws-smoke.log`):
 
 ```
-smoke 2026-10-17T23:12:36Z https://d1xg58guluup8c.cloudfront.net commit=d34f74ba70d256d3f5395bcc6abac50e339b55d9-dirty package=z4dXOG1caCf9ZFT//BBlsAQ36dRC5+4lwWAwYN5Anjk= ttfb_first=1.034778s ttfb_warm=0.983273s step_p95_ms=88.0 result=pass
+smoke 2026-10-20T21:12:31Z https://d1xg58guluup8c.cloudfront.net commit=dda308072fb4e63997a4df809a2f57abd0d3dbc0 package=r7K9s9XZtHmkq0+f2OtXiTy1CUyFo5xf2GzQkv6UJMs= ttfb_first=5.516721s ttfb_warm=0.913209s step_p95_ms=1138.9 result=pass
 ```
 
-The live build was made from a working tree with uncommitted changes (`d34f74b-dirty`), so it matches no
-public commit, and it predates the changes on this page that are marked as not yet live. It will be
-redeployed from the release commit, and this block updated with that smoke run. The costs below are
-list-price estimates until the first bill; the dashboard screenshot is not added yet.
+The site was then deployed again from commit 02219a2 with three wording fixes the live browser suite had found (v1's
+step reasons printed its profile name and scientific notation). Its smoke run (checks 1 to 5) passed, KILL halting
+the second job after 2 steps, and `tests/e2e/test_ui_live.py https://d1xg58guluup8c.cloudfront.net` passed twice:
+
+```
+smoke 2026-10-21T04:21:29Z https://d1xg58guluup8c.cloudfront.net commit=02219a2e435ea90058fcb87f03d69f30cc3f2b4d package=r7K9s9XZtHmkq0+f2OtXiTy1CUyFo5xf2GzQkv6UJMs= ttfb_first=0.857872s ttfb_warm=0.728508s step_p95_ms=973.3 result=pass
+```
+
+The current build: the site was redeployed from commit f12f50f on 2026-10-21: the app code of 4fe8e30 plus the
+re-rendered film. 4fe8e30 adds v1's governor limit of
+1500 ms (`agent.SLA_MS_BY_PROFILE`, set from the step p95s above, not from recall), work orders that mark a photo
+with no candidate region, and the regions a KILL or a cap left unvisited, as not assessed, and the site fixes from
+the 2026-10-21 re-grade. Its smoke run (checks 1 to 5) passed, KILL halting the second job after 3 steps; the run
+before it, on c06fdf9, also checked the WAF (429 at the 20th empty-bodied job start). Their step p95s were 690.8
+and 524.7 ms over 4 steps each, under the 1500 ms limit, so the governor did not switch v1 to the fast net.
+`tests/e2e/test_ui_live.py https://d1xg58guluup8c.cloudfront.net` passed twice against 4fe8e30. Against f12f50f
+it passed again, and so did the smoke run (KILL after 3 steps, step p95 666.4 ms over 4 steps):
+
+```
+smoke 2026-10-21T11:38:30Z https://d1xg58guluup8c.cloudfront.net commit=f12f50f8cebf758daa047ceefa9317c3557f56bb package=zt3ae1LspPxb2+I34jVhG75ObZEtmwt6qEgWApdokCo= ttfb_first=1.163289s ttfb_warm=1.369439s step_p95_ms=666.4 result=pass
+```
+
+The 4fe8e30 run:
+
+```
+smoke 2026-10-21T11:15:48Z https://d1xg58guluup8c.cloudfront.net commit=4fe8e3014c5eae65bc2aeacaf683a7b34ca94a55 package=zt3ae1LspPxb2+I34jVhG75ObZEtmwt6qEgWApdokCo= ttfb_first=1.101934s ttfb_warm=1.001083s step_p95_ms=690.8 result=pass
+```
+
+The first smoke after the v1 deploy failed KILL only: the kill reached a cold environment and the job finished
+first. The fix (a job start warms a second environment) is under [Smoke](#smoke), check 3.
+
+On the live site the WAF's 429 carries the JSON body `{"error": "rate limited: 10 job starts per 2 min per IP; wait
+and retry"}`, and a review reply carries `prev_token_sha256` (both checked on 2026-10-18). Cost Explorer, month to
+date on 2026-10-21: 0.62 USD before credits (0.59 of it the WAF), 0.00 USD after them; the
+[Cost estimate](#cost-estimate) below is list price at an assumed judging load. The CloudWatch dashboard `Drishyam`
+over the three days to that deploy (four of its eight widgets, from `GetMetricWidgetImage`):
+
+![CloudWatch dashboard: jobs by status, job seconds, Lambda invocations and duration](aws-dashboard.png)
 
 Three parts depend on app changes made outside `infra/` (all three are in):
 `drishyam/web.py` must read the signing key from the secret named by `DRISHYAM_SIGNING_KEY_SECRET_ARN`
@@ -75,11 +116,11 @@ flowchart LR
 | Function URL | `AuthType AWS_IAM`, `InvokeMode RESPONSE_STREAM` | Nobody can call it without a SigV4 signature, so the WAF cannot be bypassed |
 | CloudFront | Two origins, each with Origin Access Control. `/api/*` goes to the Function URL: not cached, all methods, all viewer headers and the query string forwarded, no compression, 60 s read timeout. Everything else goes to the S3 bucket, cached (`CachingOptimized`), `/` serves `index.html`, with a response headers policy built from `infra/headers.json` (CSP, HSTS, `X-Frame-Options`, `Referrer-Policy`, `nosniff`, `Permissions-Policy`, COOP, CORP; `web.py` serves the same file's headers in local runs, and `tests/test_infra.py` fails if the policy differs from it) | Lambda runs one request per environment, so a cold page load (about 30 files) through the function would hit the concurrency cap and get 429s; static invocations would also crowd out jobs and water down the Duration p95 alarm |
 | S3 bucket | Private (all public access blocked, TLS only, SSE-S3); only this distribution may read objects. CDK's `BucketDeployment` uploads `public/` on every deploy that changes it, deletes files no longer there and invalidates `/*`. `destroy` empties and deletes it | The static site off the function, with the same headers as in local runs |
-| AWS WAF | Web ACL (scope `CLOUDFRONT`, which must live in `us-east-1`). Rule `job-starts`: `POST /api/jobs`, 10 per IP per 120 s. Rule `kill-and-review`: `/api/kill` plus `/api/review`, 30 per IP per 60 s. Rule `all-requests`: every request, 300 per IP per 60 s (a page load is about 30). Paths are matched after URL decoding. Blocked requests get 429 with a JSON body that names the rule's limit, such as `{"error": "rate limited: 10 job starts per 2 min per IP; wait and retry"}` (not yet live: the current build answers with CloudFront's default 403) | A cap on job starts, the expensive call; one on the two other `POST` endpoints; and a ceiling on everything else, such as cache-busting `GET /api/health` floods. Trade-offs under Limits |
+| AWS WAF | Web ACL (scope `CLOUDFRONT`, which must live in `us-east-1`). Rule `job-starts`: `POST /api/jobs`, 10 per IP per 120 s. Rule `kill-and-review`: `/api/kill` plus `/api/review`, 30 per IP per 60 s. Rule `all-requests`: every request, 300 per IP per 60 s (a page load is about 30). Paths are matched after URL decoding. Blocked requests get 429 with a JSON body that names the rule's limit, such as `{"error": "rate limited: 10 job starts per 2 min per IP; wait and retry"}` | A cap on job starts, the expensive call; one on the two other `POST` endpoints; and a ceiling on everything else, such as cache-busting `GET /api/health` floods. Trade-offs under Limits |
 | DynamoDB kill table | On demand, partition key `k` (string), TTL attribute `exp` | `/api/kill` lands in a different Lambda environment from the job it stops; an in-process flag cannot reach it |
 | Secrets Manager | A 64-character key generated by CloudFormation, never in the repo or the template | Every Lambda environment signs and verifies work orders with the same key |
-| CloudWatch | Log group (14-day retention); dashboard `Drishyam` (jobs by status, job seconds, pixels used, steps and findings, reviews by decision, and the function's invocations, errors, throttles, duration and concurrency; reviews by decision not yet live); alarms on Errors (at least 1 in 5 min), Throttles (at least 1 in 5 min), Duration p95 (over 45 s) and AppErrors (at least 1 in 5 min). AppErrors is a metric filter on the log group for `ERROR drishyam` (an unhandled 500 or a failed job, which `web.py` logs from the `drishyam` logger) or uvicorn's `Exception in ASGI application` | Behind the Web Adapter a FastAPI 500, or a job that ends in an `{"type": "error"}` event inside a 200 stream, is a successful invocation, so the Errors alarm only sees timeouts, crashes and init failures |
-| SNS + Budget | Alarms and a 20 USD monthly cost budget (alerts at 50 % and 100 % of actual cost, credits not counted) publish to one topic, which has no subscribers until the owner adds one | Credits would otherwise hide real spend |
+| CloudWatch | Log group (14-day retention); dashboard `Drishyam` (jobs by status, job seconds, pixels used, steps and findings, reviews by decision, and the function's invocations, errors, throttles, duration and concurrency); alarms on Errors (at least 1 in 5 min), Throttles (at least 1 in 5 min), Duration p95 (over 45 s) and AppErrors (at least 1 in 5 min). AppErrors is a metric filter on the log group for `ERROR drishyam` (an unhandled 500 or a failed job, which `web.py` logs from the `drishyam` logger) or uvicorn's `Exception in ASGI application` | Behind the Web Adapter a FastAPI 500, or a job that ends in an `{"type": "error"}` event inside a 200 stream, is a successful invocation, so the Errors alarm only sees timeouts, crashes and init failures |
+| SNS + Budget | Alarms and a 20 USD monthly cost budget (alerts at 50 % and 100 % of actual cost, credits not counted) publish to one topic. Its one subscription, the owner's email, is confirmed (`PendingConfirmation` false, 2026-10-21): a test alarm (`Drishyam-AppErrorsAlarm` set to ALARM by hand with `set-alarm-state`) reached that inbox on 2026-10-21 at 10:26 IST, as the alarm history's "Successfully executed action" also records. The alarms have an ALARM action only, so a recovery sends no email | Credits would otherwise hide real spend |
 
 No VPC, no NAT, no container image (CDK's bootstrap bucket holds the zips).
 
@@ -169,8 +210,10 @@ doubles the worst-case cost below). Without `RESERVED`, `deploy` stops in such a
 ways forward: request the default quota of 1000 and deploy once it is granted (the stack then reserves
 5), or run `RESERVED=none scripts/aws.sh deploy`.
 
-**Alerts:** the topic has no subscribers. To get the alarm and budget emails, run this once and click
-the link in the confirmation email (`deploy` prints the same command with the topic ARN filled in):
+**Alerts:** the topic has one email subscription, the owner's, confirmed on 2026-10-21 and checked with a test
+alarm that reached it the same day. Until an address confirms the link in its confirmation email, no alarm or budget
+email reaches it. To subscribe another address, run this once and click that
+link (`deploy` prints the same command with the topic ARN filled in):
 
 ```
 aws sns subscribe --topic-arn "$(aws cloudformation describe-stacks --stack-name Drishyam --query "Stacks[0].Outputs[?OutputKey=='AlertTopicArn'].OutputValue" --output text --profile drishyam --region us-east-1)" --protocol email --notification-endpoint you@example.com --profile drishyam --region us-east-1
@@ -200,7 +243,7 @@ A packaged model is used only when the deploy names it: `ONNX=models/drishyam_da
 deploy` (add `ONNX_FP16=models/drishyam_dacl10k.fp16.onnx` for the fast path) passes CDK context `onnx`
 (`onnx_fp16`), which sets the function's `DRISHYAM_ONNX` (`DRISHYAM_ONNX_FP16`) to that file under
 `/var/task`; `infra/app.py` refuses a path that is not in `build/lambda`. A deploy without `ONNX` runs the
-classical engine. Making the CC BY-NC 4.0 dacl10k model the live segmenter is an owner decision.
+classical engine. Since 2026-10-21 the live segmenter is v1, the CC BY-NC 4.0 dacl10k model (the owner's decision).
 
 ## Smoke
 
@@ -214,15 +257,20 @@ classical engine. Making the CC BY-NC 4.0 dacl10k model the live segmenter is an
    `arch` and the build from `/api/health` (on Lambda, `aarch64` and `stock (not COOL)`: the stock
    OpenCV wheel, not the COOL build). It is the p95 over one job's steps, a handful of numbers.
 3. KILL: a second job is started, `/api/kill` is sent once step 2 has streamed, and the job must end
-   `halted` with cause `kill-switch`.
+   `halted` with cause `kill-switch`. The job holds its Lambda environment while it streams, so the kill lands in
+   another one; if that one starts cold (about 3 s with v1), a short job can finish first, as on the first smoke
+   after the v1 deploy (2026-10-20). So the browser (`public/js/api.js`) sends `GET /api/health` as soon as a job
+   starts streaming, which starts a second environment for a later KILL, and this script does the same during both
+   jobs and waits for that request before the kill. A KILL pressed during the very first job on a cold function can
+   still arrive after a short job has finished.
 4. Behind CloudFront only: a `POST` without `x-amz-content-sha256` gets 403.
 5. With `FUNCTION_URL` set (`scripts/aws.sh smoke` sets it): the raw Function URL gets 403.
 6. With `E2E=1`: `tests/e2e/test_ui_live.py <url>`, the browser flows (needs Playwright in `.venv`, see
    the README). It starts about 3 jobs.
 7. With `WAF_LOOP=1`: empty-bodied job starts (the app answers 400 without running a job) until the WAF
-   answers 429 with its `rate limited` JSON body (a Lambda throttle 429 does not count; not yet live: the
-   current build answers 403, so this check fails on it),
-   expected after about 10 in 120 s, fewer if the checks above started jobs. Job starts from
+   answers 429 with its `rate limited` JSON body (a Lambda throttle 429 does not count),
+   expected after about 10 in 120 s; WAF evaluates rates about every 10 s, so the block can come a few requests
+   later (the 14th, after the two jobs above, in the 2026-10-18T07:12:25Z run). Job starts from
    that IP stay blocked until its rate falls back under the limit, up to two minutes after the loop.
 
 The last line sums up the run: UTC timestamp, URL, the commit from `/api/health`, the package digest
@@ -249,7 +297,7 @@ few thousand page views.
 | DynamoDB on demand | 0.125 USD per million reads, 0.625 USD per million writes | under 0.01 USD |
 | Secrets Manager | 0.40 USD per secret, 0.05 USD per 10,000 calls | 0.40 USD |
 | CloudWatch | [10 custom metrics, 10 alarms, 3 dashboards and 5 GB of logs free](https://aws.amazon.com/cloudwatch/pricing/); then 0.30 USD per metric | 4 job metrics x 3 values of `Status` (`completed`, `halted`, `awaiting_review`) = 12 metrics, plus `Reviews` x 2 values of `Decision` (`approve`, `reject`) = 14, plus `AppErrors` = 15, 5 over the free 10: 1.50 USD. 4 alarms, within the free 10 |
-| X-Ray, SNS, Budgets | 100,000 traces a month free; no subscribers; budgets without actions cost nothing | 0 USD |
+| X-Ray, SNS, Budgets | 100,000 traces a month free; one email subscription (confirmed); budgets without actions cost nothing | 0 USD |
 | **Total** | | **about 10.30 USD**, 8 of it the WAF |
 
 CloudFront's [flat-rate plans](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/flat-rate-pricing-plan.html)
@@ -277,5 +325,8 @@ exceed the cap (10 environments live, 5 with a reservation), and `scripts/aws.sh
   users: someone who starts more than 10 jobs in two minutes is blocked until their rate drops. Viewers
   behind one shared IP (an office NAT) share all three limits.
 - A job, including any pacing between steps, must finish within the 60 s function timeout.
-- WAF sampled requests (kept by AWS for 3 hours) hold viewer IPs; CloudFront and WAF access logs are off.
+- WAF sampled requests (kept by AWS for 3 hours) hold viewer IPs; CloudFront and WAF access logs are off. The
+  function's own log names no client address: `infra/run.sh` starts uvicorn with `--no-proxy-headers`, since by
+  default uvicorn trusts the Web Adapter's (127.0.0.1) `X-Forwarded-For` and logs the address it names (seen
+  in a local run; what deployments before this change logged was not checked on AWS).
 - Rotating the signing key invalidates every work order signed before the rotation; no rotation is set up.

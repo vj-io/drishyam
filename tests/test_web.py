@@ -1,5 +1,6 @@
 import base64
 import json
+import shlex
 from pathlib import Path
 
 import cv2
@@ -43,6 +44,57 @@ def test_health_and_security_headers():
     assert h["segmenter"] == "classical-v1" and h["segmenter_licence"] == "MIT (no learned weights)"
     assert r.headers["cache-control"] == "no-store" and r.headers["x-content-type-options"] == "nosniff"
     assert client.get("/docs").status_code == 404 and client.get("/openapi.json").status_code == 404
+    b = h["cv2_build"]  # this process's own build, as cv2.getBuildInformation() prints it
+    info = cv2.getBuildInformation()
+    assert set(b) == {"hal", "cpu_baseline", "cpu_dispatch", "parallel", "onnx_runtime", "dnn_engines"}
+    for key, label in (("hal", "Custom HAL"), ("cpu_baseline", "Baseline"), ("parallel", "Parallel framework")):
+        assert b[key] and f"{label}:" in info and b[key] in info, key
+    assert "new" in b["dnn_engines"]  # OpenCV 5's cv2.dnn.ENGINE_NEW, the opt-in ONNX segmenter's engine
+    assert len(r.content) < 1000  # small: an uptime monitor polls it
+
+
+def test_a_server_error_is_generic_and_keeps_the_api_headers(monkeypatch, photo):
+    """Starlette answers an unhandled error outside the header middleware, so a 500 went out without them."""
+    from drishyam import imaging
+
+    def fail(_):
+        raise RuntimeError("secret detail /var/task/drishyam")
+
+    monkeypatch.setattr(imaging, "decode_image", fail)
+    r = TestClient(app, raise_server_exceptions=False).post("/api/jobs", content=photo,
+                                                            headers={"Content-Type": "image/jpeg"})
+    assert r.status_code == 500 and r.json() == {"error": "internal error"}
+    assert r.headers["cache-control"] == "no-store" and r.headers["x-content-type-options"] == "nosniff"
+    assert r.headers["content-security-policy"] == "default-src 'none'; frame-ancestors 'none'"
+
+
+def test_build_facts_read_the_hal_line_of_an_arm_build(monkeypatch):
+    """The parser keeps each line as printed, so an aarch64 wheel's HALs show as they are; a missing line is None."""
+    from drishyam import web
+
+    arm = ("  CPU/HW features:\n    Baseline:                    NEON FP16\n      requested:                 DETECT\n"
+           "    Dispatched code generation:  NEON_DOTPROD NEON_FP16 NEON_BF16\n"
+           "  Parallel framework:            pthreads\n"
+           "    Custom HAL:                  YES (carotene (ver 0.0.1) KleidiCV (ver 0.6.0))\n")
+    monkeypatch.setattr(web.cv2, "getBuildInformation", lambda: arm)
+    b = web.build_facts()
+    assert b["hal"] == "YES (carotene (ver 0.0.1) KleidiCV (ver 0.6.0))" and b["parallel"] == "pthreads"
+    assert (b["cpu_baseline"], b["cpu_dispatch"]) == ("NEON FP16", "NEON_DOTPROD NEON_FP16 NEON_BF16")
+    monkeypatch.setattr(web.cv2, "getBuildInformation", lambda: "General configuration for OpenCV 5.0.0\n")
+    assert web.build_facts()["hal"] is None
+
+
+def test_build_facts_list_ort_only_when_onnx_runtime_is_built_in(monkeypatch):
+    """cv2.dnn.ENGINE_ORT exists whether or not the wheel was built with ONNX Runtime: the build line decides."""
+    from drishyam import web
+
+    monkeypatch.setattr(web.cv2.dnn, "ENGINE_ORT", 3, raising=False)
+    for printed, listed in (("NO", False), ("YES (ver 1.20.0)", True)):
+        monkeypatch.setattr(web.cv2, "getBuildInformation", lambda p=printed: f"  ONNX Runtime:                  {p}\n")
+        b = web.build_facts()
+        assert b["onnx_runtime"] == printed and ("ort" in b["dnn_engines"]) is listed, printed
+    monkeypatch.setattr(web.cv2, "getBuildInformation", lambda: "General configuration for OpenCV 5.0.0\n")
+    assert "ort" not in web.build_facts()["dnn_engines"]  # no line: not claimed
 
 
 def test_health_names_the_dacl10k_licence(monkeypatch):
@@ -67,6 +119,21 @@ def test_job_streams_contract_events(photo):
     assert ev[1]["type"] == "overview" and base64.b64decode(ev[1]["heatmap_png_b64"])[:4] == b"\x89PNG"
     done = ev[-1]
     assert done["type"] == "done" and findings.verify(done["token"], KEY)["job"] == done["work_order"]["job"]
+
+
+def test_a_web_job_runs_no_cascade_even_with_a_confirm_net_named(photo, monkeypatch, tmp_path):
+    """The cascade (drishyam.cascade) is off everywhere in the app: DRISHYAM_ONNX_CONFIRM names a confirm net for
+    bench.micro and the dev evals only, and a job over HTTP (the local server, and Lambda) runs the scout alone."""
+    from drishyam import cascade
+
+    monkeypatch.setenv("DRISHYAM_ONNX_CONFIRM", str(tmp_path / "missing.onnx"))  # reading it would fail the job
+    cascade.default_confirm.cache_clear()  # (a None cached by an earlier job would hide a read)
+    try:
+        ev = lines(post(photo, params="?pixel_cap=0.5"))
+    finally:
+        cascade.default_confirm.cache_clear()
+    assert ev[-1]["type"] == "done" and "confirm_sha256" not in ev[-1]["work_order"]
+    assert not any("confirm" in e for e in ev if e["type"] == "step")
 
 
 def test_rejects_bad_uploads(photo):
@@ -98,18 +165,61 @@ def test_replay_header_validation(photo):
     assert ok.status_code == 200 and steps[0]["cause"] == "replay"
 
 
-def test_chaos_drills_over_http(scene, monkeypatch):
+def test_a_deeply_nested_replay_header_is_a_422_not_a_server_error(photo):
+    """12,288 unclosed '[' fit the 16 KB cap and the JSON decoder recursed past Python's limit: a RecursionError, a
+    500, and on AWS an ERROR line that fires the AppErrors alarm."""
+    deep = base64.urlsafe_b64encode(b"[" * 12288).decode().rstrip("=")
+    assert len(deep) <= 16_384 and post(photo, headers={"X-Drishyam-Replay": deep}).status_code == 422
+
+
+def drill_records(ev):
+    """(the step after the injected spike or None, the step-6 planner event or None) of a drill job's events."""
+    steps = [e for e in ev if e["type"] == "step"]
+    spike = next((s for s in steps if s.get("injected") == "p95_spike"), None)
+    after = spike and next((s for s in steps if s["step"] == spike["step"] + 1), None)
+    planned = next((e for e in ev if e["type"] == "planner" and e["step"] == 6), None)
+    return after, planned
+
+
+def test_chaos_drills_over_http_on_fixed_costs(scene, monkeypatch):
+    """The drills through the HTTP path on the published fixed costs (a virtual clock, as the evaluations run them),
+    so the outcome cannot move with load: the spike on look 4 makes the next record carry p95>SLA, and the malformed
+    planner on step 6 is rejected while the rule planner's look stands."""
+    import functools
+
+    from drishyam import agent, segment, web
+    from evals.harness import FixedCostJob, cost_rows, op_costs
+
+    rows = cost_rows("linux-aarch64", segment.default_segmenter().name)
+    monkeypatch.setattr(web, "JobConfig", functools.partial(agent.JobConfig, eps=0.0))  # 6+ looks: no stop-rule halt
+    monkeypatch.setattr(web, "Job", lambda img, cfg, clock=None, **kw: FixedCostJob(
+        img, cfg, op_costs(rows, img.shape[1], img.shape[0]), **kw))
+    ev = lines(post(jpeg(scene), params="?pixel_cap=1&chaos=p95_spike,planner_malformed"))
+    after, planned = drill_records(ev)
+    assert after and (after.get("governor") or after)["cause"] == "p95>SLA"
+    assert planned and planned["status"] == "rejected" and planned["proposal"] is None
+    step6 = next(e for e in ev if e["type"] == "step" and e["step"] == 6)
+    assert step6["planner_status"]["status"] == "rejected" and step6["planner"] == "rule"
+
+
+def test_chaos_drills_over_http_on_the_real_clock(scene, monkeypatch):
+    """REAL CLOCK, so it depends on machine load: a busy machine trips p95>SLA on its own and can reach the 30 s cap
+    before look 6. It asserts behaviour every path guarantees, never a timing: the job ends with a done record,
+    every governor override carries its cause, and each drill that was reached was answered (the fixed-cost test
+    above pins the full sequence)."""
     import functools
 
     from drishyam import agent, web
 
-    # The drills need a job of 6+ looks: the scene (several defects) with eps = 0, so the stop rule cannot end it
-    # before the spike (injected on look 4) and the malformed planner (step 6).
     monkeypatch.setattr(web, "JobConfig", functools.partial(agent.JobConfig, eps=0.0))
-    ev = lines(post(jpeg(scene), params="?pixel_cap=1&chaos=p95_spike,planner_malformed"))
-    assert any(e.get("governor", {}).get("cause") == "p95>SLA" for e in ev)
-    assert any(e["type"] == "planner" and e["status"] == "rejected" for e in ev)
-    assert any(e.get("planner_status", {}).get("status") == "rejected" for e in ev)
+    ev = lines(post(jpeg(scene), params="?pixel_cap=1&seconds_cap=30&chaos=p95_spike,planner_malformed"))
+    assert ev[-1]["type"] == "done"
+    assert all(e["governor"]["cause"] for e in ev if e.get("governor"))
+    after, planned = drill_records(ev)
+    if after:
+        assert "p95>SLA" in {after["cause"], (after.get("governor") or {}).get("cause")}
+    if planned:
+        assert planned["status"] == "rejected"
 
 
 def test_jobs_consult_the_configured_planner(scene, monkeypatch):
@@ -194,6 +304,42 @@ def test_privacy_blur_applies_before_analysis(monkeypatch):
     assert np.array_equal(blurred[400:], img[400:])
 
 
+@pytest.mark.parametrize("shape", [(64, 100_000), (100_000, 64)])
+def test_a_long_narrow_strip_is_a_job_not_a_server_error(shape):
+    """6.4 MP and inside every limit, but its short side shrank to 0 px for the privacy detectors: a 500, and on
+    AWS an ERROR line that fires the AppErrors alarm, for anyone who sends a PNG of about 20 KB."""
+    img = np.full((*shape, 3), 150, np.uint8)
+    r = post(cv2.imencode(".png", img)[1].tobytes(), "image/png", "?seconds_cap=5")
+    assert r.status_code == 200 and lines(r)[-1]["type"] == "done"
+
+
+def test_no_upload_metadata_comes_back(photo):
+    """Every image the API returns (crops, finding crops, heatmap) is re-encoded from pixels, so an upload's EXIF,
+    GPS position included, never comes back."""
+    tiff = b"MM\x00*\x00\x00\x00\x08" + b"\x00\x01" + b"\x88\x25\x00\x04\x00\x00\x00\x01\x00\x00\x00\x1a" + b"\x00" * 4
+    gps = b"\x00\x01" + b"\x00\x01\x00\x02\x00\x00\x00\x02N\x00\x00\x00" + b"\x00" * 4  # GPSLatitudeRef "N"
+    exif = b"Exif\x00\x00" + tiff + gps
+    upload = photo[:2] + b"\xff\xe1" + (len(exif) + 2).to_bytes(2, "big") + exif + photo[2:]
+    ev = lines(post(upload, params="?pixel_cap=1"))
+    assert ev[-1]["type"] == "done"
+    images = [e["heatmap_png_b64"] for e in ev if e["type"] == "overview"]
+    images += [e["crop_jpeg_b64"] for e in ev if e.get("crop_jpeg_b64")]
+    images += [e["finding"]["crop_jpeg_b64"] for e in ev if e["type"] == "finding"]
+    assert len(images) > 3 and not any(b"Exif" in base64.b64decode(b) for b in images)
+
+
+def test_lambda_access_log_records_no_forwarded_client_address():
+    """On Lambda uvicorn's peer is the Web Adapter on 127.0.0.1, and by default uvicorn trusts that peer's
+    X-Forwarded-For and logs the address it names as the client (a local run logged a header-supplied 203.0.113.77):
+    the viewer's or a CloudFront edge address in the 14-day log group, where docs/aws.md says none is kept. The exec
+    line is parsed with uvicorn's own CLI, so the flag in a comment does not count."""
+    from uvicorn import main as cli  # the click command run.sh invokes
+
+    run = (Path(__file__).resolve().parent.parent / "infra" / "run.sh").read_text()
+    argv = shlex.split(next(ln for ln in run.splitlines() if ln.strip().startswith("exec ")))
+    assert cli.make_context("uvicorn", argv[argv.index("uvicorn") + 1:]).params["proxy_headers"] is False
+
+
 def test_privacy_detectors_give_each_thread_its_own_result():
     """Concurrent uploads share one detectors(); YuNet's input size and NanoDet's input are per-call
     state. The low NanoDet threshold makes both results non-empty and distinct."""
@@ -221,7 +367,7 @@ class FakeTable:
 
 
 @pytest.mark.parametrize("store", ["in-process", "dynamodb"])
-def test_kill_endpoint_halts_a_running_job(photo, monkeypatch, store):
+def test_kill_endpoint_halts_a_running_job(photo, scene, monkeypatch, store):
     """TestClient buffers whole streams, so the kill lands first; the job must halt after its first look.
     With DRISHYAM_KILL_TABLE (AWS) the flag lives in DynamoDB instead of this process; same contract."""
     import time
@@ -242,6 +388,10 @@ def test_kill_endpoint_halts_a_running_job(photo, monkeypatch, store):
     looks = [e for e in events if e["type"] == "step" and e["decision"]["action"] != "halt"]
     assert events[0]["job"] == "j_abc123" and events[0]["kill_token"] == token
     assert events[-1]["cause"] == "kill-switch" and events[-1]["status"] == "halted" and len(looks) == 1
+    done = lines(post(jpeg(scene), params="?pixel_cap=1"))[-1]  # same job id and flag; KILL after its survey look
+    signed = findings.verify(done["token"], KEY)  # the signed order lists what KILL left unvisited: not ready
+    assert done["cause"] == "kill-switch" and signed["status"] == "incomplete" and "coverage_looked" in done
+    assert {a["region"] for a in signed["not_assessed"]} == {r for r in done["unvisited"] if r.startswith("r")} != set()
     assert client.post("/api/kill", json={"job": "j_zzzzzz", "kill_token": "a" * 24}).status_code == 400
     assert client.post("/api/kill", json={"job": "j_abcdef", "kill_token": "short"}).status_code == 400
     if store == "dynamodb":

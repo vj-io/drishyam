@@ -15,11 +15,12 @@ import sys
 import time
 from pathlib import Path
 
+from playwright.sync_api import TimeoutError as PlaywrightTimeout
 from playwright.sync_api import expect, sync_playwright
 
 ROOT = Path(__file__).resolve().parents[2]
 SHOTS = Path(os.environ.get("DRISHYAM_SHOTS", "/tmp/drishyam-e2e"))
-DONE = ("needs sign-off", "signed", "done", "halted", "budget spent")
+DONE = ("needs sign-off", "signed", "done", "halted", "budget spent", "needs a look")
 OPTIONAL = ("/results/",)  # the page shows a pending state without these
 JARGON = re.compile(r"\b\d+(?:\.\d+)?e[-+]?\d+\b|\b\w+_\w+\b")  # scientific notation, snake_case (p95_spike too)
 RATE_LIMITED = "Too many jobs from this address: 10 starts per 2 minutes. Wait a minute and retry."
@@ -58,6 +59,8 @@ class Page:
         self.page.on("console", lambda m: m.type == "error" and self.errors.append(m.text))
         self.page.on("pageerror", lambda e: self.errors.append(str(e)))
         self.page.on("request", lambda r: "/api/" in r.url and self.requests.append(r.url))
+        self.media = []
+        self.page.on("request", lambda r: r.url.endswith(".mp4") and self.media.append(r.url))
         self.missing = []
         self.page.on("response", lambda r: r.status in (403, 404) and self.missing.append(r.url))  # S3 behind OAC answers a missing file with 403
         self.page.goto(base + "/")
@@ -116,17 +119,20 @@ def run(base, server_log=None):
         page = p.page
         csp = page.request.get(base + "/").headers.get("content-security-policy", "")
         assert "script-src 'self'" in csp, "production CSP missing from the document"
-        expect(page.locator("#gallery .thumb")).to_have_count(8, timeout=15000)
+        expect(page.locator("#gallery .thumb")).to_have_count(10, timeout=15000)
 
         # 1. The guided run: bridge_03 (exposed rebar) is preselected, the run is paced and stays on screen,
         #    then the page hands the critical findings to a person, whose approval the server signs.
         expect(page.locator("#gallery .thumb[data-file='bridge_03.jpg']")).to_have_attribute("aria-pressed", "true", timeout=15000)
         expect(page.locator("#look")).to_be_enabled(timeout=15000)
+        expect(page.locator("#try-kill")).to_be_enabled()           # the KILL drill is offered before any run
         page.locator("#guided").click()
         t0 = time.time()
         expect(page.locator("#narrator")).to_contain_text("Sending the photo", timeout=2000)  # the page answers the click at once
         expect(page.locator("#trace .trace__line[data-step='1']")).to_be_visible(timeout=30000)
         assert any("pace_ms=1000" in u for u in p.requests if "/api/jobs" in u), p.requests
+        j = next(i for i, u in enumerate(p.requests) if "/api/jobs" in u)
+        assert any("/api/health" in u for u in p.requests[j + 1:]), "a job start warms a 2nd environment for KILL (api.js)"
         assert p.viewer_in_view(), "the viewer must stay on screen during the guided run"
         expect(page.locator("#narrator")).not_to_be_empty()
         expect(page.locator("#trace .trace__line[data-step='1'] .trace__why")).to_be_visible()
@@ -169,28 +175,55 @@ def run(base, server_log=None):
         print(f"ok  guided live run ({took:.1f} s): paced, plain words, viewer on screen, findings, recap in view, critical card, "
               f"human approval signed by the server; server total {'shown' if 'prep_ms' in job else 'not sent'}")
 
-        # Now break it, from the recap: the injected faults read in plain words too.
+        # Now break it, from the recap: the injected faults read in plain words too. REAL CLOCK: the server's job runs on
+        # wall time, so on a loaded machine the stop rule or a cap can end it before the spike (look 4) or the malformed
+        # planner (step 6). It asserts behaviour, not timing: each drill the server's trace shows was reached is shown
+        # in plain words, and the job ends with a halt record (tests/test_web.py pins the sequence on fixed costs).
         page.get_by_role("button", name="Now break it").click()
         page.locator("#skip").click()
         p.wait_done()
-        expect(page.locator("#trace .chip--inject")).to_have_text("injected: slow segmenter")
+        with page.expect_download() as dl:
+            page.get_by_role("button", name="Download trace.ndjson").click()
+        events = [json.loads(ln) for ln in Path(dl.value.path()).read_text().splitlines()]
+        steps = [e for e in events if e["type"] == "step"]
+        spiked = any(s.get("injected") == "p95_spike" for s in steps)
+        refused = any(e["type"] == "planner" and e["status"] == "rejected" for e in events)
+        assert steps and steps[-1]["decision"]["action"] == "halt", "the drill job ends with a halt record"
+        if spiked:
+            expect(page.locator("#trace .chip--inject")).to_have_text("injected: slow segmenter")
+        if refused:
+            expect(page.locator("#trace .trace__line--planner", has_text="rejected")).to_have_count(1)
         p.plain()
-        print("ok  Now break it: injected faults and the governor's reaction in plain words")
+        print(f"ok  Now break it: the drills reached ({'spike' if spiked else 'no spike'}, {'planner refused' if refused else 'no planner'})"
+              " read in plain words")
 
-        # Try KILL from the recap: a run shown live whose planner stalls 2 s at step 3, so KILL lands mid-job.
-        page.get_by_role("button", name="Try KILL").click()
+        # Try KILL from the recap: a run shown live whose planner stalls 2 s at step 3, so KILL usually lands mid-job.
+        # REAL CLOCK: on a loaded machine the stop rule can end the job before KILL reaches it. Either way KILL must not
+        # claim more than happened: a kill-switch halt by the server; or no KILL to press, because the page hides it
+        # once the server's done event has arrived; or, pressed in the same moment, the page saying the job had finished.
+        page.locator("#recap").get_by_role("button", name="Try KILL").click()
         expect(page.locator("#job-text")).to_contain_text("shown the moment it arrives", timeout=15000)
         expect(page.locator("#trace .trace__line[data-step='1']")).to_be_visible(timeout=30000)
-        page.locator("#kill").click()
-        expect(page.locator("#job-pill")).to_have_text("halted", ignore_case=True, timeout=15000)
-        expect(page.locator("#trace .trace__line .chip", has_text="kill-switch")).to_have_count(1)
-        print("ok  Try KILL: the live run was halted by the server with kill-switch")
+        try:
+            page.locator("#kill").click(timeout=5000)
+            clicked = True
+        except PlaywrightTimeout:
+            clicked = False
+        status = p.wait_done()
+        killed = page.locator("#trace .trace__line .chip", has_text="kill-switch").count() == 1
+        if killed:
+            assert clicked and status == "halted", (clicked, status)
+        elif clicked:
+            expect(page.locator("#job-text")).to_contain_text("had already finished")
+        expect(page.locator("#kill")).to_be_hidden()
+        print(f"ok  Try KILL: {'halted by the server with kill-switch' if killed else 'the job had finished first'}"
+              f"{'' if killed or clicked else ', and the page offered no KILL'}")
 
         # 2. KILL mid-run reaches the server, which halts before its next look and sends a kill-switch record.
         # planner_timeout parks the job for 2 s at step 3, so the click lands while it is still running.
         # A fresh page first: otherwise the previous job's trace lines would satisfy the waits at once.
         page.reload()
-        expect(page.locator("#gallery .thumb")).to_have_count(8, timeout=15000)
+        expect(page.locator("#gallery .thumb")).to_have_count(10, timeout=15000)
         p.pick("bridge_05.jpg")
         expect(page.locator("#look")).to_be_enabled(timeout=15000)
         page.locator("#advanced summary").click()
@@ -240,9 +273,59 @@ def run(base, server_log=None):
         p.clean()
         print("ok  no CSP violations, no console errors")
 
+        # 3b. The guided run on a real photo of ours: the v1 engine's recorded job is replayed from public/samples (no job
+        #     on the server), labelled as our photo with no ground truth, and the recap says what the agent flagged.
+        page.reload()
+        expect(page.locator("#gallery .thumb")).to_have_count(10, timeout=15000)
+        index = json.loads((ROOT / "public/samples/index.json").read_text())
+        real = next(s for s in index if s["file"] == "real_02.jpg")
+        recorded = [json.loads(ln) for ln in (ROOT / "public/samples" / real["trace"]).read_text().splitlines()]
+        expect(page.locator("#gallery .thumb--real .thumb__t")).to_have_text([real["title"]] * 2)
+        jobs = sum("/api/jobs" in u for u in p.requests)
+        page.locator("#guided-real").click()
+        expect(page.locator("#gallery .thumb[data-file='real_02.jpg']")).to_have_attribute("aria-pressed", "true", timeout=15000)
+        p.wait_done(timeout=60)
+        assert sum("/api/jobs" in u for u in p.requests) == jobs, "the real-photo guided run replays a recording: no job on the server"
+        expect(page.locator("#trace .trace__line[data-step]")).to_have_count(sum(e["type"] == "step" for e in recorded))
+        expect(page.locator("#findings .finding")).to_have_count(recorded[-1]["summary"]["findings"])
+        expect(page.locator("#job-text")).to_contain_text("(modelled)")
+        expect(page.locator("#recap .recap__real")).to_contain_text("REAL PHOTO (ours), no ground truth")
+        expect(page.locator("#recap .recap__real")).to_contain_text(real["note"])
+        p.plain()
+        page.wait_for_timeout(1500)                       # the smooth scroll to the recap
+        assert p.recap_in_view(), "the recap must be on screen at the end of the real-photo guided run"
+        page.screenshot(path=str(SHOTS / "live-desktop-real.png"))
+        page.get_by_role("button", name="Our other wall photo").click()
+        expect(page.locator("#gallery .thumb[data-file='real_01.jpg']")).to_have_attribute("aria-pressed", "true", timeout=15000)
+        expect(page.locator("#recap .recap__real")).to_contain_text("flagged nothing", timeout=30000)
+        expect(page.locator("#recap")).to_contain_text("Not assessed: no candidate region was proposed, so the whole photo is not assessed")
+        expect(page.locator("#job-pill")).to_have_text("needs a look", ignore_case=True)  # not "done": no look ran
+        assert sum("/api/jobs" in u for u in p.requests) == jobs
+        p.clean()
+        print("ok  real photos: the v1 runs replayed from their recordings (no server job), labelled, recap says what it flagged")
+
+        # 3c. The film: its poster, and its English captions track off by default (the captions are burned into the
+        #     film), loading from this origin under the production CSP once turned on (every cue of
+        #     public/video/drishyam.vtt); the MP4 is not fetched before Play (preload="none").
+        page.reload()
+        page.locator("#video-link").click()
+        v = page.locator("#video video")
+        expect(v).to_be_visible(timeout=15000)
+        assert v.evaluate("v => [v.textTracks.length, v.textTracks[0].mode]") == [1, "disabled"]
+        v.evaluate("v => { v.textTracks[0].mode = 'showing'; }")   # what the player's captions button does
+        n = (ROOT / "public/video/drishyam.vtt").read_text().count(" --> ")
+        for _ in range(100):
+            if v.evaluate("v => (v.textTracks[0].cues && v.textTracks[0].cues.length) || 0") == n:
+                break
+            page.wait_for_timeout(100)
+        assert v.evaluate("v => [v.textTracks[0].cues.length, v.poster.endsWith('video/poster.jpg')]") == [n, True]
+        assert not p.media, f"the MP4 was fetched before Play: {p.media}"
+        p.clean()
+        print(f"ok  film player: poster, captions track off by default and {n} cues under the CSP when on, no MP4 request before Play")
+
         # 4. Phone width: no horizontal scroll after a run.
         m = Page(browser, base, viewport={"width": 375, "height": 812}, is_mobile=True, has_touch=True)
-        expect(m.page.locator("#gallery .thumb")).to_have_count(8, timeout=15000)
+        expect(m.page.locator("#gallery .thumb")).to_have_count(10, timeout=15000)
         cta = m.page.locator("#guided").bounding_box()
         assert cta["y"] + cta["height"] <= 812, f"CTA below the fold at 375 px: {cta}"
         m.pick("bridge_01.jpg")

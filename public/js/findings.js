@@ -73,6 +73,7 @@ export class Findings {
     this.cards.set(f.id, card);
     this.empty.hidden = true;
     this.group(f.region ?? '–').cards.append(card);
+    this.showAsk(card);
     this.sync1(card);
     sound.click();
     return true;
@@ -86,6 +87,8 @@ export class Findings {
     old.conf.replaceWith(parts.conf);
     card.parts = parts;
     this.restyle(card, f);
+    if (f.critical && !card.review) this.addReview(card, f);  // a finer look measured it past the critical rule: a person must sign it
+    this.showAsk(card);
     this.sync1(card);
     replay(card, 'is-revised');
     return false;
@@ -103,10 +106,25 @@ export class Findings {
     this.reasons.set(id, list);
     const card = this.cards.get(id);
     if (card?.review) card.review.why.replaceChildren(...this.why(card.finding));
+    else if (card) this.showAsk(card);
+  }
+
+  extra(f) {
+    return [...(this.reasons.get(f.id) ?? [])].filter(([r]) => !r.endsWith(' is critical')).map(([, plain]) => plain);
+  }
+
+  /** A draft the agent flagged for a person (an ambiguity, a disagreement no look will settle): said on its card. A
+      critical card says it in its sign-off box instead; a draft has no sign-off, so the work order does not wait for it. */
+  showAsk(card) {
+    const extra = card.review ? [] : this.extra(card.finding);
+    card.ask?.remove();
+    card.ask = extra.length ? h('p', { class: 'finding__ask' }, h('b', {}, 'Flagged for a person to look at: '), `${extra.join('; ')}. `,
+      'No sign-off is needed for a draft, so the work order does not wait for it.') : null;
+    if (card.ask) card.insertBefore(card.ask, card.parts.conf);
   }
 
   why(f) {
-    const extra = [...(this.reasons.get(f.id) ?? [])].filter(([r]) => !r.endsWith(' is critical')).map(([, plain]) => plain);
+    const extra = this.extra(f);
     return [
       h('b', {}, 'Why you: '),
       [ruleOf(f), ...extra].filter(Boolean).join('; '),

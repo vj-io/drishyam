@@ -2,7 +2,8 @@
 
 Nothing is staged. Each case is a ground-truth box, a prediction, a distractor record (graffiti, formwork
 line, water stain, glare, blur region) or a quality-gate event that the run itself produced; the text states
-what the numbers say and the rule that would have caught it. The rules are proposals, not implemented code.
+what the numbers say and the rule that would have caught it. Each rule says which part is implemented (and where),
+why a case still slipped past it, and which part is still a proposal.
 """
 from __future__ import annotations
 
@@ -12,6 +13,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
+from drishyam.agent import DOMINATED_BY
 from drishyam.findings import is_critical
 
 # BGR, the site's drawing palette: ground truth in sky, predictions in callout amber, on blueprint deep.
@@ -46,6 +48,24 @@ def _visits(trace, gt_box):
     return [t for t in trace if t["window"] and _centre_in(gt_box, t["window"])]
 
 
+def _straight_line_miss(trace, p) -> str:
+    """Why a crack finding on a formwork line got past the straight-line test, from the run's own record. The test
+    judges a centreline's residual in L0 px (drishyam/segment.py), so a look at L removes the line only if its
+    residual is under 1.5 / 2**L view px, and keeps it otherwise; a later look never withdraws a finding an
+    earlier look drafted. Only looks after the drafting one (p's step) count as later."""
+    if p["level"] == 0:
+        return (f" The straight-line test ran at full resolution on the look that drafted it (step {p['step']}, L0) and kept it: "
+                "its centreline was not within 1.5 px (RMS) of one straight line over at least 20x its width.")
+    later = [t["level"] for t in _visits(trace, p["box"])
+             if t["step"] > p["step"] and t.get("q_ok", True) and t["level"] is not None]
+    drafted = (f" The straight-line test kept it at the look that drafted it (step {p['step']}, L{p['level']}, where a residual "
+               f"counts {2 ** p['level']}x in L0 px)")
+    if 0 in later:
+        return drafted + "; a later full-resolution look covered it, but a later look never withdraws a drafted finding."
+    return drafted + (f", and no later look was at full resolution (finest later look: L{min(later)})." if later
+                      else ", and no later look covered it.")
+
+
 # ---------------------------------------------------------------- finders: each yields cases for one image
 def _false_alarm(kind, classes, label):
     """A finding inside a distractor's bounding box that sits on no ground-truth box of any class (so it is not
@@ -66,7 +86,8 @@ def _false_alarm(kind, classes, label):
                                "marks": [_mark("pred", f"{p['cls']} {p['conf']:.2f}", p["box"]), _mark("other", label, d["box"])],
                                "what": (f"{rec['id']}, {cfg}: {_a(p['cls'])} finding (confidence {p['conf']:.2f}, step {p['step']} at "
                                         f"L{p['level']}) lies within the bounding box of {_a(label)} patch and matches no "
-                                        f"ground-truth box of any class." + (" It is critical, so it would stop at human review." if crit else ""))}
+                                        f"ground-truth box of any class." + (" It is critical, so it would stop at human review." if crit else "")
+                                        + (_straight_line_miss(res["configs"][cfg].get("trace", []), p) if kind == "formwork_line" else ""))}
     return find
 
 
@@ -91,7 +112,8 @@ def _glare_gate(rec, res):
                             f"{len(inside)} ground-truth box(es) have their centre in that window"
                             + (f" ({', '.join(sorted({g['cls'] for g in inside}))}); {len(missed)} not found by the finished job. "
                                if inside else ". ")
-                            + "The gate did what it should; the cost is an area the work order silently leaves unassessed.")}
+                            + "The gate did what it should: the work order lists that window as not assessed (action re-shoot), "
+                            "and the region it was looking at got no further look.")}
             break
 
 
@@ -147,10 +169,17 @@ def _confusion(rec, res):
             wrong = [p for p in preds if p["cls"] in group and p["cls"] != g["cls"] and hits(p["box"], g["box"])]
             if wrong:
                 p = max(wrong, key=lambda p: p["conf"] * p["area"])
+                # The agent's review on ambiguity fires only where a class is absorbed into a dominating finding.
+                review = (f" Review on ambiguity cannot flag it: it fires when a class is absorbed into a dominating finding, and "
+                          f"{g['cls'].replace('_', ' ')} is never absorbed into {p['cls'].replace('_', ' ')}."
+                          if p["cls"] not in DOMINATED_BY.get(g["cls"], ()) else
+                          f" If its {g['cls']} mask cleared A_min mostly inside that {p['cls']} finding, the agent sent the finding to "
+                          "a person as ambiguous; the evaluation scores only the class it kept.")
                 yield {"id": rec["id"], "cls": g["cls"], "cfg": cfg, "score": 10 * (g["cls"] == "exposed_rebar") + p["conf"],
                        "marks": [_mark("gt", f"GT {g['cls']}", g["box"]), _mark("pred", f"{p['cls']} {p['conf']:.2f}", p["box"])],
                        "what": (f"{rec['id']}, {cfg}: ground truth is {g['cls']}, the job reported {p['cls']} there "
-                                f"(confidence {p['conf']:.2f}, step {p['step']} at L{p['level']}) and no {g['cls']} finding overlaps the box.")}
+                                f"(confidence {p['conf']:.2f}, step {p['step']} at L{p['level']}) and no {g['cls']} finding overlaps the box."
+                                + review)}
                 break
 
 
@@ -159,14 +188,19 @@ CATEGORIES = [
      ("Chroma gate before drafting: spray paint is far more saturated than concrete or rust, so a candidate whose median "
      "saturation sits well above the surrounding concrete and outside the rust hue band is dropped as non-structural. Not implemented.")),
     ("Formwork line read as crack", _false_alarm("formwork_line", ("crack",), "formwork line"),
-     ("Straightness test on the crack mask: a centreline that fits one straight line within about 1.5 px over a length of "
-     "20x its width is a formwork seam, not a crack, because real cracks meander (cv2.fitLine residual, minAreaRect aspect). Not implemented.")),
+     ("Implemented (drishyam/segment.py drop_straight_lines): a crack component whose centreline lies within 1.5 L0 px (RMS) "
+     "of its cv2.fitLine line, over a length of at least 20x its mean width, is logged as a straight line and never drafted. "
+     "Each case says at which look the test kept the line. It reads the residual in L0 px, so a look at level L must find "
+     "the line within 1.5 / 2^L view px of its fit (0.375 px at L2), and a later look never withdraws a crack an earlier "
+     "look drafted. Not implemented: a full-resolution check of a long, thin crack drafted from a coarse look.")),
     ("Water stain read as damage", _false_alarm("water_stain", ("crack", "spalling", "efflorescence", "exposed_rebar", "corrosion"), "water stain"),
      ("Texture test before a spall may be raised: a spall floor is rough, a wet stain is smooth, so require the Laplacian "
      "variance inside the mask to exceed the surrounding concrete's. Critical spalling still stops at human review. Not implemented.")),
     ("Glare caught by the quality gate", _glare_gate,
-     ("The gate (more than 20% blown-out pixels) works. The missing rule is bookkeeping: a refused window is written to the "
-     "work order as 'not assessed' with a re-shoot suggestion, so the area never reads as clean. Not implemented.")),
+     ("Implemented (drishyam/agent.py quality gate): a view with more than 20% blown-out pixels is refused, that region gets "
+     "no further look, and the work order lists the window under not_assessed with action re-shoot, so the area never reads "
+     "as clean. What it still costs: nothing under the highlight is assessed from this photo. Not implemented: a retry with "
+     "the window shifted off the highlight.")),
     ("Crack hidden in blur", _blurred_crack,
      ("A local sharpness map: where Laplacian variance falls below the gate, report the area as unreadable and ask for a re-shoot; "
      "where the gate accepted the view, scale the sharpness threshold to the expected crack width. Not implemented.")),
@@ -174,9 +208,12 @@ CATEGORIES = [
      ("Reserve a small share of the pixel cap for a coarse sweep of low-saliency regions, or lower the stop-rule epsilon so the "
      "job does not stop while unvisited candidates remain. Both trade pixels for recall. Not implemented.")),
     ("Rebar, spall and stain confusion", _confusion,
-     ("Shape and co-occurrence rule: exposed bars need rust inside a spall rim and a linear shape (minAreaRect aspect above 3); "
-     "rust with no spall rim is corrosion. Where two classes clear the threshold on one region, send it to human review instead "
-     "of choosing. The rust-near-spall part exists; the review-on-ambiguity step does not.")),
+     ("Implemented: rust near a spall is exposed rebar and rust with no spall near it is corrosion (the classical segmenter), "
+     "and review on ambiguity (drishyam/agent.py): when a second class clears A_min mostly inside a finding that dominates it "
+     "(corrosion inside exposed rebar; crack or efflorescence inside spalling or exposed rebar), the agent keeps one finding and "
+     "sends it to a person. It cannot catch a spall reported as exposed rebar, because spalling is never absorbed: each case "
+     "says whether the rule could apply. Not implemented: the shape test (exposed bars as thin strips, minAreaRect aspect above 3) "
+     "that would keep a rust-stained spall floor as spalling.")),
 ]
 
 

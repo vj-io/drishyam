@@ -2,11 +2,14 @@
 must match the PyTorch checkpoint on 20 fixed crops.
 
     python training/parity.py --ckpt runs/dacl10k/best.pt --onnx models/drishyam_dacl10k.onnx \
-        [--onnx-fp16 models/drishyam_dacl10k.fp16.onnx]
+        [--onnx-fp16 models/drishyam_dacl10k.fp16.onnx] [--onnx-19 models/drishyam_dacl10k_19.onnx]
 
 Compared per crop: probabilities (softmax over the 6 logits, as OnnxSegmenter returns them) and the raw DNN
 logits. Crops are 512 x 512 windows of public/samples/*.jpg at fixed positions. Each ONNX runs at 512 (the
 "accurate" path) and at 256 (the "fast" path), which also checks that H x W really is dynamic.
+`--onnx-19` adds a row for the 19-class logits ONNX (raw cv2.dnn at 512 against the checkpoint's net without the
+merge; probabilities are the 19 sigmoids): DrishyamHead discards the channels mapped to background, so the rows
+above never see them. It is an FP32 row.
 Exit status: 0 when every row is within its tolerance (max |dprob|: FP32 1e-3, FP16 5e-2 by default), 1 when an
 FP32 row is not (do not install), FP16_OVER (3) when FP32 passes and only FP16 is over (install the FP32 file alone:
 the FP16 margin shrinks as training goes on, so it must not hold back a good FP32 model).
@@ -60,7 +63,8 @@ def torch_reference(model, crop: np.ndarray, size: int):
 
 
 def run(ckpt: str, onnx32: str, onnx16: str | None = None, samples: Path = ROOT / "public" / "samples",
-        n: int = 20, crop: int = 512, seed: int = 0, tol: float = 1e-3, tol16: float = 5e-2) -> list[dict]:
+        n: int = 20, crop: int = 512, seed: int = 0, tol: float = 1e-3, tol16: float = 5e-2,
+        onnx19: str | None = None) -> list[dict]:
     _, _, groups = load_class_map()
     net, _ = load_checkpoint(ckpt)
     model = DrishyamHead(net, groups).eval()
@@ -86,6 +90,17 @@ def run(ckpt: str, onnx32: str, onnx16: str | None = None, samples: Path = ROOT 
             agree.append(float((s.probs.argmax(0) == p_ref.argmax(0)).mean()))
         rows.append({"case": name, "size": size, "max_dprob": dp, "max_dlogit": dz, "max_abs_logit": zmax,
                      "label_agreement": float(np.mean(agree)), "tol": limit, "ok": dp <= limit})
+    if onnx19:  # the 19 logits before the merge, every channel (multi-label: sigmoid probabilities, agreement per channel)
+        dnn, dp, dz, zmax, agree = cv2.dnn.readNetFromONNX(onnx19, engine=cv2.dnn.ENGINE_NEW), 0.0, 0.0, 0.0, []
+        for c in cs:
+            blob, z, _ = torch_reference(net, c, crop)
+            dnn.setInput(blob)
+            y = np.asarray(dnn.forward())[0]
+            dp = max(dp, float(np.abs(1 / (1 + np.exp(-y)) - 1 / (1 + np.exp(-z))).max()))
+            dz, zmax = max(dz, float(np.abs(y - z).max())), max(zmax, float(np.abs(z).max()))
+            agree.append(float(((y > 0) == (z > 0)).mean()))
+        rows.append({"case": "fp32 19 logits", "size": crop, "max_dprob": dp, "max_dlogit": dz, "max_abs_logit": zmax,
+                     "label_agreement": float(np.mean(agree)), "tol": tol, "ok": dp <= tol})
     return rows
 
 
@@ -94,12 +109,13 @@ def main(argv=None) -> int:
     p.add_argument("--ckpt", required=True)
     p.add_argument("--onnx", required=True, help="FP32 ONNX from export_onnx.py")
     p.add_argument("--onnx-fp16")
+    p.add_argument("--onnx-19", help="19-class logits ONNX from export_onnx.py (an FP32 row of its own)")
     p.add_argument("--samples", default=str(ROOT / "public" / "samples"))
     p.add_argument("--n", type=int, default=20)
     p.add_argument("--tol", type=float, default=1e-3, help="max |dprob| allowed for FP32")
     p.add_argument("--tol-fp16", type=float, default=5e-2)
     a = p.parse_args(argv)
-    rows = run(a.ckpt, a.onnx, a.onnx_fp16, Path(a.samples), a.n, tol=a.tol, tol16=a.tol_fp16)
+    rows = run(a.ckpt, a.onnx, a.onnx_fp16, Path(a.samples), a.n, tol=a.tol, tol16=a.tol_fp16, onnx19=a.onnx_19)
     print(f"OpenCV {cv2.__version__} DNN ENGINE_NEW vs torch {torch.__version__}, {a.n} crops")
     print(f"{'case':<15}{'size':>5}{'max|dprob|':>12}{'max|dlogit|':>13}{'max|logit|':>12}{'label agree':>13}{'tol':>8}")
     for r in rows:
