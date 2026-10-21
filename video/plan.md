@@ -138,10 +138,10 @@ summary charged another machine's cost table is refused.
 
 The live site now runs v1: `video/live/aws-smoke.log` is a verbatim copy of the main checkout's `runs/aws-smoke.log`
 (every `scripts/aws.sh smoke` run's `/api/health` and step p95); the build groups the runs by the segmenter their
-health reports. Its last run (commit 38fcaee) reports `onnx:drishyam_dacl10k.onnx`. `l0` says so before the footage
+health reports. Its last run reports `onnx:drishyam_dacl10k.onnx` (the commit is in the generated table below). `l0` says so before the footage
 plays: "Recorded 18 October on the classical engine; the site now runs the trained v1"; `a4` adds "on OpenCV 5's new
-DNN engine", and `a5` a step p95 under 90 ms
-then (3 classical runs, 67.7-88.0 ms) against under 1.1 s now (6 v1 runs, 559.5-1067.3 ms). Claims whose truth
+DNN engine", and `a5` the step p95 of the classical runs
+against the v1 runs, both rounded up from the log (the run counts and ranges are in the generated table below). Claims whose truth
 depends on the data are asserted in `video/narration.py` and `video/build.py`, so a re-run that changes them stops the
 build instead of shipping a sentence that is no longer true; words and figures typed into the scene text
 (citations, the competition name, the limits, the team) are checked against their files and listed below.
