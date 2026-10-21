@@ -800,6 +800,9 @@ function buildShort() {
   el('div', 'sheetframe', stage);
   const top = el('div', 'abs', stage, `<div class="h1" style="font-size:118px">DRISHYAM</div><div class="lab" style="font-size:26px;margin-top:10px">one photo · a few looks · one human</div>`);
   css(top, { left: '108px', top: '150px', width: '864px' });
+  // the footage's engine and date, on screen for the whole cut: the live site has run v1 since (the film's a4 line)
+  const rec = el('div', 'abs lab', stage, `recorded ${LIT.recorded} on the ${D.health.segmenter} engine · the site now runs v1`);
+  css(rec, { left: '108px', top: '340px', width: '864px', fontSize: '24px', color: 'var(--line-2)' });
   const l0 = Sh.lines[0], l1 = Sh.lines[1];
   const warp = { t0: 0, t1: dur, pts: [{ t: 0.2, f: ev['step:1'] - 0.3 }, { t: l0.t + l0.dur + 0.3, f: ev['step:4'] + 1.0 }, { cut: true, a: ev['step:4'] + 1.1, b: ev['click:Reviewer'] - 0.8 }, { t: dur, f: ev['approved:0'] + SETTLED }] };
   const host = el('div', 'abs', stage); css(host, { left: '60px', top: '420px', width: '960px', height: '1000px' });
