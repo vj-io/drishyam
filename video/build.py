@@ -218,9 +218,15 @@ def data(model=MODEL, reals=REALS):
     # what f1 and f2 say about them (asserted in video/narration.py from these fields)
     fw, gl = want["Formwork line read as crack"], want["Glare caught by the quality gate"]
     D["fails_said"] = {"not_built": sum(1 for x in D["fails"] if "built" not in x),
+                       # f2: the categories that say the case was caught, and how many of the others still lack their fix
+                       # (a rule not implemented, or an implemented one whose 'Not implemented:' part is what this case needs)
+                       "caught": [x["cat"] for x in D["fails"] if "caught" in x["cat"]],
+                       "not_fixed": sum(1 for x in D["fails"] if "caught" not in x["cat"] and ("built" not in x or x["missing"])),
                        "formwork_kept_coarse": "kept it at the look that drafted it" in fw["what_happened"] and "never withdraws" in fw["rule_that_would_catch_it"],
                        "glare_listed": "not_assessed" in gl["rule_that_would_catch_it"] and "re-shoot" in gl["rule_that_would_catch_it"]}
     src("failure rules not built yet (of the four shown)", D["fails_said"]["not_built"], f, "rule_that_would_catch_it without 'Implemented (...)'")
+    src("failure cases caught (of the four shown)", D["fails_said"]["caught"], f, "category containing 'caught'")
+    src("failure cases whose fix is not built (of the other three)", D["fails_said"]["not_fixed"], f, "rule 'Not implemented', or 'Implemented (...)' with a 'Not implemented:' part")
     f = "public/results/codebrim/failures_text.json"; ft = load(f)
     rf = next(x for x in ft if x["category"] == "Rebar, spall and stain confusion" and "reported corrosion" in x["what_happened"])
     m = re.search(r"ground truth is (\w+), the job reported (\w+)", rf["what_happened"])
@@ -358,7 +364,7 @@ def data(model=MODEL, reals=REALS):
         wins = [f"L{lvl}" for lvl, t in zip((2, 1, 0), pts(s["policies"]["tiling"])) if t["recall"] >= p["recall"]]   # policies.tiling is L2, L1, L0 by pixels
         cl = H["table"]["clean@0.3"]
         D["model_segmenter"] = s["segmenter"]
-        D["model"] = {"name": name, "recall": src("trained segmenter: CODEBRIM recall (30 % cap)", p["recall"], f, "policies.drishyam[cap 0.3].recall"),
+        D["model"] = {"name": name, "n": src("trained segmenter: CODEBRIM photos", s["n_images"], f, "n_images"), "recall": src("trained segmenter: CODEBRIM recall (30 % cap)", p["recall"], f, "policies.drishyam[cap 0.3].recall"),
                       "pixels_frac": src("its share of the pixels", p["pixels_frac"], f, "policies.drishyam[cap 0.3].pixels_frac"),
                       "ci": src("its 95 % CI", p["recall_ci"], f, "policies.drishyam[cap 0.3].recall_ci"),
                       "chance": src("its boxes at random", p["chance_recall"], f, "policies.drishyam[cap 0.3].chance_recall"),
@@ -526,11 +532,11 @@ SCENES = [
     ("mcp", "An LLM over MCP", dict(lead=0.5, gap=0.3, tail=0.4)),
     ("arch", "Architecture", dict(lead=0.5, gap=0.25, tail=0.4)),
     ("results", "Results", dict(lead=0.5, gap=0.25, tail=0.4)),
-    ("real", "Real photos (ours)", dict(lead=0.5, gap=1.1, tail=0.7)),   # only when video/live/real.* and the photo exist; the gap is the glide to the second photo
+    ("real", "Real photos (ours)", dict(lead=0.5, gap=1.1, tail=0.6)),   # only when video/live/real.* and the photo exist; the gap is the glide to the second photo
     ("failures", "Failure cases", dict(lead=0.5, gap=0.3, tail=0.4)),
-    ("limits", "Limits", dict(lead=0.5, gap=0.3, tail=1.0)),   # the fourth limit is read, not said
+    ("limits", "Limits", dict(lead=0.5, gap=0.3, tail=0.8)),   # the fourth limit is read, not said
     ("repro", "Reproduce", dict(lead=0.5, gap=0.3, tail=0.4)),
-    ("end", "End", dict(lead=0.4, gap=0.4, tail=0.2, hold=2.2)),
+    ("end", "End", dict(lead=0.4, gap=0.4, tail=0.2, hold=2.0)),
 ]
 
 
@@ -699,6 +705,7 @@ REQS = [   # competition requirement -> where the film covers it (scene ids or n
     ("Narrated (offline Kokoro voice af_heart) with burned-in captions; the same cues in public/video/drishyam.vtt", ["open", "end"]),
     ("The team: Vaibhav Jangid, Bhavya Dhoot. Each real photo, then the window's looks turn it into OpenCV line art (Canny, findContours, approxPolyDP); name cards without the private inputs", ["team"]),
     ("Problem and user, with sources on screen", ["problem"]),
+    ("Disclosed before the demo plays: the footage was recorded 2026-10-18 on the classical engine; the site now runs the trained v1", ["l0"]),
     ("/api/health on the live site: opencv 5.0.0, aarch64, aws-lambda", ["l1"]),
     ("The application working: the guided run on bridge_03 ('Watch it inspect a bridge'), recorded live, with what it missed", ["l2", "l3", "l4", "l5", "l6", "l7"]),
     ("Plain-words trace (the NOTE and 'What it decided and why' panels)", ["l3", "l4", "l5", "l6", "l7"]),
@@ -709,12 +716,11 @@ REQS = [   # competition requirement -> where the film covers it (scene ids or n
     ("Honesty: no LLM runs in the live demo; the drill planners are scripted", ["b4"]),
     ("An LLM driving the OpenCV tools over MCP: IoU 0.00 at call 6 -> human; IoU 0.72 at call 18 -> confirmed; call 20 budget", ["mcp"]),
     ("Architecture: docs/agent-loop.svg, public/docs/aws-simple.svg, docs/architecture.png (AWS path and OpenCV layer)", ["arch"]),
-    ("The recording ran the classical engine; the live site now runs the trained segmenter v1 on OpenCV 5 DNN ENGINE_NEW, and its Lambda step p95 (video/live/aws-smoke.log)", ["a4", "a5"]),
+    ("The live site now runs the trained segmenter v1 on OpenCV 5 DNN ENGINE_NEW, and its Lambda step p95 then and now (video/live/aws-smoke.log)", ["a4", "a5"]),
     ("Principal results: recall vs pixels, with one downscale, the tiling family and chance", ["r1", "r3"]),
     ("Ablations (public/results/ablations.json)", ["r5"]),
-    ("Real photos (CODEBRIM), said plainly weak; no CODEBRIM image shown", ["r6"]),
-    ("False alarms on synthetic photos with no damage (public/results/clean/summary.json)", ["r7"]),
-    ("Trained segmenter v1, held out (results/heldout_models.json): CODEBRIM recall against the classical engine, its chance recall, critical boxes, the clean set", ["r8", "r7"]),
+    ("Real photos (CODEBRIM), the headline board: trained v1, held out (results/heldout_models.json), against the classical engine (about 1 in 5, the comparison row), its chance recall and critical boxes; no CODEBRIM image shown", ["r6", "r8"]),
+    ("False alarms on synthetic photos with no damage (public/results/clean/summary.json), the classical engine and v1", ["r7"]),
     ("Two real photos of our own (painted walls, no ground truth): the looks, the findings, what it missed (video/live/real.*, video/live/variants/IMG_2330/real.*)", ["real"]),
     ("Failure cases: failures.json plates and their rules; one CODEBRIM case in words only", ["failures"]),
     ("Limits and responsible use", ["limits"]),
@@ -914,36 +920,40 @@ def main():
 
 
 def film_poster(scenes, placed):
-    """The poster: the end card, fully settled (URL, tagline, team)."""
-    return round(scenes["end"]["t1"] - 0.5, 2)
+    """The poster: the agent mid-gaze in the live run, the camera settled on its look at the best region (line l5)."""
+    l5 = next(l for l in placed if l["id"] == "l5")
+    return round(l5["t"] + 0.5 * l5["dur"], 2)
+
+
+SHORT_LINES = ["Only a person can approve a critical finding.", "Try it live: the site now runs the trained v1."]
 
 
 def short(D, scenes, placed):
-    """The 15-20 s 9:16 cut: the cold open and the sign-off stamp, its own two lines of voice."""
-    s = [{"t": 0.8, "text": next(l["say"] for l in placed if l["id"] == "o1")},
-         {"t": 0.0, "text": "Only a person can approve a critical finding."}]
-    tm = narrate_short(s)
+    """The 15-20 s 9:16 cut: the cold open, the sign-off (the typing jump-cut) to the settled stamp, then the URL; three lines of voice."""
+    assert D["model"]["name"] == "v1" and D["aws"]["now"]["segmenter"] == D["model_segmenter"], "the short's last line says the site now runs v1"
+    narrate_short([next(l["say"] for l in placed if l["id"] == "o1"), *SHORT_LINES])
     fast(VIDEO / "short.html", "--width", 1080, "--height", 1920, "--dump-sfx", WORK / "short-sfx.json")
     dur = json.loads((WORK / "short-sfx.json").read_text())["dur"]
     score(WORK / "short-sfx.json", dur, WORK / "short-score.wav")
     subprocess.run([PY, str(NARRATE), str(WORK / "short-script.json"), "--voice", VOICE, "--out", str(WORK / "short-narration.wav"),
                     "--timings", str(WORK / "short-timings.json"), "--music", str(WORK / "short-score.wav"), "--mix", str(WORK / "short-mix.wav")], check=True, cwd=WORK)
     fast(VIDEO / "short.html", "--width", 1080, "--height", 1920, "--out", ROOT / "brag-output/drishyam-short.mp4", "--fps", 30,
-         "--audio", WORK / "short-mix.wav", "--poster", 1.2)
+         "--audio", WORK / "short-mix.wav", "--poster", dur - 0.6)   # the cover: the settled stamp, the URL and the v1 card
 
 
-def narrate_short(s):
-    """Line 1 at 0.8 s; line 2 placed after the stamp, which the page puts at SHORT_STAMP (film.html)."""
-    (WORK / "short-probe.json").write_text(json.dumps([{"t": 0.8, "text": s[0]["text"]}, {"t": 30.0, "text": s[1]["text"]}]))
-    tm = narrate(WORK / "short-probe.json", WORK / "short-probe.wav", WORK / "short-probe-timings.json")
-    d0, d1 = tm[0]["dur"], tm[1]["dur"]
-    t1 = round(0.8 + d0 + 2.2, 2)
-    script = [{"t": 0.8, "text": s[0]["text"]}, {"t": t1, "text": s[1]["text"]}]
+def narrate_short(texts):
+    """Line 1 (the cold open's) at 0.8 s; line 2 as the footage cuts to the sign-off (film.js buildShort: 0.3 s after line 1),
+    0.2 s in; line 3 after it, over the URL; the cut holds 2 s after the last word."""
+    probe = [{"t": 0.8 + 30.0 * i, "text": x} for i, x in enumerate(texts)]
+    (WORK / "short-probe.json").write_text(json.dumps(probe))
+    d = [x["dur"] for x in narrate(WORK / "short-probe.json", WORK / "short-probe.wav", WORK / "short-probe-timings.json")]
+    t = [0.8, round(0.8 + d[0] + 0.5, 2)]
+    t.append(round(t[1] + d[1] + 0.5, 2))
+    script = [{"t": a, "text": x} for a, x in zip(t, texts)]
     (WORK / "short-script.json").write_text(json.dumps(script))
-    (WORK / "short-data.js").write_text("window.SHORT = " + json.dumps({"lines": [{"t": 0.8, "dur": d0, "text": tm[0]["text"]},
-                                                                                 {"t": t1, "dur": d1, "text": tm[1]["text"]}], "dur": round(max(15.5, t1 + d1 + 3.4), 2)}) + ";")
-    return tm
-
+    dur = round(max(15.5, t[2] + d[2] + 2.0), 2)
+    assert dur <= 20, f"the short runs {dur} s, over 20"
+    (WORK / "short-data.js").write_text("window.SHORT = " + json.dumps({"lines": [{"t": a, "dur": b, "text": x} for a, b, x in zip(t, d, texts)], "dur": dur}) + ";")
 
 if __name__ == "__main__":
     main()

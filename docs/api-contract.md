@@ -143,6 +143,10 @@ Event types, in order:
 {"type": "error", "message": "..."}
 ```
 
+`coverage` counts the survey look, so it can read 1.0 beside a work order whose `not_assessed` lists regions no
+closer look saw: how much was looked at closely is `coverage_looked`, which the site shows whenever the record has
+it (`coverage` only for a recording older than it, labelled "seen at any level").
+
 `prep_ms` on the `job` event is the server's time before the job's clock starts, in whole milliseconds:
 `read` (receiving the upload), `decode` (`imaging.decode_image`) and `privacy` (the face, person and
 vehicle blur, `privacy.privacy_pass`). None of it is in a step's `latency_ms`, in `seconds_used`,
