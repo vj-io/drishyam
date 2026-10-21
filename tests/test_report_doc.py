@@ -183,6 +183,28 @@ def heldout_quotes() -> list:
              f"and {sc['per_class']['exposed_rebar']:.2f}")]
 
 
+def v1_look_quotes() -> list:
+    """How much v1 zooms on CODEBRIM at the headline cap, and the tiling grids beside it (its held-out summaries)."""
+    cb, sy = (load(f"public/results/{d}_dacl10k/summary.json") for d in ("codebrim", "synth"))
+    a = cb["agent_metrics"]["by_budget"]["0.3"]
+    t2, t1 = cb["policies"]["tiling"][0], sy["policies"]["tiling"][1]  # the L2 and L1 grids
+    d, s = drishyam(cb, "0.3"), drishyam(sy, "0.3")
+    return [(f"an escalation fired on {100 * a['escalation_rate']:.1f} % of v1's looks and a verify on "
+             f"{100 * a['verify_rate']:.1f} %"),
+            (f"an L2 tiling grid finds {t2['recall']:.2f} with {t2['pixels_frac']:.2f} of the pixels, against the agent's "
+             f"{d['recall']:.2f} with {d['pixels_frac']:.2f}"),
+            (f"an L1 grid finds {t1['recall']:.2f} with {t1['pixels_frac']:.2f} of the pixels, against {s['recall']:.2f} "
+             f"with {s['pixels_frac']:.2f}")]
+
+
+def pitch_quote() -> str:
+    """The README's opening paragraph: v1's CODEBRIM recall, its ratio to the classical engine and its chance score."""
+    t = load("results/heldout_models.json")
+    c, ratio = t["table"]["codebrim@0.3"]["v1"], t["pairs"]["codebrim@0.3: v1 / classical-v1"]["recall"][0]
+    return (f"finds {c['recall']:.2f} of the labelled defects, {ratio:.1f} times what the classical engine finds, but "
+            f"boxes placed at random would already find {c['chance_recall']:.2f}")
+
+
 def live_quotes() -> list:
     """What the glance blocks take from docs/aws.md: the deployed commit and the Lambda step p95s (no JSON holds them)."""
     aws = flat(AWS)
@@ -223,8 +245,9 @@ def test_glance_quotes_are_the_json():
     for name, text in (("README.md", README), ("docs/report.md", REPORT)):
         glance = text.split("## Results at a glance\n")[1].split("\n## ")[0]
         assert [r for r in glance_rows() if r not in glance] == [], name
-        want = classical_quotes()[:3] + heldout_quotes() + live_quotes()
+        want = classical_quotes()[:3] + heldout_quotes() + v1_look_quotes() + live_quotes()
         assert [w for w in want if w not in flat(glance)] == [], name
+    assert pitch_quote() in flat(README.split("## Results at a glance\n")[0])
     # moved out of the glance: tuning, cascade, INT8 and prefetching to both docs' results; Arm against x86 to the
     # README's (the report has it as the "arm" table)
     assert [w for w in adoption_quotes() if w not in flat(README) or w not in flat(REPORT)] == []
@@ -354,6 +377,11 @@ def test_real_photo_miss_is_the_trace():
     done = next(r for r in recs if r["type"] == "done")
     assert ov["candidates"] == [] and done["cause"] == "exhausted" and done["summary"]["steps"] == 0
     assert done["summary"]["findings"] == 0 and load("video/live/real.json")["image"] == "IMG_2332"
+    # its work order does not read as a clean wall: the whole photo is not assessed, and the order is incomplete
+    wo, job = done["work_order"], recs[0]
+    (na,) = wo["not_assessed"]
+    assert wo["findings"] == [] and na["box"] == [0, 0, job["width"], job["height"]]
+    assert f"lists the whole photo as `not_assessed` (action `{na['action']}`) and reads `{wo['status']}`, not `ready`" in flat(REPORT)
     assert f"{ov['pixels_frac']:.4f} of the pixels" in flat(REPORT) and "public/samples/real_01.jpg" in REPORT
     other = [json.loads(line) for line in (REPO / "public/samples/real_02.ndjson").read_text().splitlines()][-1]
     (f,) = other["work_order"]["findings"]  # IMG_2330: one look, one crack

@@ -1,16 +1,16 @@
 # Drishyam
 
-**A virtual-PTZ inspector for bridge photos**, entered in the OpenCV AI Competition 2026, powered by AWS. It is for
-bridge inspectors working through photo backlogs (624,939 US bridges, 41,148 in poor condition, each routinely
-inspected at intervals of up to 24 months; [docs/impact-sources.md](docs/impact-sources.md)). Drishyam (Sanskrit:
-*that which is seen*) decides where to look in a huge photo, zooms in where it is unsure (with the live v1 engine,
-no finer than half size on a 2048-px photo), drafts findings with pixel measurements, asks a human to sign anything
-critical, and stops looking when the next look is worth less than it costs. Every camera move is an OpenCV
-`pyrDown` / `warpPerspective` / `resize` call. The live demo runs the stock opencv-python-headless 5.0.0 wheel on Lambda arm64.
-That pinned wheel's aarch64 build already includes KleidiCV 26.03 and carotene: on GitHub's arm64 runner its
-`cv2.getBuildInformation()` reads "Custom HAL: YES (carotene (ver 0.0.1) KleidiCV (ver 26.03))"
-([results/linux-aarch64/micro.json](results/linux-aarch64/micro.json); the Lambda's own build information is not
-recorded).
+**[Watch the 4-minute film](https://github.com/vj-io/drishyam/releases/download/v1.1.0/drishyam.mp4)** (also on
+the live site) · **[Try the live demo](https://d1xg58guluup8c.cloudfront.net)**
+
+Drishyam is an inspection agent for bridge photos, for inspectors with a backlog of large photos to check. On each
+photo it decides where to look, zooms in where it is unsure, marks cracks, spalling and exposed rebar with pixel
+measurements, and stops when one more look is worth less than it costs. A person signs every critical finding; the
+agent cannot. On 200 real bridge photos the live segmenter, v1, finds 0.49 of the labelled defects, 2.5 times what
+the classical engine finds, but boxes placed at random would already find 0.30.
+
+It is built on OpenCV 5 for the OpenCV AI Competition 2026, powered by AWS. Drishyam is Sanskrit for *that which is
+seen*.
 
 - **Live demo:** https://d1xg58guluup8c.cloudfront.net (stock OpenCV 5 on AWS Lambda arm64 behind CloudFront, *not COOL*; [docs/aws.md](docs/aws.md))
 - **Report:** [docs/report.md](docs/report.md) · **Architecture:** [docs/architecture.png](docs/architecture.png) · **Agent loop:** [docs/agent-loop.svg](docs/agent-loop.svg) · **Claude driving it over MCP (recorded):** [docs/mcp-session/transcript.md](docs/mcp-session/transcript.md) · **Why it matters, with sources:** [docs/impact-sources.md](docs/impact-sources.md)
@@ -39,6 +39,11 @@ drifts from that file or, for the Lambda timings, from [docs/aws.md](docs/aws.md
 - **What the held-out runs measured:** the governor off and the 512-px FP32 net on every look. Live, the v1
   profile's SLA is 1500 ms, so looks stay on the 512-px FP32 net unless steps exceed 1.5 s. v1's finest look is L1
   (half size) on a 2048-px photo and L2 on a 4608-px one, so on these photos it never looks at full resolution.
+- **How much v1 zooms, and a tiling grid it does not beat:** on CODEBRIM at the 30 % cap an escalation fired on
+  5.9 % of v1's looks and a verify on 9.4 %, and an L2 tiling grid finds 0.50 with 0.10 of the pixels, against the
+  agent's 0.49 with 0.14; on synth200 an L1 grid finds 0.70 with 0.50 of the pixels, against 0.64 with 0.26
+  ([public/results/codebrim_dacl10k/summary.json](public/results/codebrim_dacl10k/summary.json),
+  [public/results/synth_dacl10k/summary.json](public/results/synth_dacl10k/summary.json)).
 - **Against the classical engine,** v1 finds 2.54× (2.16–3.01) its recall on CODEBRIM and 1.34× (1.24–1.45) on
   synth200, and puts no box on a clean photo where the classical engine puts 7.08 per photo. But chance is high on
   CODEBRIM because its boxes are large; it sends 5.5 times the critical boxes to the human gate (at that rate, about 24,000
@@ -75,9 +80,18 @@ flowchart TD
 ```
 
 1. **Look where it matters.** A saliency prior from imgproc ops (Sobel, black-hat, adaptive threshold, CLAHE, rust-hue `inRange`) ranks up to 20 candidate windows on the 1/8-scale overview.
-2. **Zoom until sure.** The next look is `argmax p·s·(1+u)·a / t̂` (prior × severity × uncertainty × unseen area ÷ predicted ms). An uncertain look (entropy > τ) or a tiny mask zooms one pyramid level finer on what it saw; a new confident mask is verified one level finer by mask IoU. With v1, the live engine, a look spans at least 0.3 of the photo's long side (its profile's `min_view`), so its finest level is L1 (half size) on a 2048-px photo and L2 on a 4608-px one; a look there is not escalated or verified further.
+2. **Zoom in where it is unsure.** The next look is `argmax p·s·(1+u)·a / t̂` (prior × severity × uncertainty × unseen area ÷ predicted ms). An uncertain look (entropy > τ) or a tiny mask zooms one pyramid level finer on what it saw; a new confident mask is verified one level finer by mask IoU. With v1, the live engine, a look spans at least 0.3 of the photo's long side (its profile's `min_view`), so its finest level is L1 (half size) on a 2048-px photo and L2 on a 4608-px one; a look there is not escalated or verified further.
 3. **Stop when a look is not worth its cost.** The job ends when the best next look is worth less than a quarter of the value per ms realised so far, or than the value of a look that finds nothing once every candidate left has been seen as finely as its first look would see it, inside pixel, $ and seconds caps and a p95-latency governor (switches model, then coarsens). Every step records the cause that chose it.
-4. **A human signs anything critical.** Exposed rebar and large spalling wait in `pending_review`; only a human (web review, or `drishyam review`) can approve or reject. The agent, the MCP tools and the optional LLM planner have no path to that transition.
+4. **A human signs anything critical.** Exposed rebar and large spalling wait in `pending_review`; only a human (web review, or `drishyam review`) can approve or reject. The agent, the MCP tools and the optional LLM planner have no path to that transition. The review does not check who sends it: the reviewer's name is self-asserted ([docs/security.md](docs/security.md), Known limits).
+
+It is for bridge inspectors working through photo backlogs: 624,939 US bridges, 41,148 in poor condition, each
+routinely inspected at intervals of up to 24 months ([docs/impact-sources.md](docs/impact-sources.md)). Every camera
+move is an OpenCV `pyrDown` / `warpPerspective` / `resize` call. The live demo runs the stock
+opencv-python-headless 5.0.0 wheel on Lambda arm64, whose aarch64 build already includes KleidiCV 26.03 and
+carotene: the Lambda's own `cv2.getBuildInformation()`, as its `GET /api/health` reports it, reads Custom HAL
+"YES (carotene (ver 0.0.1) KleidiCV (ver 26.03))", baseline "NEON FP16", dispatch "NEON_DOTPROD NEON_FP16 NEON_BF16"
+and parallel framework "pthreads" ([results/lambda-cv2-build.json](results/lambda-cv2-build.json), fetched
+2026-10-21), the same as on GitHub's arm64 runner ([results/linux-aarch64/micro.json](results/linux-aarch64/micro.json)).
 
 No LLM runs in the live demo: the deployed agent is the rule policy above, and its planner failure drills use planners scripted to time out or answer junk. The LLM path is the MCP server; in a [recorded session](docs/mcp-session/transcript.md) Claude chose each call from the measured IoU and entropy (its prompt states the decision rules). The full system, AWS included, is in [docs/architecture.png](docs/architecture.png), and the loop in [docs/agent-loop.svg](docs/agent-loop.svg).
 
@@ -108,6 +122,20 @@ check their sha256, then run with them.
 
 ```bash
 gh release download v1.1.0 --repo vj-io/drishyam --pattern 'drishyam_dacl10k*' --dir models
+```
+
+Or without `gh`, the same three files with curl:
+
+```bash
+curl -fL -o models/drishyam_dacl10k.onnx https://github.com/vj-io/drishyam/releases/download/v1.1.0/drishyam_dacl10k.onnx
+```
+
+```bash
+curl -fL -o models/drishyam_dacl10k.fp16.onnx https://github.com/vj-io/drishyam/releases/download/v1.1.0/drishyam_dacl10k.fp16.onnx
+```
+
+```bash
+curl -fL -o models/drishyam_dacl10k.sha256 https://github.com/vj-io/drishyam/releases/download/v1.1.0/drishyam_dacl10k.sha256
 ```
 
 ```bash

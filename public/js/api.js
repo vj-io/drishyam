@@ -70,7 +70,8 @@ export async function* streamJob({ blob, params, replay, signal, trace }) {
       { status: res.status });
   }
   // This job now holds one Lambda environment until it ends, so KILL lands in another. Start that one now: a cold start
-  // (about 3 s) after KILL can let a short job finish before the kill flag is read (docs/aws.md, Smoke, check 3).
+  // (0.86 to 6.27 s to the first byte over the v1 smoke runs) after KILL can let a short job finish before the kill
+  // flag is read (docs/aws.md, Smoke, check 3).
   fetch('/api/health', { cache: 'no-store' }).catch(() => {});
   yield* ndjson(res.body);
 }

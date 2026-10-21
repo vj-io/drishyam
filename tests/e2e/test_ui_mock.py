@@ -523,15 +523,22 @@ def test_desktop_mock(browser, base):
     expect(p.locator("#stat-cost .stat__s")).to_contain_text(
         "At the 30 % pixel cap of the headline: a cap ended 125 of 200 first, the stop rule 71, and 4 had looked at every candidate.")
     expect(p.locator("#stat-ops .stat__v")).to_have_text("49 / 50 recovered")
-    # the real-photo card is the live engine's, every number stated before the runs beside its recall
+    # the real-photo card is the live engine's and comes first, short: its interval and chance (REAL has no point at
+    # the 30 % cap, so no classical recall beside it); every number stated before the runs is in FIG. 4.2's note
+    expect(p.locator(".stats > .stat").first).to_have_id("stat-real")
     expect(p.locator("#stat-real .stat__k")).to_have_text("Live engine (v1), real bridge photos (CODEBRIM, 200)")
     expect(p.locator("#stat-real .stat__v")).to_have_text("recall 0.49")
+    expect(p.locator("#stat-real .stat__s")).to_have_text(
+        "at the 30 % pixel cap (CI 0.44–0.54); chance 0.30.")
+    lines = p.locator("#stat-real .stat__s").evaluate("e => Math.round(e.getBoundingClientRect().height / parseFloat(getComputedStyle(e).lineHeight))")
+    assert lines <= 2, f"the v1 card's note runs to {lines} lines"
+    expect(p.locator("#stat-ops .stat__k")).to_have_text("Classical engine, failure drills")
     for said in ("Recall 0.49 (95 % CI 0.44–0.54) at the 30 % pixel cap.",
                  "Its boxes at random places score 0.30, and with IoU-only matching it finds 0.25 against 0.08 by chance.",
                  "It sends 9.60 critical boxes per photo to a person, against the classical engine’s 1.73.",
                  "On the synthetic photos it finds 0.02 of the exposed rebar and 0.00 of the efflorescence, where the classical engine finds 0.57 and 0.16.",
                  "Measured with the governor off, the 512-px FP32 net on every look; live, the v1 engine keeps that net unless a step takes over 1.5 s."):
-        expect(p.locator("#stat-real .stat__s")).to_contain_text(said)
+        expect(p.locator("#bench-real")).to_contain_text(said.replace("Recall", "v1 held out: recall"))
     expect(p.locator("#bench svg.chart")).to_be_visible()
     expect(p.locator("#bench .legend li")).to_have_count(4)                       # three policies and v1's dashed line
     expect(p.locator("#bench .legend")).to_contain_text("Drishyam, v1 (the live engine)")
