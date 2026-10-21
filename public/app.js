@@ -18,7 +18,7 @@ const NOTE = 'Press Run and the agent’s reasoning appears here, one decision a
 
 const el = {
   pill: $('#job-pill'), text: $('#job-text'), count: $('#job-steps'), kill: $('#kill'), resume: $('#resume'), sound: $('#sound'),
-  look: $('#look'), runBar: $('#run-bar'), skip: $('#skip'), guided: $('#guided'), guidedReal: $('#guided-real'), recorded: $('#recorded'),
+  look: $('#look'), runBar: $('#run-bar'), tryKill: $('#try-kill'), skip: $('#skip'), guided: $('#guided'), guidedReal: $('#guided-real'), recorded: $('#recorded'),
   file: $('#file'), drop: $('#drop'), prep: $('#prep'), gallery: $('#gallery'), galleryEmpty: $('#gallery-empty'),
   slider: $('#replay'), sliderOut: $('#replay-out'), play: $('#play'), heat: $('#heat'), tiles: $('#tiles'), tilesNote: $('#tiles-note'),
   detail: $('#step-detail'), done: $('#done'), recap: $('#recap'), narrator: $('#narrator'), narratorSub: $('#narrator-sub'),
@@ -104,12 +104,12 @@ function setMode(mode, text) {
     running: 'Sending the photo to the agent…',
   }[mode] ?? '');
   const running = mode === 'running';
-  el.kill.hidden = !running;
+  el.kill.hidden = !running || Boolean(S.arrived);  // after the server's done event a KILL can stop nothing
   el.skip.hidden = !running || Q.skip;
-  el.runBar.hidden = running;
+  el.runBar.hidden = el.tryKill.hidden = running;
   el.resume.hidden = !(['killed', 'stopped'].includes(mode) || (mode === 'error' && S.steps.length > 0)
     || (mode === 'done' && S.done?.cause === 'kill-switch' && S.done.summary?.steps > 0));  // a halt before any look has nothing to resume
-  el.look.disabled = el.runBar.disabled = running || !S.image;
+  el.look.disabled = el.runBar.disabled = el.tryKill.disabled = running || !S.image;
   el.guided.disabled = el.guidedReal.disabled = running;
   if (!running) el.count.textContent = '';
   if (['error', 'killed'].includes(mode) && !S.events.length) narrate(el.text.textContent);  // nothing arrived: the NOTE still says "Sending"
@@ -437,6 +437,8 @@ function arrive(ev) {
   if (S.opts.replay && !S.events.length && !['end', 'error'].includes(ev.type)) clearJob();
   if (ev.type === 'done') {
     S.arrived = ev;
+    if (document.activeElement === el.kill) el.skip.focus({ preventScroll: true });
+    el.kill.hidden = true;  // the job is over on the server: KILL could only claim a stop that did not happen
     if (Q.timer || Q.items.length) {
       S.slow = true;
       const n = S.events.filter((e) => e.type === 'step').length;
@@ -641,7 +643,7 @@ async function run(opts = {}) {
   clearTimeout(Q.timer);
   Object.assign(Q, { items: [], timer: 0, skip: Boolean(opts.killHint) });  // a KILL drill is shown live: never behind the job it asks to stop
   const active = document.activeElement;  // all hidden or disabled while running
-  const refocus = [el.look, el.runBar, el.resume, el.guided, el.guidedReal].includes(active) || el.recap.contains(active);
+  const refocus = [el.look, el.runBar, el.tryKill, el.resume, el.guided, el.guidedReal].includes(active) || el.recap.contains(active);
   if (!opts.replay) clearJob();  // the last run goes at once: the page answers the click before the server does
   setMode('running', recorded() ? 'Recorded run: replaying a saved job (no server).'
     : opts.replay ? 'Resuming: re-sending the photo and replaying the moves so far…' : undefined);
@@ -786,12 +788,12 @@ function pickFile(file) {
 async function choose(btn) {
   const s = btn.sample;
   if (S.mode === 'running') { el.prep.textContent = 'A job is running. KILL it first to change the photo.'; return; }
-  el.look.disabled = el.runBar.disabled = true;  // the old photo must not run while the new one loads
+  el.look.disabled = el.runBar.disabled = el.tryKill.disabled = true;  // the old photo must not run while the new one loads
   el.prep.textContent = `Loading ${String(s.title ?? s.file)}…`;
   const res = await fetch(`samples/${s.file}`).catch(() => null);
   if (!res?.ok) {
     el.prep.textContent = 'That sample could not be loaded.';
-    el.look.disabled = el.runBar.disabled = !S.image;
+    el.look.disabled = el.runBar.disabled = el.tryKill.disabled = !S.image;
     return;
   }
   await useImage(await res.blob(), String(s.title ?? s.file), s.file);
@@ -824,6 +826,8 @@ async function loadSamples() {
 // ---- wiring ------------------------------------------------------------------------------------------
 el.look.addEventListener('click', () => run());
 el.runBar.addEventListener('click', () => run());
+// the KILL drill, also offered before any run: shown live, and its planner stalls 2 s at step 3 so KILL lands mid-job
+el.tryKill.addEventListener('click', () => run({ pace: GUIDE_PACE_MS, chaos: 'planner_timeout', killHint: true }));
 el.guided.addEventListener('click', guided);
 el.guidedReal.addEventListener('click', () => guidedReal());
 el.skip.addEventListener('click', skip);

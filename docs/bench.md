@@ -17,7 +17,7 @@ or on any AWS instance: this workstream does not deploy or write to AWS.
 | This Mac | Intel Core i9-9880H, x86, 8 cores / 16 threads; macOS GCD | opencv-python-headless 5.0.0 wheel (`uv.lock`), IPP HAL | Metric A, Metric B (1 thread and all 16), dacl10k latency, INT8 | `results/local-macos-x86/{kernels,loop,loop_onnx,int8,int8_repeat}.json` |
 | GitHub `ubuntu-24.04-arm` | Neoverse-N2, 4 logical CPUs; Linux pthreads | the same version, aarch64 wheel (KleidiCV and carotene HAL) | Metric A, Metric B at 1, 2, 4 threads, micro, macro | `results/linux-aarch64/`: `micro.json` (the fixed cost table, 2026-10-18); `kernels.json`, `loop.json`, `macro.json` and `micro_run39220769299.json` from run 39220769299 |
 | GitHub `ubuntu-24.04` | AMD EPYC 7763, 4 logical CPUs; Linux pthreads | the same version, x86_64 wheel (IPP HAL) | the same | `results/linux-x86_64/{micro,macro,kernels,loop}.json`, run 39220769299 |
-| Lambda arm64, 3008 MB | Graviton, 1.7 vCPU of time (below) | the same version, aarch64 wheel | not measured here | the two smoke runs in `docs/report.md` section 5 are the only Lambda timings |
+| Lambda arm64, 3008 MB | Graviton, 1.7 vCPU of time (below) | the same version, aarch64 wheel | not measured here | the smoke runs' step p95s in `docs/aws.md` are the only Lambda timings: 67.7 to 88.0 ms with the classical engine, 0.56 to 1.14 s with v1 (live since 2026-10-21) |
 
 **COOL and AISPL.** The AWS India (AISPL) account could not subscribe to the COOL Marketplace AMI (the agreement was
 terminated; a support case is open), so COOL on a Graviton4 instance was not run. The Arm evidence is the deployed
@@ -181,8 +181,9 @@ against +70 % before), so these waits were not its cause.
 
 So prefetching pays only where a look is expensive and a core is idle while it runs: one inference thread with a spare
 core, and there it shortens whole jobs, not steps. With every core busy it makes steps slower. On Lambda's 1.7 vCPU
-the second thread would have at most about 0.7 of a core, and with the classical segmenter the deployed function runs
-it buys no reliable gain for 40 to 60 % more CPU; it stays off.
+the second thread would have at most about 0.7 of a core, and with the classical segmenter (the deployed engine until
+2026-10-21) it buys no reliable gain for 40 to 60 % more CPU; it stays off. With v1 on the function it was not
+measured.
 
 ## Arm against x86 on GitHub
 
@@ -431,7 +432,8 @@ Linux reports (`os.cpu_count()`, which OpenCV's default follows) was not measure
 **`DRISHYAM_CV_THREADS`.** `drishyam/web.py` reads it at startup and calls `cv2.setNumThreads` with it; the stack sets
 it to 2 for the function (`infra/drishyam_stack.py`), the whole-CPU count nearest 1.7. When it is set, the cold start
 logs `DRISHYAM_CV_THREADS=2: cv2.getNumThreads() = N`, which is how to check on the function that it took. Unset, as
-everywhere but the stack, nothing changes. Not deployed by this workstream.
+everywhere but the stack, nothing changes. The deployed function's startup log has
+`DRISHYAM_CV_THREADS=2: cv2.getNumThreads() = 2` ([aws.md](aws.md)).
 
 **What the dacl10k FP32 512 net would need.** The governor compares the p95 of the segment op (the forward plus its
 post-processing) with `sla_ms` 500 and switches to the 256 px `fast` net above it; the PRD's target (NFR-1) is a gaze
@@ -460,8 +462,11 @@ This Mac does not decide it. Its one-thread 512 forward p95s were 764 ms (`int8.
 load average of 7 to 15, while single forwards ran as fast as 541 ms (the review run), 601 ms (the probe above) and
 668 ms (`kernels.json`'s minimum). On an idle core of this speed the p95 could fall on either side of 740 ms. If the
 512 net does not fit, the governor switches to the 256 net, which fits with room (one-thread p95 199 ms). Whether a
-Graviton core is faster or slower than this i9's for this net was not measured (the weights are not on the GitHub
-runner, and nothing ran on Lambda); only a measurement on Graviton or on the function settles it.
+Graviton core is faster or slower than this i9's for this net was not measured here (the weights are not on the
+GitHub runner). The function settled it once v1 was deployed (2026-10-21): over the eight smoke runs since, a v1
+step's p95 was 0.56 to 1.14 s ([aws.md](aws.md)), so the 512 net does not fit 500 ms there. The v1 profile's SLA is
+therefore 1500 ms, set once from those runs plus headroom, so live looks stay on the 512 net unless steps exceed
+1.5 s.
 
 ## INT8: can OpenCV 5's DNN run a quantized dacl10k?
 
