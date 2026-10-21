@@ -102,3 +102,4 @@ table.t .good { color: var(--amber); font-weight: 700; }
 .caret { display: inline-block; width: 14px; height: 1.1em; vertical-align: -.2em; background: var(--line); }
 .title { position: absolute; left: 0; right: 0; text-align: center; }
 #standin { position: absolute; left: 0; right: 0; top: 0; height: 34px; z-index: 99; background: var(--red); color: var(--red-ink); font: 700 22px/34px var(--fm); letter-spacing: .16em; text-align: center; }
+.win .rec { padding: 5px 12px; border: 2.5px solid var(--red); color: var(--red); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }

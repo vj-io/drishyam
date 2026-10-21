@@ -62,9 +62,10 @@ def lines(D):
     assert h["opencv"].startswith("5.") and h["arch"] == "aarch64" and h["host"] == "aws-lambda", h
     CV = ("five", "5")   # OpenCV's major version, from /api/health
 
-    # 1. cold open, over the live guided run
+    # 1. cold open, over the live guided run (recorded 2026-10-18 on the classical engine: o1 says which, l0 says when)
     assert round(1 / g["pixels_frac"]) == 4, "o1 says a quarter"
-    add("open", "o1", "It read a quarter of this photo's pixels, and found ", W(g["critical"]), " critical findings.")
+    assert h["segmenter"].startswith("classical"), "o1 and l0 say the footage ran the classical engine"
+    add("open", "o1", "Its classical engine read a quarter of the pixels and flagged ", W(g["critical"]), " critical findings.")
     add("open", "o2", "It will not sign them off. A person must.")
 
     # 2. team
@@ -80,14 +81,18 @@ def lines(D):
     add("problem", "p2", "One drone inspection took more than ", (f"{words(hund)} hundred", f"{hund * 100:,}"), " photos of one bridge.")
     add("problem", "p3", "Drishyam is for the engineer reviewing them: it zooms in only where needed.")
 
-    # 4. the app working, live (recorded 2026-10-18, when the site ran the classical engine: a4 says so)
-    add("live", "l1", "It runs live on AWS: OpenCV ", CV, " on an arm Lambda.")
+    # 4. the app working, live (recorded 2026-10-18, when the site ran the classical engine: l0 says so before it plays)
+    md = D.get("model")
+    assert D["lit"]["recorded"] == "2026-10-18", "l0 says October eighteenth"
+    assert md and md["name"] == "v1" and a["now"]["segmenter"] == D["model_segmenter"] and a["now"]["segmenter"].startswith("onnx:"), "l0 and a4 say the site now runs the trained v1"
+    add("live", "l0", "Recorded ", ("October eighteenth", "18 October"), " on the classical engine; the site now runs the trained v1.")
+    add("live", "l1", "Live on AWS: OpenCV ", CV, " on an arm Lambda.")
     assert sum(g["privacy"]) == 0, "l2 says there was nothing to blur in this photo"
     add("live", "l2", "Watch it inspect a bridge; a privacy pass finds nothing to blur.")
     add("live", "l3", f"One survey look at the whole photo, at one {ORD[g['survey_div']]} size.")
     assert g["tau"] == 0.5 and g["entropy1"] > g["tau"]
     add("live", "l4", "Entropy ", Dc(g["entropy1"]), ", above ", ("one half", "0.5"), ": unsure, so it zooms in.")
-    add("live", "l5", "It moves to the best region and double-checks at full resolution.")
+    add("live", "l5", "It moves to the best region and double-checks one level finer.")   # agent.py: a verify look goes one level finer
     assert g["iou"] < g["iou_min"] == 0.5 and g["rebar_rule"].startswith("exposed_rebar: always critical")
     add("live", "l6", "The masks disagree: unconfirmed. Exposed rebar always goes to a person.")
     assert g["missed"] == ["crack"] and len(g["unvisited"]) == 2
@@ -114,10 +119,7 @@ def lines(D):
     add("arch", "a0", "Each step is perception, decision and action, with a human gate at the end.")
     add("arch", "a1", "CloudFront and a rate-limiting firewall front the arm Lambda; DynamoDB keeps kill flags, Secrets Manager the key.")
     add("arch", "a3", "OpenCV does the looking: a pyramid, saliency, ", ("warp perspective", "warpPerspective"), " as a pan-tilt-zoom camera, a blur gate, face blurring.")
-    md = D.get("model")
-    assert h["segmenter"].startswith("classical"), "a4 says the recording ran the classical segmenter"
-    assert md and a["now"]["segmenter"] == D["model_segmenter"] and a["now"]["segmenter"].startswith("onnx:"), "a4 says the site now runs the trained segmenter"
-    add("arch", "a4", "Recorded on the classical segmenter; the site now runs the trained one, on OpenCV ", CV, "'s new DNN engine.")
+    add("arch", "a4", "The site now runs v1 on OpenCV ", CV, "'s new DNN engine.")
     lo, hi = a["p95"]; cap_ms = (int(hi) // 10 + 1) * 10   # 88.0 -> "under ninety"; the rail card prints both ranges
     cap_s = math.ceil(a["p95_v1"][1] / 100) / 10   # 1067.3 ms -> "under 1.1 seconds"
     assert a["p95_v1"][0] > hi, "a5 says a step now takes longer"
@@ -136,21 +138,20 @@ def lines(D):
     assert all(ab[d]["vs"]["no-verify"] in ("no measurable difference", "above the full agent") for d in ab), "r5 says dropping verify costs no recall"
     # complete by construction: every other variant (no verify, no uncertainty, governor on) is asserted above to lose no recall
     add("results", "r5", "Ablations: only dropping the survey look loses recall, and a random gaze order matches it on smaller photos.")
-    assert cb["plain"] and cb["chance"] < cb["range"][0], "r6 says every method finds about 1 in N, and chance is below that"
-    c8 = round(1 / cb["chance"])
-    add("results", "r6", "On ", W(cb["n"]), " real CODEBRIM photos, every classical method finds about ", (f"one defect in {words(cb['one_in'])}", f"1 defect in {cb['one_in']}"),
-        "; chance, ", (f"one in {words(c8)}", f"1 in {c8}"), ".")
-    # the trained segmenter, held out: build.py has checked the same photos, the governor off, and cost tables timed on one machine
+    # real photos: the trained v1, held out, is the headline; the classical engine (every classical method about 1 in N,
+    # above its own chance, on the board's comparison row) is what it is compared with. build.py has checked the same
+    # photos, the governor off, and cost tables timed on one machine.
+    assert cb["plain"] and cb["chance"] < cb["range"][0] and cb["n"] == md["n"], "the board says every classical method finds about 1 in N, above chance, on these photos"
     r, (rlo, _) = md["ratio"]; cr, (crlo, _) = md["crit_ratio"]
-    assert rlo > 1 and abs(r - 2.5) < 0.1, "r8 says two and a half times as many"
-    assert md["chance"] > md["classical"] and crlo > 1 and abs(cr - 5.5) < 0.1, "r8 says its boxes at random find more than the classical engine does, and five and a half times the critical boxes"
+    assert rlo > 1 and abs(r - 2.5) < 0.1 and round(1 / md["classical"]) == cb["one_in"], "r6 says two and a half times the classical engine's one in N"
     assert abs(md["recall"] - md["classical"] * r) < 0.02, (md["recall"], md["classical"], r)
+    add("results", "r6", "On ", W(cb["n"]), " real CODEBRIM photos, held out, the trained v1 finds ", P(md["recall"]), ": two and a half times the classical engine's ",
+        (f"one in {words(cb['one_in'])}", f"1 in {cb['one_in']}"), ".")
+    assert md["chance"] > md["classical"] and crlo > 1 and abs(cr - 5.5) < 0.1, "r8 says its boxes at random find a lot, and five and a half times the critical boxes"
     leak = [] if md["near_dups"] == 0 else [" ", W(md["near_dups"]), " of these photos have a near-duplicate in its training set."]   # the board shows the count either way
-    add("results", "r8", "Held out, the trained segmenter finds ", P(md["recall"]), ", two and a half times as many; but its boxes find ", P(md["chance"]),
-        " at random, and a person gets five and a half times the critical boxes.", *leak)
-    assert abs(cl["any"] - 2 / 3) < 0.01 and md["clean_any"] == [0.0, cl["any"]], "r7 says two times in three, and never for the trained segmenter"
-    add("results", "r7", "On ", W(cl["n"]), " undamaged synthetic photos, the classical engine flags something ", ("two times in three", "2 times in 3"),
-        "; the trained one, never.")
+    add("results", "r8", "But its boxes find ", P(md["chance"]), " at random, and a person gets five and a half times the critical boxes.", *leak)
+    assert abs(cl["any"] - 2 / 3) < 0.01 and md["clean_any"] == [0.0, cl["any"]], "r7 says two in three, and none for v1"
+    add("results", "r7", "On ", W(cl["n"]), " undamaged synthetic photos, the classical engine flags ", ("two in three", "2 in 3"), "; v1, none.")
 
     # 8b. two real photos of our own, each a recorded run of the live engine (build.py real_run): each line built from its trace
     PR = lambda x: (f"{dec(100 * x, 1)} percent", f"{100 * x:.1f} %") if x < 0.1 else P(x)   # as the PIXELS READ card prints it
@@ -177,7 +178,10 @@ def lines(D):
     assert fs["glare_listed"] and fs["formwork_kept_coarse"], fs
     add("failures", "f1", "Failures in the open: graffiti read as spalling, a formwork line as a crack, glare, and blur.")
     assert len(D["fails"]) == 4 and "built" in next(x for x in D["fails"] if x["cat"].startswith("Formwork")), D["fails"]
-    add("failures", "f2", (words(fs["not_built"]).capitalize(), str(fs["not_built"])), " of these four rules are not built yet.")
+    # failures.json: only the glare gate caught its case; graffiti and blur have no rule, and the formwork case needs the
+    # full-resolution check that is "Not implemented" (its straight-line test is built and kept the line)
+    assert fs["caught"] == ["Glare caught by the quality gate"] and fs["not_fixed"] == 3, fs
+    add("failures", "f2", "Only the glare gate caught its case; ", words(fs["not_fixed"]), " fixes are not built yet.")
     # the formwork plate's built-but-passed rule, and the CODEBRIM case in words (D["real_fail"]), are on the board
 
     # 10. limits
