@@ -780,7 +780,11 @@ async function guidedReal(file = GUIDE_REAL) {
 }
 
 // ---- image picking -----------------------------------------------------------------------------------
-async function useImage(blob, label, file = null) {
+// The latest photo asked for wins, not the one whose load finishes last (the startup preselect can still be loading
+// when a viewer taps another sample).
+let picks = 0;
+
+async function useImage(blob, label, file = null, pick = ++picks) {
   if (S.mode === 'running') {
     el.prep.textContent = 'A job is running. KILL it first to change the photo.';
     return;
@@ -788,6 +792,7 @@ async function useImage(blob, label, file = null) {
   el.prep.textContent = 'Reading the photo…';
   try {
     const p = await prepareImage(blob);
+    if (pick !== picks) return;  // another photo was asked for meanwhile
     if (S.image) URL.revokeObjectURL(S.image.url);
     S.image = { blob: p.blob, url: URL.createObjectURL(blob) };
     S.sample = file;
@@ -816,13 +821,16 @@ async function choose(btn) {
   if (S.mode === 'running') { el.prep.textContent = 'A job is running. KILL it first to change the photo.'; return; }
   el.look.disabled = el.runBar.disabled = el.tryKill.disabled = true;  // the old photo must not run while the new one loads
   el.prep.textContent = `Loading ${String(s.title ?? s.file)}…`;
+  const pick = ++picks;
   const res = await fetch(`samples/${s.file}`).catch(() => null);
+  if (pick !== picks) return;  // another photo was asked for meanwhile
   if (!res?.ok) {
     el.prep.textContent = 'That sample could not be loaded.';
     el.look.disabled = el.runBar.disabled = el.tryKill.disabled = !S.image;
     return;
   }
-  await useImage(await res.blob(), String(s.title ?? s.file), s.file);
+  const blob = await res.blob();
+  if (pick === picks) await useImage(blob, String(s.title ?? s.file), s.file, pick);
 }
 
 /** Builds the gallery; resolves to the sample to preselect (the guided one when it is there). */
@@ -929,9 +937,12 @@ document.documentElement.classList.add('js');  // only now may CSS hide not-yet-
 
 clearJob();
 setMode('idle');
-S.ready = loadSamples().then((first) => (MOCK
-  ? fetch('fixtures/mock.jpg').then((r) => r.blob()).then((b) => useImage(b, 'mock.jpg (recorded job)'))
-  : first && choose(first)));
+S.ready = loadSamples().then((first) => {
+  if (!MOCK) return first && choose(first);
+  const pick = ++picks;  // asked for now: a tap while it loads wins
+  return fetch('fixtures/mock.jpg').then((r) => r.blob())
+    .then((b) => (pick === picks ? useImage(b, 'mock.jpg (recorded job)', null, pick) : null));
+});
 initResults();
 health().then((hl) => {
   const arch = hl?.arch ?? hl?.machine;

@@ -1032,6 +1032,27 @@ def test_no_kill_after_finish(browser, base):
     print("ok  no KILL once the job has finished on the server: Skip to end instead")
 
 
+def test_the_latest_photo_picked_wins(browser, base):
+    """The startup preselect (bridge_03 live, fixtures/mock.jpg here) is still downloading when the viewer taps another
+    sample: the tap wins, and the preselect's late arrival does not take the photo back (public/app.js `picks`)."""
+    s = Session(browser, "latest-pick", viewport={"width": 375, "height": 812}, is_mobile=True, has_touch=True)
+    p = s.page
+    held = []
+    p.route("**/fixtures/mock.jpg", lambda route: held.append(route))   # held: answered only after the tap
+    p.goto(f"{base}/?mock=1")
+    until(lambda: held, "the preselect to ask for its photo", page=p)
+    p.locator("#gallery .thumb[data-file='bridge_01.jpg']").click()
+    expect(p.locator("#gallery .thumb[data-file='bridge_01.jpg']")).to_have_attribute("aria-pressed", "true", timeout=T)
+    held[0].continue_()
+    p.wait_for_timeout(1500)   # the late preselect finishes loading and must change nothing
+    expect(p.locator("#gallery .thumb[data-file='bridge_01.jpg']")).to_have_attribute("aria-pressed", "true")
+    expect(p.locator("#prep")).not_to_contain_text("mock.jpg")
+    expect(p.locator("#look")).to_be_enabled(timeout=T)
+    s.check_clean()
+    s.context.close()
+    print("ok  the latest photo picked wins over a preselect still loading")
+
+
 def test_try_kill_before_any_run(browser, base):
     """The paced KILL drill is a button in the job bar before any run: planner_timeout and pace_ms on the request, the
     run shown live, and KILL reaching the server, which halts with kill-switch."""
@@ -1585,6 +1606,7 @@ if __name__ == "__main__":
             test_phone_tools_never_overlap(browser, base)
             test_keyboard(browser, base)
             test_no_kill_after_finish(browser, base)
+            test_the_latest_photo_picked_wins(browser, base)
             test_try_kill_before_any_run(browser, base)
             test_hero_without_v1(browser, base)
             test_mobile(browser, base)
