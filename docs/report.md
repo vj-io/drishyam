@@ -185,27 +185,34 @@ limits and the cost table, is [aws.md](aws.md).
 opencv-python-headless 4.14.0.94 (`results/local-macos-x86/opencv_builds.json`). [bench.md](bench.md), "OpenCV 5
 features in the pipeline", has every figure, the rule a change had to pass (the agent's traces identical to the byte
 on the ten demo samples and four synth_dev images, with both segmenters, and a measured speed-up) and what was not
-adopted. The timings are this Mac's (a heavily shared machine) unless a runner is named; the Arm runs of both new
-benchmarks are pending.
+adopted. The timings are this Mac's (a heavily shared machine) unless a runner is named; both new benchmarks also
+ran once on GitHub's Arm and x86 runners (run 39665440222, quiet VMs, not the Lambda).
 
 - `ENGINE_NEW` (new in 5.0): `engine=cv2.dnn.ENGINE_NEW` in `OnnxSegmenter._load` (`segment.py`, exercised by
   `tests/test_segment.py` with a tiny ONNX model) is the only engine that reads v1, which the live demo runs since
   2026-10-21 on the stock 5.0.0 wheel. On 5.0 `readNet` gives it to the NanoDet privacy detector too: 4.14 took
-  x1.95 (1.79-2.13) of 5.0's time on that forward.
+  x1.95 (1.79-2.13) of 5.0's time on that forward here, and x1.59 (1.59-1.60) on the Arm runner.
 - 5.0's bilinear warp without lookup tables (new in 5.0): 4.14 took x1.60 (1.38-1.85) of 5.0's time on the gaze's
-  `warpPerspective` and x2.43 (2.07-2.86) on an oblique one, with a different output. The warp is cheap next to a
+  `warpPerspective` and x2.43 (2.07-2.86) on an oblique one, with a different output; on the Arm runner x1.53
+  (1.53-1.54) and x1.80 (1.79-1.81), but on the EPYC runner 4.14's warp was the faster. The warp is cheap next to a
   segmenter look, so a job barely moves.
 - The engine selector with `ENGINE_CLASSIC` on a static-shape copy of v1 (the selector is new in 5.0; the classic
-  engine is 4.x's): `OnnxSegmenter(engine="classic")`, off. On GitHub's Neoverse-N2 runner it ran v1's forward in
-  x0.38 of `ENGINE_NEW`'s time. On this Mac the agent's traces with it were identical on 14 of 14 photos, every
-  argmax equal, but its looks took x1.30 (1.29-1.32) of `ENGINE_NEW`'s time on 16 threads, so it is not adopted; the
-  agent-level Arm run is pending, and the Lambda package lacks the `onnx` package it needs for the copy.
+  engine is 4.x's): `OnnxSegmenter(engine="classic")`, off. On this Mac the agent's traces with it were identical on
+  14 of 14 photos, every argmax equal, but its looks took x1.30 (1.29-1.32) of `ENGINE_NEW`'s time on 16 threads. On
+  GitHub's Neoverse-N2 runner it ran v1's forward in x0.38 of `ENGINE_NEW`'s time, and at the agent level it passes
+  both tests there: the same 14 traces identical, and its looks took x0.39 (0.39-0.40) of
+  `ENGINE_NEW`'s time on one thread and x0.44 (0.44-0.45) on two, the Lambda function's thread count. It is the
+  largest gain found for the live v1, and it is off because the rule is applied on this Mac and because the Lambda
+  package lacks the `onnx` package that makes the copy. A copy written at build time into `models/`, which the
+  Lambda build ships whole, would remove that need, with one code change not made here (read that file by path, keep
+  hashing the original) and a check on the deployed Graviton.
 - The new engine's profiling mode (`Net.setProfilingMode(DNN_PROFILE_DETAILED)`, new in 5.0), in
   `bench/opencv5_features.py`: v1's time per layer on both engines. Here its twelve 3x3 convolutions are 81 % of
-  `ENGINE_NEW`'s time on one thread; on Arm the same profile is to show where the new engine's 2.6 times longer
-  forward goes.
+  `ENGINE_NEW`'s time on one thread. On the Arm runner they took 800.6 against 248.5 ms on the two engines, more than
+  the whole gap: the new engine's 2.6 times longer forward there is its 3x3 convolution.
 - `CV_Bool` (new in 5.0): the NumPy bool footprint as a `copyTo` mask in `segment.restrict`. Identical, faster in
-  three of its four timings, off under the rule.
+  three of its four timings here, off under the rule. On both GitHub runners it passes (x0.91 to x0.95 of the NumPy
+  time): it passes on Arm, where the function runs, and failed only on this Mac. Turning it on is one line.
 - `reduceArgMax` (OpenCV 4.6, not new) in `segment.finish`: identical, x0.52 to x0.74 of NumPy's time, adopted
   (`CV_ARGMAX`); on a whole look the gain is within this machine's noise.
 

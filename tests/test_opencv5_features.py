@@ -237,6 +237,118 @@ def features_figures() -> list[str]:
             f"({e['timed_looks']} timed, {rounds} rounds", f"512, {rounds} forwards"]
 
 
+GITHUB = {"linux-aarch64": "Arm", "linux-x86_64": "x86"}  # bench-arm64.yml run 39665440222
+
+
+def runners(name: str) -> dict:
+    return {a: load(name, a) for a in GITHUB}
+
+
+def ths(row: dict) -> list:
+    return [k for k in row if k.startswith("threads")]
+
+
+def gh_flag_rows():
+    """Each flag's unit on each runner: its on/off ratio at 1, 2 and 4 threads, Arm then x86."""
+    docs = runners("opencv5_features.json")
+    arm = docs["linux-aarch64"]["timing"]
+    for flag, units in feat.UNITS.items():
+        for s in arm:
+            for u in units:
+                if not arm[s][flag][u]["inputs"]:
+                    continue
+                cells = [iv(d["timing"][s][flag][u][k]["on"]) for d in docs.values() for k in ths(d["timing"][s][flag][u])]
+                yield (f"| {'all three' if flag == 'all' else flag} | {SEGS[s]} | `{u}` on {arm[s][flag][u]['inputs']} "
+                       f"looks | " + " | ".join(cells) + " |")
+
+
+def gh_engine_rows():
+    for d in runners("opencv5_features.json").values():
+        e = d["engine"]
+        yield (f"| {d['provenance']['cpu']} | {e['identical']} of {e['photos']} | {e['looks']} | "
+               f"{e['max_dprob']:.1e}".replace("e-0", "e-") + f" | {e['argmax_differs_px']} of {e['pixels']:,} | "
+               + " | ".join(iv(e[k]["on"]) for k in ths(e)) + " |")
+
+
+def gh_profile_rows(top: int = 6):
+    """v1 at 512 on one thread, per layer kind: ENGINE_NEW and ENGINE_CLASSIC ms on Arm, then on x86."""
+    rows = {a: d["profile"]["512"]["threads1"] for a, d in runners("opencv5_features.json").items()}
+    arm = rows["linux-aarch64"]
+    cell = lambda r, e, k: f"{r[e]['by_kind'][k]['ms']:.1f}" if k in r[e]["by_kind"] else ""
+    for k in list(arm["new"]["by_kind"])[:top]:
+        yield f"| {k} | " + " | ".join(cell(r, e, k) for r in rows.values() for e in ("new", "classic")) + " |"
+    yield ("| every layer (the profiler's sum) | "
+           + " | ".join(f"{r[e]['profiled_ms']:.1f}" for r in rows.values() for e in ("new", "classic")) + " |")
+    yield ("| a forward, wall time (p50) | "
+           + " | ".join(f"{r[e]['wall_p50_ms']:.1f}" for r in rows.values() for e in ("new", "classic")) + " |")
+
+
+def gh_builds_rows():
+    arm, x86 = (d["variants"] for d in runners("opencv_builds.json").values())
+    out = lambda x: f"{iv(x['vs_5.0'])}, {'same' if x['same_output'] else 'differs'}"
+    for s in arm["5.0"]["stages"]:
+        yield (f"| `{s}` | {arm['5.0']['stages'][s]['p50_ms']:.1f} | {out(arm['4.14.0.94']['stages'][s])} | "
+               f"{x86['5.0']['stages'][s]['p50_ms']:.1f} | {out(x86['4.14.0.94']['stages'][s])} | "
+               f"{out(x86['5.0 IPP off']['stages'][s])} |")
+
+
+def gh_figures() -> list[str]:
+    """The phrases the runner paragraphs take from the four JSON files, after checking what they claim."""
+    feats, builds = runners("opencv5_features.json"), runners("opencv_builds.json")
+    arm, x86 = feats["linux-aarch64"], feats["linux-x86_64"]
+    out, allnull = [], []
+    for d in feats.values():
+        p = d["provenance"]
+        assert all(i["identical"][v] == i["photos"] == 14 for i in d["identity"].values() for v in VARIANTS)
+        assert {f: adopted(d, f) for f in feat.FLAGS} == {"CV_ARGMAX": True, "CV_COMPARE": False, "CV_BOOL_MASKS": True}
+        nulls = [r[k]["null"]["ratio"] for t in d["timing"].values() for f in t.values() for r in f.values() for k in ths(r)]
+        assert all(0.99 <= x <= 1.01 for x in nulls) and d["config"]["threads"] == [1, 2, 4]
+        allnull += nulls
+        e = d["engine"]
+        assert e["identical"] == e["photos"] and e["argmax_differs_px"] == 0 and e["max_dprob"] < 1e-4
+        assert all(e[k]["on"]["ci"][1] < 1 for k in ths(e))
+        out.append(f"{p['cpu']}, {p['logical_cpus']} logical CPUs, 1-minute load average {p['load_avg'][0]} at the "
+                   f"start and {d['load_avg_end'][0]} at the end")
+    n = lambda d, flag, u, s: [d["timing"][s][flag][u][k]["on"]["ratio"] for k in ths(d["timing"][s][flag][u])]
+    masks = [x for d in feats.values() for s in ("classical", "v1") for x in n(d, "CV_BOOL_MASKS", "restrict", s)]
+    argmax = [x for d in feats.values() for s in ("classical", "v1") for x in n(d, "CV_ARGMAX", "finish", s)]
+    look = [x for d in feats.values() for x in n(d, "all", "segment_view", "classical")]
+    ea = arm["engine"]
+    pa, px = (d["profile"]["512"]["threads1"] for d in (arm, x86))
+    conv = lambda r, e: r[e]["by_kind"]["conv 3x3"]["ms"]
+    gap, conv_gap = (pa["new"]["profiled_ms"] - pa["classic"]["profiled_ms"], conv(pa, "new") - conv(pa, "classic"))
+    assert conv_gap > gap  # the 3x3 convolutions are the whole gap, and more
+    ba, bx = (d["variants"]["4.14.0.94"] for d in builds.values())
+    assert "KleidiCV" not in ba["cv2_custom_hal"] and "KleidiCV" in builds["linux-aarch64"]["variants"]["5.0"]["cv2_custom_hal"]
+    assert not builds["linux-x86_64"]["variants"]["5.0"]["stages"]["saliency"]["same_output"]
+    assert all(x["same_output"] for x in builds["linux-aarch64"]["variants"]["5.0"]["stages"].values())
+    assert all(x["same_output"] for x in load("opencv_builds.json")["variants"]["5.0"]["stages"].values())  # the Mac
+    assert all(0.98 <= x["vs_5.0"]["ratio"] <= 1.02 for x in builds["linux-x86_64"]["variants"]["5.0 IPP off"]["stages"].values())
+    assert pa["new"]["by_kind"]["depthwise conv 5x5"]["ms"] < pa["classic"]["by_kind"]["depthwise conv 5x5"]["ms"]
+    assert ba["stages"]["yunet"]["vs_5.0"]["ci"][1] < 1 and not ba["stages"]["gaze"]["same_output"]
+    mac = load("opencv5_features.json")["identity"]
+    assert all(d["identity"][s]["looks"] == mac[s]["looks"] for d in feats.values() for s in mac)
+    return out + [
+        f"the same {mac['classical']['looks']} classical and {mac['v1']['looks']} v1 looks",
+        f"between x{min(allnull):.2f} and x{max(allnull):.2f}",
+        f"x{min(masks):.2f} to x{max(masks):.2f}", f"x{min(argmax):.2f} to x{max(argmax):.2f}",
+        f"x{min(look):.2f} to x{max(look):.2f}",
+        (f"{iv(ea['threads1']['on'])} of `ENGINE_NEW`'s time on one thread, {iv(ea['threads2']['on'])} on two (the "
+         f"function's count) and {iv(ea['threads4']['on'])} on four"),
+        f"max |dprob| {ea['max_dprob']:.1e}".replace("e-0", "e-"),
+        f"{conv(pa, 'new'):.1f} against {conv(pa, 'classic'):.1f} ms", f"{gap:.1f} ms",
+        (f"the 1x1 convolutions took {pa['new']['by_kind']['conv 1x1']['ms']:.1f} and "
+         f"{pa['classic']['by_kind']['conv 1x1']['ms']:.1f} ms"),
+        f"{conv(px, 'new'):.1f} against {conv(px, 'classic'):.1f}",
+        f"`pyramid` {iv(ba['stages']['pyramid']['vs_5.0'])} on Arm and {iv(bx['stages']['pyramid']['vs_5.0'])} on x86",
+        f"{iv(ba['stages']['gaze']['vs_5.0'])} and {iv(ba['stages']['gaze_oblique']['vs_5.0'])} on Arm",
+        f"{iv(bx['stages']['gaze']['vs_5.0'])} and {iv(bx['stages']['gaze_oblique']['vs_5.0'])} on the EPYC",
+        f"`nanodet` {iv(ba['stages']['nanodet']['vs_5.0'])} on Arm and {iv(bx['stages']['nanodet']['vs_5.0'])} on x86",
+        f"`yunet` {iv(ba['stages']['yunet']['vs_5.0'])}",
+        f"4.14 wheel's HAL line reads {ba['cv2_custom_hal']}",
+        f"{load('opencv5_engines.json', 'linux-aarch64')['files']['drishyam_dacl10k.onnx']['bytes'] / 1e6:.1f} MB"]
+
+
 def test_shipped_flags_follow_the_rule():
     doc = load("opencv5_features.json")
     assert {f: getattr(segment, f) for f in feat.FLAGS} == {f: adopted(doc, f) for f in feat.FLAGS}
@@ -246,9 +358,10 @@ def test_shipped_flags_follow_the_rule():
 
 def test_features_section_is_the_json():
     text = section()
-    rows = [*identity_rows(), *timing_rows(), *profile_rows(), *builds_rows(), *api_rows()]
+    rows = [*identity_rows(), *timing_rows(), *profile_rows(), *builds_rows(), *api_rows(), *gh_flag_rows(),
+            *gh_engine_rows(), *gh_profile_rows(), *gh_builds_rows()]
     assert [r for r in rows if " ".join(r.split()) not in text] == []
-    assert [f for f in [*features_figures(), *builds_figures()] if f not in text] == []
+    assert [f for f in [*features_figures(), *builds_figures(), *gh_figures()] if f not in text] == []
 
 
 def test_report_section_6_quotes_the_json():
@@ -271,6 +384,21 @@ def test_report_section_6_quotes_the_json():
             f"{100 * one['by_kind']['conv 3x3']['ms'] / one['profiled_ms']:.0f} %", f"{1 / arm_x:.1f} times longer",
             f"x{min(r['ratio'] for r in argmax):.2f} to x{max(r['ratio'] for r in argmax):.2f} of NumPy's time",
             f"opencv-python-headless {b['4.14.0.94']['cv2']}.94"]
+    fa, ba = load("opencv5_features.json", "linux-aarch64"), load("opencv_builds.json", "linux-aarch64")["variants"]
+    bx = load("opencv_builds.json", "linux-x86_64")["variants"]["4.14.0.94"]["stages"]
+    old_a, ea, pa = ba["4.14.0.94"]["stages"], fa["engine"], fa["profile"]["512"]["threads1"]
+    masks = [r[th]["on"]["ratio"] for d in runners("opencv5_features.json").values()
+             for r in (d["timing"][s]["CV_BOOL_MASKS"]["restrict"] for s in ("classical", "v1")) for th in ths(r)]
+    assert bx["gaze"]["vs_5.0"]["ci"][1] < 1 and bx["gaze_oblique"]["vs_5.0"]["ci"][1] < 1  # 4.14 faster on the EPYC
+    assert all(adopted(d, "CV_BOOL_MASKS") for d in runners("opencv5_features.json").values())
+    assert not adopted(doc, "CV_BOOL_MASKS") and not segment.CV_BOOL_MASKS
+    assert ea["identical"] == ea["photos"] == 14 and ea["argmax_differs_px"] == 0
+    want += [f"{iv(old_a['nanodet']['vs_5.0'])} on the Arm runner",
+             f"on the Arm runner {iv(old_a['gaze']['vs_5.0'])} and {iv(old_a['gaze_oblique']['vs_5.0'])}",
+             (f"its looks took {iv(ea['threads1']['on'])} of `ENGINE_NEW`'s time on one thread and "
+              f"{iv(ea['threads2']['on'])} on two"),
+             f"they took {pa['new']['by_kind']['conv 3x3']['ms']:.1f} against {pa['classic']['by_kind']['conv 3x3']['ms']:.1f} ms",
+             f"(x{min(masks):.2f} to x{max(masks):.2f} of the NumPy time)", "run 39665440222"]
     assert [w for w in want if w not in text] == []
 
 

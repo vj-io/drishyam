@@ -14,9 +14,9 @@ or on any AWS instance: this workstream does not deploy or write to AWS.
 
 | Where | CPU, threading | OpenCV | What ran | Files |
 | --- | --- | --- | --- | --- |
-| This Mac | Intel Core i9-9880H, x86, 8 cores / 16 threads; macOS GCD | opencv-python-headless 5.0.0 wheel (`uv.lock`), IPP HAL | Metric A, Metric B (1 thread and all 16), dacl10k latency, INT8, DNN engines | `results/local-macos-x86/{kernels,loop,loop_onnx,int8,int8_repeat,opencv5_engines,opencv5_engines_repeat}.json` |
-| GitHub `ubuntu-24.04-arm` | Neoverse-N2, 4 logical CPUs; Linux pthreads | the same version, aarch64 wheel (KleidiCV and carotene HAL) | Metric A, Metric B at 1, 2, 4 threads, micro, macro, DNN engines | `results/linux-aarch64/`: `micro.json` (the fixed cost table, 2026-10-18); `kernels.json`, `loop.json`, `macro.json` and `micro_run39220769299.json` from run 39220769299; `opencv5_engines.json` from run 39617514621 |
-| GitHub `ubuntu-24.04` | AMD EPYC 7763, 4 logical CPUs; Linux pthreads | the same version, x86_64 wheel (IPP HAL) | the same | `results/linux-x86_64/{micro,macro,kernels,loop}.json`, run 39220769299; `opencv5_engines.json`, run 39617514621 |
+| This Mac | Intel Core i9-9880H, x86, 8 cores / 16 threads; macOS GCD | opencv-python-headless 5.0.0 wheel (`uv.lock`), IPP HAL | Metric A, Metric B (1 thread and all 16), dacl10k latency, INT8, DNN engines, OpenCV 5 features, 5.0 against 4.14 | `results/local-macos-x86/{kernels,loop,loop_onnx,int8,int8_repeat,opencv5_engines,opencv5_engines_repeat,opencv5_features,opencv_builds}.json` |
+| GitHub `ubuntu-24.04-arm` | Neoverse-N2, 4 logical CPUs; Linux pthreads | the same version, aarch64 wheel (KleidiCV and carotene HAL) | Metric A, Metric B at 1, 2, 4 threads, micro, macro, DNN engines, OpenCV 5 features, 5.0 against 4.14 | `results/linux-aarch64/`: `micro.json` (the fixed cost table, 2026-10-18); `kernels.json`, `loop.json`, `macro.json` and `micro_run39220769299.json` from run 39220769299; `opencv5_engines.json` from run 39617514621; `opencv5_features.json` and `opencv_builds.json` from run 39665440222 |
+| GitHub `ubuntu-24.04` | AMD EPYC 7763, 4 logical CPUs; Linux pthreads | the same version, x86_64 wheel (IPP HAL) | the same | `results/linux-x86_64/{micro,macro,kernels,loop}.json`, run 39220769299; `opencv5_engines.json`, run 39617514621; `opencv5_features.json` and `opencv_builds.json`, run 39665440222 |
 | Lambda arm64, 3008 MB | Graviton, 1.7 vCPU of time (below) | the same version, aarch64 wheel | not measured here | the smoke runs' step p95s in `docs/aws.md` are the only Lambda timings: 67.7 to 88.0 ms with the classical engine, 0.52 to 1.14 s with v1 (live since 2026-10-21) |
 
 **COOL and AISPL.** The AWS India (AISPL) account could not subscribe to the COOL Marketplace AMI (the agreement was
@@ -632,9 +632,8 @@ deployed net's p50 at 512 and 256 on one thread and then on 4, Arm: x0.38, x0.35
 x0.76, x0.75, x0.74. The null slot was within Arm 0 %, the static copy on `ENGINE_NEW` 1 % of the deployed net's p50,
 and x86 2 %, the static copy on `ENGINE_NEW` 3 %. Across the two runners the classic engine ran v1 at about the same
 speed (347.5 against 322.1 ms at 512 on one thread) while `ENGINE_NEW` took 2.1 times as long on the Neoverse-N2 as on
-the EPYC (908.2 against 432.6 ms): the gap is in the new engine's run on this Arm build, not in the core. Where in the
-net it goes is what 5.0's per-layer profiler ("OpenCV 5 features in the pipeline", below) measures; on Arm that run
-is pending. The classic engine
+the EPYC (908.2 against 432.6 ms): the gap is in the new engine's run on this Arm build, not in the core. 5.0's
+per-layer profiler puts it in the 3x3 convolutions ("OpenCV 5 features in the pipeline", below). The classic engine
 also moved one label on Arm: at 256 its argmax differed from the deployed net's at 1 of the 524,288 pixels of the 8
 crops (agreement 0.999998), with max |dprob| at most 2.5e-5 on either runner. FP16 on `ENGINE_NEW` was slower than
 FP32 here too, at Arm x1.03, x1.07, x1.14, x1.19 and x86 x1.20, x1.23, x1.39, x1.46 of its p50. Nothing is adopted
@@ -684,9 +683,10 @@ own `findContours` docstring and runs only for `RETR_LIST` without a hierarchy.
 - Its profiling mode (`Net.setProfilingMode(DNN_PROFILE_DETAILED)`, new): v1's time per layer on both engines,
   below. Benchmark only.
 - The engine selector (`readNetFromONNX(path, engine=...)`, new) with `ENGINE_CLASSIC` on a static-shape copy of v1:
-  `OnnxSegmenter(engine="classic")`. Its traces matched here, but it was not faster here: off.
+  `OnnxSegmenter(engine="classic")`. Its traces matched here, but it was not faster here: off. On GitHub's Arm
+  runner it passes both the identity and the speed test, at every thread count (below).
 - `CV_Bool` (new): `CV_BOOL_MASKS`, the NumPy bool footprint as a `copyTo` mask in `segment.restrict`: identical,
-  x0.83 to x0.94 of the NumPy time, but one interval reaches 1.02: off.
+  x0.83 to x0.94 of the NumPy time, but one interval reaches 1.02: off. It passes on both GitHub runners (below).
 - 5.0's warp (new, bilinear without lookup tables): in use with the wheel; 4.14 took 1.6 and 2.4 times as long on
   the gaze (the builds table).
 - `reduceArgMax` (OpenCV 4.6, not new): `CV_ARGMAX` in `segment.finish`: identical, x0.52 to x0.74 of NumPy's time:
@@ -768,7 +768,7 @@ layout transforms to and from its blocked layout (23.5 ms at one thread). It run
 convolutions in x0.18 of the classic engine's time and the squeeze-and-excitation multiplies in x4.7 its time. On
 16 threads its layers sum to 348.7 against 495.0 ms, most of the difference in the 3x3 and 1x1 convolutions. On the
 Neoverse-N2 the forward takes 2.6 times as long on `ENGINE_NEW` ("OpenCV 5 DNN engines for v1"); the same profile
-there (pending, below) says which of these kinds that is.
+there (below) puts that gap in the 3x3 convolutions.
 
 **The agent on `ENGINE_CLASSIC`.** `OnnxSegmenter(engine="classic")` reads the FP32 net on `ENGINE_CLASSIC`
 through a static-shape copy per input size (the FP16 net stays on `ENGINE_NEW`, the only engine that runs it); the
@@ -777,7 +777,7 @@ looks, all at the accurate size; across those looks max |dprob| 2.4e-5, and 0 of
 argmax. Its accurate looks (8 timed, 10 rounds, the null `ENGINE_NEW` again) took x0.92 (0.81-1.10) of
 `ENGINE_NEW`'s time on one thread and x1.30 (1.29-1.32) on 16. So on this Mac it passes the identity asked of a DNN
 change (every argmax equal, max |dprob| under 1e-4, the same decisions) and fails on speed: no gain this machine can
-resolve on one thread, a loss on 16, the agent's default here. On Arm the same run is pending.
+resolve on one thread, a loss on 16, the agent's default here. On Arm it passes both (below).
 
 **OpenCV 5.0 against 4.14 on the pipeline's own stages, and the IPP HAL.** `bench/opencv_builds.py` runs each
 stage on one thread in a worker process per variant: the locked 5.0 wheel (the reference), the same with
@@ -817,7 +817,8 @@ measurably needs IPP. Every look is one warp, but the warp is cheap next to a se
 **KleidiCV, by name only.** The aarch64 wheel's KleidiCV cannot be switched off at run time (the HAL replaces
 OpenCV's calls when the wheel is built, and KleidiCV's OpenCV HAL header, `adapters/opencv/kleidicv_hal.h` on its
 main branch, read 2026-10-21, has no runtime switch), so what it buys was not measured: that takes a wheel built with
-`-DWITH_KLEIDICV=OFF`, which this work did not build. By name, that header replaces these of the pipeline's calls:
+`-DWITH_KLEIDICV=OFF`, which this work did not build. The aarch64 4.14 wheel has no KleidiCV (its HAL is carotene
+alone), so the Arm runner's 4.14 column below includes KleidiCV's share without isolating it. By name, that header replaces these of the pipeline's calls:
 `GaussianBlur`, morphology (black-hat, open, dilate, hit-or-miss), `resize`, `Sobel`, `medianBlur`, `pyrDown`,
 `warpPerspective`, `remap`, `inRange` and `copyMakeBorder`, and of `cvtColor` only the gray-to-BGR, BGR-to-BGR (the
 channel swap `OnnxSegmenter` does) and YUV conversions; not CLAHE, `adaptiveThreshold`, `Laplacian`,
@@ -832,12 +833,13 @@ its wrappers fall back to OpenCV's own code when KleidiCV declines.
 - `ENGINE_CLASSIC` for v1 (`OnnxSegmenter(engine="classic")`, or `DRISHYAM_DNN_ENGINE=classic`) ships off. It
   passed the identity asked of a DNN change on this Mac (above: every argmax equal, max |dprob| under 1e-4, every
   trace identical) but was not faster here: slower on 16 threads, the agent's default on this machine, and no
-  measurable change on one. Its gain is on Arm (x0.38 of the forward on the Neoverse-N2 above), where the agent-level
-  run is pending. It also needs the `onnx` package to write its static-shape copy, a development dependency the
-  Lambda package does not install.
+  measurable change on one. Its gain is on Arm (x0.38 of the forward on the Neoverse-N2 above), where at the agent
+  level it passes both the identity and the speed test (below). It also needs the `onnx` package to write its
+  static-shape copy, a development dependency the Lambda package does not install; a copy made at build time would
+  remove that need (below).
 - `CV_BOOL_MASKS` (a NumPy bool footprint as a `CV_Bool` `copyTo` mask in `restrict`, new in 5.0) left every trace
   identical and was faster in three of its four timings, but the fourth interval (v1, one thread) reaches 1.02, so
-  under the rule it ships off.
+  under the rule it ships off. On both GitHub runners it passes (below).
 - `ALGO_HINT_APPROX` (the algorithm hint of OpenCV 4.10 on) was not tried: it allows results that differ from the
   accurate path by contract, so an identity measured on this build would say nothing about the aarch64 one the
   function runs.
@@ -854,30 +856,121 @@ its wrappers fall back to OpenCV's own code when KleidiCV declines.
   static copy to a temporary file), and `enableFusion(False)` leaves an `ENGINE_NEW` net empty (its forward asserts
   `!empty()`).
 
-**Arm: pending.** `.github/workflows/bench-arm64.yml` runs both benchmarks on GitHub's Arm and x86 runners: with
-`-f features=true` its `engines` job runs `bench/opencv5_features.py --threads 1,2,4` on the v1 weights it downloads
-and checks as above, and with `-f builds=true` its `builds` job runs `bench/opencv_builds.py`, which installs the
-4.14 wheel on each runner and needs no weights. Neither has run. From a pushed branch:
+### On GitHub's Arm and x86 runners: run 39665440222
+
+`.github/workflows/bench-arm64.yml` ran both benchmarks on 2026-10-21 with `-f features=true -f builds=true` (the
+run id is the owner's; the JSON does not record it): `bench/opencv5_features.py --threads 1,2,4` on the release
+weights, checked as above, and `bench/opencv_builds.py` with the 4.14 wheel installed on each runner, into
+`results/linux-aarch64/` and `results/linux-x86_64/` (`opencv5_features.json`, `opencv_builds.json`). The features
+runs: Neoverse-N2, 4 logical CPUs, 1-minute load average 0.19 at the start and 4.13 at the end; AMD EPYC 7763 64-Core
+Processor, 4 logical CPUs, 1-minute load average 0.07 at the start and 2.8 at the end. These runners were quiet, so
+their intervals are far narrower than the Mac's: every null ratio of the timing lay between x0.99 and x1.01. They are
+GitHub VMs, one run each, not the Lambda. To run them again from a pushed branch:
 
 ```bash
 gh workflow run bench-arm64.yml --repo vj-io/drishyam --ref <branch> -f bench=false -f engines=false -f features=true -f builds=true
 ```
 
-```bash
-gh run download <run-id> --repo vj-io/drishyam --pattern 'opencv*-linux-*' --dir runs/gh
-```
+**Identity on both runners.** Every variant's trace equalled the all-off trace on all 14 photos with both segmenters,
+over the same 62 classical and 49 v1 looks as on the Mac: 14 of 14 in every cell of the identity table above.
 
-```bash
-cp runs/gh/opencv5-features-linux-aarch64/opencv5_features.json runs/gh/opencv-builds-linux-aarch64/opencv_builds.json results/linux-aarch64/
-```
+**Timing on both runners** (on/off with its 95 % interval; the null columns are in the JSON):
 
-```bash
-cp runs/gh/opencv5-features-linux-x86_64/opencv5_features.json runs/gh/opencv-builds-linux-x86_64/opencv_builds.json results/linux-x86_64/
-```
+| flag | segmenter | unit | Arm, 1 thread | Arm, 2 | Arm, 4 | x86, 1 thread | x86, 2 | x86, 4 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| CV_ARGMAX | classical-v1 | `finish` on 24 looks | x0.79 (0.78-0.79) | x0.74 (0.74-0.74) | x0.71 (0.70-0.71) | x0.85 (0.85-0.85) | x0.77 (0.77-0.78) | x0.77 (0.77-0.77) |
+| CV_ARGMAX | v1 on `ENGINE_NEW` | `finish` on 24 looks | x0.75 (0.75-0.76) | x0.69 (0.69-0.69) | x0.64 (0.64-0.64) | x0.83 (0.83-0.83) | x0.75 (0.74-0.75) | x0.73 (0.73-0.73) |
+| CV_COMPARE | classical-v1 | `finish` on 24 looks | x1.00 (1.00-1.01) | x1.01 (1.00-1.02) | x1.00 (1.00-1.01) | x1.00 (0.99-1.00) | x1.00 (0.99-1.00) | x1.00 (1.00-1.00) |
+| CV_COMPARE | classical-v1 | `restrict` on 9 looks | x1.00 (1.00-1.00) | x1.01 (1.00-1.01) | x1.01 (1.00-1.01) | x1.00 (1.00-1.01) | x1.01 (1.00-1.02) | x1.02 (1.01-1.04) |
+| CV_COMPARE | v1 on `ENGINE_NEW` | `finish` on 24 looks | x1.00 (1.00-1.00) | x1.00 (1.00-1.00) | x1.00 (0.99-1.00) | x1.00 (0.99-1.00) | x1.00 (1.00-1.00) | x1.00 (1.00-1.00) |
+| CV_COMPARE | v1 on `ENGINE_NEW` | `restrict` on 9 looks | x1.00 (1.00-1.01) | x1.00 (0.99-1.00) | x1.00 (0.99-1.00) | x1.00 (1.00-1.01) | x1.00 (0.99-1.01) | x1.00 (0.99-1.00) |
+| CV_BOOL_MASKS | classical-v1 | `restrict` on 9 looks | x0.95 (0.94-0.95) | x0.94 (0.94-0.94) | x0.93 (0.93-0.94) | x0.93 (0.92-0.94) | x0.91 (0.91-0.92) | x0.91 (0.90-0.92) |
+| CV_BOOL_MASKS | v1 on `ENGINE_NEW` | `restrict` on 9 looks | x0.93 (0.93-0.93) | x0.93 (0.92-0.93) | x0.92 (0.92-0.93) | x0.93 (0.92-0.93) | x0.91 (0.91-0.92) | x0.91 (0.91-0.92) |
+| all three | classical-v1 | `segment_view` on 24 looks | x0.97 (0.97-0.97) | x0.96 (0.96-0.97) | x0.96 (0.96-0.96) | x0.95 (0.94-0.95) | x0.94 (0.93-0.94) | x0.94 (0.94-0.95) |
 
-On Arm the identity runs check the shipped flags on the aarch64 build (KleidiCV and carotene) and the agent on
-`ENGINE_CLASSIC` against `ENGINE_NEW` there; the profile says where `ENGINE_NEW`'s extra time on the Neoverse-N2
-goes, layer kind by layer kind; and the builds job says what 5.0's own changes buy on Arm against 4.14.
+**The rule on Arm, and on the x86 runner.** `CV_ARGMAX` passes on both (x0.64 to x0.85), `CV_COMPARE` fails on both
+(no gain), and `CV_BOOL_MASKS` passes on both: x0.91 to x0.95, every interval below 1. So `CV_BOOL_MASKS`, the one
+pipeline change that uses a type new in 5.0, passes on Arm, where the Lambda function runs, and on the x86 runner,
+but failed on this Mac, where the load stretched its v1 one-thread interval to 1.02. It still ships off, because the
+rule is applied on this machine. Shipping it is the one line `CV_BOOL_MASKS = True` in `drishyam/segment.py`, with no
+new dependency: its output is a copy, identical by construction and on all 14 photos on all three machines. What it
+buys is small, since `restrict` runs only on looks that cross the image's edge; with all three flags on, a whole
+classical look took x0.94 to x0.97 of its time on the runners.
+
+**`ENGINE_CLASSIC` at the agent level on both runners:**
+
+| runner | traces identical | looks | max \|dprob\| | pixels with another argmax | look time, 1 thread | 2 threads | 4 threads |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Neoverse-N2 | 14 of 14 | 49 | 1.5e-5 | 0 of 12,845,056 | x0.39 (0.39-0.40) | x0.44 (0.44-0.45) | x0.58 (0.58-0.58) |
+| AMD EPYC 7763 64-Core Processor | 14 of 14 | 49 | 2.2e-5 | 0 of 12,845,056 | x0.71 (0.70-0.71) | x0.76 (0.76-0.76) | x0.76 (0.76-0.76) |
+
+On the Neoverse-N2 the agent's accurate v1 looks on `ENGINE_CLASSIC` took x0.39 (0.39-0.40) of `ENGINE_NEW`'s time on
+one thread, x0.44 (0.44-0.45) on two (the function's count) and x0.58 (0.58-0.58) on four, every trace identical,
+every argmax equal, max |dprob| 1.5e-5. It passes the identity asked of a DNN change and is measurably faster on Arm
+at every thread count, and on the x86 runner too; it failed on this Mac only on speed, at 16 threads. Lambda is
+arm64 and runs OpenCV on 2 threads (`DRISHYAM_CV_THREADS`), so this is the change with the largest gain for the live
+v1. It ships off: the rule is applied on this machine, and the Lambda package cannot make its copy. With the
+governor on, faster looks would also change the live choices (fewer switches to the 256-px FP16 net under the 1500 ms
+limit), which the held-out runs, governor off, do not cover.
+
+**What shipping `ENGINE_CLASSIC` on Lambda would need.** The `onnx` package is needed only to write the static-shape
+copy (`segment._classic` sets the input's symbolic H and W and saves the model); `ENGINE_CLASSIC` then reads a plain
+ONNX file by path. So a copy made at build time avoids the runtime dependency: write it once in the build
+environment, where `onnx` is installed (`bench/opencv5_engines.py`'s `static_copy` already writes such files, and
+they loaded and ran on `ENGINE_CLASSIC` on all three CPUs), into `models/`, which `scripts/build_lambda.sh` ships
+whole (`cp models/*.onnx`). It is one file of 26.8 MB, the FP32 net at 512: the fast model keeps the FP16 file on
+`ENGINE_NEW`, which the stack also deploys, so no 256 copy is needed. The code would need one change, not made here:
+`OnnxSegmenter` reading that file by path instead of calling `_classic`, while still hashing the original FP32 file,
+since `agent.WEIGHTS` pins v1's profile to that file's sha256 and a copy hashes differently (a different hash falls
+back to the classical profile). And it would need the same identity and timing on the deployed function, a Graviton,
+not a Neoverse-N2. Nothing here changes the Lambda package or deploys.
+
+**Where v1's time goes on the runners** (512, one thread, ms per layer kind; the kinds that take the most of
+`ENGINE_NEW`'s time on Arm):
+
+| layer kind | Arm, `ENGINE_NEW` | Arm, `ENGINE_CLASSIC` | x86, `ENGINE_NEW` | x86, `ENGINE_CLASSIC` |
+| --- | --- | --- | --- | --- |
+| conv 3x3 | 800.6 | 248.5 | 388.6 | 208.5 |
+| conv 1x1 | 53.7 | 53.0 | 29.6 | 55.9 |
+| depthwise conv 3x3 | 7.0 | 6.6 | 5.3 | 5.5 |
+| Resize | 6.3 | 7.5 | 7.0 | 16.2 |
+| depthwise conv 5x5 | 6.1 | 21.8 | 5.7 | 25.4 |
+| TransformLayout | 4.5 |  | 4.3 |  |
+| every layer (the profiler's sum) | 888.5 | 346.7 | 453.9 | 323.9 |
+| a forward, wall time (p50) | 889.6 | 347.4 | 455.5 | 324.2 |
+
+On the Neoverse-N2 the twelve 3x3 convolutions took 800.6 against 248.5 ms, more than the whole 541.8 ms gap between
+the engines, while the 1x1 convolutions took 53.7 and 53.0 ms and the new engine was the faster at the 5x5 depthwise
+ones. On the EPYC the 3x3 convolutions took 388.6 against 208.5. So the new engine's Arm gap is its 3x3 convolution;
+which kernel each engine runs for it is not recorded.
+
+**5.0 against 4.14 on the runners** (one thread, ms, and 4.14's or IPP-off's time over 5.0's):
+
+| stage | Arm, 5.0 | Arm, 4.14: time over 5.0's, output | x86, 5.0 | x86, 4.14: time over 5.0's, output | x86, 5.0 with IPP off |
+| --- | --- | --- | --- | --- | --- |
+| `decode` | 32.7 | x1.01 (1.00-1.02), same | 34.3 | x1.00 (0.99-1.00), same | x1.00 (0.99-1.01), same |
+| `pyramid` | 8.9 | x1.86 (1.85-1.87), same | 7.9 | x2.49 (2.48-2.49), same | x1.00 (1.00-1.00), same |
+| `saliency` | 6.5 | x1.00 (1.00-1.01), same | 6.0 | x0.99 (0.98-1.00), differs | x0.99 (0.98-1.00), differs |
+| `gaze` | 1.9 | x1.53 (1.53-1.54), differs | 2.2 | x0.93 (0.93-0.93), differs | x1.00 (1.00-1.00), same |
+| `gaze_oblique` | 1.7 | x1.80 (1.79-1.81), differs | 2.0 | x0.84 (0.84-0.85), differs | x1.01 (1.00-1.03), same |
+| `quality` | 0.9 | x1.00 (1.00-1.01), same | 0.7 | x0.99 (0.95-1.01), same | x1.00 (0.95-1.05), same |
+| `enhance` | 3.1 | x1.01 (1.00-1.01), same | 4.2 | x0.96 (0.96-0.97), same | x1.00 (0.99-1.00), same |
+| `segment` | 43.0 | x0.98 (0.98-0.99), same | 48.6 | x0.99 (0.98-0.99), same | x1.00 (1.00-1.01), same |
+| `measure` | 1.6 | x0.99 (0.99-1.00), same | 2.9 | x1.01 (1.00-1.03), same | x1.00 (0.99-1.00), same |
+| `nanodet` | 47.1 | x1.59 (1.59-1.60), same | 32.4 | x2.40 (2.39-2.40), same | x1.00 (1.00-1.01), same |
+| `yunet` | 24.7 | x0.88 (0.87-0.89), same | 16.3 | x1.13 (1.12-1.14), same | x1.00 (1.00-1.00), same |
+
+On both runners 5.0's pyramid and NanoDet forward beat 4.14's with the same output: `pyramid` x1.86 (1.85-1.87) on
+Arm and x2.49 (2.48-2.49) on x86, `nanodet` x1.59 (1.59-1.60) on Arm and x2.40 (2.39-2.40) on x86. The warp depends on
+the machine: 4.14 took x1.53 (1.53-1.54) and x1.80 (1.79-1.81) on Arm of 5.0's time on the straight and oblique gaze,
+as on the Mac, but x0.93 (0.93-0.93) and x0.84 (0.84-0.85) on the EPYC, where 4.14's warp was the faster; its output
+differs everywhere. YuNet went the other way on Arm (`yunet` x0.88 (0.87-0.89)). On Arm the comparison also mixes in
+KleidiCV: the aarch64 4.14 wheel's HAL line reads YES (carotene (ver 0.0.1)), so a stage KleidiCV covers by name
+(`pyrDown`, `warpPerspective`) may owe part of its Arm gain to the HAL, which this run cannot split from 5.0's own
+changes; on x86 both wheels have IPP, so the pyramid's gain there is 5.0's. With IPP off on the EPYC no stage moved.
+On the x86 runner `saliency`'s output hash was not the same in every 5.0 worker, the reference's included, so that
+row's output column says nothing there (on Arm and on the Mac every stage hashed the same in every worker); why was
+not looked into.
 
 ## What is not measured
 
@@ -887,12 +980,13 @@ goes, layer kind by layer kind; and the builds job says what 5.0's own changes b
 - Run-to-run variation on GitHub's runners: run 39220769299 is one run per runner and one round of Metric B. The
   only repeat is the aarch64 micro, a day apart on the same build (37 of 39 ops within 3.5 %, the other two 6.5 % and
   18.1 % apart); x86 was never repeated.
-- What KleidiCV itself buys on Arm: no run turns the HAL off, so Arm against x86 is core, build and VM together.
+- What KleidiCV itself buys on Arm: no run turns the HAL off, so Arm against x86 is core, build and VM together, and
+  the aarch64 4.14 wheel (carotene only) against 5.0 mixes KleidiCV with 5.0's own changes.
 - Whether the x86 runner's 4 logical CPUs are 4 cores or 2 cores with two hardware threads each.
 - Mask parity between the Arm and x86 builds: `run_all.sh` saves `parity.npz` on each runner, but the workflow does
   not upload it.
 - The macro worker sweep (`WORKERS`) on GitHub: one worker only.
 - The dacl10k net on Arm in INT8: the x86 INT8 result above does not predict it. FP32 and FP16 ran on both engines
   there once (run 39617514621, "OpenCV 5 DNN engines for v1").
-- "OpenCV 5 features in the pipeline" on Arm: its two benchmarks (the flags' identity and timing, v1's per-layer
-  profile, the agent on `ENGINE_CLASSIC`, 5.0 against 4.14) have run on this Mac only.
+- "OpenCV 5 features in the pipeline" on the function itself: its two benchmarks ran on this Mac and once on each
+  GitHub runner (run 39665440222), never on the Lambda's Graviton.

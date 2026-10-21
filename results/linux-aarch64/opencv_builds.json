@@ -1,0 +1,418 @@
+{
+ "arm": "linux-aarch64",
+ "config": {
+  "rounds": 24,
+  "repeats": 5,
+  "threads": 1,
+  "photo": "public/samples/bridge_03.jpg",
+  "others": [
+   "4.14.0.94"
+  ],
+  "boot": 2000
+ },
+ "provenance": {
+  "cv2": "5.0.0",
+  "build_info_sha256": "4460ffe25568d7f496997f0593f568f4d91ee4740c97f057b2986c237e8a386c",
+  "cv2_baseline": "NEON FP16",
+  "cv2_dispatch": "NEON_DOTPROD NEON_FP16 NEON_BF16",
+  "cv2_parallel_framework": "pthreads",
+  "cv2_custom_hal": "YES (carotene (ver 0.0.1) KleidiCV (ver 26.03))",
+  "cv2_file": "/home/runner/work/drishyam/drishyam/.venv/lib/python3.13/site-packages/cv2/__init__.py",
+  "under_opt_cool": false,
+  "build": "stock (not COOL)",
+  "machine": "Linux 7.0.0-1017-azure aarch64",
+  "platform": "Linux-7.0.0-1017-azure-aarch64-with-glibc2.39",
+  "cpu": "Neoverse-N2",
+  "logical_cpus": 4,
+  "cv2_threads": 4,
+  "python": "3.13.16",
+  "numpy": "2.5.4",
+  "timestamp": "2026-10-21T19:52:59Z",
+  "load_avg": [
+   0.94,
+   0.35,
+   0.14
+  ],
+  "label": "GitHub ubuntu-24.04-arm runner, not Lambda"
+ },
+ "variants": {
+  "5.0": {
+   "cv2": "5.0.0",
+   "numpy": "2.5.4",
+   "ipp": false,
+   "cv2_baseline": "NEON FP16",
+   "cv2_dispatch": "NEON_DOTPROD NEON_FP16 NEON_BF16",
+   "cv2_parallel_framework": "pthreads",
+   "cv2_custom_hal": "YES (carotene (ver 0.0.1) KleidiCV (ver 26.03))",
+   "api": {
+    "dnn.ENGINE_NEW": true,
+    "dnn.ENGINE_CLASSIC": true,
+    "dnn.Net.setProfilingMode": true,
+    "dnn.DNN_PROFILE_DETAILED": true,
+    "dnn.Net.setTracingMode": true,
+    "dnn.Net.getPerfProfile": true,
+    "CV_Bool": true,
+    "CV_32U": true,
+    "CV_64S": true,
+    "reduceArgMax": true,
+    "compare": true,
+    "hasNonZero": true,
+    "findContoursLinkRuns": true,
+    "ALGO_HINT_APPROX": true,
+    "ipp.setUseIPP": true,
+    "bool mask": true
+   },
+   "stages": {
+    "decode": {
+     "p50_ms": 32.679,
+     "same_output": true
+    },
+    "pyramid": {
+     "p50_ms": 8.866,
+     "same_output": true
+    },
+    "saliency": {
+     "p50_ms": 6.494,
+     "same_output": true
+    },
+    "gaze": {
+     "p50_ms": 1.897,
+     "same_output": true
+    },
+    "gaze_oblique": {
+     "p50_ms": 1.668,
+     "same_output": true
+    },
+    "quality": {
+     "p50_ms": 0.913,
+     "same_output": true
+    },
+    "enhance": {
+     "p50_ms": 3.131,
+     "same_output": true
+    },
+    "segment": {
+     "p50_ms": 43.042,
+     "same_output": true
+    },
+    "measure": {
+     "p50_ms": 1.641,
+     "same_output": true
+    },
+    "nanodet": {
+     "p50_ms": 47.067,
+     "same_output": true
+    },
+    "yunet": {
+     "p50_ms": 24.703,
+     "same_output": true
+    }
+   }
+  },
+  "5.0 null": {
+   "cv2": "5.0.0",
+   "numpy": "2.5.4",
+   "ipp": false,
+   "cv2_baseline": "NEON FP16",
+   "cv2_dispatch": "NEON_DOTPROD NEON_FP16 NEON_BF16",
+   "cv2_parallel_framework": "pthreads",
+   "cv2_custom_hal": "YES (carotene (ver 0.0.1) KleidiCV (ver 26.03))",
+   "api": {
+    "dnn.ENGINE_NEW": true,
+    "dnn.ENGINE_CLASSIC": true,
+    "dnn.Net.setProfilingMode": true,
+    "dnn.DNN_PROFILE_DETAILED": true,
+    "dnn.Net.setTracingMode": true,
+    "dnn.Net.getPerfProfile": true,
+    "CV_Bool": true,
+    "CV_32U": true,
+    "CV_64S": true,
+    "reduceArgMax": true,
+    "compare": true,
+    "hasNonZero": true,
+    "findContoursLinkRuns": true,
+    "ALGO_HINT_APPROX": true,
+    "ipp.setUseIPP": true,
+    "bool mask": true
+   },
+   "stages": {
+    "decode": {
+     "p50_ms": 32.566,
+     "same_output": true,
+     "vs_5.0": {
+      "ratio": 1.0013,
+      "ci": [
+       0.9912,
+       1.0117
+      ]
+     }
+    },
+    "pyramid": {
+     "p50_ms": 8.838,
+     "same_output": true,
+     "vs_5.0": {
+      "ratio": 0.9997,
+      "ci": [
+       0.9925,
+       1.0064
+      ]
+     }
+    },
+    "saliency": {
+     "p50_ms": 6.492,
+     "same_output": true,
+     "vs_5.0": {
+      "ratio": 0.9993,
+      "ci": [
+       0.9963,
+       1.0022
+      ]
+     }
+    },
+    "gaze": {
+     "p50_ms": 1.893,
+     "same_output": true,
+     "vs_5.0": {
+      "ratio": 0.9993,
+      "ci": [
+       0.9972,
+       1.0014
+      ]
+     }
+    },
+    "gaze_oblique": {
+     "p50_ms": 1.667,
+     "same_output": true,
+     "vs_5.0": {
+      "ratio": 1.0001,
+      "ci": [
+       0.998,
+       1.0022
+      ]
+     }
+    },
+    "quality": {
+     "p50_ms": 0.913,
+     "same_output": true,
+     "vs_5.0": {
+      "ratio": 0.9972,
+      "ci": [
+       0.9933,
+       1.0009
+      ]
+     }
+    },
+    "enhance": {
+     "p50_ms": 3.134,
+     "same_output": true,
+     "vs_5.0": {
+      "ratio": 1.0003,
+      "ci": [
+       0.999,
+       1.0018
+      ]
+     }
+    },
+    "segment": {
+     "p50_ms": 43.112,
+     "same_output": true,
+     "vs_5.0": {
+      "ratio": 1.0007,
+      "ci": [
+       0.9981,
+       1.0033
+      ]
+     }
+    },
+    "measure": {
+     "p50_ms": 1.648,
+     "same_output": true,
+     "vs_5.0": {
+      "ratio": 1.0049,
+      "ci": [
+       1.0004,
+       1.0096
+      ]
+     }
+    },
+    "nanodet": {
+     "p50_ms": 47.173,
+     "same_output": true,
+     "vs_5.0": {
+      "ratio": 1.0023,
+      "ci": [
+       0.9999,
+       1.0044
+      ]
+     }
+    },
+    "yunet": {
+     "p50_ms": 24.699,
+     "same_output": true,
+     "vs_5.0": {
+      "ratio": 0.9995,
+      "ci": [
+       0.9956,
+       1.0026
+      ]
+     }
+    }
+   }
+  },
+  "4.14.0.94": {
+   "cv2": "4.14.0",
+   "numpy": "2.5.4",
+   "ipp": false,
+   "cv2_baseline": "NEON FP16",
+   "cv2_dispatch": "NEON_DOTPROD NEON_FP16 NEON_BF16",
+   "cv2_parallel_framework": "pthreads",
+   "cv2_custom_hal": "YES (carotene (ver 0.0.1))",
+   "api": {
+    "dnn.ENGINE_NEW": false,
+    "dnn.ENGINE_CLASSIC": false,
+    "dnn.Net.setProfilingMode": false,
+    "dnn.DNN_PROFILE_DETAILED": false,
+    "dnn.Net.setTracingMode": false,
+    "dnn.Net.getPerfProfile": true,
+    "CV_Bool": false,
+    "CV_32U": false,
+    "CV_64S": false,
+    "reduceArgMax": true,
+    "compare": true,
+    "hasNonZero": true,
+    "findContoursLinkRuns": true,
+    "ALGO_HINT_APPROX": true,
+    "ipp.setUseIPP": true,
+    "bool mask": false
+   },
+   "stages": {
+    "decode": {
+     "p50_ms": 32.868,
+     "same_output": true,
+     "vs_5.0": {
+      "ratio": 1.0054,
+      "ci": [
+       0.9956,
+       1.0159
+      ]
+     }
+    },
+    "pyramid": {
+     "p50_ms": 16.487,
+     "same_output": true,
+     "vs_5.0": {
+      "ratio": 1.8636,
+      "ci": [
+       1.8543,
+       1.8732
+      ]
+     }
+    },
+    "saliency": {
+     "p50_ms": 6.5,
+     "same_output": true,
+     "vs_5.0": {
+      "ratio": 1.0012,
+      "ci": [
+       0.996,
+       1.0069
+      ]
+     }
+    },
+    "gaze": {
+     "p50_ms": 2.904,
+     "same_output": false,
+     "vs_5.0": {
+      "ratio": 1.532,
+      "ci": [
+       1.5289,
+       1.5353
+      ]
+     }
+    },
+    "gaze_oblique": {
+     "p50_ms": 2.998,
+     "same_output": false,
+     "vs_5.0": {
+      "ratio": 1.8006,
+      "ci": [
+       1.7919,
+       1.8103
+      ]
+     }
+    },
+    "quality": {
+     "p50_ms": 0.917,
+     "same_output": true,
+     "vs_5.0": {
+      "ratio": 1.0025,
+      "ci": [
+       0.9973,
+       1.0076
+      ]
+     }
+    },
+    "enhance": {
+     "p50_ms": 3.152,
+     "same_output": true,
+     "vs_5.0": {
+      "ratio": 1.0063,
+      "ci": [
+       1.0043,
+       1.0086
+      ]
+     }
+    },
+    "segment": {
+     "p50_ms": 42.029,
+     "same_output": true,
+     "vs_5.0": {
+      "ratio": 0.9817,
+      "ci": [
+       0.9763,
+       0.9888
+      ]
+     }
+    },
+    "measure": {
+     "p50_ms": 1.629,
+     "same_output": true,
+     "vs_5.0": {
+      "ratio": 0.9948,
+      "ci": [
+       0.989,
+       1.0004
+      ]
+     }
+    },
+    "nanodet": {
+     "p50_ms": 74.725,
+     "same_output": true,
+     "vs_5.0": {
+      "ratio": 1.5912,
+      "ci": [
+       1.5851,
+       1.5992
+      ]
+     }
+    },
+    "yunet": {
+     "p50_ms": 21.679,
+     "same_output": true,
+     "vs_5.0": {
+      "ratio": 0.8817,
+      "ci": [
+       0.8718,
+       0.8945
+      ]
+     }
+    }
+   }
+  }
+ },
+ "load_avg_end": [
+  2.73,
+  1.2,
+  0.47
+ ]
+}
