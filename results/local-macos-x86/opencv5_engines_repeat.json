@@ -1,0 +1,565 @@
+{
+ "arm": "local-macos-x86",
+ "config": {
+  "repeats": 20,
+  "warmup": 3,
+  "crops": 8,
+  "sizes": [
+   512,
+   256
+  ],
+  "all_threads": 16,
+  "reference": "drishyam_dacl10k.onnx on ENGINE_NEW",
+  "timing": "interleaved: each round runs one forward of every net at that size",
+  "inputs": "bench.parity.make_crops (evals.synth seeds 9000 on, 512 px), INTER_AREA to the size, as OnnxSegmenter preprocesses a square crop",
+  "static_copies": "runs/opencv5_engines"
+ },
+ "provenance": {
+  "cv2": "5.0.0",
+  "build_info_sha256": "fe5f9337dbc8663639ee7bcb2deb09359893fc8d2aa5b6a447cee2a0117d2ec7",
+  "cv2_baseline": "SSE SSE2 SSE3 SSSE3 SSE4_1",
+  "cv2_dispatch": "SSE4_2 AVX FP16 AVX2 AVX512_SKX",
+  "cv2_parallel_framework": "GCD",
+  "cv2_custom_hal": "YES (ipp (ver 0.0.1))",
+  "cv2_file": "/Users/mac/Documents/Projects/opencv/.claude/worktrees/agent-aeadc1c6421ca14b6/.venv/lib/python3.13/site-packages/cv2/__init__.py",
+  "under_opt_cool": false,
+  "build": "stock (not COOL)",
+  "machine": "Darwin 25.6.0 x86_64",
+  "platform": "macOS-26.7.1-x86_64-i386-64bit-Mach-O",
+  "cpu": "Intel(R) Core(TM) i9-9880H CPU @ 2.30GHz",
+  "logical_cpus": 16,
+  "cv2_threads": 16,
+  "python": "3.13.16",
+  "numpy": "2.5.4",
+  "timestamp": "2026-10-21T13:18:50Z",
+  "load_avg": [
+   9.53,
+   49.11,
+   91.48
+  ]
+ },
+ "load_avg_end": [
+  9.63,
+  34.07,
+  78.94
+ ],
+ "files": {
+  "drishyam_dacl10k.onnx": {
+   "path": "models/drishyam_dacl10k.onnx",
+   "bytes": 26810816,
+   "sha256": "c49416c10087f3c1baa8443b53fc839a3d8eb227ff27a1b4f7be1da964d6ed4a",
+   "graph": {
+    "inputs": {
+     "input": [
+      1,
+      3,
+      "h",
+      "w"
+     ]
+    },
+    "nodes": 208,
+    "shape_nodes": [
+     {
+      "node": "/net/decoder/Shape",
+      "input": "input",
+      "chain": "Shape -> Gather -> Unsqueeze -> Concat -> Resize"
+     },
+     {
+      "node": "/net/decoder/Shape_2",
+      "input": "/net/encoder/model/blocks.0/blocks.0.0/Add_output_0",
+      "chain": "Shape -> Gather -> Unsqueeze -> Concat -> Resize"
+     },
+     {
+      "node": "/net/decoder/Shape_4",
+      "input": "/net/encoder/model/blocks.1/blocks.1.1/Add_output_0",
+      "chain": "Shape -> Gather -> Unsqueeze -> Concat -> Resize"
+     },
+     {
+      "node": "/net/decoder/Shape_6",
+      "input": "/net/encoder/model/blocks.2/blocks.2.2/Add_output_0",
+      "chain": "Shape -> Gather -> Unsqueeze -> Concat -> Resize"
+     },
+     {
+      "node": "/net/decoder/Shape_8",
+      "input": "/net/encoder/model/blocks.4/blocks.4.1/Add_output_0",
+      "chain": "Shape -> Gather -> Unsqueeze -> Concat -> Resize"
+     }
+    ]
+   }
+  },
+  "drishyam_dacl10k.fp16.onnx": {
+   "path": "models/drishyam_dacl10k.fp16.onnx",
+   "bytes": 13463469,
+   "sha256": "f9b06fabbe47a5614c4f61b9170a21c81165d0fd3caf173942ae6ee6e47cb976",
+   "graph": {
+    "inputs": {
+     "input": [
+      1,
+      3,
+      "h",
+      "w"
+     ]
+    },
+    "nodes": 221,
+    "shape_nodes": [
+     {
+      "node": "/net/decoder/Shape_2",
+      "input": "/net/encoder/model/blocks.0/blocks.0.0/Add_output_0",
+      "chain": "Shape -> Gather -> Unsqueeze -> Concat -> Resize"
+     },
+     {
+      "node": "/net/decoder/Shape_4",
+      "input": "/net/encoder/model/blocks.1/blocks.1.1/Add_output_0",
+      "chain": "Shape -> Gather -> Unsqueeze -> Concat -> Resize"
+     },
+     {
+      "node": "/net/decoder/Shape_6",
+      "input": "/net/encoder/model/blocks.2/blocks.2.2/Add_output_0",
+      "chain": "Shape -> Gather -> Unsqueeze -> Concat -> Resize"
+     },
+     {
+      "node": "/net/decoder/Shape_8",
+      "input": "/net/encoder/model/blocks.4/blocks.4.1/Add_output_0",
+      "chain": "Shape -> Gather -> Unsqueeze -> Concat -> Resize"
+     },
+     {
+      "node": "/net/decoder/Shape",
+      "input": "input_cast_to_/net/decoder/Shape",
+      "chain": "Shape -> Gather -> Unsqueeze -> Concat -> Resize"
+     }
+    ]
+   }
+  }
+ },
+ "rows": [
+  {
+   "file": "drishyam_dacl10k.onnx",
+   "path": "models/drishyam_dacl10k.onnx",
+   "engine": "new",
+   "size": 512,
+   "loads": true,
+   "runs": true,
+   "log": [],
+   "output_shape": [
+    6,
+    512,
+    512
+   ],
+   "vs_reference": "reference",
+   "null_forward_threads1": {
+    "n": 20,
+    "p50_ms": 501.151,
+    "p95_ms": 589.873,
+    "mean_ms": 514.837
+   },
+   "forward_threads1": {
+    "n": 20,
+    "p50_ms": 504.785,
+    "p95_ms": 606.724,
+    "mean_ms": 515.587
+   },
+   "null_forward_threads16": {
+    "n": 20,
+    "p50_ms": 125.975,
+    "p95_ms": 130.449,
+    "mean_ms": 125.925
+   },
+   "forward_threads16": {
+    "n": 20,
+    "p50_ms": 127.365,
+    "p95_ms": 137.368,
+    "mean_ms": 128.793
+   }
+  },
+  {
+   "file": "drishyam_dacl10k.onnx",
+   "path": "models/drishyam_dacl10k.onnx",
+   "engine": "classic",
+   "size": 512,
+   "loads": false,
+   "runs": false,
+   "error": "OpenCV(5.0.0) /Users/macmini_16g/GHA-Actions-Opencv-Python/_work/opencv-python/opencv-python/opencv/modules/dnn/src/onnx/onnx_importer.cpp:1114: error: (-2:Unspecified error) in function 'handleNode'\n> Node [Shape@ai.onnx]:(onnx_node!/net/decoder/Shape) parse error: OpenCV(5.0.0) /Users/macmini_16g/GHA-Actions-Opencv-Python/_work/opencv-python/opencv-python/opencv/modules/dnn/src/onnx/onnx_importer.cpp:2591: error: (-215:Assertion failed) !isDynamicShape in function 'parseShape'\n>",
+   "log": [
+    "[ERROR:0@3.165] global onnx_importer.cpp:2590 parseShape DNN/ONNX(Shape): dynamic 'zero' shapes are not supported, input input [<empty>]",
+    "[ERROR:0@3.165] global onnx_importer.cpp:1095 handleNode DNN/ONNX: ERROR during processing node with 1 inputs and 1 outputs: [Shape]:(onnx_node!/net/decoder/Shape) from domain='ai.onnx'"
+   ]
+  },
+  {
+   "file": "drishyam_dacl10k.onnx static",
+   "path": "runs/opencv5_engines/drishyam_dacl10k.static512.onnx",
+   "engine": "new",
+   "size": 512,
+   "loads": true,
+   "runs": true,
+   "log": [],
+   "output_shape": [
+    6,
+    512,
+    512
+   ],
+   "vs_reference": {
+    "max_dprob": 0.0,
+    "argmax_agreement": 1.0
+   },
+   "vs_other_engine": {
+    "max_dprob": 2.136826515197754e-05,
+    "argmax_agreement": 1.0
+   },
+   "forward_threads1": {
+    "n": 20,
+    "p50_ms": 506.357,
+    "p95_ms": 547.788,
+    "mean_ms": 513.225
+   },
+   "forward_threads16": {
+    "n": 20,
+    "p50_ms": 130.06,
+    "p95_ms": 170.472,
+    "mean_ms": 134.857
+   }
+  },
+  {
+   "file": "drishyam_dacl10k.onnx static",
+   "path": "runs/opencv5_engines/drishyam_dacl10k.static512.onnx",
+   "engine": "classic",
+   "size": 512,
+   "loads": true,
+   "runs": true,
+   "log": [],
+   "output_shape": [
+    6,
+    512,
+    512
+   ],
+   "vs_reference": {
+    "max_dprob": 2.136826515197754e-05,
+    "argmax_agreement": 1.0
+   },
+   "vs_other_engine": {
+    "max_dprob": 2.136826515197754e-05,
+    "argmax_agreement": 1.0
+   },
+   "forward_threads1": {
+    "n": 20,
+    "p50_ms": 425.653,
+    "p95_ms": 507.079,
+    "mean_ms": 438.067
+   },
+   "forward_threads16": {
+    "n": 20,
+    "p50_ms": 188.675,
+    "p95_ms": 199.406,
+    "mean_ms": 190.182
+   }
+  },
+  {
+   "file": "drishyam_dacl10k.fp16.onnx",
+   "path": "models/drishyam_dacl10k.fp16.onnx",
+   "engine": "new",
+   "size": 512,
+   "loads": true,
+   "runs": true,
+   "log": [],
+   "output_shape": [
+    6,
+    512,
+    512
+   ],
+   "vs_reference": {
+    "max_dprob": 0.01798674464225769,
+    "argmax_agreement": 0.999978
+   },
+   "forward_threads1": {
+    "n": 20,
+    "p50_ms": 609.693,
+    "p95_ms": 731.758,
+    "mean_ms": 637.566
+   },
+   "forward_threads16": {
+    "n": 20,
+    "p50_ms": 227.601,
+    "p95_ms": 241.861,
+    "mean_ms": 228.299
+   }
+  },
+  {
+   "file": "drishyam_dacl10k.fp16.onnx",
+   "path": "models/drishyam_dacl10k.fp16.onnx",
+   "engine": "classic",
+   "size": 512,
+   "loads": false,
+   "runs": false,
+   "error": "OpenCV(5.0.0) /Users/macmini_16g/GHA-Actions-Opencv-Python/_work/opencv-python/opencv-python/opencv/modules/dnn/src/onnx/onnx_importer.cpp:1114: error: (-2:Unspecified error) in function 'handleNode'\n> Node [Shape@ai.onnx]:(onnx_node!/net/decoder/Shape_2) parse error: OpenCV(5.0.0) /Users/macmini_16g/GHA-Actions-Opencv-Python/_work/opencv-python/opencv-python/opencv/modules/dnn/src/onnx/onnx_importer.cpp:2591: error: (-215:Assertion failed) !isDynamicShape in function 'parseShape'\n>",
+   "log": [
+    "[ERROR:0@9.903] global onnx_importer.cpp:2590 parseShape DNN/ONNX(Shape): dynamic 'zero' shapes are not supported, input /net/encoder/model/blocks.0/blocks.0.0/Add_output_0 [<empty>]",
+    "[ERROR:0@9.903] global onnx_importer.cpp:1095 handleNode DNN/ONNX: ERROR during processing node with 1 inputs and 1 outputs: [Shape]:(onnx_node!/net/decoder/Shape_2) from domain='ai.onnx'"
+   ]
+  },
+  {
+   "file": "drishyam_dacl10k.fp16.onnx static",
+   "path": "runs/opencv5_engines/drishyam_dacl10k.fp16.static512.onnx",
+   "engine": "new",
+   "size": 512,
+   "loads": true,
+   "runs": true,
+   "log": [],
+   "output_shape": [
+    6,
+    512,
+    512
+   ],
+   "vs_reference": {
+    "max_dprob": 0.01798674464225769,
+    "argmax_agreement": 0.999978
+   },
+   "forward_threads1": {
+    "n": 20,
+    "p50_ms": 604.285,
+    "p95_ms": 750.703,
+    "mean_ms": 624.554
+   },
+   "forward_threads16": {
+    "n": 20,
+    "p50_ms": 223.12,
+    "p95_ms": 229.982,
+    "mean_ms": 223.771
+   }
+  },
+  {
+   "file": "drishyam_dacl10k.fp16.onnx static",
+   "path": "runs/opencv5_engines/drishyam_dacl10k.fp16.static512.onnx",
+   "engine": "classic",
+   "size": 512,
+   "loads": true,
+   "runs": false,
+   "error": "OpenCV(5.0.0) /Users/macmini_16g/GHA-Actions-Opencv-Python/_work/opencv-python/opencv-python/opencv/modules/dnn/src/layer.cpp:274: error: (-2:Unspecified error) in function 'virtual void cv::dnn::dnn5_v20260605::Layer::getTypes(const std::vector<MatType> &, const int, const int, std::vector<MatType> &, std::vector<MatType> &) const'\n> :\n>     'input == CV_32F || input == CV_64F || input == CV_8S || input == CV_8U || input == CV_64S'\n> where\n>     'input' is 7 (CV_16FC1)",
+   "log": [
+    "[ERROR:0@12.430] global net_impl.cpp:1313 getLayerShapesRecursively OPENCV/DNN: [Convolution]:(onnx_node!/net/encoder/model/conv_stem/Conv): getMemoryShapes() throws exception. inputs=1 outputs=1/1 blobs=2",
+    "[ERROR:0@12.430] global net_impl.cpp:1316 getLayerShapesRecursively     input[0] = [1 x 3 x 512 x 512]",
+    "[ERROR:0@12.430] global net_impl.cpp:1320 getLayerShapesRecursively     output[0] = [1 x 16 x 256 x 256]",
+    "[ERROR:0@12.430] global net_impl.cpp:1324 getLayerShapesRecursively     blobs[0] = CV_32FC1 [16 x 3 x 3 x 3]",
+    "[ERROR:0@12.430] global net_impl.cpp:1324 getLayerShapesRecursively     blobs[1] = CV_32FC1 [16]",
+    "[ERROR:0@12.430] global net_impl.cpp:1326 getLayerShapesRecursively Exception message: OpenCV(5.0.0) /Users/macmini_16g/GHA-Actions-Opencv-Python/_work/opencv-python/opencv-python/opencv/modules/dnn/src/layer.cpp:274: error: (-2:Unspecified error) in function 'virtual void cv::dnn::dnn5_v20260605::Layer::getTypes(const std::vector<MatType> &, const int, const int, std::vector<MatType> &, std::vector<MatType> &) const'",
+    "> :",
+    ">     'input == CV_32F || input == CV_64F || input == CV_8S || input == CV_8U || input == CV_64S'",
+    "> where",
+    ">     'input' is 7 (CV_16FC1)"
+   ]
+  },
+  {
+   "file": "drishyam_dacl10k.onnx",
+   "path": "models/drishyam_dacl10k.onnx",
+   "engine": "new",
+   "size": 256,
+   "loads": true,
+   "runs": true,
+   "log": [],
+   "output_shape": [
+    6,
+    256,
+    256
+   ],
+   "vs_reference": "reference",
+   "null_forward_threads1": {
+    "n": 20,
+    "p50_ms": 132.599,
+    "p95_ms": 137.759,
+    "mean_ms": 133.599
+   },
+   "forward_threads1": {
+    "n": 20,
+    "p50_ms": 133.004,
+    "p95_ms": 138.63,
+    "mean_ms": 133.621
+   },
+   "null_forward_threads16": {
+    "n": 20,
+    "p50_ms": 39.129,
+    "p95_ms": 40.765,
+    "mean_ms": 39.011
+   },
+   "forward_threads16": {
+    "n": 20,
+    "p50_ms": 40.471,
+    "p95_ms": 42.559,
+    "mean_ms": 40.526
+   }
+  },
+  {
+   "file": "drishyam_dacl10k.onnx",
+   "path": "models/drishyam_dacl10k.onnx",
+   "engine": "classic",
+   "size": 256,
+   "loads": false,
+   "runs": false,
+   "error": "OpenCV(5.0.0) /Users/macmini_16g/GHA-Actions-Opencv-Python/_work/opencv-python/opencv-python/opencv/modules/dnn/src/onnx/onnx_importer.cpp:1114: error: (-2:Unspecified error) in function 'handleNode'\n> Node [Shape@ai.onnx]:(onnx_node!/net/decoder/Shape) parse error: OpenCV(5.0.0) /Users/macmini_16g/GHA-Actions-Opencv-Python/_work/opencv-python/opencv-python/opencv/modules/dnn/src/onnx/onnx_importer.cpp:2591: error: (-215:Assertion failed) !isDynamicShape in function 'parseShape'\n>",
+   "log": [
+    "[ERROR:0@111.467] global onnx_importer.cpp:2590 parseShape DNN/ONNX(Shape): dynamic 'zero' shapes are not supported, input input [<empty>]",
+    "[ERROR:0@111.467] global onnx_importer.cpp:1095 handleNode DNN/ONNX: ERROR during processing node with 1 inputs and 1 outputs: [Shape]:(onnx_node!/net/decoder/Shape) from domain='ai.onnx'"
+   ]
+  },
+  {
+   "file": "drishyam_dacl10k.onnx static",
+   "path": "runs/opencv5_engines/drishyam_dacl10k.static256.onnx",
+   "engine": "new",
+   "size": 256,
+   "loads": true,
+   "runs": true,
+   "log": [],
+   "output_shape": [
+    6,
+    256,
+    256
+   ],
+   "vs_reference": {
+    "max_dprob": 0.0,
+    "argmax_agreement": 1.0
+   },
+   "vs_other_engine": {
+    "max_dprob": 1.3500452041625977e-05,
+    "argmax_agreement": 1.0
+   },
+   "forward_threads1": {
+    "n": 20,
+    "p50_ms": 137.647,
+    "p95_ms": 140.471,
+    "mean_ms": 138.016
+   },
+   "forward_threads16": {
+    "n": 20,
+    "p50_ms": 41.664,
+    "p95_ms": 43.604,
+    "mean_ms": 41.33
+   }
+  },
+  {
+   "file": "drishyam_dacl10k.onnx static",
+   "path": "runs/opencv5_engines/drishyam_dacl10k.static256.onnx",
+   "engine": "classic",
+   "size": 256,
+   "loads": true,
+   "runs": true,
+   "log": [],
+   "output_shape": [
+    6,
+    256,
+    256
+   ],
+   "vs_reference": {
+    "max_dprob": 1.3500452041625977e-05,
+    "argmax_agreement": 1.0
+   },
+   "vs_other_engine": {
+    "max_dprob": 1.3500452041625977e-05,
+    "argmax_agreement": 1.0
+   },
+   "forward_threads1": {
+    "n": 20,
+    "p50_ms": 98.065,
+    "p95_ms": 128.83,
+    "mean_ms": 102.338
+   },
+   "forward_threads16": {
+    "n": 20,
+    "p50_ms": 56.916,
+    "p95_ms": 62.421,
+    "mean_ms": 57.314
+   }
+  },
+  {
+   "file": "drishyam_dacl10k.fp16.onnx",
+   "path": "models/drishyam_dacl10k.fp16.onnx",
+   "engine": "new",
+   "size": 256,
+   "loads": true,
+   "runs": true,
+   "log": [],
+   "output_shape": [
+    6,
+    256,
+    256
+   ],
+   "vs_reference": {
+    "max_dprob": 0.03748932480812073,
+    "argmax_agreement": 0.999899
+   },
+   "forward_threads1": {
+    "n": 20,
+    "p50_ms": 158.672,
+    "p95_ms": 162.827,
+    "mean_ms": 158.96
+   },
+   "forward_threads16": {
+    "n": 20,
+    "p50_ms": 62.025,
+    "p95_ms": 65.165,
+    "mean_ms": 62.218
+   }
+  },
+  {
+   "file": "drishyam_dacl10k.fp16.onnx",
+   "path": "models/drishyam_dacl10k.fp16.onnx",
+   "engine": "classic",
+   "size": 256,
+   "loads": false,
+   "runs": false,
+   "error": "OpenCV(5.0.0) /Users/macmini_16g/GHA-Actions-Opencv-Python/_work/opencv-python/opencv-python/opencv/modules/dnn/src/onnx/onnx_importer.cpp:1114: error: (-2:Unspecified error) in function 'handleNode'\n> Node [Shape@ai.onnx]:(onnx_node!/net/decoder/Shape_2) parse error: OpenCV(5.0.0) /Users/macmini_16g/GHA-Actions-Opencv-Python/_work/opencv-python/opencv-python/opencv/modules/dnn/src/onnx/onnx_importer.cpp:2591: error: (-215:Assertion failed) !isDynamicShape in function 'parseShape'\n>",
+   "log": [
+    "[ERROR:0@113.255] global onnx_importer.cpp:2590 parseShape DNN/ONNX(Shape): dynamic 'zero' shapes are not supported, input /net/encoder/model/blocks.0/blocks.0.0/Add_output_0 [<empty>]",
+    "[ERROR:0@113.255] global onnx_importer.cpp:1095 handleNode DNN/ONNX: ERROR during processing node with 1 inputs and 1 outputs: [Shape]:(onnx_node!/net/decoder/Shape_2) from domain='ai.onnx'"
+   ]
+  },
+  {
+   "file": "drishyam_dacl10k.fp16.onnx static",
+   "path": "runs/opencv5_engines/drishyam_dacl10k.fp16.static256.onnx",
+   "engine": "new",
+   "size": 256,
+   "loads": true,
+   "runs": true,
+   "log": [],
+   "output_shape": [
+    6,
+    256,
+    256
+   ],
+   "vs_reference": {
+    "max_dprob": 0.03748932480812073,
+    "argmax_agreement": 0.999899
+   },
+   "forward_threads1": {
+    "n": 20,
+    "p50_ms": 159.197,
+    "p95_ms": 166.364,
+    "mean_ms": 159.792
+   },
+   "forward_threads16": {
+    "n": 20,
+    "p50_ms": 63.683,
+    "p95_ms": 65.61,
+    "mean_ms": 63.783
+   }
+  },
+  {
+   "file": "drishyam_dacl10k.fp16.onnx static",
+   "path": "runs/opencv5_engines/drishyam_dacl10k.fp16.static256.onnx",
+   "engine": "classic",
+   "size": 256,
+   "loads": true,
+   "runs": false,
+   "error": "OpenCV(5.0.0) /Users/macmini_16g/GHA-Actions-Opencv-Python/_work/opencv-python/opencv-python/opencv/modules/dnn/src/layer.cpp:274: error: (-2:Unspecified error) in function 'virtual void cv::dnn::dnn5_v20260605::Layer::getTypes(const std::vector<MatType> &, const int, const int, std::vector<MatType> &, std::vector<MatType> &) const'\n> :\n>     'input == CV_32F || input == CV_64F || input == CV_8S || input == CV_8U || input == CV_64S'\n> where\n>     'input' is 7 (CV_16FC1)",
+   "log": [
+    "[ERROR:0@113.911] global net_impl.cpp:1313 getLayerShapesRecursively OPENCV/DNN: [Convolution]:(onnx_node!/net/encoder/model/conv_stem/Conv): getMemoryShapes() throws exception. inputs=1 outputs=1/1 blobs=2",
+    "[ERROR:0@113.911] global net_impl.cpp:1316 getLayerShapesRecursively     input[0] = [1 x 3 x 256 x 256]",
+    "[ERROR:0@113.911] global net_impl.cpp:1320 getLayerShapesRecursively     output[0] = [1 x 16 x 128 x 128]",
+    "[ERROR:0@113.911] global net_impl.cpp:1324 getLayerShapesRecursively     blobs[0] = CV_32FC1 [16 x 3 x 3 x 3]",
+    "[ERROR:0@113.911] global net_impl.cpp:1324 getLayerShapesRecursively     blobs[1] = CV_32FC1 [16]",
+    "[ERROR:0@113.911] global net_impl.cpp:1326 getLayerShapesRecursively Exception message: OpenCV(5.0.0) /Users/macmini_16g/GHA-Actions-Opencv-Python/_work/opencv-python/opencv-python/opencv/modules/dnn/src/layer.cpp:274: error: (-2:Unspecified error) in function 'virtual void cv::dnn::dnn5_v20260605::Layer::getTypes(const std::vector<MatType> &, const int, const int, std::vector<MatType> &, std::vector<MatType> &) const'",
+    "> :",
+    ">     'input == CV_32F || input == CV_64F || input == CV_8S || input == CV_8U || input == CV_64S'",
+    "> where",
+    ">     'input' is 7 (CV_16FC1)"
+   ]
+  }
+ ],
+ "onnx_runtime_in_build": "NO"
+}
