@@ -718,6 +718,18 @@ a spalling finding; at step 20 the remaining pixel budget ended the search. Its 
 session shows the tools carrying measured evidence to an LLM more than autonomous planning. The transcript also
 notes the large spall it missed.
 
+### Across a backlog
+
+One drone inspection produced 2,536 photos (section 1), so `drishyam batch` orchestrates a backlog
+([batch.md](batch.md)): it triages every photo by the overview's candidate priors, runs the unchanged per-photo agent
+in that order under one total budget (the remainder handed to the last job as its seconds cap), honours a kill
+switch between and inside photos, writes a decision trace (`batch_trace.jsonl`) and an HMAC-sealed report that
+`drishyam batch --report` recomputes from the reviewed work orders, with one queue of critical findings for a person
+and every photo it did not reach listed as not assessed. Its ordering is not shown to help on dev
+(`results/dev/batch_triage.json`: triage against random order ×1.23, CI 0.64–1.64; against file order ×1.45,
+CI 0.53–4.00, under a rule stated before the run), and its up-front pass makes it slower to the first critical than
+that file order; the per-photo agent sets the ceiling.
+
 ## 11. Responsible use and limits
 
 - Evidence-first UI: crop, measurements and gaze step before any confidence

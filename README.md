@@ -146,6 +146,15 @@ shasum -a 256 -c models/drishyam_dacl10k.sha256
 DRISHYAM_ONNX=models/drishyam_dacl10k.onnx DRISHYAM_ONNX_FP16=models/drishyam_dacl10k.fp16.onnx uv run drishyam run public/samples/bridge_03.jpg --pixel-cap 0.3
 ```
 
+A backlog of photos ([docs/batch.md](docs/batch.md)): triage every photo with the agent's own overview, run the
+unchanged per-photo agent in order of evidence under one total budget, list every photo it did not reach as not
+assessed, and write a signed inspection report with one queue of critical findings for a person. On the 90-photo dev
+backlog the ordering is no measurable gain (×1.23 against random order, 95 % CI 0.64–1.64).
+
+```bash
+uv run drishyam batch public/samples --seconds-cap 30
+```
+
 MCP server over stdio (12 allow-listed tools, no approve tool, no shell):
 
 ```bash
