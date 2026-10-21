@@ -108,7 +108,7 @@
   "file": "bridge_03.jpg",
   "thumb": "thumbs/bridge_03.jpg",
   "title": "Exposed rebar",
-  "note": "A broken-out spall exposing reinforcing bars: the critical finding.",
+  "note": "A broken-out spall exposing reinforcing bars. The live v1 engine may label it differently: it finds 0.02 of the exposed rebar in our synthetic test set.",
   "synthetic": true,
   "width": 3000,
   "height": 2250,

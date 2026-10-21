@@ -15,6 +15,7 @@ import sys
 import time
 from pathlib import Path
 
+from playwright.sync_api import TimeoutError as PlaywrightTimeout
 from playwright.sync_api import expect, sync_playwright
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -124,6 +125,7 @@ def run(base, server_log=None):
         #    then the page hands the critical findings to a person, whose approval the server signs.
         expect(page.locator("#gallery .thumb[data-file='bridge_03.jpg']")).to_have_attribute("aria-pressed", "true", timeout=15000)
         expect(page.locator("#look")).to_be_enabled(timeout=15000)
+        expect(page.locator("#try-kill")).to_be_enabled()           # the KILL drill is offered before any run
         page.locator("#guided").click()
         t0 = time.time()
         expect(page.locator("#narrator")).to_contain_text("Sending the photo", timeout=2000)  # the page answers the click at once
@@ -197,18 +199,25 @@ def run(base, server_log=None):
 
         # Try KILL from the recap: a run shown live whose planner stalls 2 s at step 3, so KILL usually lands mid-job.
         # REAL CLOCK: on a loaded machine the stop rule can end the job before KILL reaches it. Either way KILL must not
-        # claim more than happened: a kill-switch halt by the server, or the page saying the job had already finished.
-        page.get_by_role("button", name="Try KILL").click()
+        # claim more than happened: a kill-switch halt by the server; or no KILL to press, because the page hides it
+        # once the server's done event has arrived; or, pressed in the same moment, the page saying the job had finished.
+        page.locator("#recap").get_by_role("button", name="Try KILL").click()
         expect(page.locator("#job-text")).to_contain_text("shown the moment it arrives", timeout=15000)
         expect(page.locator("#trace .trace__line[data-step='1']")).to_be_visible(timeout=30000)
-        page.locator("#kill").click()
+        try:
+            page.locator("#kill").click(timeout=5000)
+            clicked = True
+        except PlaywrightTimeout:
+            clicked = False
         status = p.wait_done()
         killed = page.locator("#trace .trace__line .chip", has_text="kill-switch").count() == 1
         if killed:
-            assert status == "halted", status
-        else:
+            assert clicked and status == "halted", (clicked, status)
+        elif clicked:
             expect(page.locator("#job-text")).to_contain_text("had already finished")
-        print(f"ok  Try KILL: {'halted by the server with kill-switch' if killed else 'the job had finished first, and the page said so'}")
+        expect(page.locator("#kill")).to_be_hidden()
+        print(f"ok  Try KILL: {'halted by the server with kill-switch' if killed else 'the job had finished first'}"
+              f"{'' if killed or clicked else ', and the page offered no KILL'}")
 
         # 2. KILL mid-run reaches the server, which halts before its next look and sends a kill-switch record.
         # planner_timeout parks the job for 2 s at step 3, so the click lands while it is still running.
@@ -293,21 +302,24 @@ def run(base, server_log=None):
         p.clean()
         print("ok  real photos: the v1 runs replayed from their recordings (no server job), labelled, recap says what it flagged")
 
-        # 3c. The film: its poster and English captions load from this origin under the production CSP (every cue of
-        #     public/video/drishyam.vtt, showing); the MP4 is not fetched before Play (preload="none").
+        # 3c. The film: its poster, and its English captions track off by default (the captions are burned into the
+        #     film), loading from this origin under the production CSP once turned on (every cue of
+        #     public/video/drishyam.vtt); the MP4 is not fetched before Play (preload="none").
         page.reload()
         page.locator("#video-link").click()
         v = page.locator("#video video")
         expect(v).to_be_visible(timeout=15000)
+        assert v.evaluate("v => [v.textTracks.length, v.textTracks[0].mode]") == [1, "disabled"]
+        v.evaluate("v => { v.textTracks[0].mode = 'showing'; }")   # what the player's captions button does
         n = (ROOT / "public/video/drishyam.vtt").read_text().count(" --> ")
         for _ in range(100):
-            if v.evaluate("v => (v.textTracks[0] && v.textTracks[0].cues && v.textTracks[0].cues.length) || 0") == n:
+            if v.evaluate("v => (v.textTracks[0].cues && v.textTracks[0].cues.length) || 0") == n:
                 break
             page.wait_for_timeout(100)
-        assert v.evaluate("v => [v.textTracks[0].cues.length, v.textTracks[0].mode, v.poster.endsWith('video/poster.jpg')]") == [n, "showing", True]
+        assert v.evaluate("v => [v.textTracks[0].cues.length, v.poster.endsWith('video/poster.jpg')]") == [n, True]
         assert not p.media, f"the MP4 was fetched before Play: {p.media}"
         p.clean()
-        print(f"ok  film player: poster and {n} English caption cues under the CSP, no MP4 request before Play")
+        print(f"ok  film player: poster, captions track off by default and {n} cues under the CSP when on, no MP4 request before Play")
 
         # 4. Phone width: no horizontal scroll after a run.
         m = Page(browser, base, viewport={"width": 375, "height": 812}, is_mobile=True, has_touch=True)
