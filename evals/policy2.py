@@ -20,6 +20,10 @@ the same photos are hard for every policy compared on them. The 1 % cut was set 
 """
 from __future__ import annotations
 
+import re
+import subprocess
+from datetime import datetime
+
 import cv2
 import numpy as np
 
@@ -250,7 +254,31 @@ def build() -> dict:
             matched[k] |= {"recall_shown": shown[k]["recall"], "recall_shown_vs_tiling_L2": shown[k]["recall"] / t["recall"],
                            "recall_shown_vs_tiling_L2_ci": harness.ratio_ci(shown[k], t, len(m_recs)),
                            "pixels_vs_tiling_L2": matched[k]["pixels_frac"] / matched["tiling@L2"]["pixels_frac"]}
+    share = lambda c, pick: round(sum(v for a, v in c.items() if pick(a)) / max(1, sum(c.values())), 4)
+    rates = {s: {k: {"escalation_rate": share(c, lambda a: a.startswith("escalate:")),
+                     "verify_rate": share(c, lambda a: a.startswith("verify:")),
+                     "confirm_share": share(c, lambda a: ":confirm-critical " in a),
+                     "confirm_looks_per_photo": round(sum(v for a, v in c.items() if ":confirm-critical " in a)
+                                                      / sum(rows[s][k]["halt"].values()), 4)}
+                 for k, c in looks[s].items()} for s in SPLITS}
+    fb = json.loads((OUT.parent / "zero_candidate_fallback.json").read_text())["rows"]
+    same_as_fb = {s: {f: rows[s][f"cur@{CAP}"][f] == fb[s]["fb"][f] for f in ("recall", "boxes_per_image", "ms_per_job",
+                                                                             "critical_per_image", "pixels_frac")}
+                  for s in SPLITS}
+    log = (RUNS / "log.txt").read_text()
+    rule_commit = subprocess.run(["git", "log", "--diff-filter=A", "--format=%H %cI", "--", "results/dev/policy2_sweep.json"],
+                                 cwd=harness.REPO, capture_output=True, text=True, check=True).stdout.split()  # the stub's commit
+    if (first := re.search(r"^(\S+) start \|", log, re.MULTILINE)) is None:
+        raise SystemExit("runs/policy2/log.txt has no start")
+    ran_after = datetime.fromisoformat(rule_commit[1]) < datetime.fromisoformat(first.group(1))
+    heads = set(re.findall(r"HEAD (\w+) \| tracked changes (\d+)", log))
+    assert ran_after and len(heads) == 1 and next(iter(heads))[1] == "0", (rule_commit, first.group(1), heads)
     out = {**stub, "rows": rows, "critical_class_found": crit, "looks_by_action_cause_level": looks, "hard": hard,
+           "rates": rates, "cur_reproduces_v1_fallback_in_zero_candidate_fallback": same_as_fb,
+           "run": {"code_commit": next(iter(heads))[0], "rule_commit": rule_commit[0][:7], "rule_committed": rule_commit[1],
+                   "first_output": first.group(1), "order_checked": "the stub's last commit time is before the run log's "
+                   "start, and every run ran one HEAD with no tracked change (asserted)", "log": log.splitlines(),
+                   "workers": 6, "files": {s: f"runs/policy2/{s}.json" for s in (*SPLITS, "real_0.1")}},
            "matched_budget": {"cap": MATCHED_CAP, "split": "real", "rows": matched},
            "verdict": {"clauses": ver, "passed": passed, "critical_class_found_both_splits": found,
                        "critical_class_ground_truth_both_splits": total, "ranked": order, "chosen": chosen,
