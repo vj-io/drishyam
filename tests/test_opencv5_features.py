@@ -350,8 +350,10 @@ def gh_figures() -> list[str]:
 
 
 def test_shipped_flags_follow_the_rule():
-    doc = load("opencv5_features.json")
-    assert {f: getattr(segment, f) for f in feat.FLAGS} == {f: adopted(doc, f) for f in feat.FLAGS}
+    doc, arm = load("opencv5_features.json"), load("opencv5_features.json", "linux-aarch64")
+    # the rule on the Arm runner, Lambda's platform (the owner's choice, 2026-10-22): CV_BOOL_MASKS failed only on the Mac
+    assert {f: getattr(segment, f) for f in feat.FLAGS} == {f: adopted(arm, f) for f in feat.FLAGS}
+    assert {f for f in feat.FLAGS if adopted(arm, f) != adopted(doc, f)} == {"CV_BOOL_MASKS"}
     assert segment.DNN_ENGINE == "new" and doc["config"]["onnx"]  # the v1 parts ran
     assert all(i["identical"]["null"] == i["photos"] for i in doc["identity"].values())  # the identity is not noise
 
@@ -391,7 +393,7 @@ def test_report_section_6_quotes_the_json():
              for r in (d["timing"][s]["CV_BOOL_MASKS"]["restrict"] for s in ("classical", "v1")) for th in ths(r)]
     assert bx["gaze"]["vs_5.0"]["ci"][1] < 1 and bx["gaze_oblique"]["vs_5.0"]["ci"][1] < 1  # 4.14 faster on the EPYC
     assert all(adopted(d, "CV_BOOL_MASKS") for d in runners("opencv5_features.json").values())
-    assert not adopted(doc, "CV_BOOL_MASKS") and not segment.CV_BOOL_MASKS
+    assert not adopted(doc, "CV_BOOL_MASKS") and segment.CV_BOOL_MASKS
     assert ea["identical"] == ea["photos"] == 14 and ea["argmax_differs_px"] == 0
     want += [f"{iv(old_a['nanodet']['vs_5.0'])} on the Arm runner",
              f"on the Arm runner {iv(old_a['gaze']['vs_5.0'])} and {iv(old_a['gaze_oblique']['vs_5.0'])}",

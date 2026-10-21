@@ -839,7 +839,7 @@ its wrappers fall back to OpenCV's own code when KleidiCV declines.
   remove that need (below).
 - `CV_BOOL_MASKS` (a NumPy bool footprint as a `CV_Bool` `copyTo` mask in `restrict`, new in 5.0) left every trace
   identical and was faster in three of its four timings, but the fourth interval (v1, one thread) reaches 1.02, so
-  under the rule it ships off. On both GitHub runners it passes (below).
+  it fails the rule on this Mac. On both GitHub runners it passes, and it ships on since 2026-10-22 (below).
 - `ALGO_HINT_APPROX` (the algorithm hint of OpenCV 4.10 on) was not tried: it allows results that differ from the
   accurate path by contract, so an identity measured on this build would say nothing about the aarch64 one the
   function runs.
@@ -891,9 +891,10 @@ over the same 62 classical and 49 v1 looks as on the Mac: 14 of 14 in every cell
 **The rule on Arm, and on the x86 runner.** `CV_ARGMAX` passes on both (x0.64 to x0.85), `CV_COMPARE` fails on both
 (no gain), and `CV_BOOL_MASKS` passes on both: x0.91 to x0.95, every interval below 1. So `CV_BOOL_MASKS`, the one
 pipeline change that uses a type new in 5.0, passes on Arm, where the Lambda function runs, and on the x86 runner,
-but failed on this Mac, where the load stretched its v1 one-thread interval to 1.02. It still ships off, because the
-rule is applied on this machine. Shipping it is the one line `CV_BOOL_MASKS = True` in `drishyam/segment.py`, with no
-new dependency: its output is a copy, identical by construction and on all 14 photos on all three machines. What it
+but failed on this Mac, where the load stretched its v1 one-thread interval to 1.02. It ships on since 2026-10-22
+(`CV_BOOL_MASKS = True` in `drishyam/segment.py`, no new dependency): the owner chose the Arm result, where the Lambda
+function runs, after seeing both, and that choice is stated here. Its output is a copy, identical by construction
+and on all 14 photos on all three machines, so no published number moves. What it
 buys is small, since `restrict` runs only on looks that cross the image's edge; with all three flags on, a whole
 classical look took x0.94 to x0.97 of its time on the runners.
 
@@ -909,7 +910,8 @@ one thread, x0.44 (0.44-0.45) on two (the function's count) and x0.58 (0.58-0.58
 every argmax equal, max |dprob| 1.5e-5. It passes the identity asked of a DNN change and is measurably faster on Arm
 at every thread count, and on the x86 runner too; it failed on this Mac only on speed, at 16 threads. Lambda is
 arm64 and runs OpenCV on 2 threads (`DRISHYAM_CV_THREADS`), so this is the change with the largest gain for the live
-v1. It ships off: the rule is applied on this machine, and the Lambda package cannot make its copy. With the
+v1. It ships off: the owner kept `ENGINE_NEW` live (2026-10-22), and the result is reported as a finding
+([repro/README.md](../bench/repro/README.md), 3); the Lambda package also cannot make its copy. With the
 governor on, faster looks would also change the live choices (fewer switches to the 256-px FP16 net under the 1500 ms
 limit), which the held-out runs, governor off, do not cover.
 

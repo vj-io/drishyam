@@ -38,14 +38,14 @@ PORE_CAUSE = "not elongated: pore or bug hole"
 # "OpenCV 5 features in the pipeline"; tests/test_opencv5_features.py checks the values against its JSON).
 CV_ARGMAX = True  # finish: cv2.reduceArgMax (OpenCV 4.6), the first maximum, as ndarray.argmax(axis=0) returns
 CV_COMPARE = False  # _clean: cv2.compare(CMP_EQ), 255 where NumPy's == gives 1 (identical, not measurably faster)
-CV_BOOL_MASKS = False  # restrict: cv2.copyTo with the bool footprint as a CV_Bool mask (new in OpenCV 5.0); identical,
-# faster in 3 of its 4 timings on the Mac, the fourth's interval reaching 1.02: not adopted under the rule. It passes
-# on GitHub's Arm and x86 runners (docs/bench.md); True is all it takes to ship it.
+CV_BOOL_MASKS = True  # restrict: cv2.copyTo with the bool footprint as a CV_Bool mask (new in OpenCV 5.0); identical,
+# faster in 3 of its 4 timings on the Mac, the fourth's interval reaching 1.02, so it fails the rule there. It passes
+# on GitHub's Arm runner, where Lambda runs, and the x86 one (docs/bench.md); on since 2026-10-22, the owner's choice.
 # The engine OnnxSegmenter reads its FP32 net with: "new" (ENGINE_NEW, the default) or "classic" (ENGINE_CLASSIC on
 # a static-shape copy per input size; the FP16 net stays on ENGINE_NEW, which alone runs it). Not adopted: on the x86
 # Mac the agent's traces matched but its looks were slower on 16 threads. On GitHub's Arm runner they matched too and
-# took 0.44 of the time on 2 threads; on Lambda it would need the copy made at build time, since `onnx` is not in the
-# package (docs/bench.md, "OpenCV 5 features in the pipeline").
+# took 0.44 of the time on 2 threads, but the owner kept ENGINE_NEW live (2026-10-22): a finding, bench/repro/README.md,
+# 3. On Lambda it would need the copy made at build time, since `onnx` is not in the package (docs/bench.md).
 DNN_ENGINE = os.environ.get("DRISHYAM_DNN_ENGINE", "new")
 
 

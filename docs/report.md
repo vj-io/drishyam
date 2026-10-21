@@ -202,17 +202,19 @@ ran once on GitHub's Arm and x86 runners (run 39665440222, quiet VMs, not the La
   GitHub's Neoverse-N2 runner it ran v1's forward in x0.38 of `ENGINE_NEW`'s time, and at the agent level it passes
   both tests there: the same 14 traces identical, and its looks took x0.39 (0.39-0.40) of
   `ENGINE_NEW`'s time on one thread and x0.44 (0.44-0.45) on two, the Lambda function's thread count. It is the
-  largest gain found for the live v1, and it is off because the rule is applied on this Mac and because the Lambda
-  package lacks the `onnx` package that makes the copy. A copy written at build time into `models/`, which the
-  Lambda build ships whole, would remove that need, with one code change not made here (read that file by path, keep
-  hashing the original) and a check on the deployed Graviton.
+  largest gain found for the live v1. It stays off: the owner kept `ENGINE_NEW` live (2026-10-22), so this is
+  reported as a finding, not a change (bench/repro/README.md, 3). Shipping it would need a copy written at build time
+  into `models/` (the Lambda package lacks the `onnx` package that makes it), one code change (read that file by path,
+  keep hashing the original) and a check on the deployed Graviton.
 - The new engine's profiling mode (`Net.setProfilingMode(DNN_PROFILE_DETAILED)`, new in 5.0), in
   `bench/opencv5_features.py`: v1's time per layer on both engines. Here its twelve 3x3 convolutions are 81 % of
   `ENGINE_NEW`'s time on one thread. On the Arm runner they took 800.6 against 248.5 ms on the two engines, more than
   the whole gap: the new engine's 2.6 times longer forward there is its 3x3 convolution.
 - `CV_Bool` (new in 5.0): the NumPy bool footprint as a `copyTo` mask in `segment.restrict`. Identical, faster in
-  three of its four timings here, off under the rule. On both GitHub runners it passes (x0.91 to x0.95 of the NumPy
-  time): it passes on Arm, where the function runs, and failed only on this Mac. Turning it on is one line.
+  three of its four timings here, where it failed the rule (one interval reaches 1.02). On both GitHub runners it
+  passes (x0.91 to x0.95 of the NumPy time). It is on since 2026-10-22 (`CV_BOOL_MASKS`): the owner chose the result
+  on Arm, where the function runs, after seeing both. Its output is identical on all three machines, so no published
+  number moves.
 - `reduceArgMax` (OpenCV 4.6, not new) in `segment.finish`: identical, x0.52 to x0.74 of NumPy's time, adopted
   (`CV_ARGMAX`); on a whole look the gain is within this machine's noise.
 

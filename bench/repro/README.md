@@ -1,9 +1,9 @@
-# OpenCV 5.0.0 DNN: two problems found with Drishyam's segmenters
+# OpenCV 5.0.0 DNN: three problems found with Drishyam's segmenters
 
 Written so the owner can file them upstream; nothing here has been filed. Measured with the stock
 `opencv-python-headless` 5.0.0.93 wheel (cv2 5.0.0), onnx 1.23.2, NumPy 2.5.4, Python 3.13.16, on macOS x86_64
-(Intel i9-9880H). The Linux x86_64 and aarch64 runs are the `engines` job of `.github/workflows/bench-arm64.yml`,
-not run yet.
+(Intel i9-9880H). The Linux x86_64 and aarch64 runs are the `engines` and `features` jobs of
+`.github/workflows/bench-arm64.yml` (runs 39617514621 and 39665440222).
 
 ## 1. `ENGINE_CLASSIC` cannot import a `Shape` node whose input has a symbolic H or W
 
@@ -93,3 +93,16 @@ not a finding. To isolate it: export an untrained `DeepLabV3Plus` with and witho
 `segmentation_models_pytorch` and `timm` are not in this repository's environment), run `training/parity.py` on
 both engines, then bisect the graph by exposing intermediate outputs (`onnx.utils.extract_model`) until the first
 tensor that differs. Until that is done there is nothing to file.
+
+## 3. `ENGINE_NEW` runs v1's 3x3 convolutions about 3.2 times slower than `ENGINE_CLASSIC` on aarch64
+
+A performance finding, not a bug: the owner kept `ENGINE_NEW` live, so it is reported here. On GitHub's Neoverse-N2
+runner (stock 5.0.0 aarch64 wheel, 1 thread, v1 at 512), `Net.setProfilingMode(DNN_PROFILE_DETAILED)` puts v1's twelve
+3x3 convolutions at 800.6 ms on `ENGINE_NEW` against 248.5 ms on `ENGINE_CLASSIC` (a static-shape copy of the same
+file; at the agent level the traces were identical and max |dprob| 1.5e-5). That is more than the whole gap between
+the two forwards; the 1x1 convolutions take the same time on both, and `ENGINE_NEW` is the faster on the 5x5 depthwise
+ones. v1's looks on `ENGINE_CLASSIC` took x0.39 of `ENGINE_NEW`'s time on 1 thread and x0.44 on 2. On the x86 runner
+the 3x3 convolutions took 388.6 against 208.5 ms. Which kernel each engine picks for them is not recorded. The numbers
+are in `results/linux-aarch64/opencv5_features.json` (`profile`, `engine`) and docs/bench.md, "OpenCV 5 features in
+the pipeline". An upstream report could attach that JSON and ask whether `ENGINE_NEW`'s 3x3 convolution on aarch64
+misses the path `ENGINE_CLASSIC` takes (KleidiCV, carotene or its own NEON code).
