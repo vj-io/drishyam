@@ -82,7 +82,7 @@ def route_all(records: list[dict], rt: router.Router) -> list[dict]:
     for tri, f in futs:
         r = f.result()
         billed = r["usage"] or r.get("first_usage", {})
-        out.append({k: r[k] for k in ("label", "reason", "status", "cause", "cached", "latency_ms")}
+        out.append({k: r[k] for k in ("label", "reason", "status", "cause", "cached", "latency_ms", "reply") if k in r}
                    | {"usage": billed, "usd": router.usd(billed), "seconds": router.usd(billed) * 3600 / USD_PER_HOUR,
                       "prior_sum": tri["prior_sum"]})
     return out

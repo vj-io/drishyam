@@ -26,6 +26,7 @@ charged to the total. The default, `--router rule`, is the triage above alone.
 
 from __future__ import annotations
 
+import functools
 import hashlib
 import json
 import math
@@ -40,6 +41,7 @@ from .agent import Job
 from .cli import fixed_cost_job, write_crops, write_json_atomic
 from .findings import DISCLAIMER, SEVERITY, now_iso
 from .router import LABELS, RANK, usd
+from .segment import default_segmenter
 
 PHOTO_TYPES = {".jpg", ".jpeg", ".png"}
 SEAL_TTL_S = 10 * 365 * 24 * 3600  # a seal on a report, not a review token: it must outlast the review work
@@ -59,9 +61,15 @@ def photo_list(args) -> list[Path]:
     return out
 
 
+@functools.lru_cache(maxsize=2)
+def _segmenter(onnx, fp16):  # the env's model, read once per batch instead of once per Job (2 nets, 40 MB for v1)
+    return default_segmenter()
+
+
 def make_job(img, cfg, kill=lambda: False, job_id=None, cost_model="live", micro_arm="linux-aarch64") -> Job:
     """The Job `drishyam run` makes for one photo: live (this machine's clock) or on the published fixed costs."""
-    kw = {"kill": kill, "planner": planner.from_env(), "job_id": job_id}
+    kw = {"kill": kill, "planner": planner.from_env(), "job_id": job_id,
+          "segmenter": _segmenter(os.environ.get("DRISHYAM_ONNX"), os.environ.get("DRISHYAM_ONNX_FP16"))}
     return Job(img, cfg, **kw) if cost_model == "live" else fixed_cost_job(img, cfg, micro_arm, kw)
 
 
@@ -165,11 +173,13 @@ def run_batch(paths, out: Path, cfg, usd_cap=None, seconds_cap=None, make=make_j
         if stop and routes[p["index"]].cancel():
             continue
         r = routes[p["index"]].result()
-        p["route"] = {k: r[k] for k in ("label", "reason", "status", "cause", "cached", "latency_ms", "usage")}
+        p["route"] = {k: r[k] for k in ("label", "reason", "status", "cause", "cached", "latency_ms", "usage", "reply")
+                      if k in r}  # reply: the first 200 characters of a rejected one
         route_usd += usd(r["usage"])
         spent += usd(r["usage"]) * 3600 / cfg.usd_per_hour
         log("routed", "cached" if r["cached"] else r["status"], f"{r['label']}: {r['reason']}", p, label=r["label"],
-            detail=r["cause"], latency_ms=r["latency_ms"], usd=usd(r["usage"]))
+            detail=r["cause"], latency_ms=r["latency_ms"], usd=usd(r["usage"]),
+            **({"reply": r["reply"]} if "reply" in r else {}))
     if router and not stop:
         for p in photos:
             if p.get("route", {}).get("label") == "Clear":

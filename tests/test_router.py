@@ -18,7 +18,7 @@ import pytest
 
 from drishyam import batch, cli, router
 from drishyam.agent import JobConfig
-from drishyam.planner import Invalid, parse
+from drishyam.planner import Invalid
 from tests.test_batch import KEY, PHOTOS, SAMPLES, backlog, by_name, decisions, isolated  # noqa: F401 -- autouse
 
 CFG = JobConfig(pixel_cap=0.2)
@@ -78,8 +78,15 @@ def test_validate_accepts_exactly_the_schema():
                 ["Clear", "x"], "Clear"):
         with pytest.raises(Invalid):
             router.validate(bad)
-    with pytest.raises(Invalid):  # a fenced reply is not the one JSON object asked for
-        parse('```json\n{"label": "Clear", "reason": "x"}\n```')
+    # the whole reply as one ```json block (Nova Lite's habit) is the object; anything around or inside it is not
+    assert router.parse_reply('```json\n{\n  "label": "Clear",\n  "reason": "x"\n}\n```\n') == {"label": "Clear",
+                                                                                               "reason": "x"}
+    for bad in ('Here you go:\n```json\n{"label": "Clear", "reason": "x"}\n```',
+                '```json\n{"label": "Clear", "reason": "x"}\n```\nI am sure.',
+                '```json\n{"label": "Clear", "reason": "x"}\n```\n```json\n{"label": "Critical", "reason": "y"}\n```',
+                '{"label": "Clear", "reason": "x"} {"label": "Critical", "reason": "y"}'):
+        with pytest.raises(Invalid):
+            router.parse_reply(bad)
 
 
 def test_a_malformed_reply_falls_back_to_the_rule_triage_with_its_cause():

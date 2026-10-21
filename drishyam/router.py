@@ -3,7 +3,8 @@
 MAP. Each photo's own L3 overview (the pyramid level the survey and the saliency map read: decoded, people blurred,
 at most 896 px on its long side) and the OpenCV measurements of it (the batch triage's candidate count and priors,
 saliency statistics, the quality gate on the overview) go to Amazon Nova Lite on Amazon Bedrock with one fixed prompt.
-The reply must be exactly one JSON object {"label": "Clear" | "Requires zoom" | "Critical", "reason": one line}.
+The reply must be exactly one JSON object {"label": "Clear" | "Requires zoom" | "Critical", "reason": one line}
+(bare, or as the whole reply in one ```json fence, which Nova Lite adds).
 Anything else, a timeout, or any error falls back to the rule triage for that photo (label Requires zoom: it runs, in
 prior-sum order, and is never cleared), with the cause and latency recorded. Accepted replies are cached by the photo's
 sha256 (with the prompt and model), so a rerun costs nothing.
@@ -36,6 +37,7 @@ LABELS = ("Clear", "Requires zoom", "Critical")
 RANK = {"Critical": 0, "Requires zoom": 1}  # the run order; Clear gets no job
 FALLBACK = "Requires zoom"  # the rule triage's treatment: run in prior-sum order, never cleared
 REASON = re.compile(r"[^\x00-\x1f\x7f<>\[\]`|\\]{1,200}")  # one printable line, nothing markdown or HTML acts on
+FENCE = re.compile(r"```(?:json)?\n(.*)\n```", re.DOTALL)
 MAX_SIDE = 896  # Nova rescales an image so one side passes 896 px: a larger overview buys no detail
 TIMEOUT_S = 10.0
 WORKERS = 8
@@ -70,6 +72,12 @@ def validate(obj) -> dict:
     return {"label": obj["label"], "reason": obj["reason"]}
 
 
+def parse_reply(text: str):
+    """The reply's JSON: the whole text, or the whole text as one ```json fenced block (Nova Lite's habit)."""
+    m = FENCE.fullmatch(text.strip()) if isinstance(text, str) else None
+    return parse(m.group(1) if m else text)
+
+
 def prepare(img: np.ndarray, tri: dict) -> tuple[bytes, dict]:
     """(JPEG of the L3 overview, the measurements): what the router sends for one photo. `img` is blurred already."""
     pyr = imaging.build_pyramid(img)
@@ -101,10 +109,14 @@ class Nova:
             try:
                 import boto3
                 from botocore.config import Config
+                from botocore.exceptions import BotoCoreError
             except ImportError as exc:
                 raise ValueError("--router nova needs boto3: pip install 'drishyam[aws]'") from exc
-            client = boto3.Session(region_name=REGION).client("bedrock-runtime", config=Config(
-                connect_timeout=5, read_timeout=TIMEOUT_S, retries={"mode": "adaptive", "max_attempts": 3}))
+            try:
+                client = boto3.Session(region_name=REGION).client("bedrock-runtime", config=Config(
+                    connect_timeout=5, read_timeout=TIMEOUT_S, retries={"mode": "adaptive", "max_attempts": 3}))
+            except BotoCoreError as exc:  # no credentials, or an `aws login` profile without botocore[crt]
+                raise ValueError(f"--router nova could not set up AWS credentials: {exc}") from exc
         self.client = client
 
     def __call__(self, jpeg: bytes, facts: dict) -> tuple[str, dict]:
@@ -128,7 +140,7 @@ def consult(call, jpeg: bytes, facts: dict, timeout_s: float = TIMEOUT_S) -> dic
     try:
         text, out["usage"] = pool.submit(call, jpeg, facts).result(timeout=timeout_s)
         try:
-            out.update(validate(parse(text)), status="accepted")
+            out.update(validate(parse_reply(text)), status="accepted")
         except Invalid as exc:
             out.update(status="rejected", cause=str(exc), reply=str(text)[:200])
     except FutureTimeout:

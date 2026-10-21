@@ -110,7 +110,8 @@ def fixed_cost_job(img, cfg, micro_arm: str, kw: dict):
 
     from .segment import default_segmenter
 
-    costs = op_costs(cost_rows(micro_arm, default_segmenter().name), img.shape[1], img.shape[0])
+    seg = kw.get("segmenter") or default_segmenter()
+    costs = op_costs(cost_rows(micro_arm, seg.name), img.shape[1], img.shape[0])
     return FixedCostJob(img, cfg, costs, **kw)
 
 
