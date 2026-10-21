@@ -7,7 +7,8 @@ person. It approves nothing.
 
 ```bash
 drishyam batch FOLDER [MORE FOLDERS, PHOTOS OR .txt LISTS] [--usd-cap TOTAL] [--seconds-cap TOTAL] \
-    [--photo-pixel-cap 0.3] [--photo-usd-cap 0.05] [--photo-seconds-cap 20] [--cost-model live|fixed] [--out runs]
+    [--photo-pixel-cap 0.3] [--photo-usd-cap 0.05] [--photo-seconds-cap 20] [--cost-model live|fixed] [--out runs] \
+    [--router rule|nova]
 # a person reviews each critical finding in its photo's work order, as for one photo
 drishyam review runs/batch-<id>/<job>/work_order.json f1 approve --by "A. Engineer"
 # then the batch report is recomputed from the work orders and signed again
@@ -22,7 +23,7 @@ step. Each run leaves `runs/batch-<id>/`:
 
 | File | What it holds |
 | --- | --- |
-| `batch_trace.jsonl` | One record per batch decision (`triaged`, `ordered`, `started`, `finished`, `budget-stop`, `killed`, `refreshed`), each with its `cause`, a `rationale` that cites the measured values, and the seconds spent so far |
+| `batch_trace.jsonl` | One record per batch decision (`triaged`, with `--router nova` also `routed` and `cleared`, then `ordered`, `started`, `finished`, `budget-stop`, `killed`, `refreshed`), each with its `cause`, a `rationale` that cites the measured values, and the seconds spent so far |
 | `<job>/trace.jsonl`, `<job>/work_order.json`, `<job>/crops/` | Each photo's own run, exactly what `drishyam run` writes |
 | `inspection.json` | The report, sealed with the work-order HMAC (`findings.sign`) |
 | `inspection.md` | The same, for a person: status, the human queue, everything not assessed, each photo in the order run |
@@ -109,6 +110,44 @@ per-photo agent's reach, this dev backlog cannot separate that from chance. The 
 orchestrates the backlog, and it does not depend on the ranking: one budget, a stop with every photo it did not reach
 listed, one human queue, and a sealed report.
 
+## A live LLM router: `--router nova`
+
+`drishyam batch --router nova` puts a live LLM, Amazon Nova Lite (`amazon.nova-lite-v1:0`) on Amazon Bedrock in
+us-east-1, between the triage and the runs ([drishyam/router.py](../drishyam/router.py)). `--router rule`, the
+default, is the batch above, unchanged.
+
+1. **Map, one call per photo.** The router sends the photo's own L3 overview, the pyramid level the saliency map and
+   the survey read, decoded and with people already blurred, at most 896 px on its long side (Nova rescales any image
+   so one side passes 896 px, so a larger one buys no detail), and the OpenCV measurements of it: the triage's
+   candidate count and priors, saliency statistics (mean, 95th percentile, share above 0.5) and the quality gate run
+   on the overview. No file name or path is sent. One fixed prompt asks for one JSON object,
+   `{"label": "Clear" | "Requires zoom" | "Critical", "reason": "<one line>"}`, at temperature 0 with at most 120
+   output tokens. Eight calls run at once while the next photos are decoded.
+2. **Validation.** The reply must be exactly that object (or the whole reply as one ```` ```json ```` block, which
+   Nova Lite adds): exactly the two keys, one of the three labels, and a reason of 1 to 200 printable characters
+   with no newline and none of `` <>[]`|\ ``. Anything else is `rejected`; a timeout (30 s), a throttle, an access
+   error or any other exception is a `fallback`. Either way the photo gets the rule triage's treatment, label
+   Requires zoom: it is run, in prior-sum order, and never cleared. Every reply is one `routed` line of
+   batch_trace.jsonl with its status, the cause, the latency and its $; a rejected reply's first 200 characters are
+   kept there too.
+3. **Cache.** An accepted reply is cached by the photo's sha256 together with the model and the prompt
+   (`DRISHYAM_ROUTER_CACHE`, default `~/.drishyam/router_cache`), so a rerun of the same photos makes no call and
+   costs nothing, whatever the files are named. Failures are not cached: a rerun asks again.
+4. **Reduce.** A Clear photo gets no job. It is listed under not assessed as "cleared by the router (not looked at
+   closely)" with the router's reason, and the action "look at it, or run it with --router rule"; it is never
+   reported as assessed or clean, and a batch with a cleared photo is never `ready`. Critical photos run first, then
+   Requires zoom, each in the triage's order, under the batch budget, which is also charged the router's Bedrock $
+   as seconds at the agent's $0.339 per hour (on a rerun, cached labels cost nothing and charge nothing). The human
+   gate is the per-photo one, unchanged: the router only orders and clears, and no label approves anything.
+5. **Kill.** The kill switch stops the map step before the next photo's triage or before the next reply is taken
+   (calls not yet started are cancelled), and the reduce step as before. A batch killed during the map clears
+   nothing: every photo is listed as not reached.
+
+The router sees pixels, which the planner never does ([planner.py](../drishyam/planner.py) gets numbers only), so
+text painted on a wall could steer its label, though the prompt says to ignore it. A label can only order a photo or
+clear it, and a cleared photo stays in the report as not assessed. Credentials come from the default AWS chain
+(`AWS_PROFILE`); a profile made by `aws login` also needs `pip install "botocore[crt]"`.
+
 ## Not done
 
 - No MCP tool: a read-only `batch_status` would be small, but it would change the MCP allow-list of twelve that
@@ -119,3 +158,10 @@ listed, one human queue, and a sealed report.
   not reached, never as clean.
 - Non-critical review requests (ambiguous, disagree, class change, unconfirmed) stay in each photo's trace; the batch
   queue holds the critical findings, which are what blocks a work order.
+- The router runs from the CLI only: no web, MCP or Lambda path calls it, and nothing in infra/ changed.
+- The router reads one small overview. At 2048x1536 that is 256x192 px, where a 1-2 px crack is gone; it cannot see
+  what the per-photo agent zooms for, so it can order and skip photos but not assess one.
+- A call that times out is not cached and its tokens are not counted: Bedrock may still bill it, so the router's $
+  in the report is a floor (CloudWatch's token counts for the model are the bill).
+- The cache has no expiry or size cap (one small JSON file per photo).
+- Each Clear is one model's judgement of a thumbnail; nothing re-checks a sample of the cleared photos.
