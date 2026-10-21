@@ -764,3 +764,20 @@ def test_dev_sweep_runs_end_to_end_and_writes_its_rows(tmp_path, monkeypatch):
     assert all(len(r["per_image"]) == 2 and "vs_downscale_ci" in r for r in agents)
     # every variant after the first is compared, paired, with the first at its own cap
     assert [rows["rows"][k].get("ref") for k in ("a@1.0", "a@0.3", "b@1.0", "b@0.3")] == [None, None, "a@1.0", "a@0.3"]
+
+
+def test_the_hard_subset_reads_labels_and_the_overview_only(scene):
+    """A photo is hard when a critical-class ground-truth box (exposed rebar, spalling) covers under 1 % of it, or
+    when the overview proposes no candidate; a small crack, a large spall or a photo with candidates is not."""
+    from evals import policy2
+
+    from .test_agent import soft_disc
+
+    rec = lambda *boxes: {"id": "p", "width": 1000, "height": 1000, "boxes": [{"cls": c, "box": b} for c, b in boxes]}
+    assert policy2.hard_reasons(rec(("exposed_rebar", [0, 0, 99, 100])), scene) == ["small-critical"]
+    assert policy2.hard_reasons(rec(("spalling", [0, 0, 99, 100]), ("crack", [0, 0, 5, 5])), scene) == ["small-critical"]
+    assert policy2.hard_reasons(rec(("spalling", [0, 0, 100, 100]), ("crack", [0, 0, 5, 5])), scene) == []
+    assert policy2.hard_reasons(rec(), soft_disc(4000, 3000)) == ["no-candidate"]
+    both = policy2.hard_reasons(rec(("exposed_rebar", [0, 0, 10, 10])), soft_disc(4000, 3000))
+    assert both == ["small-critical", "no-candidate"]
+    assert policy2.HARD_AREA_FRAC == 0.01 and policy2.CRITICAL_CLASSES == ("exposed_rebar", "spalling")
