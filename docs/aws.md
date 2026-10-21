@@ -12,13 +12,21 @@ from `aws-lambda` on `aarch64` with OpenCV 5.0.0 (`stock (not COOL)`), segmenter
 commit dda3080, a job on `bridge_03.jpg` streamed to `done` (`awaiting_review`, 6 steps), KILL halted a second job
 after 3 steps, an unsigned `POST` through CloudFront got 403, the raw Function URL got 403, and the WAF answered 429
 at the 18th empty-bodied job start. The startup log has `DRISHYAM_CV_THREADS=2: cv2.getNumThreads() = 2`. The step
-p95 was 1138.9 ms over 6 steps: with v1 a step costs 0.56 to 1.14 s at p95 over the seven smoke runs since the v1
+p95 was 1138.9 ms over 6 steps: with v1 a step costs 0.56 to 1.14 s at p95 over the eight smoke runs since the v1
 deploy, against 67.7 to 88.0 ms for the classical engine, so the governor's 500 ms target sends most later looks to
 the fast FP16 net. The summary line, copied here because `runs/aws-smoke.log` is git-ignored (UTC; earlier lines are
 in `video/live/aws-smoke.log`):
 
 ```
 smoke 2026-10-20T21:12:31Z https://d1xg58guluup8c.cloudfront.net commit=dda308072fb4e63997a4df809a2f57abd0d3dbc0 package=r7K9s9XZtHmkq0+f2OtXiTy1CUyFo5xf2GzQkv6UJMs= ttfb_first=5.516721s ttfb_warm=0.913209s step_p95_ms=1138.9 result=pass
+```
+
+The site was then redeployed from commit 02219a2 with three wording fixes the live browser suite had found (v1's
+step reasons printed its profile name and scientific notation). Its smoke run (checks 1 to 5) passed, KILL halting
+the second job after 2 steps, and `tests/e2e/test_ui_live.py https://d1xg58guluup8c.cloudfront.net` passed twice:
+
+```
+smoke 2026-10-21T04:21:29Z https://d1xg58guluup8c.cloudfront.net commit=02219a2e435ea90058fcb87f03d69f30cc3f2b4d package=r7K9s9XZtHmkq0+f2OtXiTy1CUyFo5xf2GzQkv6UJMs= ttfb_first=0.857872s ttfb_warm=0.728508s step_p95_ms=973.3 result=pass
 ```
 
 The first smoke after the v1 deploy failed KILL only: the kill reached a cold environment and the job finished
