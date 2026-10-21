@@ -68,7 +68,7 @@ SMALL_PX = 96 * 96  # GT boxes below this area form the small-box stratum
 PER_IMAGE_OPS = ("pyrDown", "saliency", "downscale")  # their cost grows with the image; per-look ops read 512x512
 REPO = Path(__file__).resolve().parents[1]
 SWITCHES = ("order", "seed", "use_uncertainty", "seed_from_looks", "v0", "survey", "verify",
-            "governor")  # JobConfig fields a variant may flip
+            "governor", "fallback_l2")  # JobConfig fields a variant may flip
 ABLATION_CAPS = (0.3, 1.0)
 ABLATIONS = {  # FR-21: each variant flips one switch of the compared agent (governor off, as in every comparison)
     "full": {},

@@ -13,6 +13,7 @@ Nothing is tuned here.
 from __future__ import annotations
 
 import argparse
+import collections
 import hashlib
 import itertools
 import json
@@ -49,6 +50,24 @@ PRIOR = ("v1 had been scored on two of these sets before, once each, on 2026-10-
          "earlier jobs were the install's smoke jobs on three of the demo's bridge photos (the main checkout's "
          "runs/model-smoke/), and no run folder under runs/ or a worktree names it.")
 NAMES = {"codebrim": "CODEBRIM eval200", "synth": "synth200", "large": "synth_large, 4608×3456", "clean": "clean"}
+# A configuration of one model, scored beside it after its own dev rule: run folder prefix, run_fallback.sh tag, model.
+CONFIGS = {"v1+fallback": ("onnx-fb", "dacl10k+fallback", "v1")}
+ALL = {}  # every model, each followed by its configurations: (run folder prefix, run script tag, model)
+for _m, (_p, _t) in MODELS.items():
+    ALL |= {_m: (_p, _t, _m), **{c: v for c, v in CONFIGS.items() if v[2] == _m}}
+FALLBACK_COMMAND = ("runs/heldout/run_fallback.sh (v1+fallback, later, after the fallback's dev rule passed): the leakage "
+                    "check, then python -m evals.harness --cost-model fixed --workers 6 --micro-arm "
+                    "local-macos-x86-dacl10k-retime with DRISHYAM_ONNX set on data/codebrim (--n 200) and data/synth200 "
+                    "(--n 200), as evals.model_eval runs them but without --publish, and on data/synth_clean (--n 51 --seed "
+                    "11 --chaos 0,0,0), with JobConfig.fallback_l2 on (its default since 7cddb48)")
+PRIOR_FALLBACK = ("v1+fallback is v1 with the zero-candidate fallback on (JobConfig.fallback_l2: a photo whose overview "
+                  "proposes no candidate gets one whole-photo look at L2). It is v1's third read of CODEBRIM eval200 and "
+                  "synth200 and its second of the clean set: v1 was scored on CODEBRIM eval200 and synth200 on 2026-10-18 "
+                  "(unpublished, see prior_exposure) and on all three in its published run here, and the fallback was "
+                  "adopted on the dev splits after those reads, by a rule stated before its dev run "
+                  "(results/dev/zero_candidate_fallback.json; it passed on 1 dev photo of 190). Nothing was changed after "
+                  "this read. The fallback acts only on a photo with no candidate; on every other photo its jobs equal "
+                  "v1's here, look for look (asserted), so the pair below measures the fallback alone.")
 r4 = lambda x: round(float(x), 4) if isinstance(x, (float, np.floating)) else x
 
 
@@ -146,6 +165,47 @@ def verdicts(pairs: dict) -> dict:
     return out
 
 
+def verdicts_vs(pairs: dict, c: str, b: str) -> dict:
+    """Configuration c against its model b at the 30 % cap, by the same standard: recall better / same / worse on
+    CODEBRIM eval200 and synth200, a clean harm, and (outside the criterion) critical boxes and ms ratios."""
+    out = {}
+    for s in ("codebrim", "synth"):
+        if p := pairs.get(f"{s}@0.3: {c} / {b}"):
+            out[s] = ("worse", "same", "better")[1 + side(p["recall"][1], 1)]
+            out[f"{s}_critical"], out[f"{s}_ms"] = p["critical"], p["ms"]
+    if p := pairs.get(f"clean@0.3: {c} / {b}"):
+        out["clean_harm"] = any(side(p[f][1], 0) > 0 for f in ("boxes_per_photo_diff", "any_box_share_diff"))
+    return out
+
+
+def fallback_acted(fb: list[dict], base: list[dict], records: list[dict]) -> dict:
+    """Per cap: the photos the fallback acted on (a fallback-l2 look; the model's own job took no look there), what it
+    added, and a check that every other photo's job is the model's, look for look and box for box."""
+    look = lambda c: [(t["action"], t["cause"], t["level"], t["x"], t["y"]) for t in c["trace"]]
+    out = {}
+    for k in CAPS:
+        cs, bs = [x["configs"][k] for x in fb], [x["configs"][k] for x in base]
+        on = [i for i, c in enumerate(cs) if any(t["cause"] == "fallback-l2" for t in c["trace"])]
+        for i, (c, b) in enumerate(zip(cs, bs, strict=True)):
+            if i in on and any(t["action"] != "halt" for t in b["trace"]):
+                raise SystemExit(f"{k}: photo {i} got a fallback look although the model's own job looked at it")
+            if i not in on and (look(c), c["preds"], c["preds_union"], c["wall_s"]) != (look(b), b["preds"], b["preds_union"], b["wall_s"]):
+                raise SystemExit(f"{k}: photo {i} has no fallback look but its job differs from the model's")
+        found = lambda c, rec: sum(harness.found(g, c["preds"]) for g in rec["boxes"])
+        added = [t for i in on for t in cs[i]["trace"] if t["action"] != "halt"]
+        ms = [1000 * (cs[i]["wall_s"] - bs[i]["wall_s"]) for i in on]
+        out[k[9:]] = {"photos": len(on), "of": len(cs), "indices": on, "looks_added": dict(sorted(collections.Counter(
+            f"{t['cause']} L{t['level']}" for t in added).items())), "halts": dict(collections.Counter(cs[i]["halt_cause"] for i in on)),
+            "boxes_drafted": sum(len(cs[i]["preds"]) for i in on), "photos_with_a_box": sum(bool(cs[i]["preds"]) for i in on),
+            "classes_drafted": dict(collections.Counter(p["cls"] for i in on for p in cs[i]["preds"])),
+            "critical_boxes": sum(harness.critical_counts(cs[i]["preds"], records[i]["boxes"])[0] for i in on),
+            "ground_truth_boxes_on_them": sum(len(records[i]["boxes"]) for i in on),
+            "found_without": sum(found(bs[i], records[i]) for i in on), "found_with": sum(found(cs[i], records[i]) for i in on),
+            "extra_modelled_ms_per_photo_acted_on": round(sum(ms) / len(ms), 1) if ms else None,
+            "extra_modelled_ms_per_job": round(sum(ms) / len(cs), 1), "same_as_the_model_elsewhere": True}
+    return out
+
+
 def markdown(out: dict) -> str:
     """The held-out tables docs/report.md quotes at the 30 % cap (tests/test_evals.py checks the report holds them)."""
     ci = lambda c: "–" if c is None or None in c else f"{c[0]:.2f}–{c[1]:.2f}"
@@ -181,38 +241,47 @@ def main(argv=None) -> dict:
     dev = json.loads((REPO / "results" / "dev" / "model_choice_dev.json").read_text())
     log = (REPO / "runs" / "heldout" / "log.txt").read_text()
     starts = dict(re.findall(r"^\S+ (\S+) start \| .* \| HEAD (\w+)", log, re.MULTILINE))  # the last start of each call wins
-    table, pairs, datasets, runs = {}, {}, {}, {}
+    table, pairs, datasets, runs, acted = {}, {}, {}, {}, {}
     for s, (path, n, seed) in SETS.items():
         records, _ = harness.load_records(REPO / path, n, seed=seed)
         data_id = harness.dataset_sha256(records)
         datasets[s] = {"n": len(records), **data_id}
-        got = {m: r for m, (prefix, _) in MODELS.items() if (r := load(prefix, s, records, data_id))}
+        got = {m: r for m, (prefix, _, _) in ALL.items() if (r := load(prefix, s, records, data_id))}
         for m, r in got.items():
-            cost = dev["models"][m]["cost_table"]["file"]
-            if not r["summary"]["cost_model"]["source"].startswith(cost + " ") or r["segmenter"] != dev["models"][m]["segmenter"]:
+            dm = dev["models"][ALL[m][2]]  # a configuration is charged and checked as its model
+            cost = dm["cost_table"]["file"]
+            if not r["summary"]["cost_model"]["source"].startswith(cost + " ") or r["segmenter"] != dm["segmenter"]:
                 raise SystemExit(f"{m} on {s}: scored {r['segmenter']} on {r['summary']['cost_model']['source']}, not "
-                                 f"{dev['models'][m]['segmenter']} on {cost}")
+                                 f"{dm['segmenter']} on {cost}")
             profiles = {x["configs"][k]["profile"] for x in r["results"] for k in CAPS}
-            if profiles != {dev["models"][m]["profile"]}:
-                raise SystemExit(f"{m} on {s} ran profiles {profiles}, not {dev['models'][m]['profile']}")
+            if profiles != {dm["profile"]}:
+                raise SystemExit(f"{m} on {s} ran profiles {profiles}, not {dm['profile']}")
+            fallback = {x["configs"][k]["switches"].get("fallback_l2", False) for x in r["results"] for k in CAPS}
+            if fallback != {m in CONFIGS}:  # runs from before the switch existed ran without the fallback
+                raise SystemExit(f"{m} on {s} ran fallback_l2 {fallback}")
             prov = r["summary"]["provenance"]
-            runs[f"{m} {s}"] = {"folder": f"runs/model-eval/{MODELS[m][0]}-{s}", "code_commit": starts.get(MODELS[m][1]),
+            runs[f"{m} {s}"] = {"folder": f"runs/model-eval/{ALL[m][0]}-{s}", "code_commit": starts.get(ALL[m][1]),
                                 "finished": prov["timestamp"],  # the harness takes its provenance at the end of a run
                                 **{k: prov.get(k) for k in ("load_avg_start", "load_avg_end", "machine")}}
         scored = {m: {k: harness.score_config(k, records, r["results"]) for k in KEYS} for m, r in got.items()}
         x = {m: {k: per_image(records, r["results"], k) for k in CAPS} for m, r in got.items()}
+        for c in (c for c in got if c in CONFIGS):
+            acted[f"{c} {s}"] = fallback_acted(got[c]["results"], got[ALL[c][2]]["results"], records)
         for k in CAPS:
             table[f"{s}@{k[9:]}"] = {m: row(k, records, r["results"], scored[m]) for m, r in got.items()}
-            for ma, mb in itertools.combinations(got, 2):
+            for ma, mb in itertools.combinations([m for m in got if m in MODELS], 2):
                 pairs[f"{s}@{k[9:]}: {ma} / {mb}"] = compare(scored[ma][k], scored[mb][k], x[ma][k], x[mb][k], len(records))
+            for c, b in ((c, ALL[c][2]) for c in got if c in CONFIGS):
+                pairs[f"{s}@{k[9:]}: {c} / {b}"] = compare(scored[c][k], scored[b][k], x[c][k], x[b][k], len(records))
         for base in ("downscale", "tiling@L0"):
             table[f"{s}:{base}"] = {m: row(base, records, r["results"], scored[m]) for m, r in got.items()}
     pub = {p.parent.name: json.loads(p.read_text()) for p in sorted((REPO / "public" / "results").glob("*_dacl10k*/summary.json"))}
     leaks = {json.dumps(v["leakage"], sort_keys=True) for v in pub.values() if "leakage" in v}
     if len(leaks) > 1:
         raise SystemExit("the published CODEBRIM summaries carry different leakage counts")
-    crit, other = losses({k: v for k, v in pairs.items() if k.split("@")[0] in DEV_SETS})
-    large_crit, large_other = losses({k: v for k, v in pairs.items() if k.startswith("large")})
+    models_only = {k: v for k, v in pairs.items() if not any(f" {c} / " in k for c in CONFIGS)}
+    crit, other = losses({k: v for k, v in models_only.items() if k.split("@")[0] in DEV_SETS})
+    large_crit, large_other = losses({k: v for k, v in models_only.items() if k.startswith("large")})
     ver = verdicts(pairs)
     best = [m for m in MODELS if all(v["clean_harm"] is False and "worse" not in (v["codebrim"], v["synth"])
                                      and "better" in (v["codebrim"], v["synth"]) for k, v in ver.items() if k.startswith(m + " vs"))
@@ -252,6 +321,20 @@ def main(argv=None) -> dict:
         "prior_exposure": PRIOR, "leakage": json.loads(leaks.pop()) if leaks else None, "published": sorted(f"public/results/{k}/summary.json" for k in pub),
         "table": table, "pairs": pairs,
     }
+    for c, (_, tag, b) in CONFIGS.items():  # only once its runs exist, so the file without them is as it was
+        if done := [s for s in SETS if f"{c} {s}" in runs]:
+            out["what"] += (f" {c}, v1 with the zero-candidate fallback, was scored once more, later, beside v1 (whose runs "
+                            f"were not repeated): see the {c} block.")
+            out["commands"] = [*COMMANDS, FALLBACK_COMMAND]
+            leak = json.loads((REPO / "runs" / "heldout" / f"leakage-{tag}.json").read_text())
+            if out["leakage"] and {k: leak[k] for k in out["leakage"] if k != "calibration"} != {
+                    k: v for k, v in out["leakage"].items() if k != "calibration"}:
+                raise SystemExit(f"{c}'s leakage check counts differ from the published ones")
+            out[c] = {"model": b, "sets": done, "prior_exposure": PRIOR_FALLBACK,
+                      "dev_rule": "results/dev/zero_candidate_fallback.json",
+                      "verdict_vs_v1": verdicts_vs(pairs, c, b), "acted_on": {s: acted[f"{c} {s}"] for s in done},
+                      "leakage": "the check ran again before this run (runs/heldout/leakage-dacl10k+fallback.json): the "
+                                 "same counts as the published leakage block"}
     Path(REPO / a.out).write_text(json.dumps(out, indent=1, ensure_ascii=False) + "\n")
     print(markdown(out), statement, sep="\n\n")
     return out

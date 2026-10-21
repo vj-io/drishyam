@@ -169,6 +169,11 @@ class JobConfig:
     # A fixed predicted cost per look, {"warp": ms, "segment": ms, "segment:<model>": ms}, instead of live p95s:
     # scores and the stop rule then do not move with machine load. The caps still run on the real clock.
     t_hat_ms: dict | None = None
+    # fallback: when the overview proposes no candidate, one look at L2 whose window spans the whole photo before the
+    # fallback: job ends (cause fallback-l2), then the rules' follow-ups; off, such a photo gets no look at all. On for
+    # fallback: every profile since it passed the rule stated before its dev run (results/dev/zero_candidate_fallback.json,
+    # fallback: v1 at the 30 % cap; it acted on 1 dev photo of 190); every number published before it ran with it off.
+    fallback_l2: bool = True  # fallback
     # cascade: with a confirm net (Job(confirm=...), drishyam.cascade; none by default), the scout entropy band, both
     # cascade: ends included, in which the confirm net segments a look again. Not tuned: it straddles tau.
     tau_confirm_lo: float = 0.35  # cascade
@@ -536,6 +541,18 @@ class Job:
         if not cands and not self.replay:  # nothing proposed is not a clean photo: no look will run, so a person looks
             self.not_assessed.append({"step": 0, "box": [0, 0, W, H], "reason": "no candidate region was proposed",
                                       "action": "check-by-eye"})
+        # fallback: the overview's L3 pyramid can blur a hairline crack away, so a photo the prior is silent on gets one
+        # fallback: look at L2 spanning it (a gaze of the long side / 4 px, never under `size`), governed and capped
+        # fallback: like any look; it stays not assessed whatever that look drafts. A resumed job replays the look.
+        whole = max(cfg.size, math.ceil(max(W, H) / 4))  # fallback
+        if cfg.fallback_l2 and not cands and self.replay and self.replay[0][3:] == (2, whole):  # fallback
+            self.not_assessed.append({"step": 0, "box": [0, 0, W, H],  # fallback
+                                      "reason": "no candidate region was proposed", "action": "check-by-eye"})  # fallback
+        elif cfg.fallback_l2 and not cands and not self.replay:  # fallback
+            self.settings.size = whole  # fallback
+            r = self.regions["w0"] = Region("w0", W // 2, H // 2, 0.0, 2)  # fallback
+            why = f"no candidate region was proposed: one L2 look of {self.settings.size} px spans the photo"  # fallback
+            self.forced.append(("gaze", r, 2, "fallback-l2", why))  # fallback
         asked: set = set()  # (finding id, class) pairs already sent to review as ambiguous
         self.followups = 0  # events that follow the step record just yielded (its findings and review requests)
         self.drills: set = set()  # the chaos drills that fired (each on its fixed step)
@@ -619,6 +636,7 @@ class Job:
                     break
             # 4. the look itself
             size = self.settings.size
+            self.settings.size = min(size, cfg.size)  # fallback: a whole-photo look's gaze is its own, not the next look's
             cx, cy, window = self._window(r.cx, r.cy, level, size)
             (crop, to_l0), warp_ms = self._timed("warp", imaging.gaze, pyr, cx, cy, level, size=size)
             q, _ = self._timed("quality", imaging.quality, crop)
@@ -643,6 +661,8 @@ class Job:
             self.seen[level][y0:y1, x0:x1] = True
             if cause != "survey" and not (cause == "replay" and self.step == 1 and level > first):  # nor its replay
                 self.looked[y0:y1, x0:x1] = True
+            if cause == "fallback-l2":  # fallback: the first look, and a whole-photo one is no closer than the survey
+                self.looked[:] = False  # fallback
             sal_max = round(float(sal[y0:y1, x0:x1].max()), 4) if y1 > y0 and x1 > x0 else 0.0
 
             # 5. what the measurements say to do next
@@ -918,6 +938,9 @@ def validate_replay(replay: list, shape, max_size: int = 512) -> list[tuple[str,
         size = rest[0] if rest else None
         if not (0 <= x < W and 0 <= y < H and 0 <= level <= 3):
             raise ValueError("replay decision outside the image or level range")
+        if level == 2 and size == max(max_size, math.ceil(max(W, H) / 4)):  # fallback: the whole-photo look's gaze
+            out.append((action, x, y, level, size))  # fallback
+            continue  # fallback
         if size is not None and not MIN_GAZE <= size <= max_size:
             raise ValueError(f"replay gaze size must be {MIN_GAZE}..{max_size}")
         out.append((action, x, y, level, size))
