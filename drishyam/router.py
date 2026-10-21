@@ -39,7 +39,9 @@ FALLBACK = "Requires zoom"  # the rule triage's treatment: run in prior-sum orde
 REASON = re.compile(r"[^\x00-\x1f\x7f<>\[\]`|\\]{1,200}")  # one printable line, nothing markdown or HTML acts on
 FENCE = re.compile(r"```(?:json)?\n(.*)\n```", re.DOTALL)
 MAX_SIDE = 896  # Nova rescales an image so one side passes 896 px: a larger overview buys no detail
-TIMEOUT_S = 10.0
+# 10 s timed out 37 of 190 dev calls (19 %), 9 of them twice: a 4608x3456 photo's 576x432 overview is about 2,000
+# input tokens and took 5.9 s alone, longer with 8 in flight
+TIMEOUT_S = 30.0
 WORKERS = 8
 MODEL_ID = "amazon.nova-lite-v1:0"
 REGION = "us-east-1"

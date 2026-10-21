@@ -304,6 +304,21 @@ def test_privacy_blur_applies_before_analysis(monkeypatch):
     assert np.array_equal(blurred[400:], img[400:])
 
 
+def test_a_wide_box_is_blurred_on_a_shrunk_copy_as_the_full_kernel_would():
+    """A box's sigma is its width / 6, so a 2,859 px vehicle box in a 6000x4000 photo meant a 2,857-tap kernel and
+    minutes per photo. Above BLUR_SIGMA_MAX the blur runs on a shrunk copy: within a grey level of the exact one."""
+    from drishyam import privacy
+
+    rng = np.random.default_rng(0)
+    img = cv2.resize(rng.integers(0, 255, (30, 30, 3), dtype=np.uint8), (240, 240), interpolation=cv2.INTER_CUBIC)
+    for w in (144, 240):  # sigma 24 (the full kernel, unchanged) and 40 (the shrunk copy)
+        got = img.copy()
+        privacy.blur_boxes(got, [[0, 0, w, 240]])
+        exact = cv2.GaussianBlur(img[:, :w], (0, 0), max(6.0, w / 6))
+        assert np.abs(got[:, :w].astype(int) - exact).mean() < (1e-9 if w == 144 else 1.0)
+        assert np.array_equal(got[:, w:], img[:, w:])
+
+
 @pytest.mark.parametrize("shape", [(64, 100_000), (100_000, 64)])
 def test_a_long_narrow_strip_is_a_job_not_a_server_error(shape):
     """6.4 MP and inside every limit, but its short side shrank to 0 px for the privacy detectors: a 500, and on
