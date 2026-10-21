@@ -20,13 +20,14 @@ Scenarios (a real Chromium, the document served with the production CSP header):
   3. guided run: pace_ms on the request, the paced-for-viewing label, the viewer in view, the critical NOTE held,
      the recap in view, hand-off to the reviewer, and Try KILL (planner_timeout, shown live) halted by KILL.
   4. photo, NOTE and newest trace line on one screen (1440x900; 375x812 with the crop, never over the photo, and the replay label),
-  5. keyboard only, 6. KILL after the job had finished, 7. mobile 375 px, 8. prefers-reduced-motion,
+  5. keyboard only, 6. no KILL once the job has finished, 7. mobile 375 px, 8. prefers-reduced-motion,
   9. heading names, 10. pending states (no results), 11. halt governor note, 12. planner_status chip,
   13. KILL before the first record (live, the operator switch before any look, recorded), 14. KILL the server never
   confirms, 15. the shared contract in words (review kinds, a class change, verify classes, seeded candidates and the
   severity they set, a floor-bound stop), 16. focus, contrast and repeats at 1440 and 375 px, 17. the phone tool row
-  at 320/360/375 px (no overlap, no shift when the crop shows), 18. the film's player: poster, captions loaded and on,
-  nothing of the MP4 fetched before Play, the hero link, and inside 375 px.
+  at 320/360/375 px (no overlap, no shift when the crop shows), 18. the film's player: poster, its captions track off
+  (the captions are burned in) and loading when turned on, nothing of the MP4 fetched before Play, the hero link, and
+  inside 375 px, 19. Try KILL in the job bar before any run, 20. the hero without v1's summaries.
 Any CSP violation, console error or page error fails the run. wait_for_function is avoided on purpose
 (it is blocked by a strict CSP): every wait uses locators or polls page.evaluate.
 """
@@ -103,7 +104,9 @@ SUMMARY = {
     "agent_metrics": {"by_budget": {"0.3": {"halt_causes": {"cap-hit": 125, "exhausted": 4, "stop-rule": 71}},
                                     "1.0": {"halt_causes": {"exhausted": 17, "stop-rule": 183}}},
                       "planner_recovery": {"timeout": {"fired": 20}, "malformed": {"fired": 20}, "recovered_total": 40},
-                      "governor_response": {"fired": 10, "recovered": 9}},
+                      "governor_response": {"fired": 10, "recovered": 9},
+                      "false_accept_critical": {"drishyam@0.3": {"critical_predictions": 346}}},
+    "per_class": {"drishyam@0.3": {"exposed_rebar": 0.57, "efflorescence": 0.16}},
     "policies": {
         "downscale": [{"pixels_frac": 0.06, "recall": 0.41, "usd": 0.0001}],
         "tiling": [{"pixels_frac": 0.25, "recall": 0.55, "usd": 0.0009}, {"pixels_frac": 0.5, "recall": 0.74, "usd": 0.0016},
@@ -124,6 +127,12 @@ REAL = {**SUMMARY, "dataset": "CODEBRIM (test fixture)", "policies": {
     "drishyam": [{"pixels_frac": 0.09, "recall": 0.13, "recall_iou_only": 0.05},
                  {"pixels_frac": 0.29, "recall": 0.2, "recall_iou_only": 0.09, "chance_recall": 0.14, "chance_recall_iou_only": 0.02},
                  {"pixels_frac": 0.44, "recall": 0.22, "recall_iou_only": 0.1}]}}
+# v1 (the live engine) on the same images: six points, one per pixel cap (evals.harness.BUDGETS); made-up numbers
+V1_POINTS = [{"pixels_frac": f, "recall": r, "recall_ci": [r - 0.05, r + 0.05], "chance_recall": 0.3, "recall_iou_only": 0.25,
+              "chance_recall_iou_only": 0.08} for f, r in ((0.04, 0.32), (0.09, 0.42), (0.12, 0.48), (0.14, 0.49), (0.16, 0.5), (0.17, 0.5))]
+V1 = {"n_images": 200, "segmenter": "onnx:drishyam_dacl10k.onnx", "headline_stats": {"budget": 0.3},
+      "policies": {"drishyam": V1_POINTS}, "agent_metrics": {"false_accept_critical": {"drishyam@0.3": {"critical_predictions": 1920}}},
+      "per_class": {"drishyam@0.3": {"exposed_rebar": 0.02, "efflorescence": 0.0}}}
 # the run on measured wall time: the governor never switched the model, so the note must not say "0 times"
 WALL = {**SUMMARY, "agent_metrics": {**SUMMARY["agent_metrics"], "governor_activity_in_eval": {"p95>SLA": 0, "warp-spike": 6}}}
 FAILURES = [{"image": "failures/f01.jpg", "category": "graffiti read as damage",
@@ -138,6 +147,8 @@ DATA = {
     "/results/codebrim/summary.json": ("application/json", json.dumps(REAL).encode()),
     "/results/failures.json": ("application/json", json.dumps(FAILURES).encode()),
     "/results/live/summary.json": ("application/json", json.dumps(WALL).encode()),
+    "/results/synth_dacl10k/summary.json": ("application/json", json.dumps({**V1, "dataset": "synthetic-200 (v1)"}).encode()),
+    "/results/codebrim_dacl10k/summary.json": ("application/json", json.dumps({**V1, "dataset": "CODEBRIM (v1)"}).encode()),
     "/results/failures/f01.jpg": ("image/jpeg", MOCK_JPG),
 }
 
@@ -468,7 +479,8 @@ def test_static_csp_hygiene():
     vids = re.findall(r"<video\b[^>]*>.*?</video>", html, re.DOTALL)   # the film: static markup, nothing fetched before Play
     assert len(vids) == 1 and re.search(r'<video controls preload="none" poster="video/poster.jpg"', vids[0]), vids
     assert '<source src="video/drishyam.mp4" type="video/mp4">' in vids[0], vids[0]
-    assert '<track kind="captions" src="video/drishyam.vtt" srclang="en" label="English" default>' in vids[0], vids[0]
+    assert '<track kind="captions" src="video/drishyam.vtt" srclang="en" label="English">' in vids[0], vids[0]  # not `default`:
+    # the captions are burned into the film, and a showing track would stack a second copy on them
     assert (PUBLIC / "video/drishyam.vtt").read_text().startswith("WEBVTT") and (PUBLIC / "video/poster.jpg").stat().st_size, "captions and poster are in git"
     print("ok  static CSP hygiene")
 
@@ -493,7 +505,7 @@ def test_desktop_mock(browser, base):
     hs = SUMMARY["headline_stats"]
     head = max((pt for pt in SUMMARY["policies"]["drishyam"] if pt["pixels_frac"] <= hs["budget"]), key=lambda pt: pt["pixels_frac"])
     expect(p.locator("#stat-recall .stat__v")).to_have_text(f"{round(100 * hs['recall_ratio_vs_tiling'])} %", timeout=T)
-    expect(p.locator("#stat-recall .stat__k")).to_have_text(f"Synthetic test set ({SUMMARY['n_images']} photos)")
+    expect(p.locator("#stat-recall .stat__k")).to_have_text(f"Classical engine, synthetic test set ({SUMMARY['n_images']} photos)")
     expect(p.locator("#stat-recall .stat__s")).to_contain_text(
         f"reading {round(100 * head['pixels_frac'])} % of the image's pixels under the 30 % pixel cap (tiling reads 100 %).")
     expect(p.locator("#stat-recall .stat__s")).to_contain_text("Target was 90 %: met. It beats one downscaled pass (1.60×, 95 % CI 1.40–1.80).")
@@ -506,13 +518,21 @@ def test_desktop_mock(browser, base):
     expect(p.locator("#stat-cost .stat__s")).to_contain_text(
         "At the 30 % pixel cap of the headline: a cap ended 125 of 200 first, the stop rule 71, and 4 had looked at every candidate.")
     expect(p.locator("#stat-ops .stat__v")).to_have_text("49 / 50 recovered")
-    expect(p.locator("#stat-real .stat__k")).to_have_text("Real bridge photos (CODEBRIM, 200)")
-    expect(p.locator("#stat-real .stat__v")).to_have_text("about 1 in 5")           # every policy within 0.05: recall about 0.21
-    expect(p.locator("#stat-real .stat__s")).to_contain_text(            # the same unit throughout the card
-        "Its boxes at random places find about 1 in 7. With strict IoU matching it finds about 1 in 11 against about 1 in 50 by chance.")
+    # the real-photo card is the live engine's, every number stated before the runs beside its recall
+    expect(p.locator("#stat-real .stat__k")).to_have_text("Live engine (v1), real bridge photos (CODEBRIM, 200)")
+    expect(p.locator("#stat-real .stat__v")).to_have_text("recall 0.49")
+    for said in ("Recall 0.49 (95 % CI 0.44–0.54) at the 30 % pixel cap.",
+                 "Its boxes at random places score 0.30, and with IoU-only matching it finds 0.25 against 0.08 by chance.",
+                 "It sends 9.60 critical boxes per photo to a person, against the classical engine’s 1.73.",
+                 "On the synthetic photos it finds 0.02 of the exposed rebar and 0.00 of the efflorescence, where the classical engine finds 0.57 and 0.16.",
+                 "Measured with the governor off, the 512-px FP32 net on every look; live, the v1 engine keeps that net unless a step takes over 1.5 s."):
+        expect(p.locator("#stat-real .stat__s")).to_contain_text(said)
     expect(p.locator("#bench svg.chart")).to_be_visible()
-    expect(p.locator("#bench .legend li")).to_have_count(3)                       # three policies; no trained-model summary is fetched
-    n_iou = sum(len(v) for v in REAL["policies"].values())
+    expect(p.locator("#bench .legend li")).to_have_count(4)                       # three policies and v1's dashed line
+    expect(p.locator("#bench .legend")).to_contain_text("Drishyam, v1 (the live engine)")
+    expect(p.locator("#bench-real")).to_contain_text("Dashed red: Drishyam with v1, the dacl10k-trained segmenter the live demo runs since 2026-10-21")
+    expect(p.locator("#bench-real")).to_contain_text("v1 held out: recall 0.49 (95 % CI 0.44–0.54) at the 30 % pixel cap.")
+    n_iou = sum(len(v) for v in REAL["policies"].values()) + len(V1_POINTS)
     expect(p.locator("#bench-real .chart__plot path[d*='l10 10']")).to_have_count(n_iou)  # IoU-only crosses on FIG. 4.2 only
     expect(p.locator("#bench .chart__plot path[d*='l10 10']")).to_have_count(0)
     expect(p.locator("#bench details.data summary").last).to_have_text("Micro-benchmarks and provenance: test rig")  # folded away
@@ -861,7 +881,7 @@ def test_guided(browser, base):
     until(lambda: p.evaluate("document.activeElement.id") == f"rev-{CRIT[0]}", "focus on the first critical card's reviewer field")
     expect(card(p, CRIT[0]).locator(".review__only")).to_be_visible()
     # Try KILL: planner_timeout parks the job on the server, the page shows it live, and KILL halts it
-    p.get_by_role("button", name="Try KILL").click()
+    p.locator("#recap").get_by_role("button", name="Try KILL").click()
     until(lambda: len(LIVE["jobs"]) == 2, "the Try KILL job request", page=p)
     q = LIVE["jobs"][1]["query"]
     assert q.get("chaos") == ["planner_timeout"] and q.get("pace_ms") == ["1000"], q
@@ -985,20 +1005,68 @@ def test_keyboard(browser, base):
     print("ok  keyboard: CTA, Skip to end and a sign-off without a mouse")
 
 
-def test_kill_after_finish(browser, base):
-    """KILL pressed while the page is still replaying a job the server already finished says so."""
+def test_no_kill_after_finish(browser, base):
+    """Once the server's done event has arrived, KILL is gone while the page still replays the job: it could stop
+    nothing. Skip to end stays."""
     s = Session(browser, "kill-late", viewport={"width": 1440, "height": 900})
     p = s.page
     p.goto(f"{base}/?mock=1")
     expect(p.locator("#look")).to_be_enabled(timeout=T)
     p.click("#look")
+    expect(p.locator("#kill")).to_be_visible()
     expect(p.locator("#job-text")).to_contain_text("Replay: the recorded agent took", timeout=T)   # done arrived; the replay is behind
-    p.click("#kill")
-    expect(p.locator("#job-text")).to_contain_text("had already finished", timeout=T)
-    expect(p.locator("#job-pill")).to_have_text(DONE_LABEL)
+    expect(p.locator("#kill")).to_be_hidden()
+    expect(p.locator("#skip")).to_be_visible()
+    expect(p.locator("#job-pill")).to_have_text("running")
+    p.click("#skip")
+    expect(p.locator("#job-pill")).to_have_text(DONE_LABEL, timeout=T)
+    expect(p.locator("#kill")).to_be_hidden()
     s.check_clean()
     s.context.close()
-    print("ok  KILL after the job finished: says so instead of claiming a kill")
+    print("ok  no KILL once the job has finished on the server: Skip to end instead")
+
+
+def test_try_kill_before_any_run(browser, base):
+    """The paced KILL drill is a button in the job bar before any run: planner_timeout and pace_ms on the request, the
+    run shown live, and KILL reaching the server, which halts with kill-switch."""
+    reset_live([{"lines": JOB_LINES, "delay": 0.25, "killable": True}])
+    s = Session(browser, "try-kill", viewport={"width": 1440, "height": 900})
+    p = s.page
+    p.goto(f"{base}/")
+    expect(p.locator("#try-kill")).to_be_enabled(timeout=T)
+    expect(p.locator("#recap")).to_be_hidden()                # no run yet: the recap's own Try KILL is not there
+    p.click("#try-kill")
+    until(lambda: LIVE["jobs"], "the Try KILL job request", page=p)
+    q = LIVE["jobs"][0]["query"]
+    assert q.get("chaos") == ["planner_timeout"] and q.get("pace_ms") == ["1000"], q
+    expect(p.locator("#try-kill")).to_be_hidden()             # while it runs, KILL takes its place
+    expect(p.locator("#job-text")).to_contain_text("shown the moment it arrives", timeout=T)
+    expect(p.locator(".trace__line[data-step='1']")).to_be_visible(timeout=T)
+    p.click("#kill")
+    until(lambda: LIVE["kills"], "POST /api/kill", page=p)
+    expect(p.locator("#job-pill")).to_have_text("halted", timeout=T)
+    expect(p.locator(".trace__line .chip", has_text=re.compile("^kill-switch$"))).to_have_count(1)
+    expect(p.locator("#try-kill")).to_be_visible()
+    s.check_clean()
+    s.context.close()
+    print("ok  Try KILL before any run: in the job bar, planner_timeout + pace_ms, KILL halts it on the server")
+
+
+def test_hero_without_v1(browser, base):
+    """Without v1's summaries the real-photo card falls back to the classical runs, in one plain unit, and FIG. 4.1
+    draws the three classical policies only."""
+    s = Session(browser, "no-v1", viewport={"width": 1440, "height": 900})
+    p = s.page
+    p.route("**/results/*_dacl10k/summary.json", lambda r: r.fulfill(status=200, content_type="application/json", body="null"))
+    p.goto(f"{base}/?mock=1")
+    expect(p.locator("#stat-real .stat__k")).to_have_text("Real bridge photos (CODEBRIM, 200)", timeout=T)
+    expect(p.locator("#stat-real .stat__v")).to_have_text("about 1 in 5")           # every policy within 0.05: recall about 0.21
+    expect(p.locator("#stat-real .stat__s")).to_contain_text(            # the same unit throughout the card
+        "Its boxes at random places find about 1 in 7. With strict IoU matching it finds about 1 in 11 against about 1 in 50 by chance.")
+    expect(p.locator("#bench .legend li")).to_have_count(3)
+    s.check_clean()
+    s.context.close()
+    print("ok  hero without v1's summaries: the classical card, three policies")
 
 
 def test_mobile(browser, base):
@@ -1101,14 +1169,15 @@ def test_pending_states(browser, base):
 
 
 def test_video_player(browser, base):
-    """The film in the footer: its poster, the English captions loaded and showing (every cue of
-    public/video/drishyam.vtt), no request for the MP4 before Play (preload="none"), the hero link going to it, and the
-    player inside the page at 375 px with no horizontal scroll."""
+    """The film in the footer: its poster, the English captions track off by default (the captions are burned into
+    the film) and every cue of public/video/drishyam.vtt loading when it is turned on, no request for the MP4 before
+    Play (preload="none"), the hero link going to it, and the player inside the page at 375 px with no horizontal
+    scroll."""
     vtt = (PUBLIC / "video/drishyam.vtt").read_text()
     n_cues, first = vtt.count(" --> "), vtt.split(" --> ", 1)[1].split("\n", 2)[1]
     for size, phone in (({"width": 1440, "height": 900}, False), ({"width": 375, "height": 812}, True)):
         check_player(browser, base, size, phone, n_cues, first)
-    print(f"ok  film player: poster, {n_cues} English caption cues showing, no MP4 request before Play, hero link, inside 375 px")
+    print(f"ok  film player: poster, captions track off by default, {n_cues} cues when on, no MP4 request before Play, hero link, inside 375 px")
 
 
 def check_player(browser, base, size, phone, n_cues, first):
@@ -1122,9 +1191,11 @@ def check_player(browser, base, size, phone, n_cues, first):
     v = p.locator("#video video")
     expect(v).to_be_visible()
     until(lambda: v.evaluate("v => v.poster.endsWith('video/poster.jpg')"), "the poster")
-    until(lambda: v.evaluate("v => v.textTracks.length === 1 && (v.textTracks[0].cues?.length || 0)") == n_cues, f"{n_cues} caption cues", page=p)
-    track = v.evaluate("v => { const t = v.textTracks[0]; return [t.kind, t.language, t.label, t.mode, t.cues[0].text]; }")
-    assert track == ["captions", "en", "English", "showing", first], track
+    track = v.evaluate("v => { const t = v.textTracks[0]; return [v.textTracks.length, t.kind, t.language, t.label, t.mode]; }")
+    assert track == [1, "captions", "en", "English", "disabled"], track   # off: the film's own captions are burned in
+    v.evaluate("v => { v.textTracks[0].mode = 'showing'; }")              # what the player's captions button does
+    until(lambda: v.evaluate("v => v.textTracks[0].cues?.length || 0") == n_cues, f"{n_cues} caption cues", page=p)
+    assert v.evaluate("v => v.textTracks[0].cues[0].text") == first
     assert v.evaluate("v => v.preload") == "none" and not media, f"the MP4 was fetched before Play: {media}"
     box, sw = v.bounding_box(), p.evaluate("document.documentElement.scrollWidth")
     assert box["x"] >= 0 and box["x"] + box["width"] <= size["width"] and sw <= size["width"], f"player outside the page at {size}: {box}, scrollWidth {sw}"
@@ -1507,7 +1578,9 @@ if __name__ == "__main__":
             test_fits_on_screen(browser, base)
             test_phone_tools_never_overlap(browser, base)
             test_keyboard(browser, base)
-            test_kill_after_finish(browser, base)
+            test_no_kill_after_finish(browser, base)
+            test_try_kill_before_any_run(browser, base)
+            test_hero_without_v1(browser, base)
             test_mobile(browser, base)
             test_reduced_motion(browser, base)
             test_heading_names(browser, base)

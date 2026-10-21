@@ -12,8 +12,9 @@ before an image is analysed or displayed. Fonts in `public/fonts/` are SIL OFL 1
 The trained segmenter `drishyam_dacl10k.onnx` (and `.fp16.onnx`), built by `training/` and installed here by
 `scripts/install_model.sh`, is not a permissive model: it is trained on dacl10k, so its weights are
 [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) (non-commercial, with attribution;
-`LICENSE.drishyam_dacl10k`). Its weight files are not committed to this repository, and the live demo does not use
-it: the deployed `/api/health` reports segmenter `classical-v1`.
+`LICENSE.drishyam_dacl10k`). Its weight files are not committed to this repository; they ship in the Lambda package
+and are release assets of v1.1.0, with the sha256 values below. It is the live segmenter since 2026-10-21: the
+deployed `/api/health` reports segmenter `onnx:drishyam_dacl10k.onnx`.
 
 ## Trained segmenter: `drishyam_dacl10k`
 

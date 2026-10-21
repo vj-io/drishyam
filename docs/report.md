@@ -9,54 +9,39 @@ implementation · 7 Related work · 8 Evaluation · 9 Failures · 10 Agentic evi
 
 ## Results at a glance
 
-Every number here is in a committed JSON file, and `tests/test_report_doc.py` fails if one drifts from it. Recall is
-the share of labelled defects found at the 30 % pixel cap; the intervals are paired 95 % bootstrap intervals over
-photos (section 8).
+Recall is the share of labelled defects found at the 30 % pixel cap, with paired 95 % bootstrap intervals over
+photos; chance is the same model's boxes moved to random places, and IoU-only drops the contains-the-centre match
+(section 8). Each segmenter was scored once on the held-out sets (`results/heldout_models.json`);
+`tests/test_report_doc.py` fails if a number here drifts from that file or, for the Lambda timings, from
+[aws.md](aws.md).
 
-- **The segmenter chosen for the live engine is v1** (a dacl10k-trained UNet with a MobileNetV3-Large encoder). Five
-  segmenters were compared on the dev splits only: four dacl10k-trained models (v1, v2a, v2b, v2c) and the classical
-  engine. None was better than all the others, and v1 was the only one with no measurable loss against any other
-  (`results/dev/model_choice_dev.json`). Each was then scored once on the held-out sets, and held-out confirms the
-  dev choice (`results/heldout_models.json`). The deployed demo runs v1 since 2026-10-21 (commit 38fcaee,
-  smoke-tested: [aws.md](aws.md)); its CC BY-NC 4.0 weights ship in the Lambda package, not in git.
-- **What v1 gains, held out.** On 200 real CODEBRIM bridge photos it finds 0.49 of the defects (0.44–0.54) against
-  the classical engine's 0.19, 2.54× (2.16–3.01). On 200 synthetic photos it finds 0.64 (0.61–0.67) against 0.48,
-  1.34× (1.24–1.45). On 51 synthetic photos with no damage it puts no box anywhere, where the classical engine puts
-  7.08 per photo.
-- **What v1 costs, held out.** Chance is high on CODEBRIM: its own boxes at random places find 0.30, because its
-  boxes are large; with IoU only it finds 0.25 against a chance of 0.08. It sends 9.60 critical boxes per CODEBRIM
-  photo to the human gate, 5.5 times the classical engine's 1.73, against v2a's 4.38, v2b's 4.65 and v2c's 3.71. Its
-  modelled ms per CODEBRIM job are 1.99× the classical engine's (CI 1.92–2.06), from x86 cost tables (the classical
-  table was timed at a higher machine load, so at equal load the ratio would be higher); none was measured on the
-  Lambda. On the synthetic set it finds no efflorescence (0.00) and almost no exposed rebar (0.02), where the
-  classical engine finds 0.16 and 0.57. It had been scored once before on CODEBRIM and the synthetic set
-  (unpublished), so its held-out numbers are second scorings. On one of our own wall photos it flagged nothing
-  although a hairline crack is visible by eye (section 9).
-- **The classical engine** (no weights; the deployed demo until 2026-10-21, and every policy comparison below) does not let the agent
-  beat the simple baselines. On the 200 synthetic photos at the 30 % cap the agent is 0.87× exhaustive tiling
-  (0.81–0.93) at 0.16× its pixels, so the PRD hypothesis (at least 0.9× tiling's recall at no more than 0.3× its
-  pixels) is not met, and 0.96× one 1024-px downscale (0.91–1.02). On the real photos it finds 0.19 of CODEBRIM's
-  defects, 0.98× one downscale (0.90–1.06). Only on synthetic photos at CODEBRIM's 4608×3456 does zooming beat one
-  downscale, 1.14× (1.04–1.25), and there an L2 tiling grid finds 0.53 with 0.10 of the pixels against Drishyam's
-  0.29.
-- **Measured and not adopted** (dev splits only, each read by a rule written down before its run):
-  - the classical agent's tuning knobs (`tau_scout`, a finer overview, budget fill, the stop floor, the survey's
-    share of value): nothing adopted. `tau_scout` 0.7 was adopted, then reverted after review: its synth_dev gain
-    was not measurable (1.03×, 0.98–1.09), and its one measurable gain, on CODEBRIM dev100 (1.22×, 1.09–1.43), is on
-    the rule's guard split and about a third of it is what the same boxes find at random places
-    (`results/dev/tune_sweep.json`);
-  - a two-model cascade, v2a scouting every look and v2b confirming uncertain ones: lower recall than v2a alone on
-    CODEBRIM dev100 (0.83×, 0.73–0.93) and on synth_dev (0.91×, 0.85–0.98), at more modelled ms per job, so it stays
-    off (`results/dev/cascade_dacl10k_v2a+v2b.json`);
-  - INT8: OpenCV 5.0.0 loads the dynamically quantized model on neither DNN engine and runs the statically quantized
-    ones only on `ENGINE_NEW`, slower than FP32 on the x86 Mac (one 512-px forward on one thread: 1066.6 and 1391.1
-    ms against FP32's 686.7), and the QDQ model's crack masks overlap FP32's at IoU 0.37
-    (`results/local-macos-x86/int8.json`, [bench.md](bench.md));
-  - prefetching the next look: off. On GitHub's runners it shortened one-thread jobs but slowed steps on x86 at 2
-    and 4 threads, and it never ran on the function ([bench.md](bench.md)).
-- **Arm against x86** (GitHub's runners, one run each, shared VMs, not the Lambda; section 6): the Arm runner did
-  5.13 images/s against x86's 4.06 in the 200-image macro run on one thread, and ran the agent loop at 1.21 times
-  x86's jobs/s on one thread and 1.27 times on four.
+| Segmenter | CODEBRIM recall (95 % CI) | chance | IoU-only (chance) | synth200 recall (95 % CI) | clean photos with a box | critical boxes per CODEBRIM photo |
+| --- | --- | --- | --- | --- | --- | --- |
+| **v1 (live)** | 0.49 (0.44–0.54) | 0.30 | 0.25 (0.08) | 0.64 (0.61–0.67) | 0 of 51 | 9.60 |
+| v2a | 0.48 (0.43–0.52) | 0.30 | 0.24 (0.08) | 0.61 (0.57–0.64) | 9 of 51 | 4.38 |
+| v2b | 0.49 (0.44–0.53) | 0.28 | 0.25 (0.08) | 0.57 (0.53–0.61) | 9 of 51 | 4.65 |
+| v2c | 0.48 (0.44–0.53) | 0.28 | 0.23 (0.07) | 0.57 (0.54–0.61) | 22 of 51 | 3.71 |
+| classical engine | 0.19 (0.16–0.23) | 0.12 | 0.08 (0.03) | 0.48 (0.44–0.52) | 34 of 51 | 1.73 |
+
+- **v1 runs live since 2026-10-21** (deployed commit 02219a2, smoke-tested: [aws.md](aws.md)). It was chosen on the
+  dev splits only (`results/dev/model_choice_dev.json`); held out it is again the only model with no measurable
+  loss against any other. These are its second scorings (one earlier, unpublished). Its CC BY-NC 4.0 weights are
+  release assets of v1.1.0, not in git.
+- **What the held-out runs measured:** the governor off and the 512-px FP32 net on every look. Live, the v1
+  profile's SLA is 1500 ms, so looks stay on the 512-px FP32 net unless steps exceed 1.5 s. v1's finest look is L1
+  (half size) on a 2048-px photo and L2 on a 4608-px one, so on these photos it never looks at full resolution.
+- **Against the classical engine,** v1 finds 2.54× (2.16–3.01) its recall on CODEBRIM and 1.34× (1.24–1.45) on
+  synth200, and puts no box on a clean photo where the classical engine puts 7.08 per photo. But chance is high on
+  CODEBRIM because its boxes are large; it sends 5.5 times the critical boxes to the human gate (about 24,000 for
+  the 2,536 photos of one bridge inspection); its modelled ms per CODEBRIM job are 1.99× (CI 1.92–2.06); and on the
+  Lambda its step p95 was 0.56 to 1.14 s, against 67.7 to 88.0 ms.
+- **Where v1 fails:** on synthetic photos it finds no efflorescence (0.00) and almost no exposed rebar (0.02), where
+  the classical engine finds 0.16 and 0.57; on one of our own wall photos it flagged nothing although a hairline
+  crack is visible by eye (section 9).
+- **The classical engine** (the deployed demo until 2026-10-21, and every policy comparison below) does not let the
+  agent beat the simple baselines: on synth200 it is 0.87× exhaustive tiling (0.81–0.93) at 0.16× its pixels, so
+  the PRD hypothesis (at least 0.9× tiling's recall at no more than 0.3× its pixels) is not met, and 0.96× one
+  1024-px downscale (0.91–1.02); it finds 0.19 of CODEBRIM's defects, 0.98× one downscale (0.90–1.06).
 
 ## 1. Problem
 
@@ -69,8 +54,8 @@ shortages. Every figure, with its source and the date it was checked: [impact-so
 The defects that matter most (hairline cracks, early exposed rebar) are small at thumbnail scale, so a tool must
 either tile every photo at full resolution or guess where to look. Drishyam's bet is that *looking is cheap when it
 is a geometric warp*, and that where to look next can be read from what OpenCV just measured. This report makes no
-time-saving claim: on real photos Drishyam finds about 0.2 of the labelled defects with the classical engine the
-demo runs, and about half with the trained v1 segmenter (section 8).
+time-saving claim: on real photos Drishyam finds about 0.2 of the labelled defects with the classical engine, and
+about half with the trained v1 segmenter, which the demo runs since 2026-10-21 (section 8).
 
 ## 2. Users
 
@@ -87,8 +72,7 @@ goes to the site bucket at deploy, not into git); `video/plan.md` says how it is
 comes from.
 
 Not built yet: approval from an SNS email link (approval is the web review or `drishyam review`); the COOL
-benchmark (section 6); delivery of alarms and budget alerts (the SNS topic's one email
-subscription awaits confirmation, section 5); a budget stop action or auto-stop schedule (the stop is `scripts/aws.sh stop`); a live LLM planner (the
+benchmark (section 6); a budget stop action or auto-stop schedule (the stop is `scripts/aws.sh stop`); a live LLM planner (the
 drills use scripted planners, section 3). Dropped: the Hugging Face Space mirror; the demo runs only on AWS.
 
 ## 3. How it works
@@ -103,13 +87,17 @@ Each job is a loop of camera moves over an image pyramid (L0 = full resolution, 
    The agent always passes yaw = pitch = 0; only the MCP tool exposes yaw and pitch, as a synthetic rotation with
    f = view size, not a calibrated rectification.
 3. **Quality gate.** Laplacian sharpness and exposure; glare and blur are logged and not trusted.
-4. **Segment.** Per-class probabilities, masks and an entropy score. The demo engine is classical (evidence maps,
-   no weights); a dacl10k ONNX model runs on OpenCV 5 DNN `ENGINE_NEW` with the same interface.
+4. **Segment.** Per-class probabilities, masks and an entropy score. The live engine since 2026-10-21 is v1, a
+   dacl10k-trained ONNX model on OpenCV 5 DNN `ENGINE_NEW`; without `DRISHYAM_ONNX` the classical engine (evidence
+   maps, no weights) runs behind the same interface, and every policy comparison in section 8 uses it.
 5. **Decide.** The next look is `argmax p·s·(1+u)·a / t̂` (prior × severity × uncertainty × unseen area ÷ predicted
    ms). Escalate one level finer, centred on what it saw, when entropy > τ or the mask is below A_min; verify a new
    confident mask one level finer by mask IoU; log findings with length, width, area and orientation in pixels.
-6. **Govern.** Before every step: kill switch, pixel / $ / seconds caps, p95 latency against the SLA (switch to the
-   fast model, then a coarser level), warp spikes, and a $ ≥ 80 % mode that verifies only critical classes.
+   With v1 a look spans at least 0.3 of the photo's long side (its profile's `min_view`), so its finest level is L1
+   (half size) on a 2048-px photo and L2 on a 4608-px one; a look there is not escalated, and a mask first drafted
+   there is not verified one level finer.
+6. **Govern.** Before every step: kill switch, pixel / $ / seconds caps, p95 latency against the SLA (500 ms; 1500
+   ms for the v1 profile; switch to the fast model, then a coarser level), warp spikes, and a $ ≥ 80 % mode that verifies only critical classes.
 7. **Stop** when the best remaining expected value per ms falls below a quarter of the realised value per ms so far,
    or below a floor, the value of a look that finds nothing (ε·v0/t̂, v0 = 2), once every candidate left has been
    shown by a look as fine as its own first look (a coarse survey alone never ends a job). Under a pixel cap the cap
@@ -154,18 +142,20 @@ limits and the cost table, is [aws.md](aws.md).
   another Lambda environment); Secrets Manager holds the HMAC key that signs work orders. The function's role can do
   only that plus writing its own logs and X-Ray traces, and `tests/test_infra.py` fails if it gains anything else.
 - **Observability.** One EMF log line per job, a CloudWatch dashboard, 4 alarms (Errors, Throttles, Duration p95,
-  AppErrors) and X-Ray tracing. The alarms and a 20 USD monthly budget publish to one SNS topic; its one email
-  subscription awaits confirmation, so until it is confirmed they reach nobody.
-- **Smoke test** (`scripts/aws.sh smoke`, `scripts/smoke.sh`): `smoke 2026-10-18T07:12:25Z result=pass`: a job ran
-  to `awaiting_review`; KILL, sent after step 2 streamed, halted the second job after 3 steps (before step 4) with
-  cause `kill-switch`; a `POST` without the body hash and a direct Function URL call both got 403; the WAF answered
-  429 at the 14th empty-bodied job start (WAF evaluates rates about every 10 s, so it blocks late); and the step
-  p95 was 67.7 ms on aarch64, over the 6 steps of one job.
-  That run was against the deployed build of commit ca69037, the commit `/api/health` reports. An earlier run against
-  the same build (`smoke 2026-10-18T07:09:20Z`, without the WAF check) also passed but measured more weakly: step p95
-  83.7 ms over 6 steps, and KILL halted the second job only after 6 steps ([aws.md](aws.md) quotes both runs).
-- **Cost.** Spent so far: not measured yet; the month-to-date figure from AWS Billing is still to be added. The
-  list-price estimate is about 10 USD a month at 1,000 jobs a month, 8 of it the WAF ([aws.md](aws.md)). The $ shown
+  AppErrors) and X-Ray tracing. The alarms and a 20 USD monthly budget publish to one SNS topic, whose email
+  subscription is confirmed: a test alarm (AppErrors set to ALARM by hand) reached the owner's email on 2026-10-21.
+  The alarms have no OK action, so a recovery sends no email.
+- **Smoke test** (`scripts/aws.sh smoke`, `scripts/smoke.sh`): `smoke 2026-10-21T04:21:29Z result=pass`, against
+  the deployed build of commit 02219a2, the commit `/api/health` reports, with segmenter
+  `onnx:drishyam_dacl10k.onnx` on aarch64: a job on `bridge_03.jpg` streamed to its `done` event; KILL, sent after
+  step 2 streamed, halted the second job after 2 steps with cause `kill-switch`; a `POST` without the body hash and a
+  direct Function URL call both got 403; and the step p95 was 973.3 ms over one job's steps. The live browser suite
+  (`tests/e2e/test_ui_live.py`) passed twice against the same deploy. The run before it, on the v1 deploy of commit
+  dda3080, also checked the WAF, which answered 429 at the 18th empty-bodied job start (WAF evaluates rates about
+  every 10 s, so it blocks late). With v1 a step's p95 was 0.56 to 1.14 s over the eight smoke runs since the v1
+  deploy, against 67.7 to 88.0 ms for the classical engine before it ([aws.md](aws.md) quotes the runs).
+- **Cost.** Spent so far: 0.62 USD before credits, month to date on 2026-10-21 (Cost Explorer; 0.59 of it the WAF),
+  0.00 USD after them. The list-price estimate is about 10 USD a month at 1,000 jobs a month, 8 of it the WAF ([aws.md](aws.md)). The $ shown
   in the UI and the evals is *modelled*: timed op milliseconds × 0.339 USD/h, the c8g.2xlarge rate plus the COOL
   Marketplace fee the PRD planned for. It is not the Lambda bill, and decode and the privacy blur, which run before
   the job starts, are not in it.
@@ -252,8 +242,8 @@ the run was not repeated. Tables and provenance: [bench.md](bench.md), "Arm agai
 | macro, per-image p50 ms | 195.8 | 248.2 | |
 
 From 1 to 4 threads the Arm runner's agent loop went from 3.97 to 4.88 jobs/s and x86's from 3.28 to 3.84. The
-function itself has 1.7 vCPU of time at 3008 MB; the stack sets OpenCV to 2 threads (`DRISHYAM_CV_THREADS`), a
-setting the deployed build predates ([bench.md](bench.md), "Lambda").
+function itself has 1.7 vCPU of time at 3008 MB; the stack sets OpenCV to 2 threads (`DRISHYAM_CV_THREADS`), and
+the deployed function's startup log confirms 2 ([aws.md](aws.md); [bench.md](bench.md), "Lambda").
 
 ## 7. Related work
 
@@ -496,6 +486,12 @@ was calibrated on dev and joined the dev comparison first (five models; v1 staye
 once here; the other models' held-out runs were not repeated, and the tables re-score their saved per-image files,
 which give the same numbers as before.
 
+**What these numbers describe, and what runs live.** The held-out runs had the governor off, so every look used the
+512-px FP32 net. Live, the v1 profile's governor SLA is 1500 ms, set once from the smoke runs' Lambda step p95s (up
+to 1.14 s, section 5) plus headroom and not tuned against recall, so live looks stay on the 512-px FP32 net unless
+steps exceed 1.5 s; a slower step switches the job to the FP16 256-px net, which no held-out run scored. v1's profile
+(`min_view` 0.3) makes L1 (half size) its finest look on a 2048-px photo and L2 on a 4608-px one.
+
 At the 30 % cap (pixels ratio and per-class recall are in the JSON):
 
 | Set | Model | recall (95 % CI) | IoU-only | chance | precision | boxes / photo | critical / photo | × L0 tiling (95 % CI) | × downscale (95 % CI) | modelled ms / job |
@@ -599,6 +595,25 @@ kagglehub download, its train, validation and test-dev folders) it finds no cand
 photos is within hash distance 64 of any dacl10k image (the `leakage` block of each published CODEBRIM summary, run
 before each model's evaluation, the same each time).
 
+### Measured and not adopted
+
+On the dev splits only, each read by a rule written down before its run:
+
+- the classical agent's tuning knobs (`tau_scout`, a finer overview, budget fill, the stop floor, the survey's
+  share of value): nothing adopted. `tau_scout` 0.7 was adopted, then reverted after review: its synth_dev gain
+  was not measurable (1.03×, 0.98–1.09), and its one measurable gain, on CODEBRIM dev100 (1.22×, 1.09–1.43), is on
+  the rule's guard split and about a third of it is what the same boxes find at random places
+  (`results/dev/tune_sweep.json`);
+- a two-model cascade, v2a scouting every look and v2b confirming uncertain ones: lower recall than v2a alone on
+  CODEBRIM dev100 (0.83×, 0.73–0.93) and on synth_dev (0.91×, 0.85–0.98), at more modelled ms per job, so it stays
+  off (`results/dev/cascade_dacl10k_v2a+v2b.json`);
+- INT8: OpenCV 5.0.0 loads the dynamically quantized model on neither DNN engine and runs the statically quantized
+  ones only on `ENGINE_NEW`, slower than FP32 on the x86 Mac (one 512-px forward on one thread: 1066.6 and 1391.1
+  ms against FP32's 686.7), and the QDQ model's crack masks overlap FP32's at IoU 0.37
+  (`results/local-macos-x86/int8.json`, [bench.md](bench.md));
+- prefetching the next look: off. On GitHub's runners it shortened one-thread jobs but slowed steps on x86 at 2
+  and 4 threads, and it never ran on the function ([bench.md](bench.md)).
+
 ## 9. Failures
 
 Twelve measured failures from the synthetic run, two in each of six categories (FIG. 5 on the live site; [public/results/failures.json](../public/results/failures.json)). The rule column is the gallery generator's current text (`evals/failures.py`); `make eval` rewrites failures.json, not this table, so after a re-run `python -m tests.test_report_doc` prints the rows to copy here, and `tests/test_report_doc.py` fails until they match:
@@ -641,7 +656,8 @@ crack got no finding. With no ground truth neither photo is scored.
 ## 10. Agentic evidence
 
 Every step's action is a logged function of an OpenCV output or a runtime
-statistic, with a `cause`. A recorded trace (synthetic sample `bridge_03`, 30 % pixel cap, the published fixed arm64
+statistic, with a `cause`. A recorded trace (synthetic sample `bridge_03`, the classical engine, which zooms to L0
+where v1 stops at L1, 30 % pixel cap, the published fixed arm64
 costs on a virtual clock, so machine load does not change it and a re-run on x86 gives the same file:
 [trace-bridge_03.ndjson](trace-bridge_03.ndjson), from `python -m evals.trace_sample`), its first four steps abridged
 (the seeds without their entropy):
@@ -675,7 +691,7 @@ Failure drills, each runnable from the UI (`chaos` toggles) and covered by tests
 | --- | --- |
 | 20 planner timeouts + 20 malformed planner replies | 40 / 40 recovered by the rule planner (`test_20_timeouts_and_20_malformed_all_recover`) |
 | Forced p95 spike on the segmenter | the next step's cause is `p95>SLA` and its model is `fast` (`test_forced_p95_spike_changes_next_steps_model`) |
-| KILL during a live job | kill sent during step 3 → step 4 halted with cause `kill-switch` (`test_kill_endpoint_halts_a_running_job`, the live e2e run; on the deployed site, check 3 of `scripts/smoke.sh`, sent once step 2 has streamed: halted after 3 steps in the 07:12 smoke run and after 6 in the 07:09 one, section 5) |
+| KILL during a live job | kill sent during step 3 → step 4 halted with cause `kill-switch` (`test_kill_endpoint_halts_a_running_job`, the live e2e run; on the deployed site, check 3 of `scripts/smoke.sh`, sent once step 2 has streamed: halted after 2 steps in the 02219a2 smoke run, section 5) |
 | $ and pixel caps | the job halts inside one step with coverage and unvisited regions reported (`test_pixel_cap_is_never_exceeded`, `test_seconds_and_usd_caps_halt`) |
 | Agent tries to approve its own critical finding | `ForbiddenTransition` (`test_agent_cannot_decide_or_downgrade`) |
 
@@ -703,9 +719,11 @@ notes the large spall it missed.
 - The classical engine's probabilities are a softmax over hand-built evidence scores; its confidence and entropy
   are not calibrated.
 - The policy comparison holds on synthetic images, but on 200 real CODEBRIM photos the **classical** segmenter caps
-  every policy at about 0.2 recall. Of the dacl10k models, v1 (the dev choice) is deployed since 2026-10-21. Held out, it
-  finds 0.49 of CODEBRIM's defects at the 30 % cap against the classical engine's 0.19, with twice the critical boxes
-  of the retrained models for the human gate, and its ms are modelled from x86 tables only (section 8).
+  every policy at about 0.2 recall. Of the dacl10k models, v1 (the dev choice) is deployed since 2026-10-21. Held out,
+  with the governor off and the 512-px FP32 net on every look, it finds 0.49 of CODEBRIM's defects at the 30 % cap
+  against the classical engine's 0.19 (chance 0.30; IoU-only 0.25 against a chance of 0.08), with twice the critical
+  boxes of the retrained models for the human gate; its held-out ms are modelled from x86 tables, and on the Lambda
+  its step p95 was 0.56 to 1.14 s (sections 5 and 8).
 - The ablations show that at the 30 % cap the uncertainty term, the seeding and the governor change nothing
   measurable, that the uncertainty term and the seeding earn a little recall only uncapped on the 2048×1536 set, and
   that image-driven gaze order beats random order only on the larger photos (section 8).
@@ -714,8 +732,9 @@ notes the large spall it missed.
   for a clean wall.
 - COOL on Graviton was not run (section 6).
 - The arm64 timings come from GitHub's `ubuntu-24.04-arm` runner (`results/linux-aarch64/`, Neoverse-N2, one
-  thread for the cost table), a GitHub Actions VM, not the deployed Lambda; on the deployed Lambda build the only numbers are the two smoke runs'
-  step p95s, 67.7 and 83.7 ms, each over one job (section 5). The evals ran on the x86 laptop with those arm64 costs.
+  thread for the cost table), a GitHub Actions VM, not the deployed Lambda; on the Lambda the only numbers are the
+  smoke runs' step p95s, each over one job: 67.7 to 88.0 ms with the classical engine and 0.56 to 1.14 s with v1
+  (section 5). The evals ran on the x86 laptop with those arm64 costs (v1's held-out runs with x86 tables).
   The Arm-against-x86 comparison (section 6, [bench.md](bench.md)) is one run per runner on shared GitHub VMs.
 - The web demo is stateless; the signed `work_order.json` is its audit trail. There is no approval store, and
   human-approval latency is not measured.

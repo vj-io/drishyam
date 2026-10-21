@@ -504,8 +504,8 @@ SAMPLES = [
     (101, "Hairline cracks", "Five 1-2 px cracks that all but vanish in a thumbnail.", {"crack": 5, "hairline": True}),
     (102, "Crack with efflorescence", "A crack with chalky salt deposits leached out beneath it.",
      {"crack": 2, "efflorescence": 2}),
-    (120, "Exposed rebar", "A broken-out spall exposing reinforcing bars: the critical finding.",
-     {"crack": 1, "spalling": 1, "exposed_rebar": 1}),
+    (120, "Exposed rebar", "A broken-out spall exposing reinforcing bars. The live v1 engine may label it differently: "
+     "it finds 0.02 of the exposed rebar in our synthetic test set.", {"crack": 1, "spalling": 1, "exposed_rebar": 1}),
     (104, "Corrosion run-off", "Rust staining bleeding down the face in streaks.", {"corrosion": 2, "crack": 1}),
     (105, "Mixed defects", "Cracks, spalling, exposed bars, rust and efflorescence on one wall.",
      {"crack": 3, "spalling": 1, "exposed_rebar": 1, "corrosion": 1, "efflorescence": 1}),

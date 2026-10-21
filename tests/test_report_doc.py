@@ -1,6 +1,7 @@
-"""docs/report.md's classical-engine tables, its failure gallery and its Arm-against-x86 table, and the numbers the
-results-at-a-glance blocks of README.md and docs/report.md quote, are the committed JSON in public/results/ and
-results/. `python -m tests.test_report_doc` prints the rows."""
+"""docs/report.md's classical-engine tables, its failure gallery and its Arm-against-x86 table, and the table and
+numbers the results-at-a-glance blocks of README.md and docs/report.md quote, are the committed JSON in
+public/results/ and results/ (the Lambda timings: docs/aws.md's smoke record). `python -m tests.test_report_doc`
+prints the rows."""
 import json
 import re
 from pathlib import Path
@@ -9,7 +10,7 @@ from tests.test_bench_doc import ARM, X86, kernels, loop
 from tests.test_bench_doc import load as bench
 
 REPO = Path(__file__).resolve().parents[1]
-REPORT, README = ((REPO / f).read_text() for f in ("docs/report.md", "README.md"))
+REPORT, README, AWS = ((REPO / f).read_text() for f in ("docs/report.md", "README.md", "docs/aws.md"))
 CAPS = ("0.05", "0.1", "0.2", "0.3", "0.5", "1.0")  # evals.harness.BUDGETS: the order of policies["drishyam"]
 SETS = {"synth": "summary.json", "large": "large/summary.json", "codebrim": "codebrim/summary.json"}
 CLASSES = ("crack", "spalling", "efflorescence", "exposed_rebar", "corrosion")
@@ -147,27 +148,47 @@ def classical_quotes() -> list:
             f"the stop rule ends {halts('synth', '1.0')['stop-rule']} of 200 synthetic jobs"]
 
 
+GLANCE = (("v1", "**v1 (live)**"), ("v2a", "v2a"), ("v2b", "v2b"), ("v2c", "v2c"), ("classical-v1", "classical engine"))
+INSPECTION_PHOTOS = 2536  # one detailed drone inspection of one bridge (docs/impact-sources.md, ODOT SPR 787)
+
+
+def glance_rows():
+    """The held-out table both glance blocks open with: one row per segmenter at the 30 % cap."""
+    out = load("results/heldout_models.json")
+    t, n = out["table"], out["datasets"]["clean"]["n"]
+    for m, label in GLANCE:
+        c, s, k = (t[f"{d}@0.3"][m] for d in ("codebrim", "synth", "clean"))
+        yield (f"| {label} | {c['recall']:.2f} ({ci(c['recall_ci'])}) | {c['chance_recall']:.2f} | "
+               f"{c['recall_iou_only']:.2f} ({c['chance_recall_iou_only']:.2f}) | {s['recall']:.2f} ({ci(s['recall_ci'])}) | "
+               f"{round(k['images_with_any'] * n)} of {n} | {c['critical_per_image']:.2f} |")
+
+
 def heldout_quotes() -> list:
     out = load("results/heldout_models.json")
     t, pr = out["table"], out["pairs"]
-    v1, cl = t["codebrim@0.3"]["v1"], t["codebrim@0.3"]["classical-v1"]
     s1, sc = t["synth@0.3"]["v1"], t["synth@0.3"]["classical-v1"]
     r, rs = pr["codebrim@0.3: v1 / classical-v1"]["recall"], pr["synth@0.3: v1 / classical-v1"]["recall"]
     ms = pr["codebrim@0.3: v1 / classical-v1"]["ms"]
-    crit = [t["codebrim@0.3"][m]["critical_per_image"] for m in ("v1", "v2a", "v2b", "v2c", "classical-v1")]
+    crit = [t["codebrim@0.3"][m]["critical_per_image"] for m in ("v1", "classical-v1")]
     assert out["dev_choice"]["confirms"] is True and out["where_each_loses"]["v1"] == []
-    return [(f"finds {v1['recall']:.2f} of the defects ({ci(v1['recall_ci'])}) against the classical engine's "
-            f"{cl['recall']:.2f}, {r[0]:.2f}× ({ci(r[1])})"),
-            f"{s1['recall']:.2f} ({ci(s1['recall_ci'])}) against {sc['recall']:.2f}, {rs[0]:.2f}× ({ci(rs[1])})",
+    assert t["clean@0.3"]["v1"]["boxes_per_image"] == 0  # "puts no box on a clean photo"
+    return [f"v1 finds {r[0]:.2f}× ({ci(r[1])}) its recall on CODEBRIM and {rs[0]:.2f}× ({ci(rs[1])}) on synth200",
             f"where the classical engine puts {t['clean@0.3']['classical-v1']['boxes_per_image']:.2f} per photo",
-            f"its own boxes at random places find {v1['chance_recall']:.2f}",
-            f"with IoU only it finds {v1['recall_iou_only']:.2f} against a chance of {v1['chance_recall_iou_only']:.2f}",
-            (f"{crit[0]:.2f} critical boxes per CODEBRIM photo to the human gate, {crit[0] / crit[4]:.1f} times the classical "
-            f"engine's {crit[4]:.2f}, against v2a's {crit[1]:.2f}, v2b's {crit[2]:.2f} and v2c's {crit[3]:.2f}"),
-            f"{ms[0]:.2f}× the classical engine's (CI {ci(ms[1])})",
+            (f"it sends {crit[0] / crit[1]:.1f} times the critical boxes to the human gate (about "
+             f"{round(crit[0] * INSPECTION_PHOTOS, -3):,.0f} for the {INSPECTION_PHOTOS:,} photos of one bridge inspection)"),
+            f"its modelled ms per CODEBRIM job are {ms[0]:.2f}× (CI {ci(ms[1])})",
             (f"no efflorescence ({s1['per_class']['efflorescence']:.2f}) and almost no exposed rebar "
-            f"({s1['per_class']['exposed_rebar']:.2f}), where the classical engine finds {sc['per_class']['efflorescence']:.2f} "
-            f"and {sc['per_class']['exposed_rebar']:.2f}")]
+             f"({s1['per_class']['exposed_rebar']:.2f}), where the classical engine finds {sc['per_class']['efflorescence']:.2f} "
+             f"and {sc['per_class']['exposed_rebar']:.2f}")]
+
+
+def live_quotes() -> list:
+    """What the glance blocks take from docs/aws.md: the deployed commit and the Lambda step p95s (no JSON holds them)."""
+    aws = flat(AWS)
+    deployed = re.search(r"redeployed from commit (\w{7})", aws).group(1)
+    v1 = re.search(r"with v1 a step costs (\d\.\d\d) to (\d\.\d\d) s at p95", aws).groups()
+    cl = re.search(r"against (\d+\.\d) to (\d+\.\d) ms for the classical engine", aws).groups()
+    return [f"deployed commit {deployed}", f"its step p95 was {v1[0]} to {v1[1]} s, against {cl[0]} to {cl[1]} ms"]
 
 
 def adoption_quotes() -> list:
@@ -199,9 +220,14 @@ def arm_quotes() -> list:
 
 def test_glance_quotes_are_the_json():
     for name, text in (("README.md", README), ("docs/report.md", REPORT)):
-        glance = flat(text.split("## Results at a glance\n")[1].split("\n## ")[0])
-        want = classical_quotes()[:5] + heldout_quotes() + adoption_quotes() + arm_quotes()
-        assert [w for w in want if w not in glance] == [], name
+        glance = text.split("## Results at a glance\n")[1].split("\n## ")[0]
+        assert [r for r in glance_rows() if r not in glance] == [], name
+        want = classical_quotes()[:3] + heldout_quotes() + live_quotes()
+        assert [w for w in want if w not in flat(glance)] == [], name
+    # moved out of the glance: tuning, cascade, INT8 and prefetching to both docs' results; Arm against x86 to the
+    # README's (the report has it as the "arm" table)
+    assert [w for w in adoption_quotes() if w not in flat(README) or w not in flat(REPORT)] == []
+    assert [w for w in arm_quotes() if w not in flat(README)] == []
     assert [w for w in classical_quotes()[5:] if w not in flat(README) or w not in flat(REPORT)] == []
 
 
@@ -355,4 +381,5 @@ def test_no_codebrim_image_is_published():
 if __name__ == "__main__":
     for k, f in ROWS.items():
         print(f"\n{k}", *f(), sep="\n")
-    print("", *classical_quotes(), *heldout_quotes(), *adoption_quotes(), *arm_quotes(), sep="\n")
+    print("\nglance", *glance_rows(), sep="\n")
+    print("", *classical_quotes(), *heldout_quotes(), *live_quotes(), *adoption_quotes(), *arm_quotes(), sep="\n")

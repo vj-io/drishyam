@@ -1,5 +1,9 @@
 # DRISHYAM — Product Requirements Document
 
+> **This is the original plan (2026-10-17); it is not kept current.** What was built, measured and deployed is in [report.md](report.md) and [README.md](../README.md): since
+> 2026-10-21 the live demo runs v1, the dacl10k-trained segmenter, and the hypothesis below was not met by the
+> classical engine on synthetic photos. [requirements.md](requirements.md) traces each requirement to its status.
+
 Oct 17, 2026 · @Vaibhav Jangid
 
 ## Summary

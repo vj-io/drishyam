@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1340 1640" width="1340" height="1640" role="img" aria-labelledby="t d">
 <title id="t">Drishyam system architecture</title>
-<desc id="d">Clients (browser UI, drishyam CLI, MCP client) reach one agent core: the browser through CloudFront with OAC and WAF, a Lambda Function URL and an arm64 Lambda running the FastAPI web tier (deployed); the CLI and MCP server run it locally. The agent core (policy, governor, planner with allow-list validator, human gate) drives the OpenCV 5 layer and emits an NDJSON trace and a signed work order. DynamoDB holds the kill flag, Secrets Manager the signing key, CloudWatch the metrics and alarms, AWS Budgets the spend alerts.</desc>
+<desc id="d">Clients (browser UI, drishyam CLI, MCP client) reach one agent core: the browser through CloudFront with OAC and WAF, a Lambda Function URL and an arm64 Lambda running the FastAPI web tier (deployed; v1, the dacl10k-trained segmenter, runs live since 2026-10-21), with the static site in a private S3 bucket behind the same distribution; the CLI and MCP server run it locally. The agent core (policy, governor, planner with allow-list validator, human gate) drives the OpenCV 5 layer and emits an NDJSON trace and a signed work order. DynamoDB holds the kill flag, Secrets Manager the signing key, CloudWatch the metrics and alarms, X-Ray the traces, AWS Budgets the spend alerts; alarms and budget alerts reach the owner's email through SNS.</desc>
 <style>
   .bg { fill: #072247; }
   .sheet { fill: #0F3B73; stroke: #E8F1FF; stroke-width: 3; }
@@ -80,13 +80,13 @@
 <circle class="n" cx="82" cy="320" r="11"/>
 <text class="nt" x="82" y="324" text-anchor="middle">2</text>
 <text x="100" y="324" class="fl" xml:space="preserve">ENTRY · AWS PATH</text>
-<text x="252.24" y="324" class="fs" xml:space="preserve">deployed 2026-10-18, smoke-tested</text>
+<text x="252.24" y="324" class="fs" xml:space="preserve">deployed; v1 live since 2026-10-21 (02219a2), smoke-tested</text>
 <g class="node" data-box="80 344 440 104">
 <rect class="box" x="80" y="344" width="440" height="104"/>
 <text x="90" y="364" class="h" xml:space="preserve">CLOUDFRONT DISTRIBUTION</text>
 <line class="band" x1="80" y1="374" x2="520" y2="374"/>
-<text x="90" y="388" xml:space="preserve">Origin Access Control (OAC) signs every</text>
-<text x="90" y="404" xml:space="preserve">origin request with SigV4</text>
+<text x="90" y="388" xml:space="preserve">OAC (SigV4) on both origins: the site from</text>
+<text x="90" y="404" xml:space="preserve">a private S3 bucket, /api/* to the URL</text>
 <text x="90" y="420" xml:space="preserve">AWS WAF web ACL: rate-based rules</text>
 <text x="90" y="436" xml:space="preserve">POST bodies carry x-amz-content-sha256</text>
 </g>
@@ -127,8 +127,8 @@
 <rect class="box" x="580" y="512" width="340" height="72"/>
 <text x="590" y="532" class="h" xml:space="preserve">CLOUDWATCH</text>
 <line class="band" x1="580" y1="542" x2="920" y2="542"/>
-<text x="590" y="556" xml:space="preserve">EMF metrics: one log line per job</text>
-<text x="590" y="572" xml:space="preserve">dashboard; alarms → SNS (email unconfirmed)</text>
+<text x="590" y="556" xml:space="preserve">EMF: one log line per job · X-Ray traces</text>
+<text x="590" y="572" xml:space="preserve">dashboard; alarms → SNS → email (verified)</text>
 </g>
 <g class="node" data-box="580 604 340 72">
 <rect class="box" x="580" y="604" width="340" height="72"/>
@@ -301,8 +301,8 @@
 <line class="band" x1="694" y1="1290" x2="973" y2="1290"/>
 <text x="704" y="1304" xml:space="preserve"><tspan class="cv">cv2.dnn.readNetFromONNX</tspan>(path,</text>
 <text x="704" y="1320" xml:space="preserve">  engine=<tspan class="cv">cv2.dnn.ENGINE_NEW</tspan>)</text>
-<text x="704" y="1336" xml:space="preserve">dacl10k ONNX, dynamic H×W, opt-in</text>
-<text x="704" y="1352" xml:space="preserve">default: classical, no weights</text>
+<text x="704" y="1336" xml:space="preserve">v1 dacl10k ONNX: the live engine</text>
+<text x="704" y="1352" xml:space="preserve">fallback: classical, no weights</text>
 <text x="704" y="1368" xml:space="preserve">→ class masks, areas, entropy</text>
 </g>
 <g class="node" data-box="1001 1260 279 120">
@@ -351,5 +351,5 @@
 <text x="926" y="1523" class="fs" xml:space="preserve">built and tested</text>
 <text x="896" y="1545" class="fs" xml:space="preserve"><tspan class="cv">cv2.call</tspan> OpenCV call · <tspan class="ca">cause</tspan> trace cause</text>
 <text x="896" y="1566" class="fs" xml:space="preserve"><tspan class="rd">red</tspan> human gate or kill · ★ OpenCV-5-only</text>
-<text x="896" y="1593" class="fs" xml:space="preserve">DRAWN 2026-10-18 · SCALE NTS · REV 1.1.0</text>
+<text x="896" y="1593" class="fs" xml:space="preserve">DRAWN 2026-10-21 · SCALE NTS · REV 1.1.0</text>
 </svg>
