@@ -191,6 +191,52 @@ def builds_figures() -> list[str]:
             f"({v['5.0']['stages']['gaze']['p50_ms']:.1f} ms here against {v['5.0']['stages']['segment']['p50_ms']:.1f}"]
 
 
+def features_figures() -> list[str]:
+    """The phrases the section's prose takes from opencv5_features.json (and the Arm engines run), after checking
+    what they claim."""
+    doc = load("opencv5_features.json")
+    c, t, e, p = doc["config"], doc["timing"], doc["engine"], doc["profile"]["512"]
+    n, rounds = c["all_threads"], max(3, c["rounds"] // 2)  # the profile's and the engine part's rounds
+    cells = lambda f, unit: [t[s][f][unit][th]["on"] for s in t for th in t[s][f][unit] if th.startswith("threads")]
+    span = lambda rs: f"x{min(r['ratio'] for r in rs):.2f} to x{max(r['ratio'] for r in rs):.2f}"
+    argmax, masks = cells("CV_ARGMAX", "finish"), cells("CV_BOOL_MASKS", "restrict")
+    one, many = p["threads1"], p[f"threads{n}"]
+    share = lambda eng: f"{100 * one[eng]['by_kind']['conv 3x3']['ms'] / one[eng]['profiled_ms']:.0f} %"
+    ms = lambda eng, kind: one[eng]["by_kind"][kind]["ms"]
+    arm = {(r["file"], r["engine"]): r for r in load("opencv5_engines.json", "linux-aarch64")["rows"] if r["size"] == 512}
+    arm_x = (arm["drishyam_dacl10k.onnx static", "classic"]["forward_threads1"]["p50_ms"]
+             / arm["drishyam_dacl10k.onnx", "new"]["forward_threads1"]["p50_ms"])
+    look = t["classical"]["all"]["segment_view"]
+    assert "first 4 of" in c["dev"] and len(c["photos"]) == 14 and c["threads"] == [1, n]
+    assert e["identical"] == e["photos"] and e["argmax_differs_px"] == 0 and e["max_dprob"] < 1e-4
+    assert e[f"threads{n}"]["on"]["ci"][0] > 1 and e["threads1"]["on"]["ci"][0] < 1 < e["threads1"]["on"]["ci"][1]
+    assert all(r["ci"][1] < 1 for r in argmax) and sum(r["ci"][1] < 1 for r in masks) == len(masks) - 1
+    assert all(look[th]["on"]["ci"][0] < 1 < look[th]["on"]["ci"][1] for th in look if th.startswith("threads"))
+    assert 0.15 < t["classical"]["CV_ARGMAX"]["finish"]["threads1"]["off_p50_ms"] / look["threads1"]["off_p50_ms"] < 0.25
+    assert e["accurate_looks"] == e["looks"]
+    acts = [one["classic"]["by_kind"][a] for a in ("HardSwish", "Relu", "HardSigmoid")]
+    assert all(a["ms"] == 0 for a in acts) and not {"HardSwish", "Relu", "HardSigmoid", "Add"} & set(one["new"]["by_kind"])
+    assert {"Shape", "Unsqueeze"} <= set(one["new"]["by_kind"]) - set(one["classic"]["by_kind"])
+    return [f"{sum(a['layers'] for a in acts)} are activations the classic engine fused",
+            f"the {one['classic']['by_kind']['Add']['layers']} residual additions",
+            f"in {c['rounds']} rounds", f"every k-th, {c['looks']} at most",
+            f"load average was {doc['provenance']['load_avg'][0]} at the start and {doc['load_avg_end'][0]} at the end",
+            f"identical, {span(argmax)} of NumPy's time", f"identical, {span(masks)}",
+            f"reaches {max(r['ci'][1] for r in masks):.2f}",
+            f"{share('new')} of `ENGINE_NEW`'s and {share('classic')} of `ENGINE_CLASSIC`'s",
+            f"lists {one['new']['layers']} layers against the classic engine's {one['classic']['layers']}",
+            f"adds {one['new']['by_kind']['TransformLayout']['layers']} layout transforms",
+            f"({ms('new', 'TransformLayout'):.1f} ms at one thread)",
+            f"x{ms('new', 'depthwise conv 5x5') / ms('classic', 'depthwise conv 5x5'):.2f} of the classic engine's time",
+            f"x{ms('new', 'Mul') / ms('classic', 'Mul'):.1f} its time",
+            f"{many['new']['profiled_ms']:.1f} against {many['classic']['profiled_ms']:.1f} ms",
+            f"{e['identical']} of {e['photos']} photos", f"over {e['looks']} looks, all at the accurate size",
+            f"max |dprob| {e['max_dprob']:.1e}".replace("e-0", "e-"), f"0 of the {e['pixels']:,} pixels",
+            f"{iv(e['threads1']['on'])} of `ENGINE_NEW`'s time on one thread and {iv(e[f'threads{n}']['on'])} on {n}",
+            f"x{arm_x:.2f} of the forward on the Neoverse-N2", f"{1 / arm_x:.1f} times as long on `ENGINE_NEW`",
+            f"({e['timed_looks']} timed, {rounds} rounds", f"512, {rounds} forwards"]
+
+
 def test_shipped_flags_follow_the_rule():
     doc = load("opencv5_features.json")
     assert {f: getattr(segment, f) for f in feat.FLAGS} == {f: adopted(doc, f) for f in feat.FLAGS}
@@ -202,7 +248,32 @@ def test_features_section_is_the_json():
     text = section()
     rows = [*identity_rows(), *timing_rows(), *profile_rows(), *builds_rows(), *api_rows()]
     assert [r for r in rows if " ".join(r.split()) not in text] == []
+    assert [f for f in [*features_figures(), *builds_figures()] if f not in text] == []
+
+
+def test_report_section_6_quotes_the_json():
+    text = " ".join((REPO / "docs" / "report.md").read_text().split("## 6. OpenCV 5 implementation\n")[1]
+                    .split("\n## ")[0].split())
+    doc, b = load("opencv5_features.json"), load("opencv_builds.json")["variants"]
+    old = b["4.14.0.94"]["stages"]
+    e, one = doc["engine"], doc["profile"]["512"]["threads1"]["new"]
+    n = doc["config"]["all_threads"]
+    arm = {(r["file"], r["engine"]): r for r in load("opencv5_engines.json", "linux-aarch64")["rows"] if r["size"] == 512}
+    arm_x = (arm["drishyam_dacl10k.onnx static", "classic"]["forward_threads1"]["p50_ms"]
+             / arm["drishyam_dacl10k.onnx", "new"]["forward_threads1"]["p50_ms"])
+    argmax = [r[th]["on"] for r in (t["CV_ARGMAX"]["finish"] for t in doc["timing"].values()) for th in r
+              if th.startswith("threads")]
+    want = [f"{iv(old['nanodet']['vs_5.0'])} of 5.0's time on that forward",
+            (f"{iv(old['gaze']['vs_5.0'])} of 5.0's time on the gaze's `warpPerspective` and "
+             f"{iv(old['gaze_oblique']['vs_5.0'])} on an oblique one"),
+            f"x{arm_x:.2f} of `ENGINE_NEW`'s time", f"{e['identical']} of {e['photos']} photos",
+            f"{iv(e[f'threads{n}']['on'])} of `ENGINE_NEW`'s time on {n} threads",
+            f"{100 * one['by_kind']['conv 3x3']['ms'] / one['profiled_ms']:.0f} %", f"{1 / arm_x:.1f} times longer",
+            f"x{min(r['ratio'] for r in argmax):.2f} to x{max(r['ratio'] for r in argmax):.2f} of NumPy's time",
+            f"opencv-python-headless {b['4.14.0.94']['cv2']}.94"]
+    assert [w for w in want if w not in text] == []
 
 
 if __name__ == "__main__":
-    print(*identity_rows(), *timing_rows(), *profile_rows(), *builds_rows(), *api_rows(), sep="\n")
+    print(*identity_rows(), *timing_rows(), *profile_rows(), *builds_rows(), *api_rows(), *features_figures(),
+          *builds_figures(), sep="\n")

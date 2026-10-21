@@ -676,7 +676,25 @@ own `findContours` docstring and runs only for `RETR_LIST` without a hierarchy.
 | `ipp.setUseIPP` | yes | yes |
 | `bool mask` | yes | no |
 
-<!-- USES -->
+**What each one did here** ("new" means absent from the 4.14 wheel; the figures are in the tables below and in
+"OpenCV 5 DNN engines for v1"):
+
+- `ENGINE_NEW` (new): the only engine that reads v1, the live segmenter. On 5.0 `readNet` gives it to the NanoDet
+  privacy detector too, which ran in about half of 4.14's time (the builds table).
+- Its profiling mode (`Net.setProfilingMode(DNN_PROFILE_DETAILED)`, new): v1's time per layer on both engines,
+  below. Benchmark only.
+- The engine selector (`readNetFromONNX(path, engine=...)`, new) with `ENGINE_CLASSIC` on a static-shape copy of v1:
+  `OnnxSegmenter(engine="classic")`. Its traces matched here, but it was not faster here: off.
+- `CV_Bool` (new): `CV_BOOL_MASKS`, the NumPy bool footprint as a `copyTo` mask in `segment.restrict`: identical,
+  x0.83 to x0.94 of the NumPy time, but one interval reaches 1.02: off.
+- 5.0's warp (new, bilinear without lookup tables): in use with the wheel; 4.14 took 1.6 and 2.4 times as long on
+  the gaze (the builds table).
+- `reduceArgMax` (OpenCV 4.6, not new): `CV_ARGMAX` in `segment.finish`: identical, x0.52 to x0.74 of NumPy's time:
+  on, the one flag adopted. On a whole look the change is within this machine's noise (the last two timing rows,
+  all three flags at once): `finish` is about a fifth of a classical look's time here.
+- `compare` (not new): `CV_COMPARE` in `_clean`: identical, no measurable gain: off.
+- The x86 wheel's IPP HAL (not new): with it off only `saliency`'s output changed, and no stage was measurably
+  slower. Arm's KleidiCV HAL (in 4.x wheels too): no runtime switch, not measured (below).
 
 **The rule, and the identity set.** A flag of `drishyam/segment.py` ships on only if, on every photo of the identity
 set and with every segmenter, the agent's event stream with it on is the stream with every flag off to the byte, and
@@ -721,7 +739,12 @@ gets the two small units only.
 | all three | classical-v1 | `segment_view` on 24 looks | 1 | 11749.7 | 11691.1 | x0.98 (0.93-1.04) | x1.01 (0.96-1.06) |
 | all three | classical-v1 | `segment_view` on 24 looks | 16 | 11479.3 | 11269.1 | x0.93 (0.85-1.02) | x0.96 (0.89-1.03) |
 
-<!-- PROFILE -->
+**Where v1's time goes, layer by layer (OpenCV 5's profiler).** With `Net.setProfilingMode(DNN_PROFILE_DETAILED)`
+(new in 5.0) `ENGINE_NEW`'s `getPerfProfile()` returns every layer's time, as `ENGINE_CLASSIC`'s always has. Layers
+are named after their ONNX nodes, so the graph says what each one is and the two engines line up node by node. v1 at
+512, 10 forwards per engine and thread count, interleaved, each layer's median; the kinds that take the most of
+`ENGINE_NEW`'s time on one thread, then the totals. The run's 1-minute load average was 143.97 at the start and
+22.82 at the end, so the absolute times are inflated and only the comparison within the run holds:
 
 | layer kind (from the ONNX graph) | layers, `ENGINE_NEW` | layers, `ENGINE_CLASSIC` | 1 thread, `ENGINE_NEW`, ms | 1 thread, `ENGINE_CLASSIC`, ms | 16 threads, `ENGINE_NEW`, ms | 16 threads, `ENGINE_CLASSIC`, ms |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -736,7 +759,25 @@ gets the two small units only.
 | every layer (the profiler's sum) | 159 | 185 | 1807.4 | 2011.7 | 348.7 | 495.0 |
 | a forward, wall time (p50) | | | 1944.6 | 2041.3 | 405.6 | 579.2 |
 
-<!-- ENGINE -->
+The twelve 3x3 convolutions (the stem, the UNet decoder's ten and the segmentation head) are most of either
+engine's time: 81 % of `ENGINE_NEW`'s and 77 % of `ENGINE_CLASSIC`'s on one thread. The new engine's graph lists 159
+layers against the classic engine's 185, of which 57 are activations the classic engine fused into their
+convolutions (listed, with no time). The new engine fuses those and the 10 residual additions into the convolutions,
+keeps the decoder's shape arithmetic (`Shape`, `Gather`, `Unsqueeze`) as layers it evaluates at run time, and adds 18
+layout transforms to and from its blocked layout (23.5 ms at one thread). It runs the 5x5 depthwise
+convolutions in x0.18 of the classic engine's time and the squeeze-and-excitation multiplies in x4.7 its time. On
+16 threads its layers sum to 348.7 against 495.0 ms, most of the difference in the 3x3 and 1x1 convolutions. On the
+Neoverse-N2 the forward takes 2.6 times as long on `ENGINE_NEW` ("OpenCV 5 DNN engines for v1"); the same profile
+there (pending, below) says which of these kinds that is.
+
+**The agent on `ENGINE_CLASSIC`.** `OnnxSegmenter(engine="classic")` reads the FP32 net on `ENGINE_CLASSIC`
+through a static-shape copy per input size (the FP16 net stays on `ENGINE_NEW`, the only engine that runs it); the
+run puts it against `engine="new"` on the same photos. The agent's trace was identical on 14 of 14 photos, over 49
+looks, all at the accurate size; across those looks max |dprob| 2.4e-5, and 0 of the 12,845,056 pixels had another
+argmax. Its accurate looks (8 timed, 10 rounds, the null `ENGINE_NEW` again) took x0.92 (0.81-1.10) of
+`ENGINE_NEW`'s time on one thread and x1.30 (1.29-1.32) on 16. So on this Mac it passes the identity asked of a DNN
+change (every argmax equal, max |dprob| under 1e-4, the same decisions) and fails on speed: no gain this machine can
+resolve on one thread, a loss on 16, the agent's default here. On Arm the same run is pending.
 
 **OpenCV 5.0 against 4.14 on the pipeline's own stages, and the IPP HAL.** `bench/opencv_builds.py` runs each
 stage on one thread in a worker process per variant: the locked 5.0 wheel (the reference), the same with
@@ -763,15 +804,15 @@ and 150.83 at the end (`results/local-macos-x86/opencv_builds.json`):
 | `yunet` | 169.4 | x1.09 (0.97-1.23), same | x1.12 (0.99-1.29), same | x1.06 (0.94-1.19) |
 
 The null slot's own interval reaches x1.38 (`gaze_oblique`), so only a ratio whose interval clears the null's for
-the same stage says anything. Three do, in two findings. 5.0's warp is faster and computes differently: 4.14 took x1.60 (1.38-1.85) of its time on the straight 512-px gaze and
-x2.43 (2.07-2.86) on the oblique one, and its output differs, as the migration guide says 5.0's bilinear warp
-without lookup tables does. And 5.0 runs the NanoDet privacy detector in about half the time, x1.95 (1.79-2.13)
-for 4.14 (`readNet` picks `ENGINE_NEW` on 5.0; 4.14 has only its one engine), with the same boxes. Decode, pyramid,
-saliency, quality, enhance, the classical segmenter, crack measurement and YuNet are within about 15 % either way.
-With IPP off only `saliency`'s output changed, so IPP computes some of it, and every IPP-off interval overlaps the
-null's for the same stage: on this CPU no stage measurably needs IPP. The gaze's gain is on the live path: every look is one warp. The warp is cheap next to a
-segmenter look, though (11.1 ms here against 445.2 for the classical segmenter on the same crop), so the job barely
-moves.
+the same stage says anything. Three do, in two findings. 5.0's warp is faster and computes differently: 4.14 took
+x1.60 (1.38-1.85) of its time on the straight 512-px gaze and x2.43 (2.07-2.86) on the oblique one, and its output
+differs, as the migration guide says 5.0's bilinear warp without lookup tables does. And 5.0 runs the NanoDet
+privacy detector in about half the time, x1.95 (1.79-2.13) for 4.14 (`readNet` picks `ENGINE_NEW` on 5.0; 4.14 has
+only its one engine), with the same boxes. Decode, pyramid, saliency, quality, enhance, the classical segmenter,
+crack measurement and YuNet are within about 15 % either way. With IPP off only `saliency`'s output changed, so IPP
+computes some of it, and every IPP-off interval overlaps the null's for the same stage: on this CPU no stage
+measurably needs IPP. Every look is one warp, but the warp is cheap next to a segmenter look (11.1 ms here against
+445.2 for the classical segmenter on the same crop), so a job barely moves.
 
 **KleidiCV, by name only.** The aarch64 wheel's KleidiCV cannot be switched off at run time (the HAL replaces
 OpenCV's calls when the wheel is built, and KleidiCV's OpenCV HAL header, `adapters/opencv/kleidicv_hal.h` on its
@@ -789,8 +830,8 @@ its wrappers fall back to OpenCV's own code when KleidiCV declines.
 - `CV_COMPARE` (`cv2.compare` for `_clean`'s class masks; not new in 5.0) left every trace identical but did not
   pass the rule (the timing table): it ships off, the NumPy form.
 - `ENGINE_CLASSIC` for v1 (`OnnxSegmenter(engine="classic")`, or `DRISHYAM_DNN_ENGINE=classic`) ships off. It
-  passed the identity this task set for a DNN change on this Mac (below: every argmax equal, max |dprob| under 1e-4,
-  every trace identical) but was not faster here: slower on 16 threads, the agent's default on this machine, and no
+  passed the identity asked of a DNN change on this Mac (above: every argmax equal, max |dprob| under 1e-4, every
+  trace identical) but was not faster here: slower on 16 threads, the agent's default on this machine, and no
   measurable change on one. Its gain is on Arm (x0.38 of the forward on the Neoverse-N2 above), where the agent-level
   run is pending. It also needs the `onnx` package to write its static-shape copy, a development dependency the
   Lambda package does not install.
@@ -813,10 +854,10 @@ its wrappers fall back to OpenCV's own code when KleidiCV declines.
   static copy to a temporary file), and `enableFusion(False)` leaves an `ENGINE_NEW` net empty (its forward asserts
   `!empty()`).
 
-**Arm: pending.** The `engines` job of `.github/workflows/bench-arm64.yml` runs both benchmarks on GitHub's Arm and
-x86 runners when dispatched with `-f features=true` (`bench/opencv5_features.py --threads 1,2,4`, on the v1 weights
-it downloads and checks as above) and `-f builds=true` (the `builds` job, `bench/opencv_builds.py`, which installs
-the 4.14 wheel on each runner and needs no weights). Neither has run. From a pushed branch:
+**Arm: pending.** `.github/workflows/bench-arm64.yml` runs both benchmarks on GitHub's Arm and x86 runners: with
+`-f features=true` its `engines` job runs `bench/opencv5_features.py --threads 1,2,4` on the v1 weights it downloads
+and checks as above, and with `-f builds=true` its `builds` job runs `bench/opencv_builds.py`, which installs the
+4.14 wheel on each runner and needs no weights. Neither has run. From a pushed branch:
 
 ```bash
 gh workflow run bench-arm64.yml --repo vj-io/drishyam --ref <branch> -f bench=false -f engines=false -f features=true -f builds=true
@@ -853,3 +894,5 @@ goes, layer kind by layer kind; and the builds job says what 5.0's own changes b
 - The macro worker sweep (`WORKERS`) on GitHub: one worker only.
 - The dacl10k net on Arm in INT8: the x86 INT8 result above does not predict it. FP32 and FP16 ran on both engines
   there once (run 39617514621, "OpenCV 5 DNN engines for v1").
+- "OpenCV 5 features in the pipeline" on Arm: its two benchmarks (the flags' identity and timing, v1's per-layer
+  profile, the agent on `ENGINE_CLASSIC`, 5.0 against 4.14) have run on this Mac only.

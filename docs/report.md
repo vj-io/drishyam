@@ -181,9 +181,33 @@ limits and the cost table, is [aws.md](aws.md).
 | Segment | classical engine: `cvtColor`, `createCLAHE`, `GaussianBlur`, `medianBlur`, `morphologyEx`, `inRange`, `dilate`, `connectedComponentsWithStats`; ONNX engine: `dnn.readNetFromONNX(path, engine=cv2.dnn.ENGINE_NEW)` | `segment.py` |
 | Measure and verify | `morphologyEx` (hit-or-miss thinning), `findContours`, `minAreaRect`, `arcLength`, `approxPolyDP`; cross-level mask IoU through `warpPerspective` and `dilate` | `measure.py`, `agent.py` |
 
-Only one call is specific to OpenCV 5: the `engine=cv2.dnn.ENGINE_NEW` argument (`OnnxSegmenter._load` in `segment.py`), on the opt-in
-ONNX path, which `tests/test_segment.py` exercises with a tiny ONNX model. The live demo runs v1 on that path (since
-2026-10-21), so it uses this one OpenCV-5-only API; it runs on the stock OpenCV 5.0.0 wheel.
+**What OpenCV 5 adds, and what the pipeline does with it.** "New in 5.0" means absent from the latest 4.x wheel,
+opencv-python-headless 4.14.0.94 (`results/local-macos-x86/opencv_builds.json`). [bench.md](bench.md), "OpenCV 5
+features in the pipeline", has every figure, the rule a change had to pass (the agent's traces identical to the byte
+on the ten demo samples and four synth_dev images, with both segmenters, and a measured speed-up) and what was not
+adopted. The timings are this Mac's (a heavily shared machine) unless a runner is named; the Arm runs of both new
+benchmarks are pending.
+
+- `ENGINE_NEW` (new in 5.0): `engine=cv2.dnn.ENGINE_NEW` in `OnnxSegmenter._load` (`segment.py`, exercised by
+  `tests/test_segment.py` with a tiny ONNX model) is the only engine that reads v1, which the live demo runs since
+  2026-10-21 on the stock 5.0.0 wheel. On 5.0 `readNet` gives it to the NanoDet privacy detector too: 4.14 took
+  x1.95 (1.79-2.13) of 5.0's time on that forward.
+- 5.0's bilinear warp without lookup tables (new in 5.0): 4.14 took x1.60 (1.38-1.85) of 5.0's time on the gaze's
+  `warpPerspective` and x2.43 (2.07-2.86) on an oblique one, with a different output. The warp is cheap next to a
+  segmenter look, so a job barely moves.
+- The engine selector with `ENGINE_CLASSIC` on a static-shape copy of v1 (the selector is new in 5.0; the classic
+  engine is 4.x's): `OnnxSegmenter(engine="classic")`, off. On GitHub's Neoverse-N2 runner it ran v1's forward in
+  x0.38 of `ENGINE_NEW`'s time. On this Mac the agent's traces with it were identical on 14 of 14 photos, every
+  argmax equal, but its looks took x1.30 (1.29-1.32) of `ENGINE_NEW`'s time on 16 threads, so it is not adopted; the
+  agent-level Arm run is pending, and the Lambda package lacks the `onnx` package it needs for the copy.
+- The new engine's profiling mode (`Net.setProfilingMode(DNN_PROFILE_DETAILED)`, new in 5.0), in
+  `bench/opencv5_features.py`: v1's time per layer on both engines. Here its twelve 3x3 convolutions are 81 % of
+  `ENGINE_NEW`'s time on one thread; on Arm the same profile is to show where the new engine's 2.6 times longer
+  forward goes.
+- `CV_Bool` (new in 5.0): the NumPy bool footprint as a `copyTo` mask in `segment.restrict`. Identical, faster in
+  three of its four timings, off under the rule.
+- `reduceArgMax` (OpenCV 4.6, not new) in `segment.finish`: identical, x0.52 to x0.74 of NumPy's time, adopted
+  (`CV_ARGMAX`); on a whole look the gain is within this machine's noise.
 
 **What OpenCV 5's DNN module loaded, and what it did not.** The v1 model loads only on `ENGINE_NEW`:
 `ENGINE_CLASSIC` stops at the decoder's `Shape` node (`Assertion failed: !isDynamicShape in function 'parseShape'`)

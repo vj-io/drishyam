@@ -41,8 +41,9 @@ CV_COMPARE = False  # _clean: cv2.compare(CMP_EQ), 255 where NumPy's == gives 1 
 CV_BOOL_MASKS = False  # restrict: cv2.copyTo with the bool footprint as a CV_Bool mask (new in OpenCV 5.0); identical,
 # faster in 3 of its 4 timings, the fourth's interval reaching 1.02: not adopted under the rule
 # The engine OnnxSegmenter reads its FP32 net with: "new" (ENGINE_NEW, the default) or "classic" (ENGINE_CLASSIC on
-# a static-shape copy per input size; the FP16 net stays on ENGINE_NEW, which alone runs it). Not adopted: its output
-# differs from ENGINE_NEW's by up to 2.5e-5 in probability (docs/bench.md, "OpenCV 5 DNN engines for v1").
+# a static-shape copy per input size; the FP16 net stays on ENGINE_NEW, which alone runs it). Not adopted: on the x86
+# Mac the agent's traces matched but its looks were slower on 16 threads; on Arm its forward is faster, and the
+# agent-level run there is pending (docs/bench.md, "OpenCV 5 features in the pipeline").
 DNN_ENGINE = os.environ.get("DRISHYAM_DNN_ENGINE", "new")
 
 
