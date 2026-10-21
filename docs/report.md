@@ -23,7 +23,7 @@ photos; chance is the same model's boxes moved to random places, and IoU-only dr
 | v2c | 0.48 (0.44–0.53) | 0.28 | 0.23 (0.07) | 0.57 (0.54–0.61) | 22 of 51 | 3.71 |
 | classical engine | 0.19 (0.16–0.23) | 0.12 | 0.08 (0.03) | 0.48 (0.44–0.52) | 34 of 51 | 1.73 |
 
-- **v1 runs live since 2026-10-21** (deployed commit 4fe8e30, smoke-tested: [aws.md](aws.md)). It was chosen on the
+- **v1 runs live since 2026-10-21** (deployed commit f12f50f, smoke-tested: [aws.md](aws.md)). It was chosen on the
   dev splits only (`results/dev/model_choice_dev.json`); held out it is again the only model with no measurable
   loss against any other. These are its second scorings (one earlier, unpublished). Its CC BY-NC 4.0 weights are
   release assets of v1.1.0, not in git.
@@ -145,14 +145,15 @@ limits and the cost table, is [aws.md](aws.md).
   AppErrors) and X-Ray tracing. The alarms and a 20 USD monthly budget publish to one SNS topic, whose email
   subscription is confirmed: a test alarm (AppErrors set to ALARM by hand) reached the owner's email on 2026-10-21.
   The alarms have no OK action, so a recovery sends no email.
-- **Smoke test** (`scripts/aws.sh smoke`, `scripts/smoke.sh`): `smoke 2026-10-21T11:15:48Z result=pass`, against
-  the deployed build of commit 4fe8e30, the commit `/api/health` reports, with segmenter
+- **Smoke test** (`scripts/aws.sh smoke`, `scripts/smoke.sh`): `smoke 2026-10-21T11:38:30Z result=pass`, against
+  the deployed build of commit f12f50f (4fe8e30's app code and the re-rendered film), the commit `/api/health`
+  reports, with segmenter
   `onnx:drishyam_dacl10k.onnx` on aarch64: a job on `bridge_03.jpg` streamed to its `done` event; KILL, sent after
   step 2 streamed, halted the second job after 3 steps with cause `kill-switch`; a `POST` without the body hash and a
-  direct Function URL call both got 403; and the step p95 was 690.8 ms over one job's 4 steps, under v1's 1500 ms
-  limit. The live browser suite (`tests/e2e/test_ui_live.py`) passed twice against the same deploy. The run before
-  it, on commit c06fdf9, also checked the WAF, which answered 429 at the 20th empty-bodied job start (WAF evaluates
-  rates about every 10 s, so it blocks late). With v1 a step's p95 was 0.52 to 1.14 s over the ten smoke runs since
+  direct Function URL call both got 403; and the step p95 was 666.4 ms over one job's 4 steps, under v1's 1500 ms
+  limit. The live browser suite (`tests/e2e/test_ui_live.py`) passed against this deploy, and twice against 4fe8e30.
+  An earlier run, on commit c06fdf9, also checked the WAF, which answered 429 at the 20th empty-bodied job start (WAF evaluates
+  rates about every 10 s, so it blocks late). With v1 a step's p95 was 0.52 to 1.14 s over the eleven smoke runs since
   the v1 deploy, against 67.7 to 88.0 ms for the classical engine before it ([aws.md](aws.md) quotes the runs).
 - **Cost.** Spent so far: 0.62 USD before credits, month to date on 2026-10-21 (Cost Explorer; 0.59 of it the WAF),
   0.00 USD after them. The list-price estimate is about 10 USD a month at 1,000 jobs a month, 8 of it the WAF ([aws.md](aws.md)). The $ shown

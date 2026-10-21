@@ -92,3 +92,10 @@ PASS kill: halted cause=kill-switch steps=3
 PASS oac-unsigned-post: 403
 PASS function-url-direct: 403
 smoke 2026-10-21T11:15:48Z https://d1xg58guluup8c.cloudfront.net commit=4fe8e3014c5eae65bc2aeacaf683a7b34ca94a55 package=zt3ae1LspPxb2+I34jVhG75ObZEtmwt6qEgWApdokCo= ttfb_first=1.101934s ttfb_warm=1.001083s step_p95_ms=690.8 result=pass
+PASS health: {"version":"1.1.0","opencv":"5.0.0","build":"stock (not COOL)","segmenter":"onnx:drishyam_dacl10k.onnx","host":"aws-lambda","arch":"aarch64","commit":"f12f50f8cebf758daa047ceefa9317c3557f56bb"}, ttfb first 1.163289s (cold if the function was idle or just deployed), warm 1.369439s
+PASS job: awaiting_review cause=stop-rule steps=4 seconds=2.666, ttfb 2.927700s, total 5.644829s
+INFO latency: p95 666.4 ms per step over 4 steps, aarch64 OpenCV 5.0.0 stock (not COOL)
+PASS kill: halted cause=kill-switch steps=3
+PASS oac-unsigned-post: 403
+PASS function-url-direct: 403
+smoke 2026-10-21T11:38:30Z https://d1xg58guluup8c.cloudfront.net commit=f12f50f8cebf758daa047ceefa9317c3557f56bb package=zt3ae1LspPxb2+I34jVhG75ObZEtmwt6qEgWApdokCo= ttfb_first=1.163289s ttfb_warm=1.369439s step_p95_ms=666.4 result=pass
