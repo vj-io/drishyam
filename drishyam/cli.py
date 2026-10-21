@@ -177,12 +177,14 @@ def cmd_run(a) -> int:
     print(f"job {job.id}: {done['status']} ({done['cause']})")
     print(
         f"steps {s['steps']}  pixels {s['pixels_frac']:.1%}  ${s['usd']}  {s['seconds']} s  "
-        f"coverage {done['coverage']:.0%}"
+        f"looked at {done['coverage_looked']:.0%} of the salient area (the survey look not counted)"
     )
     if a.cost_model == "fixed":
         print(f"seconds and $ are modelled from results/{a.micro_arm}/micro.json (--cost-model fixed), not measured")
     print(f"findings {s['findings']}  critical pending review {s['critical_pending']}")
     print(f"work order {wo_path} ({done['work_order']['status']})")
+    if na := done["work_order"]["not_assessed"]:
+        print(f"not assessed: {len(na)} area{'s' * (len(na) > 1)} listed in the work order; a person should look there")
     if s["critical_pending"]:
         print(
             f"a human decides each critical finding: drishyam review {wo_path} <finding id> approve|reject --by NAME"
