@@ -26,5 +26,491 @@
   "bash runs/fallback/sweep.sh, which for split in synth_dev clean real runs: DRISHYAM_ONNX=models/drishyam_dacl10k.onnx DRISHYAM_ONNX_FP16=models/drishyam_dacl10k.fp16.onnx PYTHONPATH=<the worktree> .venv/bin/python -m evals.dev_sweep <split> 0.3 \"cur=fallback_l2:False;fb=fallback_l2:True\" --workers 6 --micro-arm local-macos-x86-dacl10k-retime --codebrim data/codebrim --out runs/fallback/<split>.json --dump runs/fallback/<split>.dump.json.gz, and logs the code commit, the tracked changes and the load at the start and end of each split in runs/fallback/log.txt",
   "then the rows, counts and verdict are read from runs/fallback/<split>.json and the dumps into this file by the rule above, unchanged"
  ],
- "if_adopted_held_out": "Each held-out set once, v1 with fallback_l2 on (the new default), as v1's earlier held-out runs (runs/heldout/run_model.sh dacl10k local-macos-x86-dacl10k-retime): the dacl10k-vs-CODEBRIM leakage check (evals.leakage) first; then python -m evals.harness --cost-model fixed --micro-arm local-macos-x86-dacl10k-retime --workers 6 with DRISHYAM_ONNX set, on data/codebrim (--n 200: eval200.txt), data/synth200 (--n 200, seed 7) and data/synth_clean (--n 51 --seed 11 --chaos 0,0,0), into runs/model-eval/onnx-fb-<set>; every job's switches must say fallback_l2 True; then python -m evals.heldout adds them to results/heldout_models.json as a new model \"v1+fallback\" beside v1 (whose runs are not repeated), with prior_exposure saying how often v1 was read on these sets before (CODEBRIM eval200 and synth200 twice, synth_clean once: evals.heldout.PRIOR and its published runs) and that this configuration was chosen on dev after those reads. Nothing is written to public/."
+ "if_adopted_held_out": "Each held-out set once, v1 with fallback_l2 on (the new default), as v1's earlier held-out runs (runs/heldout/run_model.sh dacl10k local-macos-x86-dacl10k-retime): the dacl10k-vs-CODEBRIM leakage check (evals.leakage) first; then python -m evals.harness --cost-model fixed --micro-arm local-macos-x86-dacl10k-retime --workers 6 with DRISHYAM_ONNX set, on data/codebrim (--n 200: eval200.txt), data/synth200 (--n 200, seed 7) and data/synth_clean (--n 51 --seed 11 --chaos 0,0,0), into runs/model-eval/onnx-fb-<set>; every job's switches must say fallback_l2 True; then python -m evals.heldout adds them to results/heldout_models.json as a new model \"v1+fallback\" beside v1 (whose runs are not repeated), with prior_exposure saying how often v1 was read on these sets before (CODEBRIM eval200 and synth200 twice, synth_clean once: evals.heldout.PRIOR and its published runs) and that this configuration was chosen on dev after those reads. Nothing is written to public/.",
+ "decision": "Adopted by the rule as stated (every clause holds): fallback_l2 becomes the default, for every profile. The pass rests on 1 of 190 dev photos: no photo of synth_dev or of the clean dev split has zero candidates under v1 (0 of 60, 0 of 30), so on them fb equals cur photo for photo and their clauses pass trivially (recall x1.00, CI 1.00-1.00; clean differences 0, CIs [0, 0]); in particular no clean photo exercised the false-alarm clause. On CODEBRIM dev100 the fallback acted on 1 photo of 100 (2048x1536): its fallback look at L2 and a verify look at L1 drafted 2 crack boxes and found 1 of its 1 ground-truth box, which cur missed (0): recall x1.0025 (CI 1.00-1.0093), boxes per photo 39.12 to 39.14, no critical box added. Modelled cost: +1183.3 ms on that photo (two looks of about 592 ms on the 2048x1536 row of the table), +11.8 ms per job over dev100 (x1.0035, CI 1.00-1.0135). That is the rule's outcome; it does not show the fallback helps in general, only that on these dev splits it cost no recall and added no false alarm, and it acted on almost nothing.",
+ "notes": [
+  "On every photo the fallback did not act on, fb's trace, boxes and modelled seconds equal cur's (asserted), so every difference comes from the photos counted in acted_on.",
+  "cur reproduces v1's dev rows in results/dev/model_choice_dev.json photo for photo (found, IoU-only found, ground truth, boxes and modelled ms; the chance columns are seeded by the row's name): cur_reproduces_v1_in_model_choice_dev.",
+  "acted_on.real.indices index the split's photo order (evals/codebrim_dev100.txt as harness.load_records reads it); no CODEBRIM photo or name is stored here.",
+  "the costs are a fixed table on a virtual clock, so the machine load in run.log (up to about 56) changes no row."
+ ],
+ "run": {
+  "code_commit": "b336c912dbfd2425203aaba187fc4eee756d28e6",
+  "rule_commit": "a6d8882",
+  "rule_committed": "2026-10-21T19:45:49+05:30",
+  "first_output": "2026-10-21T19:46:05+05:30",
+  "order_checked": "the rule commit's time is before the run log's and every split log's creation (asserted)",
+  "log": [
+   "2026-10-21T14:16:05Z start | load { 10.98 8.39 8.12 } | HEAD b336c912dbfd2425203aaba187fc4eee756d28e6 | tracked changes 0",
+   "2026-10-21T14:16:05Z synth_dev start | load { 10.98 8.39 8.12 } | HEAD b336c912dbfd2425203aaba187fc4eee756d28e6 | tracked changes 0",
+   "2026-10-21T14:18:42Z synth_dev end | load { 45.82 26.18 15.53 } | HEAD b336c912dbfd2425203aaba187fc4eee756d28e6 | tracked changes 0",
+   "2026-10-21T14:18:42Z clean start | load { 45.82 26.18 15.53 } | HEAD b336c912dbfd2425203aaba187fc4eee756d28e6 | tracked changes 0",
+   "2026-10-21T14:19:50Z clean end | load { 29.09 25.42 16.10 } | HEAD b336c912dbfd2425203aaba187fc4eee756d28e6 | tracked changes 0",
+   "2026-10-21T14:19:50Z real start | load { 29.09 25.42 16.10 } | HEAD b336c912dbfd2425203aaba187fc4eee756d28e6 | tracked changes 0",
+   "2026-10-21T14:26:58Z real end | load { 56.03 43.27 27.04 } | HEAD b336c912dbfd2425203aaba187fc4eee756d28e6 | tracked changes 0",
+   "2026-10-21T14:26:58Z end | load { 56.03 43.27 27.04 } | HEAD b336c912dbfd2425203aaba187fc4eee756d28e6 | tracked changes 0"
+  ],
+  "workers": 6,
+  "files": {
+   "synth_dev": {
+    "file": "runs/fallback/synth_dev.json",
+    "dump": "runs/fallback/synth_dev.dump.json.gz",
+    "log": "runs/fallback/synth_dev.log"
+   },
+   "clean": {
+    "file": "runs/fallback/clean.json",
+    "dump": "runs/fallback/clean.dump.json.gz",
+    "log": "runs/fallback/clean.log"
+   },
+   "real": {
+    "file": "runs/fallback/real.json",
+    "dump": "runs/fallback/real.dump.json.gz",
+    "log": "runs/fallback/real.log"
+   }
+  }
+ },
+ "datasets": {
+  "synth_dev": {
+   "n": 60,
+   "dataset_gt_sha256": "ab3ea45abb852fa21e2696721060a4952819196b2959085d6f27866726b74bd3",
+   "dataset_images_sha256": "736126cce1714f7fa3823b04d001f0a5f9d913179f959ed34c675f3cd2332777"
+  },
+  "clean": {
+   "n": 30,
+   "dataset_gt_sha256": "6007a8bf12e5641f297a1630e2f4dc3f2f335ca1806f8dea3b4daad693df2ecc",
+   "dataset_images_sha256": "eaac718e380bfc6eef0571a2c91f21a4019c82f4232866d45624be1f4fa3c373"
+  },
+  "real": {
+   "n": 100,
+   "dataset_gt_sha256": "b5b6a2b442f558285ec31a7a97747cb5c918a0db4a189b2ddfca9fab710c4cd3",
+   "dataset_images_sha256": "445cf8082075eaeccdff012920c475801e3b3200831cfe76c37a972b1fa9a477"
+  }
+ },
+ "rows": {
+  "synth_dev": {
+   "cur": {
+    "recall": 0.615,
+    "recall_ci": [
+     0.5468,
+     0.6786
+    ],
+    "recall_iou_only": 0.59,
+    "chance_recall": 0.09,
+    "precision": 0.3398,
+    "boxes_per_image": 5.9833,
+    "images_with_any": 0.95,
+    "critical_per_image": 0.8167,
+    "findings_per_image": 2.2667,
+    "pixels_frac": 0.2545,
+    "ms_per_job": 1709.8092,
+    "halt": {
+     "cap-hit": 52,
+     "stop-rule": 8
+    },
+    "looks_mean": 2.8667,
+    "looks_by_level": {
+     "L1": 112,
+     "L2": 60
+    },
+    "looks_by_action": {
+     "gaze": 114,
+     "escalate": 10,
+     "verify": 48
+    },
+    "profile": "onnx:drishyam_dacl10k.onnx",
+    "segmenter": "onnx:drishyam_dacl10k.onnx",
+    "vs_downscale": 1.0082,
+    "vs_downscale_ci": [
+     0.9389,
+     1.0763
+    ]
+   },
+   "fb": {
+    "recall": 0.615,
+    "recall_ci": [
+     0.5468,
+     0.6786
+    ],
+    "recall_iou_only": 0.59,
+    "chance_recall": 0.055,
+    "precision": 0.3398,
+    "boxes_per_image": 5.9833,
+    "images_with_any": 0.95,
+    "critical_per_image": 0.8167,
+    "findings_per_image": 2.2667,
+    "pixels_frac": 0.2545,
+    "ms_per_job": 1709.8092,
+    "halt": {
+     "cap-hit": 52,
+     "stop-rule": 8
+    },
+    "looks_mean": 2.8667,
+    "looks_by_level": {
+     "L1": 112,
+     "L2": 60
+    },
+    "looks_by_action": {
+     "gaze": 114,
+     "escalate": 10,
+     "verify": 48
+    },
+    "profile": "onnx:drishyam_dacl10k.onnx",
+    "segmenter": "onnx:drishyam_dacl10k.onnx",
+    "vs_ref": 1.0,
+    "vs_ref_ci": [
+     1.0,
+     1.0
+    ],
+    "vs_ref_iou_only_ci": [
+     1.0,
+     1.0
+    ],
+    "boxes_diff_vs_ref_ci": [
+     0.0,
+     0.0
+    ],
+    "images_with_any_vs_ref_ci": [
+     0.0,
+     0.0
+    ],
+    "ms_vs_ref": 1.0,
+    "ms_vs_ref_ci": [
+     1.0,
+     1.0
+    ],
+    "chance_vs_ref_ci": [
+     0.2857,
+     1.1334
+    ],
+    "vs_downscale": 1.0082,
+    "vs_downscale_ci": [
+     0.9389,
+     1.0763
+    ]
+   },
+   "downscale": {
+    "recall": 0.61,
+    "boxes_per_image": 2.9333,
+    "ms_per_job": 589.741
+   }
+  },
+  "clean": {
+   "cur": {
+    "recall": null,
+    "recall_ci": [
+     null,
+     null
+    ],
+    "recall_iou_only": null,
+    "chance_recall": null,
+    "precision": 0.0,
+    "boxes_per_image": 0.0333,
+    "images_with_any": 0.0333,
+    "critical_per_image": 0.0,
+    "findings_per_image": 0.0333,
+    "pixels_frac": 0.2434,
+    "ms_per_job": 1630.9224,
+    "halt": {
+     "stop-rule": 4,
+     "exhausted": 2,
+     "cap-hit": 24
+    },
+    "looks_mean": 2.7333,
+    "looks_by_level": {
+     "L1": 54,
+     "L2": 28
+    },
+    "looks_by_action": {
+     "gaze": 82
+    },
+    "profile": "onnx:drishyam_dacl10k.onnx",
+    "segmenter": "onnx:drishyam_dacl10k.onnx"
+   },
+   "fb": {
+    "recall": null,
+    "recall_ci": [
+     null,
+     null
+    ],
+    "recall_iou_only": null,
+    "chance_recall": null,
+    "precision": 0.0,
+    "boxes_per_image": 0.0333,
+    "images_with_any": 0.0333,
+    "critical_per_image": 0.0,
+    "findings_per_image": 0.0333,
+    "pixels_frac": 0.2434,
+    "ms_per_job": 1630.9224,
+    "halt": {
+     "stop-rule": 4,
+     "exhausted": 2,
+     "cap-hit": 24
+    },
+    "looks_mean": 2.7333,
+    "looks_by_level": {
+     "L1": 54,
+     "L2": 28
+    },
+    "looks_by_action": {
+     "gaze": 82
+    },
+    "profile": "onnx:drishyam_dacl10k.onnx",
+    "segmenter": "onnx:drishyam_dacl10k.onnx",
+    "boxes_diff_vs_ref_ci": [
+     0.0,
+     0.0
+    ],
+    "images_with_any_vs_ref_ci": [
+     0.0,
+     0.0
+    ],
+    "ms_vs_ref": 1.0,
+    "ms_vs_ref_ci": [
+     1.0,
+     1.0
+    ]
+   },
+   "downscale": {
+    "recall": null,
+    "boxes_per_image": 0.4,
+    "ms_per_job": 589.741
+   }
+  },
+  "real": {
+   "cur": {
+    "recall": 0.4791,
+    "recall_ci": [
+     0.4041,
+     0.5441
+    ],
+    "recall_iou_only": 0.2664,
+    "chance_recall": 0.2413,
+    "precision": 0.0846,
+    "boxes_per_image": 39.12,
+    "images_with_any": 0.91,
+    "critical_per_image": 7.24,
+    "findings_per_image": 6.61,
+    "pixels_frac": 0.1404,
+    "ms_per_job": 3367.5996,
+    "halt": {
+     "stop-rule": 76,
+     "cap-hit": 17,
+     "exhausted": 7
+    },
+    "looks_mean": 5.79,
+    "looks_by_level": {
+     "L1": 48,
+     "L2": 436,
+     "L3": 95
+    },
+    "looks_by_action": {
+     "gaze": 495,
+     "escalate": 39,
+     "verify": 45
+    },
+    "profile": "onnx:drishyam_dacl10k.onnx",
+    "segmenter": "onnx:drishyam_dacl10k.onnx",
+    "vs_downscale": 1.1794,
+    "vs_downscale_ci": [
+     1.0695,
+     1.3052
+    ]
+   },
+   "fb": {
+    "recall": 0.4803,
+    "recall_ci": [
+     0.4054,
+     0.5453
+    ],
+    "recall_iou_only": 0.2676,
+    "chance_recall": 0.2354,
+    "precision": 0.0848,
+    "boxes_per_image": 39.14,
+    "images_with_any": 0.92,
+    "critical_per_image": 7.24,
+    "findings_per_image": 6.62,
+    "pixels_frac": 0.142,
+    "ms_per_job": 3379.4326,
+    "halt": {
+     "stop-rule": 76,
+     "cap-hit": 17,
+     "exhausted": 7
+    },
+    "looks_mean": 5.81,
+    "looks_by_level": {
+     "L1": 49,
+     "L2": 437,
+     "L3": 95
+    },
+    "looks_by_action": {
+     "gaze": 496,
+     "escalate": 39,
+     "verify": 46
+    },
+    "profile": "onnx:drishyam_dacl10k.onnx",
+    "segmenter": "onnx:drishyam_dacl10k.onnx",
+    "vs_ref": 1.0025,
+    "vs_ref_ci": [
+     1.0,
+     1.0093
+    ],
+    "vs_ref_iou_only_ci": [
+     1.0,
+     1.0165
+    ],
+    "boxes_diff_vs_ref_ci": [
+     0.0,
+     0.08
+    ],
+    "images_with_any_vs_ref_ci": [
+     0.0,
+     0.04
+    ],
+    "ms_vs_ref": 1.0035,
+    "ms_vs_ref_ci": [
+     1.0,
+     1.0135
+    ],
+    "chance_vs_ref_ci": [
+     0.8518,
+     1.1286
+    ],
+    "vs_downscale": 1.1824,
+    "vs_downscale_ci": [
+     1.0751,
+     1.3098
+    ]
+   },
+   "downscale": {
+    "recall": 0.4062,
+    "boxes_per_image": 7.89,
+    "ms_per_job": 612.4838
+   }
+  }
+ },
+ "acted_on": {
+  "synth_dev": {
+   "photos": 0,
+   "of": 60,
+   "indices": [],
+   "sizes": {},
+   "looks_added": 0,
+   "looks_added_by_cause_level": {},
+   "fb_halt": {},
+   "boxes_drafted": 0,
+   "photos_with_a_box": 0,
+   "classes_drafted": {},
+   "critical_boxes": 0,
+   "ground_truth_boxes_on_them": 0,
+   "found_by_cur": 0,
+   "found_by_fb": 0,
+   "extra_modelled_ms_per_photo_acted_on": null,
+   "extra_modelled_ms_per_job_over_the_split": 0.0
+  },
+  "clean": {
+   "photos": 0,
+   "of": 30,
+   "indices": [],
+   "sizes": {},
+   "looks_added": 0,
+   "looks_added_by_cause_level": {},
+   "fb_halt": {},
+   "boxes_drafted": 0,
+   "photos_with_a_box": 0,
+   "classes_drafted": {},
+   "critical_boxes": null,
+   "ground_truth_boxes_on_them": 0,
+   "found_by_cur": 0,
+   "found_by_fb": 0,
+   "extra_modelled_ms_per_photo_acted_on": null,
+   "extra_modelled_ms_per_job_over_the_split": 0.0
+  },
+  "real": {
+   "photos": 1,
+   "of": 100,
+   "indices": [
+    28
+   ],
+   "sizes": {
+    "2048x1536": 1
+   },
+   "looks_added": 2,
+   "looks_added_by_cause_level": {
+    "fallback-l2 L2": 1,
+    "verify-new-mask L1": 1
+   },
+   "fb_halt": {
+    "exhausted": 1
+   },
+   "boxes_drafted": 2,
+   "photos_with_a_box": 1,
+   "classes_drafted": {
+    "crack": 2
+   },
+   "critical_boxes": 0,
+   "ground_truth_boxes_on_them": 1,
+   "found_by_cur": 0,
+   "found_by_fb": 1,
+   "extra_modelled_ms_per_photo_acted_on": 1183.3,
+   "extra_modelled_ms_per_job_over_the_split": 11.8
+  }
+ },
+ "evidence": {
+  "synth_dev": {
+   "vs_ref": 1.0,
+   "vs_ref_ci": [
+    1.0,
+    1.0
+   ]
+  },
+  "real": {
+   "vs_ref": 1.0025,
+   "vs_ref_ci": [
+    1.0,
+    1.0093
+   ]
+  },
+  "clean": {
+   "boxes_diff_vs_ref_ci": [
+    0.0,
+    0.0
+   ],
+   "images_with_any_vs_ref_ci": [
+    0.0,
+    0.0
+   ],
+   "boxes_per_photo": [
+    0.0333,
+    0.0333
+   ],
+   "share_with_a_box": [
+    0.0333,
+    0.0333
+   ]
+  }
+ },
+ "verdict": {
+  "recall_holds_synth_dev": true,
+  "recall_holds_real": true,
+  "clean_boxes_do_not_rise": true,
+  "clean_share_with_a_box_does_not_rise": true,
+  "adopted": true
+ },
+ "cur_reproduces_v1_in_model_choice_dev": {
+  "synth_dev": {
+   "found": true,
+   "boxes": true,
+   "ms": true
+  },
+  "clean": {
+   "found": true,
+   "boxes": true,
+   "ms": true
+  },
+  "real": {
+   "found": true,
+   "boxes": true,
+   "ms": true
+  }
+ }
 }
