@@ -4,7 +4,8 @@ The web demo (the FastAPI app and the static site) runs on AWS only, as one CDK 
 `us-east-1`: the API on Lambda arm64 (Graviton) and the static site in a private S3 bucket, both reached
 only through CloudFront and AWS WAF.
 
-**Status: deployed** on 2026-10-21 (India time) to `us-east-1` from commit dda3080, with the v1 segmenter
+**Status: deployed** on 2026-10-21 (India time) to `us-east-1`, last from commit 4fe8e30 (below). The v1 deploy
+itself came from commit dda3080, with the v1 segmenter
 (`ONNX=models/drishyam_dacl10k.onnx ONNX_FP16=models/drishyam_dacl10k.fp16.onnx RESERVED=none scripts/aws.sh deploy`)
 and the submission film in the site bucket (`video/drishyam.mp4`, served with byte ranges). The smoke run
 (`scripts/aws.sh smoke` with `WAF_LOOP=1`: checks 1 to 5 and 7 under [Smoke](#smoke)) passed: `/api/health` answered
@@ -12,21 +13,33 @@ from `aws-lambda` on `aarch64` with OpenCV 5.0.0 (`stock (not COOL)`), segmenter
 commit dda3080, a job on `bridge_03.jpg` streamed to `done` (`awaiting_review`, 6 steps), KILL halted a second job
 after 3 steps, an unsigned `POST` through CloudFront got 403, the raw Function URL got 403, and the WAF answered 429
 at the 18th empty-bodied job start. The startup log has `DRISHYAM_CV_THREADS=2: cv2.getNumThreads() = 2`. The step
-p95 was 1138.9 ms over 6 steps: with v1 a step costs 0.56 to 1.14 s at p95 over the eight smoke runs since the v1
-deploy, against 67.7 to 88.0 ms for the classical engine, so the governor's 500 ms target sends most later looks to
-the fast FP16 net. The summary line, copied here because `runs/aws-smoke.log` is git-ignored (UTC; earlier lines are
+p95 was 1138.9 ms over 6 steps: with v1 a step costs 0.52 to 1.14 s at p95 over the ten smoke runs since the v1
+deploy, against 67.7 to 88.0 ms for the classical engine. At that deploy the governor's 500 ms target sent most
+later looks to the fast FP16 net; the v1 limit is now 1500 ms (below). The summary line, copied here because `runs/aws-smoke.log` is git-ignored (UTC; earlier lines are
 in `video/live/aws-smoke.log`):
 
 ```
 smoke 2026-10-20T21:12:31Z https://d1xg58guluup8c.cloudfront.net commit=dda308072fb4e63997a4df809a2f57abd0d3dbc0 package=r7K9s9XZtHmkq0+f2OtXiTy1CUyFo5xf2GzQkv6UJMs= ttfb_first=5.516721s ttfb_warm=0.913209s step_p95_ms=1138.9 result=pass
 ```
 
-The site was then redeployed from commit 02219a2 with three wording fixes the live browser suite had found (v1's
+The site was then deployed again from commit 02219a2 with three wording fixes the live browser suite had found (v1's
 step reasons printed its profile name and scientific notation). Its smoke run (checks 1 to 5) passed, KILL halting
 the second job after 2 steps, and `tests/e2e/test_ui_live.py https://d1xg58guluup8c.cloudfront.net` passed twice:
 
 ```
 smoke 2026-10-21T04:21:29Z https://d1xg58guluup8c.cloudfront.net commit=02219a2e435ea90058fcb87f03d69f30cc3f2b4d package=r7K9s9XZtHmkq0+f2OtXiTy1CUyFo5xf2GzQkv6UJMs= ttfb_first=0.857872s ttfb_warm=0.728508s step_p95_ms=973.3 result=pass
+```
+
+The current build: the site was redeployed from commit 4fe8e30 on 2026-10-21. It adds v1's governor limit of
+1500 ms (`agent.SLA_MS_BY_PROFILE`, set from the step p95s above, not from recall), work orders that mark a photo
+with no candidate region, and the regions a KILL or a cap left unvisited, as not assessed, and the site fixes from
+the 2026-10-21 re-grade. Its smoke run (checks 1 to 5) passed, KILL halting the second job after 3 steps; the run
+before it, on c06fdf9, also checked the WAF (429 at the 20th empty-bodied job start). Their step p95s were 690.8
+and 524.7 ms over 4 steps each, under the 1500 ms limit, so the governor did not switch v1 to the fast net.
+`tests/e2e/test_ui_live.py https://d1xg58guluup8c.cloudfront.net` passed twice against 4fe8e30:
+
+```
+smoke 2026-10-21T11:15:48Z https://d1xg58guluup8c.cloudfront.net commit=4fe8e3014c5eae65bc2aeacaf683a7b34ca94a55 package=zt3ae1LspPxb2+I34jVhG75ObZEtmwt6qEgWApdokCo= ttfb_first=1.101934s ttfb_warm=1.001083s step_p95_ms=690.8 result=pass
 ```
 
 The first smoke after the v1 deploy failed KILL only: the kill reached a cold environment and the job finished

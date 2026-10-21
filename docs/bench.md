@@ -17,7 +17,7 @@ or on any AWS instance: this workstream does not deploy or write to AWS.
 | This Mac | Intel Core i9-9880H, x86, 8 cores / 16 threads; macOS GCD | opencv-python-headless 5.0.0 wheel (`uv.lock`), IPP HAL | Metric A, Metric B (1 thread and all 16), dacl10k latency, INT8 | `results/local-macos-x86/{kernels,loop,loop_onnx,int8,int8_repeat}.json` |
 | GitHub `ubuntu-24.04-arm` | Neoverse-N2, 4 logical CPUs; Linux pthreads | the same version, aarch64 wheel (KleidiCV and carotene HAL) | Metric A, Metric B at 1, 2, 4 threads, micro, macro | `results/linux-aarch64/`: `micro.json` (the fixed cost table, 2026-10-18); `kernels.json`, `loop.json`, `macro.json` and `micro_run39220769299.json` from run 39220769299 |
 | GitHub `ubuntu-24.04` | AMD EPYC 7763, 4 logical CPUs; Linux pthreads | the same version, x86_64 wheel (IPP HAL) | the same | `results/linux-x86_64/{micro,macro,kernels,loop}.json`, run 39220769299 |
-| Lambda arm64, 3008 MB | Graviton, 1.7 vCPU of time (below) | the same version, aarch64 wheel | not measured here | the smoke runs' step p95s in `docs/aws.md` are the only Lambda timings: 67.7 to 88.0 ms with the classical engine, 0.56 to 1.14 s with v1 (live since 2026-10-21) |
+| Lambda arm64, 3008 MB | Graviton, 1.7 vCPU of time (below) | the same version, aarch64 wheel | not measured here | the smoke runs' step p95s in `docs/aws.md` are the only Lambda timings: 67.7 to 88.0 ms with the classical engine, 0.52 to 1.14 s with v1 (live since 2026-10-21) |
 
 **COOL and AISPL.** The AWS India (AISPL) account could not subscribe to the COOL Marketplace AMI (the agreement was
 terminated; a support case is open), so COOL on a Graviton4 instance was not run. The Arm evidence is the deployed
@@ -463,8 +463,8 @@ load average of 7 to 15, while single forwards ran as fast as 541 ms (the review
 668 ms (`kernels.json`'s minimum). On an idle core of this speed the p95 could fall on either side of 740 ms. If the
 512 net does not fit, the governor switches to the 256 net, which fits with room (one-thread p95 199 ms). Whether a
 Graviton core is faster or slower than this i9's for this net was not measured here (the weights are not on the
-GitHub runner). The function settled it once v1 was deployed (2026-10-21): over the eight smoke runs since, a v1
-step's p95 was 0.56 to 1.14 s ([aws.md](aws.md)), so the 512 net does not fit 500 ms there. The v1 profile's SLA is
+GitHub runner). The function settled it once v1 was deployed (2026-10-21): over the eight smoke runs before the limit below, a
+v1 step's p95 was 0.56 to 1.14 s ([aws.md](aws.md)), so the 512 net does not fit 500 ms there. The v1 profile's SLA is
 therefore 1500 ms, set once from those runs plus headroom, so live looks stay on the 512 net unless steps exceed
 1.5 s.
 

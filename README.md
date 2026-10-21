@@ -32,7 +32,7 @@ drifts from that file or, for the Lambda timings, from [docs/aws.md](docs/aws.md
 | v2c | 0.48 (0.44–0.53) | 0.28 | 0.23 (0.07) | 0.57 (0.54–0.61) | 22 of 51 | 3.71 |
 | classical engine | 0.19 (0.16–0.23) | 0.12 | 0.08 (0.03) | 0.48 (0.44–0.52) | 34 of 51 | 1.73 |
 
-- **v1 runs live since 2026-10-21** (deployed commit 02219a2, smoke-tested: [docs/aws.md](docs/aws.md)). It was
+- **v1 runs live since 2026-10-21** (deployed commit 4fe8e30, smoke-tested: [docs/aws.md](docs/aws.md)). It was
   chosen on the dev splits only ([results/dev/model_choice_dev.json](results/dev/model_choice_dev.json)); held out
   it is again the only model with no measurable loss against any other. These are its second scorings (one earlier,
   unpublished). Its CC BY-NC 4.0 weights are release assets of v1.1.0, not in git.
@@ -43,7 +43,7 @@ drifts from that file or, for the Lambda timings, from [docs/aws.md](docs/aws.md
   synth200, and puts no box on a clean photo where the classical engine puts 7.08 per photo. But chance is high on
   CODEBRIM because its boxes are large; it sends 5.5 times the critical boxes to the human gate (at that rate, about 24,000
   for a 2,536-photo bridge inspection, an extrapolation from CODEBRIM photos); its modelled ms per CODEBRIM job are 1.99× (CI 1.92–2.06); and on the
-  Lambda its step p95 was 0.56 to 1.14 s, against 67.7 to 88.0 ms.
+  Lambda its step p95 was 0.52 to 1.14 s, against 67.7 to 88.0 ms.
 - **Where v1 fails:** on synthetic photos it finds no efflorescence (0.00) and almost no exposed rebar (0.02), where
   the classical engine finds 0.16 and 0.57; on one of our own wall photos it flagged nothing although a hairline
   crack is visible by eye ([report, section 9](docs/report.md#9-failures)).

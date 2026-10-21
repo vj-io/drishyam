@@ -23,7 +23,7 @@ photos; chance is the same model's boxes moved to random places, and IoU-only dr
 | v2c | 0.48 (0.44–0.53) | 0.28 | 0.23 (0.07) | 0.57 (0.54–0.61) | 22 of 51 | 3.71 |
 | classical engine | 0.19 (0.16–0.23) | 0.12 | 0.08 (0.03) | 0.48 (0.44–0.52) | 34 of 51 | 1.73 |
 
-- **v1 runs live since 2026-10-21** (deployed commit 02219a2, smoke-tested: [aws.md](aws.md)). It was chosen on the
+- **v1 runs live since 2026-10-21** (deployed commit 4fe8e30, smoke-tested: [aws.md](aws.md)). It was chosen on the
   dev splits only (`results/dev/model_choice_dev.json`); held out it is again the only model with no measurable
   loss against any other. These are its second scorings (one earlier, unpublished). Its CC BY-NC 4.0 weights are
   release assets of v1.1.0, not in git.
@@ -34,7 +34,7 @@ photos; chance is the same model's boxes moved to random places, and IoU-only dr
   synth200, and puts no box on a clean photo where the classical engine puts 7.08 per photo. But chance is high on
   CODEBRIM because its boxes are large; it sends 5.5 times the critical boxes to the human gate (at that rate, about 24,000
   for a 2,536-photo bridge inspection, an extrapolation from CODEBRIM photos); its modelled ms per CODEBRIM job are 1.99× (CI 1.92–2.06); and on the
-  Lambda its step p95 was 0.56 to 1.14 s, against 67.7 to 88.0 ms.
+  Lambda its step p95 was 0.52 to 1.14 s, against 67.7 to 88.0 ms.
 - **Where v1 fails:** on synthetic photos it finds no efflorescence (0.00) and almost no exposed rebar (0.02), where
   the classical engine finds 0.16 and 0.57; on one of our own wall photos it flagged nothing although a hairline
   crack is visible by eye (section 9).
@@ -145,15 +145,15 @@ limits and the cost table, is [aws.md](aws.md).
   AppErrors) and X-Ray tracing. The alarms and a 20 USD monthly budget publish to one SNS topic, whose email
   subscription is confirmed: a test alarm (AppErrors set to ALARM by hand) reached the owner's email on 2026-10-21.
   The alarms have no OK action, so a recovery sends no email.
-- **Smoke test** (`scripts/aws.sh smoke`, `scripts/smoke.sh`): `smoke 2026-10-21T04:21:29Z result=pass`, against
-  the deployed build of commit 02219a2, the commit `/api/health` reports, with segmenter
+- **Smoke test** (`scripts/aws.sh smoke`, `scripts/smoke.sh`): `smoke 2026-10-21T11:15:48Z result=pass`, against
+  the deployed build of commit 4fe8e30, the commit `/api/health` reports, with segmenter
   `onnx:drishyam_dacl10k.onnx` on aarch64: a job on `bridge_03.jpg` streamed to its `done` event; KILL, sent after
-  step 2 streamed, halted the second job after 2 steps with cause `kill-switch`; a `POST` without the body hash and a
-  direct Function URL call both got 403; and the step p95 was 973.3 ms over one job's steps. The live browser suite
-  (`tests/e2e/test_ui_live.py`) passed twice against the same deploy. The run before it, on the v1 deploy of commit
-  dda3080, also checked the WAF, which answered 429 at the 18th empty-bodied job start (WAF evaluates rates about
-  every 10 s, so it blocks late). With v1 a step's p95 was 0.56 to 1.14 s over the eight smoke runs since the v1
-  deploy, against 67.7 to 88.0 ms for the classical engine before it ([aws.md](aws.md) quotes the runs).
+  step 2 streamed, halted the second job after 3 steps with cause `kill-switch`; a `POST` without the body hash and a
+  direct Function URL call both got 403; and the step p95 was 690.8 ms over one job's 4 steps, under v1's 1500 ms
+  limit. The live browser suite (`tests/e2e/test_ui_live.py`) passed twice against the same deploy. The run before
+  it, on commit c06fdf9, also checked the WAF, which answered 429 at the 20th empty-bodied job start (WAF evaluates
+  rates about every 10 s, so it blocks late). With v1 a step's p95 was 0.52 to 1.14 s over the ten smoke runs since
+  the v1 deploy, against 67.7 to 88.0 ms for the classical engine before it ([aws.md](aws.md) quotes the runs).
 - **Cost.** Spent so far: 0.62 USD before credits, month to date on 2026-10-21 (Cost Explorer; 0.59 of it the WAF),
   0.00 USD after them. The list-price estimate is about 10 USD a month at 1,000 jobs a month, 8 of it the WAF ([aws.md](aws.md)). The $ shown
   in the UI and the evals is *modelled*: timed op milliseconds × 0.339 USD/h, the c8g.2xlarge rate plus the COOL
@@ -723,7 +723,7 @@ notes the large spall it missed.
   with the governor off and the 512-px FP32 net on every look, it finds 0.49 of CODEBRIM's defects at the 30 % cap
   against the classical engine's 0.19 (chance 0.30; IoU-only 0.25 against a chance of 0.08), with twice the critical
   boxes of the retrained models for the human gate; its held-out ms are modelled from x86 tables, and on the Lambda
-  its step p95 was 0.56 to 1.14 s (sections 5 and 8).
+  its step p95 was 0.52 to 1.14 s (sections 5 and 8).
 - The ablations show that at the 30 % cap the uncertainty term, the seeding and the governor change nothing
   measurable, that the uncertainty term and the seeding earn a little recall only uncapped on the 2048×1536 set, and
   that image-driven gaze order beats random order only on the larger photos (section 8).
@@ -733,7 +733,7 @@ notes the large spall it missed.
 - COOL on Graviton was not run (section 6).
 - The arm64 timings come from GitHub's `ubuntu-24.04-arm` runner (`results/linux-aarch64/`, Neoverse-N2, one
   thread for the cost table), a GitHub Actions VM, not the deployed Lambda; on the Lambda the only numbers are the
-  smoke runs' step p95s, each over one job: 67.7 to 88.0 ms with the classical engine and 0.56 to 1.14 s with v1
+  smoke runs' step p95s, each over one job: 67.7 to 88.0 ms with the classical engine and 0.52 to 1.14 s with v1
   (section 5). The evals ran on the x86 laptop with those arm64 costs (v1's held-out runs with x86 tables).
   The Arm-against-x86 comparison (section 6, [bench.md](bench.md)) is one run per runner on shared GitHub VMs.
 - The web demo is stateless; the signed `work_order.json` is its audit trail. There is no approval store, and

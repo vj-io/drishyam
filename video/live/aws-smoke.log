@@ -62,3 +62,33 @@ PASS kill: halted cause=kill-switch steps=3
 PASS oac-unsigned-post: 403
 PASS function-url-direct: 403
 smoke 2026-10-20T19:54:14Z https://d1xg58guluup8c.cloudfront.net commit=38fcaeec678d5012b7f7b8f9c75e3270ae2d6ae4 package=r7K9s9XZtHmkq0+f2OtXiTy1CUyFo5xf2GzQkv6UJMs= ttfb_first=1.308735s ttfb_warm=1.075209s step_p95_ms=957.4 result=pass
+PASS health: {"version":"1.1.0","opencv":"5.0.0","build":"stock (not COOL)","segmenter":"onnx:drishyam_dacl10k.onnx","host":"aws-lambda","arch":"aarch64","commit":"dda308072fb4e63997a4df809a2f57abd0d3dbc0"}, ttfb first 5.516721s (cold if the function was idle or just deployed), warm 0.913209s
+PASS job: awaiting_review cause=exhausted steps=6 seconds=2.812, ttfb 3.149860s, total 6.016239s
+INFO latency: p95 1138.9 ms per step over 6 steps, aarch64 OpenCV 5.0.0 stock (not COOL)
+PASS kill: halted cause=kill-switch steps=3
+PASS oac-unsigned-post: 403
+PASS function-url-direct: 403
+PASS waf: blocked at request 18: 400 400 400 400 400 400 400 400 400 400 400 400 400 400 400 400 400 429
+smoke 2026-10-20T21:12:31Z https://d1xg58guluup8c.cloudfront.net commit=dda308072fb4e63997a4df809a2f57abd0d3dbc0 package=r7K9s9XZtHmkq0+f2OtXiTy1CUyFo5xf2GzQkv6UJMs= ttfb_first=5.516721s ttfb_warm=0.913209s step_p95_ms=1138.9 result=pass
+PASS health: {"version":"1.1.0","opencv":"5.0.0","build":"stock (not COOL)","segmenter":"onnx:drishyam_dacl10k.onnx","host":"aws-lambda","arch":"aarch64","commit":"02219a2e435ea90058fcb87f03d69f30cc3f2b4d"}, ttfb first 0.857872s (cold if the function was idle or just deployed), warm 0.728508s
+PASS job: awaiting_review cause=exhausted steps=6 seconds=2.482, ttfb 2.217660s, total 4.725856s
+INFO latency: p95 973.3 ms per step over 6 steps, aarch64 OpenCV 5.0.0 stock (not COOL)
+PASS kill: halted cause=kill-switch steps=2
+PASS oac-unsigned-post: 403
+PASS function-url-direct: 403
+smoke 2026-10-21T04:21:29Z https://d1xg58guluup8c.cloudfront.net commit=02219a2e435ea90058fcb87f03d69f30cc3f2b4d package=r7K9s9XZtHmkq0+f2OtXiTy1CUyFo5xf2GzQkv6UJMs= ttfb_first=0.857872s ttfb_warm=0.728508s step_p95_ms=973.3 result=pass
+PASS health: {"version":"1.1.0","opencv":"5.0.0","build":"stock (not COOL)","segmenter":"onnx:drishyam_dacl10k.onnx","host":"aws-lambda","arch":"aarch64","commit":"c06fdf923f8b4dd8697656b537a29cdaa0caa3f2-dirty"}, ttfb first 1.441142s (cold if the function was idle or just deployed), warm 1.883115s
+PASS job: awaiting_review cause=stop-rule steps=4 seconds=2.17, ttfb 11.560296s, total 13.686534s
+INFO latency: p95 524.7 ms per step over 4 steps, aarch64 OpenCV 5.0.0 stock (not COOL)
+PASS kill: halted cause=kill-switch steps=3
+PASS oac-unsigned-post: 403
+PASS function-url-direct: 403
+PASS waf: blocked at request 20: 400 400 400 400 400 400 400 400 400 400 400 400 400 400 400 400 400 400 400 429
+smoke 2026-10-21T10:51:27Z https://d1xg58guluup8c.cloudfront.net commit=c06fdf923f8b4dd8697656b537a29cdaa0caa3f2-dirty package=zt3ae1LspPxb2+I34jVhG75ObZEtmwt6qEgWApdokCo= ttfb_first=1.441142s ttfb_warm=1.883115s step_p95_ms=524.7 result=pass
+PASS health: {"version":"1.1.0","opencv":"5.0.0","build":"stock (not COOL)","segmenter":"onnx:drishyam_dacl10k.onnx","host":"aws-lambda","arch":"aarch64","commit":"4fe8e3014c5eae65bc2aeacaf683a7b34ca94a55"}, ttfb first 1.101934s (cold if the function was idle or just deployed), warm 1.001083s
+PASS job: awaiting_review cause=stop-rule steps=4 seconds=2.798, ttfb 3.039926s, total 5.841176s
+INFO latency: p95 690.8 ms per step over 4 steps, aarch64 OpenCV 5.0.0 stock (not COOL)
+PASS kill: halted cause=kill-switch steps=3
+PASS oac-unsigned-post: 403
+PASS function-url-direct: 403
+smoke 2026-10-21T11:15:48Z https://d1xg58guluup8c.cloudfront.net commit=4fe8e3014c5eae65bc2aeacaf683a7b34ca94a55 package=zt3ae1LspPxb2+I34jVhG75ObZEtmwt6qEgWApdokCo= ttfb_first=1.101934s ttfb_warm=1.001083s step_p95_ms=690.8 result=pass
