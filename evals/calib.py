@@ -64,7 +64,8 @@ def run_one(path: Path, boxes: list[dict], rows: list[dict]) -> dict:
             "found_union": sum(harness.found(g, union) for g in boxes),
             "found_comp": sum(harness.found(g, comps) for g in boxes),
             "rejected": dict(Counter(x["cause"] for e in events if e["type"] == "step" for x in e.get("rejected", []))),
-            "not_assessed": len(events[-1]["work_order"]["not_assessed"]),
+            # the areas the gate or the overview could not read (re-shoot), not those a halt left (check-by-eye)
+            "not_assessed": sum(a["action"] == "re-shoot" for a in events[-1]["work_order"]["not_assessed"]),
             "pixels_frac": events[-1]["summary"]["pixels_frac"], "halt": events[-1]["cause"]}
 
 

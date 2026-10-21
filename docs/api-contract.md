@@ -133,7 +133,8 @@ Event types, in order:
  "cause": "stop-rule",                                  // stop-rule | exhausted | cap-hit | kill-switch | planner:stop
  "summary": {"steps": 14, "pixels_used": 1950000, "pixels_frac": 0.289, "usd": 0.0008,
              "seconds": 8.4, "findings": 3, "critical_pending": 1},
- "coverage": 0.62, "unvisited": ["r9", "r10"],
+ "coverage": 0.62, "unvisited": ["r9", "r10"],           // salient area seen at any level, the survey included
+ "coverage_looked": 0.41,                               // ... seen by a look other than the survey (looked at closely)
  "drills_not_reached": ["planner_malformed"],          // requested chaos drills whose fixed step (timeout 3,
                                                         // spike 4, malformed 6) the job never reached: they tested
                                                         // nothing; [] when every requested drill fired
@@ -240,8 +241,9 @@ lambda = max(eps x value found / ms spent, eps x v0 / t_hat), with eps 0.25 and 
 floor, the value of a look that finds nothing, so a photo with nothing to find can stop before its cap. The floor
 holds only once every candidate still worth a look (unseen > 0) has been shown by a look at least as fine as its
 own first look (L1 by default): a coarser look (the survey, L2 or L3) cannot resolve what that look would, a
-hairline crack for one, so its seed orders candidates but never ends a job. A job therefore never stops on a saliency prior and a coarse view alone,
-nor before it has seen anything; on a photo whose candidates lie apart the floor rarely binds and the cap ends it. A `stop-rule` halt names the binding term:
+hairline crack for one, so its seed orders candidates but never ends a job. The stop rule therefore never ends a job on a saliency prior and a coarse view alone,
+nor before it has seen anything (an overview that proposes no candidate ends the job `exhausted` with no look, and its
+work order lists the whole photo as not assessed); on a photo whose candidates lie apart the floor rarely binds and the cap ends it. A `stop-rule` halt names the binding term:
 `"best score 1.2e-04 < lambda 2.0e-04 (floor: eps x v0 / t_hat)"` or `"... (eps x value/cost)"`.
 
 Step `decision.action` values: `gaze` (first look at a region, or the survey), `escalate`
@@ -442,12 +444,15 @@ A wrong token is accepted and kills nothing (no oracle). Returns `{"ok": true, "
  "profile": "classical-v1", "weights_sha256": null}
 ```
 
-`status` is `blocked` while any critical finding is `pending_review`, else `ready`. `profile` is the job's (see the
-step record) and `weights_sha256` the sha256 of the ONNX weights that made its looks (`null` for the classical
-engine); a work order the MCP tools draft has neither, since there the client chose every level.
-`not_assessed` lists every window the quality gate refused (`reason` `blur`, `glare` or `dark`;
-`box` clipped to the image), and, with `step` 0, every blown-out or black area the overview found larger than 5 %
-of the image, which gets no look at all, so an area the agent could not read never passes for a clean one.
+`status` is `blocked` while any critical finding is `pending_review`, else `incomplete` while `not_assessed` lists
+anything (a person should look there), else `ready`; the done record's own `status` keeps its meaning. `profile` is
+the job's (see the step record) and `weights_sha256` the sha256 of the ONNX weights that made its looks (`null` for
+the classical engine); a work order the MCP tools draft has neither, since there the client chose every level.
+`not_assessed` lists every window the quality gate refused (`reason` `blur`, `glare` or `dark`; `box` clipped to the
+image), and, with `step` 0, every blown-out or black area the overview found larger than 5 % of the image, which gets
+no look at all, so an area the agent could not read never passes for a clean one. With `action` `check-by-eye` it also
+lists the whole photo when the overview proposed no candidate (`reason` `no candidate region was proposed`) and, after
+a `kill-switch` or `cap-hit` halt, each candidate no look of its own reached (`region` names it).
 
 ### Downloaded work-order file
 

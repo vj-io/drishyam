@@ -509,6 +509,7 @@ class Job:
 
         self.regions = {c.id: Region(c.id, c.cx, c.cy, c.prior, first, box=c.box) for c in cands}
         self.seen = [np.zeros(sal.shape, bool) for _ in range(len(pyr))]
+        self.looked = np.zeros(sal.shape, bool)  # seen by a look other than the survey: coverage_looked
         self.forced: deque = deque()
         replay_meta: deque = deque()  # (x, y, size) of each replayed look, applied when it runs
         prev_r = None
@@ -532,6 +533,9 @@ class Job:
         govs: list = []  # governor overrides not yet written to the trace (PRD rule 5: every override writes a cause)
         rng = random.Random(cfg.seed)  # only the order="random" ablation draws from it
         self.not_assessed = imaging.unseen_areas(pyr[ov], self.ov_scale, (W, H))  # too large to spend looks on
+        if not cands and not self.replay:  # nothing proposed is not a clean photo: no look will run, so a person looks
+            self.not_assessed.append({"step": 0, "box": [0, 0, W, H], "reason": "no candidate region was proposed",
+                                      "action": "check-by-eye"})
         asked: set = set()  # (finding id, class) pairs already sent to review as ambiguous
         self.followups = 0  # events that follow the step record just yielded (its findings and review requests)
         self.drills: set = set()  # the chaos drills that fired (each on its fixed step)
@@ -637,6 +641,8 @@ class Job:
                 self.drills.add(injected)
             y0, y1, x0, x1 = _rect_on(self.seen[level].shape, window, self.ov_scale)
             self.seen[level][y0:y1, x0:x1] = True
+            if cause != "survey" and not (cause == "replay" and self.step == 1 and level > first):  # nor its replay
+                self.looked[y0:y1, x0:x1] = True
             sal_max = round(float(sal[y0:y1, x0:x1].max()), 4) if y1 > y0 and x1 > x0 else 0.0
 
             # 5. what the measurements say to do next
@@ -794,6 +800,11 @@ class Job:
         status = "halted" if halted else ("awaiting_review" if pending else "completed")
         seen_any = np.logical_or.reduce(self.seen)
         coverage = float((sal * seen_any).sum() / max(sal.sum(), 1e-6))
+        if halted:  # a candidate the halt left without a look of its own is not assessed, never clean
+            self.not_assessed += [{"step": self.step, "box": imaging.l0_box(r.box, np.eye(3), (W, H)),
+                                   "reason": f"not looked at: {halt_cause} halted the job first",
+                                   "action": "check-by-eye", "region": r.id}
+                                  for r in self.regions.values() if not r.looks and r.box is not None]
         self.work_order = work_order(self.id, self.findings, self.gaze_path, self.not_assessed)
         self.work_order["profile"] = cfg.profile  # the levels it looked at were this segmenter's (PROFILES)
         self.work_order["weights_sha256"] = getattr(self.segmenter, "sha256", None)  # the model that looked (WEIGHTS)
@@ -804,7 +815,8 @@ class Job:
                            "pixels_frac": round(self.budget.pixels_used / (W * H), 4),
                            "usd": round(self.budget.usd_used, 6), "seconds": round(self.budget.seconds_used, 3),
                            "findings": len(self.findings), "critical_pending": pending},
-               "coverage": round(coverage, 4),
+               "coverage": round(coverage, 4),  # seen at any level, the survey included
+               "coverage_looked": round(float((sal * self.looked).sum() / max(sal.sum(), 1e-6)), 4),
                "unvisited": [r.id for r in self.regions.values() if not r.looks],
                # requested drills whose step the job never reached (it ended first): they tested nothing
                "drills_not_reached": [d for d in cfg.chaos if d not in self.drills],

@@ -96,13 +96,13 @@ def test_review_approve_unblocks_the_order(copy, capsys):
         doc = json.loads(wo.read_text())
         assert {f["id"]: f["state"] for f in doc["findings"]}[fid] == "approved"
         assert doc["status"] == (
-            "ready" if i == len(critical) else "blocked"
-        )  # ready only after the last one
+            "incomplete" if i == len(critical) else "blocked"
+        )  # unblocked only after the last one; not ready, since the small cap left candidates not assessed
     assert [(a["finding_id"], a["decision"], a["reviewer"]) for a in doc["approvals"]] == [
         (fid, "approve", "A. Engineer") for fid in critical
     ]
     assert doc["approvals"][0]["at"].endswith("Z") and not pending(wo)
-    assert f"{critical[-1]} approved by A. Engineer; work order ready" in capsys.readouterr().out
+    assert doc["not_assessed"] and f"{critical[-1]} approved by A. Engineer; work order incomplete" in capsys.readouterr().out
     assert not (copy / "work_order.json.tmp").exists()
 
 

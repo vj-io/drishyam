@@ -159,7 +159,11 @@ def work_order(job_id: str, findings: list[Finding], gaze_path: list[list[int]],
 
 
 def order_status(wo: dict) -> str:
-    return "blocked" if any(f["state"] == "pending_review" for f in wo["findings"]) else "ready"
+    """blocked while a critical finding awaits a person; incomplete while an area is not assessed (a person looks
+    there); ready only when neither is left."""
+    if any(f["state"] == "pending_review" for f in wo["findings"]):
+        return "blocked"
+    return "incomplete" if wo["not_assessed"] else "ready"
 
 
 def _b64(b: bytes) -> str:
