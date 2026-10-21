@@ -32,8 +32,8 @@ photos; chance is the same model's boxes moved to random places, and IoU-only dr
   (half size) on a 2048-px photo and L2 on a 4608-px one, so on these photos it never looks at full resolution.
 - **Against the classical engine,** v1 finds 2.54× (2.16–3.01) its recall on CODEBRIM and 1.34× (1.24–1.45) on
   synth200, and puts no box on a clean photo where the classical engine puts 7.08 per photo. But chance is high on
-  CODEBRIM because its boxes are large; it sends 5.5 times the critical boxes to the human gate (about 24,000 for
-  the 2,536 photos of one bridge inspection); its modelled ms per CODEBRIM job are 1.99× (CI 1.92–2.06); and on the
+  CODEBRIM because its boxes are large; it sends 5.5 times the critical boxes to the human gate (at that rate, about 24,000
+  for a 2,536-photo bridge inspection, an extrapolation from CODEBRIM photos); its modelled ms per CODEBRIM job are 1.99× (CI 1.92–2.06); and on the
   Lambda its step p95 was 0.56 to 1.14 s, against 67.7 to 88.0 ms.
 - **Where v1 fails:** on synthetic photos it finds no efflorescence (0.00) and almost no exposed rebar (0.02), where
   the classical engine finds 0.16 and 0.57; on one of our own wall photos it flagged nothing although a hairline

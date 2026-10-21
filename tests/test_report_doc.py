@@ -174,8 +174,9 @@ def heldout_quotes() -> list:
     assert t["clean@0.3"]["v1"]["boxes_per_image"] == 0  # "puts no box on a clean photo"
     return [f"v1 finds {r[0]:.2f}× ({ci(r[1])}) its recall on CODEBRIM and {rs[0]:.2f}× ({ci(rs[1])}) on synth200",
             f"where the classical engine puts {t['clean@0.3']['classical-v1']['boxes_per_image']:.2f} per photo",
-            (f"it sends {crit[0] / crit[1]:.1f} times the critical boxes to the human gate (about "
-             f"{round(crit[0] * INSPECTION_PHOTOS, -3):,.0f} for the {INSPECTION_PHOTOS:,} photos of one bridge inspection)"),
+            (f"it sends {crit[0] / crit[1]:.1f} times the critical boxes to the human gate (at that rate, about "
+             f"{round(crit[0] * INSPECTION_PHOTOS, -3):,.0f} for a {INSPECTION_PHOTOS:,}-photo bridge inspection, an "
+             "extrapolation from CODEBRIM photos)"),
             f"its modelled ms per CODEBRIM job are {ms[0]:.2f}× (CI {ci(ms[1])})",
             (f"no efflorescence ({s1['per_class']['efflorescence']:.2f}) and almost no exposed rebar "
              f"({s1['per_class']['exposed_rebar']:.2f}), where the classical engine finds {sc['per_class']['efflorescence']:.2f} "
