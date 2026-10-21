@@ -50,7 +50,14 @@ import numpy as np
 
 from bench.micro import check_load, provenance, set_threads
 from drishyam import imaging
-from drishyam.agent import PLANNER_MALFORMED_STEP, PLANNER_TIMEOUT_STEP, Job, JobConfig, profile_for
+from drishyam.agent import (
+    PLANNER_MALFORMED_STEP,
+    PLANNER_TIMEOUT_STEP,
+    POLICY2_OFF,
+    Job,
+    JobConfig,
+    profile_for,
+)
 from drishyam.findings import SPALL_CRITICAL_AREA_PX, is_critical
 from drishyam.governor import USD_PER_HOUR
 from drishyam.segment import DEFECTS, ClassicalSegmenter, default_segmenter, drop_straight_lines, restrict
@@ -68,7 +75,8 @@ SMALL_PX = 96 * 96  # GT boxes below this area form the small-box stratum
 PER_IMAGE_OPS = ("pyrDown", "saliency", "downscale")  # their cost grows with the image; per-look ops read 512x512
 REPO = Path(__file__).resolve().parents[1]
 SWITCHES = ("order", "seed", "use_uncertainty", "seed_from_looks", "v0", "survey", "verify",
-            "governor", "fallback_l2")  # JobConfig fields a variant may flip
+            "governor", "fallback_l2", "grid", "crit_weight", "crit_floor", "crit_confirm",
+            "merge_critical")  # JobConfig fields a variant may flip
 ABLATION_CAPS = (0.3, 1.0)
 ABLATIONS = {  # FR-21: each variant flips one switch of the compared agent (governor off, as in every comparison)
     "full": {},
@@ -272,17 +280,18 @@ def gaze_to_l0(x: int, y: int, level: int, size: int) -> np.ndarray:
     return np.array([[s, 0, s * (x / s - size / 2)], [0, s, s * (y / s - size / 2)], [0, 0, 1.0]])
 
 
-def finding_components(job: Job, segs: list, confirms: list = ()) -> list[dict]:
+def finding_components(job: Job, segs: list, confirms: list = (), held: dict | None = None) -> list[dict]:
     """Drishyam's evidence in the baselines' box semantics: per-component boxes of the classes behind each
     finding, from every look in its evidence trail. Lets the harness score both box conventions (see `run`).
     `segs`: the scout's raw output per look; `confirms`: the confirm net's, in order, for the looks it segmented
-    again (a cascade, drishyam.cascade), which then kept the confirm's."""
+    again (a cascade, drishyam.cascade), which then kept the confirm's. `held` ({step: classes}): instead, the
+    components of those classes in those looks (v1-policy2's needs-a-look masks, which are no finding)."""
     looks = [r for r in job.trace if r["decision"]["action"] != "halt"]
     out, wh, again = [], job.image.shape[1::-1], iter(confirms)
     for rec, seg in zip(looks, segs, strict=True):
         if "latency_ms" in rec.get("confirm", {}):
             seg = next(again)
-        classes = {f.cls for f in job.findings if rec["step"] in f.steps}
+        classes = {f.cls for f in job.findings if rec["step"] in f.steps} if held is None else held.get(rec["step"], ())
         if classes:
             a = rec["decision"]["args"]
             to_l0 = gaze_to_l0(a["x"], a["y"], a["level"], a["size"])
@@ -319,7 +328,8 @@ def run_drishyam(img: np.ndarray, cap: float, costs: dict | None = None, segment
     cfg = JobConfig(pixel_cap=cap, thumbs=False, **{"governor": False, **switches})
     kw = {"segmenter": rec_seg, "confirm": rec_confirm}
     job = Job(img, cfg, **kw) if costs is None else FixedCostJob(img, cfg, costs, **kw)
-    done = list(job.run())[-1]
+    events = list(job.run())
+    done = events[-1]
     wall = time.perf_counter() - t0 if costs is None else job.now
     preds = [{"cls": f.cls, "box": list(f.box), "area": int(f.measure["area_px"]), "conf": round(f.confidence, 3),
               "step": f.step, "level": f.level, "region": f.region} for f in job.findings]
@@ -332,7 +342,17 @@ def run_drishyam(img: np.ndarray, cap: float, costs: dict | None = None, segment
               **({"confirm": r["confirm"]} if "confirm" in r else {})} for r in job.trace]
     confirms = rec_confirm.log if rec_confirm else []
     net = net_px(rec_seg.log + confirms)
-    return {"preds": finding_components(job, rec_seg.log, confirms), "preds_union": preds,
+    # v1-policy2's needs-a-look masks: no finding, so not in `preds` (critical boxes count what goes to sign-off), but a
+    # person is shown them (`preds_all`, both tiers); `signoffs` = critical findings, each a person's decision
+    look = [e for e in job.not_assessed if e.get("kind") == "needs-a-look"]
+    held: dict = {}
+    for e in look:
+        held.setdefault(e["step"], set()).add(e["cls"])
+    drafted = finding_components(job, rec_seg.log, confirms)
+    preds_look = finding_components(job, rec_seg.log, confirms, held) if held else []
+    return {"preds": drafted, "preds_look": preds_look, "preds_all": drafted + preds_look, "needs_look": len(look),
+            "signoffs": sum(f.critical for f in job.findings),
+            "reviews": sum(e["type"] == "review_request" for e in events), "preds_union": preds,
             "pixels_frac": done["summary"]["pixels_frac"],
             "net_pixels_frac": None if net is None else net / (img.shape[0] * img.shape[1]), "wall_s": wall,
             "trace": trace, "status": done["status"], "halt_cause": done["cause"],
@@ -900,9 +920,9 @@ def run(data_dir="data/synth200", n=200, out_dir="public/results", results_dir="
 
 # ---------------------------------------------------------------- ablations (FR-21)
 def switches(variant: str) -> dict:
-    """The JobConfig switches an ablation variant must have run with."""
+    """The JobConfig switches an ablation variant must have run with (v1-policy2's knobs off: the classical engine)."""
     base = JobConfig(governor=False)
-    return {k: getattr(base, k) for k in SWITCHES} | ABLATIONS[variant]
+    return {k: getattr(base, k) for k in SWITCHES} | POLICY2_OFF | ABLATIONS[variant]
 
 
 def ablation_image(rec: dict, caps=ABLATION_CAPS, cost_rows: list | None = None) -> dict:

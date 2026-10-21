@@ -40,7 +40,7 @@ import numpy as np
 from drishyam import cascade
 from drishyam.agent import profile_for
 from drishyam.segment import default_segmenter
-from evals import harness, synth
+from evals import harness, policy2, synth
 
 NETS = ("scout", "confirm", "cascade")
 
@@ -80,11 +80,11 @@ def arm(net: str, seg, confirm, costs: dict, sw: dict) -> dict:
     return {"segmenter": seg, "confirm": confirm if net == "cascade" else None, "costs": costs, **sw}
 
 
-def task(rec, variants, rows, caps, baselines=False):
+def task(rec, variants, rows, caps, baselines=()):
     img = cv2.imread(rec["path"], cv2.IMREAD_COLOR)
     costs, seg = harness.op_costs(rows, img.shape[1], img.shape[0]), default_segmenter()
     cfg = {"downscale": harness.run_downscale(img, seg, costs)}
-    for lv in harness.TILE_LEVELS if baselines else ():
+    for lv in harness.TILE_LEVELS if baselines is True else baselines or ():
         cfg[f"tiling@L{lv}"] = harness.run_tiling(img, seg, lv, costs)
     for k, sw in variants.items():
         kw = arm(sw.get("net", "scout"), seg, cascade.default_confirm(), costs, {x: v for x, v in sw.items() if x != "net"})
@@ -110,7 +110,8 @@ def row(key: str, records, results, scored: dict, ref: str | None = None) -> dic
     wall = np.array([c["wall_s"] for c in cs])  # modelled seconds per job (fixed costs)
     out |= {"ms_per_job": 1000 * float(wall.mean()),
             "recall_per_s": None if m["recall"] is None else m["recall"] / float(wall.mean())}
-    for name, k in (("downscale", "downscale"), ("tiling_L0", "tiling@L0"), ("ref", ref)):
+    for name, k in (("downscale", "downscale"), ("tiling_L0", "tiling@L0"), ("tiling_L1", "tiling@L1"),
+                    ("tiling_L2", "tiling@L2"), ("ref", ref)):
         if k in scored and k != key and scored[k]["recall"]:
             b = scored[k]
             out |= {f"vs_{name}": m["recall"] / b["recall"], f"vs_{name}_ci": harness.ratio_ci(m, b, n),
@@ -143,6 +144,7 @@ def row(key: str, records, results, scored: dict, ref: str | None = None) -> dic
             out |= {"confirms_per_job": len(done) / len(cs),
                     "confirm_reasons": dict(collections.Counter(c["reason"] for c in done)),
                     "confirms_skipped": dict(collections.Counter(c["skipped"].split(":")[0] for c in conf if c not in done))}
+    out |= policy2.fields(key, records, results, scored, ref)  # critical-class recall; with v1-policy2's tiers, its gate
     out["per_image"] = m["per_image"]  # [found, found IoU-only, chance, chance IoU-only, GT] per image: paired comparisons
     return {x: (round(y, 4) if isinstance(y, float) else y) for x, y in out.items()}
 
@@ -155,7 +157,8 @@ def main(argv=None) -> None:
     ap.add_argument("--workers", type=int, default=6)
     ap.add_argument("--codebrim", default="data/codebrim")
     ap.add_argument("--micro-arm", default="linux-aarch64", help="results/<arm>/micro.json job_ops: the fixed costs")
-    ap.add_argument("--baselines", action="store_true", help="also tiling at L2, L1 and L0 (the downscale always runs)")
+    ap.add_argument("--baselines", nargs="?", const="2,1,0", default="",
+                    help="also tiling at these levels (bare: L2, L1 and L0; the downscale always runs)")
     ap.add_argument("--out", help="also write the rows here, as JSON")
     ap.add_argument("--dump", help="also write every image's predictions and traces here (gzipped JSON)")
     ap.add_argument("--confirm", help="a cascade's confirm net, an ONNX path (default: DRISHYAM_ONNX_CONFIRM)")
@@ -177,7 +180,8 @@ def main(argv=None) -> None:
     elif confirm is None:
         raise SystemExit("net:confirm and net:cascade need a confirm net: --confirm or DRISHYAM_ONNX_CONFIRM")
     rows = harness.cost_rows(a.micro_arm, seg.name, confirm and confirm.name)
-    results = harness.pool_map(functools.partial(task, variants=variants, rows=rows, caps=caps, baselines=a.baselines),
+    levels = tuple(int(v) for v in a.baselines.split(",") if v)
+    results = harness.pool_map(functools.partial(task, variants=variants, rows=rows, caps=caps, baselines=levels),
                                records, a.workers, lambda m: print(m, flush=True), a.split)
     scored = {k: harness.score_config(k, records, results, "preds") for k in results[0]["configs"]}
     first, out = next(iter(variants)), {}

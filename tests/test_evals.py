@@ -781,3 +781,52 @@ def test_the_hard_subset_reads_labels_and_the_overview_only(scene):
     both = policy2.hard_reasons(rec(("exposed_rebar", [0, 0, 10, 10])), soft_disc(4000, 3000))
     assert both == ["small-critical", "no-candidate"]
     assert policy2.HARD_AREA_FRAC == 0.01 and policy2.CRITICAL_CLASSES == ("exposed_rebar", "spalling")
+
+
+def test_the_policy2_grid_reaches_the_job_as_listed_and_its_rule_reads_each_clause():
+    """The grid, as dev_sweep reads it, sets exactly the JobConfig fields it lists (cur first, no knob); each clause of
+    the rule flips on its own CI, and a CI that could not be computed fails its clause."""
+    from drishyam.agent import JobConfig
+    from evals import dev_sweep, policy2
+
+    grid = dev_sweep.parse(policy2.spec("all"))
+    assert next(iter(grid)) == "cur" and grid["cur"] == {} and len(policy2.ELIGIBLE) == 8 and len(grid) == 14
+    assert all(set(sw) <= set(JobConfig.__dataclass_fields__) for sw in grid.values())
+    assert grid["g_f70"] == {"crit_weight": 2.0, "merge_critical": True, "grid": True, "crit_confirm": "finer",
+                             "crit_floor": 0.7}
+    good = {"recall_all_vs_ref_ci": [0.97, 1.02], "crit_recall_vs_ref_ci": [0.9, 1.0], "crit_diff_vs_ref_ci": [-2.0, -0.5],
+            "signoffs_diff_vs_ref_ci": [-1.0, 0.0], "all_diff_vs_ref_ci": [0.0, 0.1],
+            "images_with_any_all_vs_ref_ci": [-0.1, 0.0]}
+    rows = {s: {"k@0.3": dict(good)} for s in policy2.SPLITS}
+    assert all(policy2.clauses(rows, "k").values())
+    for split, field, ci, clause in (
+            ("synth_dev", "recall_all_vs_ref_ci", [0.9, 0.99], "recall_shown_holds_synth_dev"),
+            ("real", "crit_recall_vs_ref_ci", [0.8, 0.999], "critical_recall_holds_real"),
+            ("real", "crit_diff_vs_ref_ci", [-1.0, 0.0], "critical_boxes_fall_real"),
+            ("synth_dev", "crit_diff_vs_ref_ci", [0.01, 0.5], "critical_boxes_do_not_rise_synth_dev"),
+            ("real", "signoffs_diff_vs_ref_ci", [0.1, 0.3], "signoffs_do_not_rise_real"),
+            ("clean", "all_diff_vs_ref_ci", [0.03, 0.2], "clean_boxes_do_not_rise"),
+            ("clean", "images_with_any_all_vs_ref_ci", [None, None], "clean_share_with_a_box_does_not_rise")):
+        bad = {s: {"k@0.3": dict(good)} for s in policy2.SPLITS}
+        bad[split]["k@0.3"][field] = ci
+        assert [c for c, v in policy2.clauses(bad, "k").items() if not v] == [clause]
+
+
+def test_dev_sweep_rows_carry_critical_class_recall_and_policy2s_gate_counts(tmp_path, monkeypatch):
+    """Every dev row has critical-class recall (exposed_rebar and spalling, pooled), against L2 tiling when it ran; a
+    Drishyam row also has recall of everything a person is shown and the per-photo gate counts, and a variant after the
+    first gets their paired CIs against it (a variant identical to the reference: every difference exactly 0)."""
+    from evals import dev_sweep
+
+    synth.build_dataset(tmp_path / "tiny", n=3, seed=3, width=640, height=480)
+    monkeypatch.setitem(dev_sweep.SPLITS, "tiny", (tmp_path / "tiny", 3, 3))
+    out = tmp_path / "rows.json"
+    dev_sweep.main(["tiny", "1.0", "cur=;same=merge_critical:False;p2=crit_weight:2.0,merge_critical:True,grid:True",
+                    "--workers", "1", "--baselines", "2", "--out", str(out)])
+    rows = json.loads(out.read_text())["rows"]
+    assert set(rows) == {"downscale", "tiling@L2", "cur@1.0", "same@1.0", "p2@1.0"}
+    assert "crit_recall_ci" in rows["tiling@L2"] and "recall_all" not in rows["tiling@L2"]
+    cur, same = rows["cur@1.0"], rows["same@1.0"]
+    assert cur["recall_all"] == cur["recall"] and cur["look_per_image"] == 0 and "crit_recall_vs_tiling_L2_ci" in cur
+    assert all(same[f"{k}_diff_vs_ref_ci"] == [0.0, 0.0] for k in ("crit", "signoffs", "reviews", "look", "all"))
+    assert same["recall_all_vs_ref_ci"] == [1.0, 1.0] and "crit_diff_vs_ref_ci" in rows["p2@1.0"]

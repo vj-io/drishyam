@@ -982,7 +982,7 @@ def test_the_classical_profile_is_the_agent_every_classical_number_ran_with(scen
     absorption on), so no classical result moves (results/dev/onnx_profile_sweep.json: the byte-for-byte rerun).
     tau_scout, fill and survey_value stay off: measured, not adopted (results/dev/tune_sweep.json). fallback_l2 is on
     for every profile since its dev run (results/dev/zero_candidate_fallback.json, measured on v1); the classical numbers
-    ran before it, with it off, and it changes only a photo with no candidate."""
+    ran before it, with it off, and it changes only a photo with no candidate. v1-policy2's knobs are off for it."""
     from dataclasses import asdict
 
     from drishyam.agent import PROFILES
@@ -998,7 +998,8 @@ def test_the_classical_profile_is_the_agent_every_classical_number_ran_with(scen
         "usd_per_hour": USD_PER_HOUR, "thumbs": True, "max_steps": 200, "use_uncertainty": True,
         "seed_from_looks": True, "v0": 2.0, "survey": True, "verify": True, "absorb": True, "order": "score", "seed": 0,
         "governor": True, "fill": False, "survey_value": True,
-        "t_hat_ms": None, "fallback_l2": True, "tau_confirm_lo": 0.35, "tau_confirm_hi": 0.65}
+        "t_hat_ms": None, "fallback_l2": True, "tau_confirm_lo": 0.35, "tau_confirm_hi": 0.65,
+        "grid": False, "crit_weight": 1.0, "crit_floor": 0.0, "crit_confirm": "off", "merge_critical": False}
 
 
 def test_a_job_takes_its_segmenters_profile_by_name_and_a_knob_set_explicitly_wins(scene, monkeypatch):
@@ -1435,4 +1436,313 @@ def test_with_the_flag_off_every_event_is_the_agents_before_the_fallback(name, m
     streams = [json.dumps(_no_wall_clock(list(mod.Job(img, mod.JobConfig(**kw), clock=FakeClock(), job_id="j_test",
                                                        segmenter=seg).run())), sort_keys=True)
                for mod, kw in ((agent, {"fallback_l2": False}), (off, {}))]
+    assert streams[0] == streams[1]
+
+
+# ---- v1-policy2 (JobConfig grid, crit_weight, crit_floor, crit_confirm, merge_critical) ---------------------------
+P2_OFF = {"grid": False, "crit_weight": 1.0, "crit_floor": 0.0, "crit_confirm": "off", "merge_critical": False}
+
+
+def blots(w, h):
+    """Concrete with two large dark discs: under `Unsure` each is a spalling mask far above the critical area at every
+    level (about 106,000 L0 px on a 4608-px photo), at confidence 0.55."""
+    from .conftest import concrete
+
+    img = concrete(h, w, 5)
+    for fx, fy in ((0.3, 0.4), (0.7, 0.62)):
+        cv2.circle(img, (int(fx * w), int(fy * h)), w // 25, (40, 40, 40), -1)
+    return img
+
+
+class Blink(Unsure):
+    """`Unsure` on odd calls, all background on even ones: the look right after a look that saw a mask sees nothing."""
+
+    def __init__(self, name):
+        super().__init__(name)
+        self.n = 0
+
+    def predict(self, crop, model="accurate"):
+        self.n += 1
+        if self.n % 2:
+            return super().predict(crop, model)
+        probs = np.zeros((len(CLASSES), *crop.shape[:2]), np.float32)
+        probs[0] = 1
+        return finish(probs, time.perf_counter(), model)
+
+
+def needs_look(done):
+    return [e for e in done["work_order"]["not_assessed"] if e.get("kind") == "needs-a-look"]
+
+
+def test_the_grid_cells_are_the_tiling_baselines_tiles():
+    """The grid a policy2 first look is placed on is evals.harness.slice_boxes (SAHI's 20 %-overlap 512-px tiles), the
+    tiling baseline's own, on any level shape, including one smaller than a tile."""
+    from drishyam.agent import _tiles
+    from evals import harness
+
+    for h, w in ((864, 1152), (384, 512), (1536, 2048), (1000, 1500), (300, 700), (512, 512)):
+        assert _tiles(h, w, 512) == harness.slice_boxes(h, w, 512)
+
+
+def test_with_grid_each_first_look_is_one_tiling_cell_that_holds_a_candidate():
+    """grid: the regions are the cells of the first level's tiling grid that hold a candidate's centre (each candidate
+    counted in the first cell, in tile order, that holds it), so no two first looks share a cell; every first look's
+    window is its cell. Off: one region per candidate, as before."""
+    from evals import harness
+
+    img = spots(4608, 3456)
+    job = fixed_job(img, Sure(ONNX), pixel_cap=1.0, grid=True)
+    ev = list(job.run())
+    cells = [[4 * x0, 4 * y0, 4 * (x1 - x0), 4 * (y1 - y0)] for x0, y0, x1, y1 in harness.slice_boxes(864, 1152)]
+    inside = lambda c, b: b[0] <= c["box"][0] + c["box"][2] // 2 < b[0] + b[2] and b[1] <= c["box"][1] + c["box"][3] // 2 < b[1] + b[3]
+    cands = ev[1]["candidates"]
+    want = [b for b in cells if any(inside(c, b) and next(x for x in cells if inside(c, x)) == b for c in cands)]
+    grid = [r for r in job.regions.values() if r.box is not None]
+    assert cands and len(grid) < len(cands) and sorted(map(list, (r.box for r in grid))) == sorted(want)
+    firsts = [s for s in looks_of(ev) if s["cause"] == "best-score"]
+    assert firsts and all(s["window"] == list(job.regions[s["region"]].box) for s in firsts)
+    assert len({s["region"] for s in firsts}) == len(firsts)
+    off = fixed_job(img, Sure(ONNX), pixel_cap=1.0, grid=False)
+    list(off.run())
+    assert {r.id for r in off.regions.values() if r.box is not None} == {c["id"] for c in cands}
+
+
+def test_grid_counts_each_candidate_in_the_first_tile_that_holds_it():
+    """Tiles overlap by 20 %: a candidate in an overlap joins the first tile (in tile order) that holds it, once, so
+    a tile whose only candidates an earlier tile took gets no region, and a region's prior is its own candidates'."""
+    from drishyam.agent import _grid_regions
+    from drishyam.imaging import Candidate
+
+    cands = [Candidate("r1", 1800, 600, (0, 0, 1, 1), 0.9), Candidate("r2", 3000, 600, (0, 0, 1, 1), 0.6)]
+    regions = _grid_regions(cands, (864, 1152), 2, 512)  # L2 of 4608 x 3456: tiles at L0 x 0, 1640, 2560 (2048 wide)
+    assert {k: (r.prior, r.box, (r.cx, r.cy)) for k, r in regions.items()} == {
+        "g1": (0.9, (0, 0, 2048, 2048), (1024, 1024)), "g2": (0.6, (1640, 0, 2048, 2048), (2664, 1024))}
+
+
+def test_crit_weight_scales_the_look_score_of_a_region_seen_as_a_critical_class_only(scene):
+    """crit_weight multiplies the severity in a region's expected value when the region was seen (seeded or looked at)
+    as exposed_rebar or spalling, and leaves every other class, and an unseen region, as before."""
+    from dataclasses import replace
+
+    job = Job(scene, JobConfig(thumbs=False, crit_weight=1.0), clock=FakeClock())
+    it = job.run()
+    next(e for e in it if e["type"] == "step")
+    r = next(r for r in job.regions.values() if not r.looks and job._score(r)[2] > 0)
+
+    def ev(cls, w):
+        r.cls, job.cfg = cls, replace(job.cfg, crit_weight=w)
+        return job._score(r)[1]
+
+    for cls, ratio in (("exposed_rebar", 2.5), ("spalling", 2.5), ("crack", 1), ("corrosion", 1), ("efflorescence", 1),
+                       (None, 1)):
+        assert ev(cls, 2.5) == pytest.approx(ratio * ev(cls, 1.0)) and ev(cls, 1.0) > 0
+
+
+def rect_seg(cls, x0, y0, x1, y1, p=0.9):
+    probs = np.zeros((len(CLASSES), 512, 512), np.float32)
+    probs[0] = 1
+    probs[0, y0:y1, x0:x1], probs[CLASSES.index(cls), y0:y1, x0:x1] = 1 - p, p
+    return finish(probs, time.perf_counter(), "accurate")
+
+
+@pytest.mark.parametrize("merge", [False, True])
+def test_merge_critical_makes_a_critical_mask_inside_a_critical_finding_of_its_class_join_it(merge):
+    """Two looks at two regions see one large spall: the coarser box holds the finer one (IoU 0.13, so the rule that
+    joins same-class masks at IoU > 0.3 keeps them apart). merge_critical: the second joins the first, one critical
+    finding for a person instead of two; a critical mask of another class, or a mask of the class under the critical
+    area, never joins."""
+    from drishyam.agent import Region
+    from evals.harness import gaze_to_l0
+
+    img = np.full((3000, 4000, 3), 128, np.uint8)
+    job = Job(img, JobConfig(thumbs=False, merge_critical=merge, crit_floor=0.0), clock=FakeClock())
+    crop = np.zeros((512, 512, 3), np.uint8)
+    looks = [(Region("r1", 1000, 1000, 0.5, 1), "spalling", (100, 100, 300, 300), (1000, 1000, 1)),
+             (Region("r2", 1500, 1500, 0.5, 2), "spalling", (31, 31, 306, 306), (1500, 1500, 2)),
+             (Region("r3", 1500, 1500, 0.5, 2), "exposed_rebar", (31, 31, 306, 306), (1500, 1500, 2)),
+             (Region("r4", 1000, 1000, 0.5, 1), "spalling", (150, 150, 240, 240), (1000, 1000, 1))]
+    kinds = []
+    for job.step, (r, cls, rect, (x, y, lv)) in enumerate(looks, start=1):
+        kinds.append(job._log_finding(r, cls, rect_seg(cls, *rect), crop, gaze_to_l0(x, y, lv, 512), lv)[1])
+    spall = [f for f in job.findings if f.cls == "spalling"]
+    assert [f.critical for f in spall] == ([True] if merge else [True, True]) + [False]
+    assert kinds == (["new", "update", "new", "new"] if merge else ["new", "new", "new", "new"])
+    if merge:
+        assert spall[0].steps == [1, 2] and spall[0].box[2] >= 1100
+    assert [f.cls for f in job.findings if f.critical] == ["spalling"] * (1 if merge else 2) + ["exposed_rebar"]
+
+
+def test_under_the_floor_a_critical_mask_goes_to_a_person_as_needs_a_look_not_as_a_critical_finding():
+    """crit_floor without a confirm look: a mask that would make a critical finding (here spalling far above the
+    critical area) but whose confidence (0.55) is under the floor is drafted as no finding at all; the work order lists
+    it as not assessed, kind needs-a-look, with its class, confidence and box, action check-by-eye, so the order is
+    never ready. A confident mask (0.97) is a critical finding as before; with the floor off, so is the unsure one."""
+    img = blots(4608, 3456)
+    job = fixed_job(img, Unsure(ONNX), pixel_cap=1.0, crit_floor=0.6, crit_confirm="off")
+    ev = list(job.run())
+    done, look = ev[-1], needs_look(ev[-1])
+    assert look and all(e["cls"] == "spalling" and e["confidence"] == pytest.approx(0.55, abs=1e-3)
+                        and e["action"] == "check-by-eye" and "under the floor 0.6" in e["reason"]
+                        and e["box"][2] * e["box"][3] >= SPALL_CRITICAL_AREA_PX for e in look)
+    assert {e["step"] for e in look} <= {s["step"] for s in looks_of(ev)}
+    assert not any(f.critical for f in job.findings)
+    assert not any(e["type"] == "review_request" and e["kind"] == "critical" for e in ev)
+    assert done["work_order"]["status"] == "incomplete" and not any(s["cause"] == "confirm-critical" for s in job.trace)
+    for seg, floor in ((Sure(ONNX), 0.6), (Unsure(ONNX), 0.0)):
+        j = fixed_job(img, seg, pixel_cap=1.0, crit_floor=floor, crit_confirm="off")
+        d = list(j.run())[-1]
+        assert any(f.critical and f.cls == "spalling" for f in j.findings) and not needs_look(d)
+        assert d["work_order"]["status"] == "blocked"
+
+
+class UnsureRust(Unsure):
+    """`Unsure`, plus a confident 40 x 40 px corrosion patch at the same place in every view: another class every
+    look drafts."""
+
+    def predict(self, crop, model="accurate"):
+        out = super().predict(crop, model)
+        probs = out.probs.copy()
+        probs[:, 460:500, 460:500] = 0
+        probs[0, 460:500, 460:500], probs[CLASSES.index("corrosion"), 460:500, 460:500] = 0.1, 0.9
+        return finish(probs, time.perf_counter(), model)
+
+
+def test_a_held_mask_gets_one_confirm_look_at_its_level_recentred_on_it_and_is_critical_when_it_agrees():
+    """crit_confirm shift: a held mask queues one verify look (cause confirm-critical) at the same level, centred on the
+    mask; when that look's mask of the class overlaps the held one (IoU >= 0.5) the class is drafted from it as a
+    critical finding, verified, and sent to a person; a confirm look drafts no other class (here corrosion)."""
+    img = blots(4608, 3456)
+    job = fixed_job(img, UnsureRust(ONNX), pixel_cap=1.0, crit_floor=0.6, crit_confirm="shift")
+    ev = list(job.run())
+    st = looks_of(ev)
+    conf = [s for s in st if s["cause"] == "confirm-critical"]
+    assert conf and all(s["decision"]["action"] == "verify" and s["decision"]["args"]["level"] == 2 for s in conf)
+    held = {s["step"]: s for s in st}
+    for s in conf:  # the look that held the mask ran at the same level, and the confirm look is centred on the mask
+        h = held[s["step"] - 1]
+        assert h["decision"]["args"]["level"] == 2 and "held for a confirm look" in h["rationale"]
+    crit = [f for f in job.findings if f.critical]
+    assert crit and all(f.step in {s["step"] for s in conf} and f.verified and f.state == "pending_review" for f in crit)
+    assert {f.id for f in crit} <= {e["finding_id"] for e in ev if e["type"] == "review_request" and e["kind"] == "critical"}
+    assert not needs_look(ev[-1])
+    assert all({f.cls for f in job.findings if s["step"] in f.steps} <= {"spalling"} for s in conf)
+
+
+def test_a_held_mask_its_confirm_look_does_not_see_again_goes_to_a_person_as_needs_a_look():
+    """The confirm look sees nothing where the held mask was (`Blink`): no critical finding is drafted from it, and
+    the held mask is listed needs-a-look, saying its confirm look did not confirm it."""
+    job = fixed_job(blots(4608, 3456), Blink(ONNX), pixel_cap=1.0, crit_floor=0.6, crit_confirm="shift")
+    ev = list(job.run())
+    conf = [s for s in looks_of(ev) if s["cause"] == "confirm-critical"]
+    look = needs_look(ev[-1])
+    assert conf and len(look) == len(conf) and not any(f.critical for f in job.findings)
+    assert all("not confirmed by its L2 confirm look" in e["reason"] and e["step"] + 1 in {s["step"] for s in conf}
+               for e in look)
+
+
+class Shrink(Unsure):
+    """`Unsure` on odd calls; on even ones a confident (0.97) spall on only the middle of each dark disc, under the
+    critical area: the look right after a held mask confirms it by confidence but measures it smaller."""
+
+    def __init__(self, name):
+        super().__init__(name)
+        self.n = 0
+
+    def predict(self, crop, model="accurate"):
+        self.n += 1
+        if self.n % 2:
+            return super().predict(crop, model)
+        dark = (cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY) < 105).astype(np.uint8)
+        core = cv2.erode(dark, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (53, 53))).astype(np.float32)
+        probs = np.zeros((len(CLASSES), *dark.shape), np.float32)
+        probs[0], probs[CLASSES.index("spalling")] = 1 - 0.97 * core, 0.97 * core
+        return finish(probs, time.perf_counter(), model)
+
+
+def test_a_confirmed_mask_keeps_the_criticality_its_held_look_measured():
+    """A confirm look that confirms a held spall but measures it under the critical area still sends it to a person:
+    the finding is held critical by the area the held look measured (criticality only rises)."""
+    job = fixed_job(blots(4608, 3456), Shrink(ONNX), pixel_cap=1.0, crit_floor=0.6, crit_confirm="shift")
+    ev = list(job.run())
+    conf = {s["step"] for s in looks_of(ev) if s["cause"] == "confirm-critical"}
+    crit = [f for f in job.findings if f.critical]
+    assert conf and crit and all(f.critical_step in conf and f.critical_area_px >= SPALL_CRITICAL_AREA_PX
+                                 and f.measure["area_px"] < SPALL_CRITICAL_AREA_PX and f.state == "pending_review"
+                                 for f in crit)
+    assert {f.id for f in crit} <= {e["finding_id"] for e in ev if e["type"] == "review_request" and e["kind"] == "critical"}
+
+
+def test_a_finer_confirm_look_goes_one_level_past_min_view_and_no_other_look_does():
+    """crit_confirm finer: the confirm look runs one level finer than the look that held the mask, L1 on a 4608-px
+    photo, although v1's min_view makes L2 the finest level for every other look."""
+    job = fixed_job(blots(4608, 3456), Unsure(ONNX), pixel_cap=1.0, crit_floor=0.6, crit_confirm="finer")
+    st = looks_of(list(job.run()))
+    conf = [s for s in st if s["cause"] == "confirm-critical"]
+    assert conf and all(s["decision"]["args"]["level"] == 1 for s in conf)
+    assert all(s["decision"]["args"]["level"] >= 2 for s in st if s["cause"] != "confirm-critical")
+
+
+def test_a_held_mask_whose_confirm_look_never_runs_goes_to_a_person():
+    """A job that ends before a held mask's confirm look (here max_steps) lists the mask needs-a-look."""
+    full = fixed_job(blots(4608, 3456), Unsure(ONNX), pixel_cap=1.0, crit_floor=0.6, crit_confirm="shift")
+    first = next(s["step"] for s in looks_of(list(full.run())) if s["cause"] == "confirm-critical")
+    cut = fixed_job(blots(4608, 3456), Unsure(ONNX), pixel_cap=1.0, crit_floor=0.6, crit_confirm="shift",
+                    max_steps=first - 1)
+    look = needs_look(list(cut.run())[-1])
+    assert any(e["step"] == first - 1 and "the job ended before its confirm look" in e["reason"] for e in look)
+
+
+def test_the_eval_scores_a_needs_a_look_mask_apart_from_the_drafted_boxes():
+    """evals.harness: the boxes of needs-a-look masks (per component, as drafted boxes are) are `preds_look`, never in
+    `preds`, so critical boxes count what goes to sign-off; the job's critical findings (sign-offs), review requests and
+    needs-a-look entries are counted, and `preds_all` is both tiers, what a person is shown."""
+    from drishyam.findings import is_critical
+    from evals import harness
+
+    img = blots(4608, 3456)
+    on = harness.run_drishyam(img, 1.0, FALLBACK_COSTS, segmenter=Unsure(ONNX), crit_floor=0.6, crit_confirm="off")
+    off = harness.run_drishyam(img, 1.0, FALLBACK_COSTS, segmenter=Unsure(ONNX), crit_floor=0.0, crit_confirm="off")
+    assert on["preds_look"] and {p["cls"] for p in on["preds_look"]} == {"spalling"} and on["needs_look"] > 0
+    assert not any(p["cls"] == "spalling" and is_critical(p["cls"], p["area"]) for p in on["preds"])
+    assert on["preds_all"] == on["preds"] + on["preds_look"] and on["signoffs"] == 0
+    assert off["preds_look"] == [] and off["needs_look"] == 0 and off["preds_all"] == off["preds"]
+    assert 0 < off["signoffs"] <= sum(f["cls"] == "spalling" for f in off["preds_union"]) and off["reviews"] >= off["signoffs"]
+    assert {k: on["switches"][k] for k in P2_OFF} == {**P2_OFF, "crit_floor": 0.6}
+
+
+def without_policy2(monkeypatch):
+    """drishyam.agent without its lines marked `# policy2`: the agent before v1-policy2."""
+    import re
+    import sys
+    import types
+
+    from drishyam import agent
+
+    src = Path(agent.__file__).read_text()
+    kept = "".join(ln for ln in src.splitlines(keepends=True) if not re.search(r"#\s*policy2\b", ln))
+    assert kept != src
+    mod = types.ModuleType("drishyam._agent_without_policy2")
+    mod.__package__ = "drishyam"
+    monkeypatch.setitem(sys.modules, mod.__name__, mod)
+    exec(compile(kept, "drishyam/agent.py without policy2", "exec"), mod.__dict__)  # noqa: S102 -- our own source
+    assert "crit_floor" in agent.JobConfig.__dataclass_fields__ and "crit_floor" not in mod.JobConfig.__dataclass_fields__
+    return mod
+
+
+@pytest.mark.parametrize("name", [*(p.stem for p in SAMPLE_PHOTOS), "blots@v1", "spots@v1", "soft_disc@v1"])
+def test_with_policy2_off_every_event_is_the_agents_before_policy2(name, monkeypatch):
+    """Every bundled sample on the classical engine, and three synthetic photos under v1's profile: with every policy2
+    knob off, the whole event stream equals the agent's with policy2's lines removed."""
+    import json
+
+    from drishyam import agent
+
+    off = without_policy2(monkeypatch)
+    paths = {p.stem: p for p in SAMPLE_PHOTOS}
+    img = (cv2.imread(str(paths[name])) if name in paths else
+           {"blots": blots, "spots": spots, "soft_disc": soft_disc}[name.split("@")[0]](3000, 2250))
+    seg = (Unsure if name.startswith("blots") else Sure)(ONNX) if name.endswith("@v1") else None
+    streams = [json.dumps(_no_wall_clock(list(mod.Job(img, mod.JobConfig(**kw), clock=FakeClock(), job_id="j_test",
+                                                       segmenter=seg).run())), sort_keys=True)
+               for mod, kw in ((agent, P2_OFF), (off, {}))]
     assert streams[0] == streams[1]
