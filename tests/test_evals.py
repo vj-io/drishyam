@@ -672,6 +672,43 @@ def test_heldout_reads_each_pair_in_both_directions_by_the_dev_criterion():
     assert other["v2a"] == ["codebrim@0.3 modelled ms per job x1.111 (CI 1.05-1.25) against v1"]
 
 
+def test_heldout_reads_policy2_beside_v1_with_its_matrix_and_hard_subset(tmp_path):
+    """evals.heldout.policy2_read on two synthetic photos (no held-out set): the baselines are checked against the
+    model's run, both sides' sign-offs are counted by each finding's final measure (v1's runs did not record them) with
+    the configuration's exact count kept, v1-policy2 is paired with v1 at each cap, and the matrix puts every policy
+    against L2 tiling, L1 tiling, the downscale and v1."""
+    from evals import heldout
+
+    synth.build_dataset(tmp_path / "s", n=2, seed=3, width=2048, height=1536)
+    recs, _ = harness.load_records(tmp_path / "s", 2, seed=3)
+
+    def results(**sw):
+        out = []
+        for r in recs:
+            img = cv2.imread(r["path"])
+            cfg = {"downscale": harness.run_downscale(img, harness.default_segmenter()),
+                   **{f"tiling@L{lv}": harness.run_tiling(img, harness.default_segmenter(), lv) for lv in (2, 1, 0)},
+                   **{f"drishyam@{c}": harness.run_drishyam(img, c, None, **sw) for c in (0.3, 0.1, 1.0)}}
+            for c in cfg.values():
+                c["wall_s"] = 0.5  # one value both runs share: the check compares boxes and modelled time
+            out.append({"id": r["id"], "width": img.shape[1], "height": img.shape[0], "configs": cfg})
+        return out
+
+    v1 = results()
+    for x in v1:  # a run from before the tiers: no needs-a-look, shown boxes or sign-off fields
+        for k in ("drishyam@0.3", "drishyam@0.1"):
+            for f in ("preds_look", "preds_all", "needs_look", "signoffs", "reviews"):
+                x["configs"][k].pop(f)
+    p2 = results(grid=True, crit_weight=2.0, merge_critical=True)
+    read = heldout.policy2_read(p2, v1, recs)
+    assert read["baselines_same_as_v1s_run"] == dict.fromkeys(heldout.BASELINES, True)
+    assert set(read["matrix"]) == {*heldout.BASELINES, "v1@0.3", "v1-policy2@0.3", "v1@0.1", "v1-policy2@0.1"}
+    m = read["matrix"]["v1-policy2@0.3"]
+    assert {"vs tiling@L2", "vs tiling@L1", "vs downscale", "vs v1@0.3"} <= set(m) and "signoffs_exact_per_image" in m
+    assert "signoffs_exact_per_image" not in read["matrix"]["v1@0.3"] and read["rows"]["v1-policy2@0.1"]["ref"] == "v1@0.1"
+    assert read["hard"]["of"] == 2 and set(read["hard"]["reasons"]) <= {"small-critical", "no-candidate"}
+
+
 def test_heldout_docs_quote_the_json():
     """docs/report.md holds the held-out tables and verdict as evals.heldout renders them from
     results/heldout_models.json, and the numbers its prose and README.md quote are the JSON's."""

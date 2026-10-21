@@ -1700,14 +1700,36 @@ def test_the_eval_scores_a_needs_a_look_mask_apart_from_the_drafted_boxes():
     from evals import harness
 
     img = blots(4608, 3456)
-    on = harness.run_drishyam(img, 1.0, FALLBACK_COSTS, segmenter=Unsure(ONNX), crit_floor=0.6, crit_confirm="off")
-    off = harness.run_drishyam(img, 1.0, FALLBACK_COSTS, segmenter=Unsure(ONNX), crit_floor=0.0, crit_confirm="off")
+    on = harness.run_drishyam(img, 1.0, FALLBACK_COSTS, segmenter=Unsure(ONNX), **{**P2_OFF, "crit_floor": 0.6})
+    off = harness.run_drishyam(img, 1.0, FALLBACK_COSTS, segmenter=Unsure(ONNX), **P2_OFF)
     assert on["preds_look"] and {p["cls"] for p in on["preds_look"]} == {"spalling"} and on["needs_look"] > 0
     assert not any(p["cls"] == "spalling" and is_critical(p["cls"], p["area"]) for p in on["preds"])
     assert on["preds_all"] == on["preds"] + on["preds_look"] and on["signoffs"] == 0
     assert off["preds_look"] == [] and off["needs_look"] == 0 and off["preds_all"] == off["preds"]
     assert 0 < off["signoffs"] <= sum(f["cls"] == "spalling" for f in off["preds_union"]) and off["reviews"] >= off["signoffs"]
     assert {k: on["switches"][k] for k in P2_OFF} == {**P2_OFF, "crit_floor": 0.6}
+
+
+def test_v1_runs_the_policy2_its_dev_rule_chose_and_no_other_profile_does(scene):
+    """v1's profile (its name and released weights) takes g_s60, the configuration results/dev/policy2_sweep.json
+    chose; the classical engine, v2a-v2c and v1's name with other weights keep every knob off; a knob set explicitly
+    wins."""
+    import json
+
+    from drishyam.agent import POLICY2, POLICY2_OFF, WEIGHTS
+    from evals import policy2
+
+    chosen = json.loads((Path(__file__).resolve().parents[1] / "results" / "dev" / "policy2_sweep.json").read_text())
+    assert chosen["verdict"]["adopted"] and POLICY2 == {ONNX: policy2.ELIGIBLE[chosen["verdict"]["chosen"]]}
+    knobs = lambda seg=None, **kw: {k: getattr(Job(scene, JobConfig(**kw), segmenter=seg).cfg, k) for k in POLICY2_OFF}
+    assert knobs(Sure(ONNX)) == POLICY2[ONNX] and knobs() == POLICY2_OFF
+    for name in WEIGHTS:
+        if name != ONNX:
+            assert knobs(Sure(name)) == POLICY2_OFF
+    other = Sure(ONNX)
+    other.sha256 = "0" * 64
+    assert knobs(other) == POLICY2_OFF
+    assert knobs(Sure(ONNX), crit_floor=0.0, grid=False) == {**POLICY2[ONNX], "crit_floor": 0.0, "grid": False}
 
 
 def without_policy2(monkeypatch):

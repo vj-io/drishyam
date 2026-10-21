@@ -120,7 +120,12 @@ SLA_MS_BY_PROFILE = {"onnx:drishyam_dacl10k.onnx": 1500.0}
 # policy2: v1-policy2's knobs (JobConfig grid, crit_weight, crit_floor, crit_confirm, merge_critical) by profile, for a
 # policy2: JobConfig field left None; a profile not listed, or a knob it does not set, takes POLICY2_OFF, the agent before
 # policy2: them. results/dev/policy2_sweep.json states the rule, grid and dev runs they were chosen by.
-POLICY2: dict = {}  # policy2
+# policy2: v1 takes g_s60, the one configuration the rule chose of the 8 it listed (results/dev/policy2_sweep.json, 30 %
+# policy2: cap, paired 95 % CIs against v1 as it was): on CODEBRIM dev100 sign-offs per photo 2.12 to 1.34, critical
+# policy2: boxes 7.24 to 6.38, recall of what a person is shown x1.02 (0.99-1.05), critical-class recall x0.98
+# policy2: (0.95-1.02); nothing measurable moved on synth_dev or the clean split. It does not match L2 tiling.
+POLICY2: dict = {"onnx:drishyam_dacl10k.onnx": {"grid": True, "crit_weight": 2.0, "crit_floor": 0.6,  # policy2
+                                               "crit_confirm": "shift", "merge_critical": True}}  # policy2
 POLICY2_OFF = {"grid": False, "crit_weight": 1.0, "crit_floor": 0.0, "crit_confirm": "off", "merge_critical": False}  # policy2
 CRIT_CLASSES = ("exposed_rebar", "spalling")  # policy2: the classes findings.is_critical can make critical
 

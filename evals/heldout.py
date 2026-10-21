@@ -22,7 +22,9 @@ from pathlib import Path
 
 import numpy as np
 
-from evals import dev_sweep, harness
+from drishyam.agent import POLICY2, POLICY2_OFF
+from drishyam.findings import is_critical
+from evals import dev_sweep, harness, policy2
 
 REPO = harness.REPO
 RUNS = REPO / "runs" / "model-eval"
@@ -50,24 +52,25 @@ PRIOR = ("v1 had been scored on two of these sets before, once each, on 2026-10-
          "earlier jobs were the install's smoke jobs on three of the demo's bridge photos (the main checkout's "
          "runs/model-smoke/), and no run folder under runs/ or a worktree names it.")
 NAMES = {"codebrim": "CODEBRIM eval200", "synth": "synth200", "large": "synth_large, 4608×3456", "clean": "clean"}
-# A configuration of one model, scored beside it after its own dev rule: run folder prefix, run_fallback.sh tag, model.
-CONFIGS = {"v1+fallback": ("onnx-fb", "dacl10k+fallback", "v1")}
+# A configuration of one model, scored beside it after its own dev rule: run folder prefix, run script tag, model.
+CONFIGS = {"v1-policy2": ("onnx-p2", "dacl10k+policy2", "v1")}
 ALL = {}  # every model, each followed by its configurations: (run folder prefix, run script tag, model)
 for _m, (_p, _t) in MODELS.items():
     ALL |= {_m: (_p, _t, _m), **{c: v for c, v in CONFIGS.items() if v[2] == _m}}
-FALLBACK_COMMAND = ("runs/heldout/run_fallback.sh (v1+fallback, later, after the fallback's dev rule passed): the leakage "
-                    "check, then python -m evals.harness --cost-model fixed --workers 6 --micro-arm "
-                    "local-macos-x86-dacl10k-retime with DRISHYAM_ONNX set on data/codebrim (--n 200) and data/synth200 "
-                    "(--n 200), as evals.model_eval runs them but without --publish, and on data/synth_clean (--n 51 --seed "
-                    "11 --chaos 0,0,0), with JobConfig.fallback_l2 on (its default since 7cddb48)")
-PRIOR_FALLBACK = ("v1+fallback is v1 with the zero-candidate fallback on (JobConfig.fallback_l2: a photo whose overview "
-                  "proposes no candidate gets one whole-photo look at L2). It is v1's third read of CODEBRIM eval200 and "
-                  "synth200 and its second of the clean set: v1 was scored on CODEBRIM eval200 and synth200 on 2026-10-18 "
-                  "(unpublished, see prior_exposure) and on all three in its published run here, and the fallback was "
-                  "adopted on the dev splits after those reads, by a rule stated before its dev run "
-                  "(results/dev/zero_candidate_fallback.json; it passed on 1 dev photo of 190). Nothing was changed after "
-                  "this read. The fallback acts only on a photo with no candidate; on every other photo its jobs equal "
-                  "v1's here, look for look (asserted), so the pair below measures the fallback alone.")
+POLICY2_COMMAND = ("runs/heldout/run_policy2.sh (v1-policy2, later, after its dev rule chose it): the leakage check, then "
+                   "python -m evals.harness --cost-model fixed --workers 6 --micro-arm local-macos-x86-dacl10k-retime with "
+                   "DRISHYAM_ONNX set on data/codebrim (--n 200) and data/synth200 (--n 200), as evals.model_eval runs them "
+                   "but without --publish, and on data/synth_clean (--n 51 --seed 11 --chaos 0,0,0), with v1's profile "
+                   "taking agent.POLICY2 (its default since the dev choice) and the zero-candidate fallback on")
+PRIOR_POLICY2 = ("v1-policy2 is v1 with the configuration results/dev/policy2_sweep.json chose on the dev splits (g_s60: "
+                 "first looks on the tiling grid, a confirm look at the same level for a critical mask under confidence 0.6, "
+                 "which otherwise goes to a person as needs-a-look, critical classes weighted x2 in the look score, "
+                 "overlapping critical findings of one class merged) and the zero-candidate fallback on. It is v1's third "
+                 "read of CODEBRIM eval200 and synth200 and its second of the clean set: v1 was scored on CODEBRIM eval200 "
+                 "and synth200 on 2026-10-18 (unpublished, see prior_exposure) and on all three in its published run here. "
+                 "A held-out run of v1 with the fallback alone was started on 2026-10-21 in another worktree and stopped; "
+                 "its output was never read or used. This configuration was chosen on dev after those reads, by a rule "
+                 "stated before its dev run, and nothing was changed after this read.")
 r4 = lambda x: round(float(x), 4) if isinstance(x, (float, np.floating)) else x
 
 
@@ -178,32 +181,64 @@ def verdicts_vs(pairs: dict, c: str, b: str) -> dict:
     return out
 
 
-def fallback_acted(fb: list[dict], base: list[dict], records: list[dict]) -> dict:
-    """Per cap: the photos the fallback acted on (a fallback-l2 look; the model's own job took no look there), what it
-    added, and a check that every other photo's job is the model's, look for look and box for box."""
-    look = lambda c: [(t["action"], t["cause"], t["level"], t["x"], t["y"]) for t in c["trace"]]
-    out = {}
-    for k in CAPS:
-        cs, bs = [x["configs"][k] for x in fb], [x["configs"][k] for x in base]
-        on = [i for i, c in enumerate(cs) if any(t["cause"] == "fallback-l2" for t in c["trace"])]
-        for i, (c, b) in enumerate(zip(cs, bs, strict=True)):
-            if i in on and any(t["action"] != "halt" for t in b["trace"]):
-                raise SystemExit(f"{k}: photo {i} got a fallback look although the model's own job looked at it")
-            if i not in on and (look(c), c["preds"], c["preds_union"], c["wall_s"]) != (look(b), b["preds"], b["preds_union"], b["wall_s"]):
-                raise SystemExit(f"{k}: photo {i} has no fallback look but its job differs from the model's")
-        found = lambda c, rec: sum(harness.found(g, c["preds"]) for g in rec["boxes"])
-        added = [t for i in on for t in cs[i]["trace"] if t["action"] != "halt"]
-        ms = [1000 * (cs[i]["wall_s"] - bs[i]["wall_s"]) for i in on]
-        out[k[9:]] = {"photos": len(on), "of": len(cs), "indices": on, "looks_added": dict(sorted(collections.Counter(
-            f"{t['cause']} L{t['level']}" for t in added).items())), "halts": dict(collections.Counter(cs[i]["halt_cause"] for i in on)),
-            "boxes_drafted": sum(len(cs[i]["preds"]) for i in on), "photos_with_a_box": sum(bool(cs[i]["preds"]) for i in on),
-            "classes_drafted": dict(collections.Counter(p["cls"] for i in on for p in cs[i]["preds"])),
-            "critical_boxes": sum(harness.critical_counts(cs[i]["preds"], records[i]["boxes"])[0] for i in on),
-            "ground_truth_boxes_on_them": sum(len(records[i]["boxes"]) for i in on),
-            "found_without": sum(found(bs[i], records[i]) for i in on), "found_with": sum(found(cs[i], records[i]) for i in on),
-            "extra_modelled_ms_per_photo_acted_on": round(sum(ms) / len(ms), 1) if ms else None,
-            "extra_modelled_ms_per_job": round(sum(ms) / len(cs), 1), "same_as_the_model_elsewhere": True}
-    return out
+BASELINES = ("downscale", "tiling@L2", "tiling@L1", "tiling@L0")
+MATRIX_CAPS = ("0.3", "0.1")  # the cap the rule read, and about L2 tiling's pixels on CODEBRIM
+
+
+def _gate(c: dict) -> dict:
+    """A Drishyam job's two tiers in v1-policy2's terms. v1's runs predate them: nothing was held (its shown boxes are its
+    drafted ones) and sign-offs were not recorded, so both sides count critical findings by each finding's final measure
+    (`signoffs`, a slight undercount: a finding made critical by a coarser look is missed) and v1-policy2's exact count
+    is kept beside it (`signoffs_exact`)."""
+    approx = sum(is_critical(f["cls"], f["area"]) for f in c["preds_union"])
+    return {**c, "preds_look": c.get("preds_look", []), "preds_all": c.get("preds_all", c["preds"]),
+            "needs_look": c.get("needs_look", 0), "signoffs": approx, "signoffs_exact": c.get("signoffs"), "reviews": 0}
+
+
+def policy2_read(p2: list[dict], v1: list[dict], records: list[dict]) -> dict:
+    """v1-policy2 against v1 on one held-out set, both at the matrix caps, with the baselines of v1-policy2's own run
+    (checked against v1's run of them): rows by evals.dev_sweep.row (v1-policy2 paired with v1 at its cap) on every
+    photo and on the hard subset (evals.policy2), and the compute-savings vs accuracy matrix: pixels and modelled ms
+    against recall of what a person is shown and drafted critical-class recall, each policy against L2 tiling, L1
+    tiling, the downscale and v1, with paired 95 % bootstrap CIs."""
+    same = {k: all(a["configs"][k]["preds"] == b["configs"][k]["preds"] and a["configs"][k]["wall_s"] == b["configs"][k]["wall_s"]
+                   for a, b in zip(p2, v1, strict=True)) for k in BASELINES}
+    merged = [{**a, "configs": {**{k: a["configs"][k] for k in BASELINES},
+                                **{f"{m}@{cap}": _gate(x["configs"][f"drishyam@{cap}"]) for cap in MATRIX_CAPS
+                                   for m, x in (("v1", b), ("v1-policy2", a))}}} for a, b in zip(p2, v1, strict=True)]
+    keys, n = list(merged[0]["configs"]), len(records)
+    scored = {k: harness.score_config(k, records, merged, "preds") for k in keys}
+    shown = {k: harness.score_config(k, records, merged, "preds" if k in BASELINES else "preds_all") for k in keys}
+    ref = lambda k: f"v1@{k.rpartition('@')[2]}" if k.startswith("v1-policy2@") else None
+    rows = {k: {a: r4(b) for a, b in dev_sweep.row(k, records, merged, scored, ref(k)).items() if a != "per_image"}
+            for k in keys}
+    matrix = {}
+    for k in keys:
+        x = rows[k]
+        m = {"pixels_frac": x["pixels_frac"], "ms_per_job": x["ms_per_job"], "recall_shown": r4(shown[k]["recall"]),
+             "recall_shown_ci": harness.boot_ci(harness.recall_of(shown[k]), n),
+             **{f: x.get(f) for f in ("crit_recall", "crit_recall_ci", "critical_per_image", "signoffs_per_image",
+                                      "needs_look_per_image", "look_per_image")}}
+        exact = [r["configs"][k].get("signoffs_exact") for r in merged]
+        if k not in BASELINES and None not in exact:
+            m["signoffs_exact_per_image"] = r4(sum(exact) / n)
+        for b in ("tiling@L2", "tiling@L1", "downscale", f"v1@{k.rpartition('@')[2]}"):
+            if b in scored and b != k and shown[b]["recall"]:
+                cv, cci = policy2.ratio_of(policy2.crit_cols(scored[k], records), policy2.crit_cols(scored[b], records), n)
+                m[f"vs {b}"] = {"recall_shown": [r4(shown[k]["recall"] / shown[b]["recall"]), harness.ratio_ci(shown[k], shown[b], n)],
+                                "crit_recall": [r4(cv) if cv is not None else None, cci],
+                                "pixels": r4(x["pixels_frac"] / rows[b]["pixels_frac"]),
+                                "ms": r4(x["ms_per_job"] / rows[b]["ms_per_job"])}
+        matrix[k] = m
+    keep = [i for i, rec in enumerate(records) if policy2.hard_reasons(rec)]
+    hard = {"photos": len(keep), "of": n, "indices": keep,
+            "reasons": dict(collections.Counter(why for i in keep for why in policy2.hard_reasons(records[i]))),
+            "small_critical_boxes": sum(len(policy2.small_critical(records[i])) for i in keep),
+            "rows": {k: {a: r4(b) for a, b in v.items()} for k, v in policy2.subset_rows(records, merged, keep, keys, "v1").items()}
+            if keep else {}}
+    looks = {k: dict(collections.Counter(f"{t['action']}:{t['cause']}" for r in merged for t in r["configs"][k]["trace"]
+                                         if t["action"] != "halt")) for k in keys if "trace" in merged[0]["configs"][k]}
+    return {"baselines_same_as_v1s_run": same, "rows": rows, "matrix": matrix, "hard": hard, "looks_by_action_cause": looks}
 
 
 def markdown(out: dict) -> str:
@@ -259,6 +294,9 @@ def main(argv=None) -> dict:
             fallback = {x["configs"][k]["switches"].get("fallback_l2", False) for x in r["results"] for k in CAPS}
             if fallback != {m in CONFIGS}:  # runs from before the switch existed ran without the fallback
                 raise SystemExit(f"{m} on {s} ran fallback_l2 {fallback}")
+            knobs = {tuple(x["configs"][k]["switches"].get(n, v) for n, v in POLICY2_OFF.items()) for x in r["results"] for k in CAPS}
+            if knobs != {tuple({**POLICY2_OFF, **(POLICY2[dm["profile"]] if m in CONFIGS else {})}.values())}:
+                raise SystemExit(f"{m} on {s} ran v1-policy2's knobs {knobs}")  # the models ran before the knobs existed
             prov = r["summary"]["provenance"]
             runs[f"{m} {s}"] = {"folder": f"runs/model-eval/{ALL[m][0]}-{s}", "code_commit": starts.get(ALL[m][1]),
                                 "finished": prov["timestamp"],  # the harness takes its provenance at the end of a run
@@ -266,7 +304,7 @@ def main(argv=None) -> dict:
         scored = {m: {k: harness.score_config(k, records, r["results"]) for k in KEYS} for m, r in got.items()}
         x = {m: {k: per_image(records, r["results"], k) for k in CAPS} for m, r in got.items()}
         for c in (c for c in got if c in CONFIGS):
-            acted[f"{c} {s}"] = fallback_acted(got[c]["results"], got[ALL[c][2]]["results"], records)
+            acted[f"{c} {s}"] = policy2_read(got[c]["results"], got[ALL[c][2]]["results"], records)
         for k in CAPS:
             table[f"{s}@{k[9:]}"] = {m: row(k, records, r["results"], scored[m]) for m, r in got.items()}
             for ma, mb in itertools.combinations([m for m in got if m in MODELS], 2):
@@ -323,18 +361,19 @@ def main(argv=None) -> dict:
     }
     for c, (_, tag, b) in CONFIGS.items():  # only once its runs exist, so the file without them is as it was
         if done := [s for s in SETS if f"{c} {s}" in runs]:
-            out["what"] += (f" {c}, v1 with the zero-candidate fallback, was scored once more, later, beside v1 (whose runs "
-                            f"were not repeated): see the {c} block.")
-            out["commands"] = [*COMMANDS, FALLBACK_COMMAND]
+            out["what"] += (f" {c}, v1 with the configuration its dev rule chose, was scored once more, later, beside v1 "
+                            f"(whose runs were not repeated): see the {c} block.")
+            out["commands"] = [*COMMANDS, POLICY2_COMMAND]
             leak = json.loads((REPO / "runs" / "heldout" / f"leakage-{tag}.json").read_text())
             if out["leakage"] and {k: leak[k] for k in out["leakage"] if k != "calibration"} != {
                     k: v for k, v in out["leakage"].items() if k != "calibration"}:
                 raise SystemExit(f"{c}'s leakage check counts differ from the published ones")
-            out[c] = {"model": b, "sets": done, "prior_exposure": PRIOR_FALLBACK,
-                      "dev_rule": "results/dev/zero_candidate_fallback.json",
-                      "verdict_vs_v1": verdicts_vs(pairs, c, b), "acted_on": {s: acted[f"{c} {s}"] for s in done},
-                      "leakage": "the check ran again before this run (runs/heldout/leakage-dacl10k+fallback.json): the "
-                                 "same counts as the published leakage block"}
+            out[c] = {"model": b, "sets": done, "prior_exposure": PRIOR_POLICY2,
+                      "configuration": POLICY2[out["models"][b]["profile"]],
+                      "dev_rule": "results/dev/policy2_sweep.json (rule stated in 54b5601, before its dev run)",
+                      "verdict_vs_v1": verdicts_vs(pairs, c, b), "read": {s: acted[f"{c} {s}"] for s in done},
+                      "leakage": f"the check ran again before this run (runs/heldout/leakage-{tag}.json): the same counts "
+                                 "as the published leakage block"}
     Path(REPO / a.out).write_text(json.dumps(out, indent=1, ensure_ascii=False) + "\n")
     print(markdown(out), statement, sep="\n\n")
     return out

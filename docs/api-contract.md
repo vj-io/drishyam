@@ -255,7 +255,8 @@ Step `decision.action` values: `gaze` (first look at a region, or the survey), `
 (one level finer, same centre, because the last look was uncertain), `verify`
 (one level finer to confirm a mask), `halt`. Look `cause` values:
 `survey`, `fallback-l2`, `best-score`, `entropy>tau`, `area<A_min`, `verify-new-mask`, `iou<0.5`,
-`planner:<strategy>`, `replay`, and `random-order` (only under the `order="random"` ablation).
+`confirm-critical` (v1-policy2's confirm look, below), `planner:<strategy>`, `replay`, and `random-order` (only under
+the `order="random"` ablation).
 `governor.cause` values: `p95>SLA`, `warp-spike`, `usd≥80%`. Halt `cause` values: `stop-rule`,
 `exhausted`, `cap-hit`, `kill-switch`, `planner:stop`. `planner_status.status` is `accepted`,
 `rejected` or `fallback` (a timeout or a network error), as on the `planner` event. A planner's
@@ -381,8 +382,42 @@ did not drop on synth_dev or CODEBRIM dev100 and clean false alarms did not rise
 190, the only one with no candidate (a 2048 × 1536 CODEBRIM photo, whose one crack it found: recall ×1.0025, CI
 1.00–1.0093, +11.8 modelled ms per dev100 job); synth_dev and the clean dev split have none, so no clean photo tested
 its false alarms on dev. It is a `JobConfig` field, not a profile value, so it is on for every profile; every number
-published before it (the classical engine's, v1's first held-out numbers, v2a to v2c) ran with it off. v1's held-out
-read with it on is `"v1+fallback"` in `results/heldout_models.json` (report, section 8).
+published before it (the classical engine's, v1's first held-out numbers, v2a to v2c) ran with it off. A held-out run of
+v1 with the fallback alone was started and stopped unread; v1's one held-out read with it on is v1-policy2's
+(`"v1-policy2"` in `results/heldout_models.json`, report section 8).
+
+### v1-policy2 (v1's default; off for every other profile)
+
+Five `JobConfig` knobs, each None by default: a profile listed in `drishyam.agent.POLICY2` takes its values there (only
+v1's, by name and released weights), any other takes `POLICY2_OFF` (every knob off: the agent before them). `grid`:
+the first looks are the tiles of the first level's 20 %-overlap 512-px grid (`agent._tiles`, the tiling baseline's own
+`slice_boxes`) that hold an overview candidate's centre, one region per tile (id `g<n>`, prior the best of its
+candidates'), so no two first looks re-read one tile. `crit_weight`: the look score's severity, times this, for a
+region seen as `exposed_rebar` or `spalling`. `crit_floor`: a mask that would put a new critical finding before a person
+(critical by area, joining no critical finding of its class) but whose class confidence is under the floor is not
+drafted; the step's rationale says so (`"; spalling 0.55 under the floor 0.6: held for a confirm look at L2"`).
+`crit_confirm`: `shift` queues one look at the same level with the window recentred on the mask, `finer` one level finer
+(past `min_view`, for this look only); it is a `verify` with `cause` `confirm-critical`, region `<region>.c<step>`, never
+escalates, and drafts only the held classes it confirms (its own mask at or above the floor, or one overlapping the held
+mask at IoU ≥ 0.5), held critical by the area the held look measured. A held mask that is not confirmed, has no confirm
+look (`off`), or whose confirm look never ran (a cap, KILL, `max_steps`) becomes a `not_assessed` entry of `kind`
+`needs-a-look`:
+
+```json
+{"step": 7, "box": [1820, 940, 610, 380], "reason": "spalling at L2, confidence 0.55 under the floor 0.6: not a critical finding; not confirmed by its L2 confirm look",
+ "action": "check-by-eye", "kind": "needs-a-look", "cls": "spalling", "confidence": 0.55}
+```
+
+so the order is never `ready` while one is there. `merge_critical`: a critical mask mostly inside (intersection over
+the smaller box ≥ 0.5) a critical finding of its class joins it: one decision instead of two. Nothing here approves
+anything: every critical finding the agent keeps waits in `pending_review` for a person. A resumed job (replay) runs no
+confirm look: a mask the replayed looks hold goes to `needs-a-look` at once. v1 takes `grid` on, `crit_weight` 2,
+`crit_floor` 0.6, `crit_confirm` `shift` and `merge_critical` on: of 8 configurations listed before their dev run
+(`results/dev/policy2_sweep.json`), the one that passed every clause of the rule stated with them and found the most
+critical-class boxes. On CODEBRIM dev100 it cut sign-offs per photo from 2.12 to 1.34 and critical boxes from 7.24 to
+6.38 at no measurable loss of recall (what a person is shown ×1.02, CI 0.99–1.05; drafted critical-class recall ×0.98,
+0.95–1.02), with 0.14 needs-a-look entries per photo; it did not raise critical-class recall, and it does not match L2
+tiling (×0.85 of its recall at the 10 % cap). Its held-out read is in report section 8.
 
 ### Two-model cascade (off by default)
 
