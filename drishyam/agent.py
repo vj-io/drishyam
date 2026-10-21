@@ -36,7 +36,7 @@ from .segment import (
 )
 
 SPIKE_STEP = 4  # chaos p95_spike lands here; the governor reacts on the next step
-SPIKE_MS = 900.0
+SPIKE_X = 1.8  # chaos p95_spike records a look at 1.8x the job's governor limit (900 ms at the default 500 ms)
 PLANNER_TIMEOUT_STEP = 3
 PLANNER_MALFORMED_STEP = 6
 REPLAY_ACTIONS = ("gaze", "escalate", "verify")
@@ -109,6 +109,15 @@ WEIGHTS = {"onnx:drishyam_dacl10k.onnx": "c49416c10087f3c1baa8443b53fc839a3d8eb2
            "onnx:drishyam_dacl10k_v2c.onnx": "24b4d561fb012cb525131e16fa211b528a2e30c90fd9b9e76d98e29edbf18d21"}
 
 
+# The governor's limit on the segmenter's p95 per look (`governor.check`), per profile; any other profile gets SLA_MS.
+# Not a dev-chosen value: on Lambda arm64 one v1 look (512 px, FP32) measured 0.56-1.14 s at p95 over the smoke runs
+# of 2026-10-21 (docs/aws.md), so at 500 ms every live v1 job left the 512-px net the held-out runs measured (governor
+# off) for the 256-px FP16 net after its first looks. 1500 ms is that p95 plus headroom, set once from latency, never
+# from recall; a slower step than that still switches.
+SLA_MS = 500.0
+SLA_MS_BY_PROFILE = {"onnx:drishyam_dacl10k.onnx": 1500.0}
+
+
 def profile_for(segmenter) -> str:
     """The PROFILES key of a segmenter (its `name`), or classical-v1 for one not calibrated: a name not listed, or
     weights (its `sha256`) other than those the profile was chosen with (WEIGHTS)."""
@@ -131,7 +140,7 @@ class JobConfig:
     tau_scout: float | None = None  # the same for a look at L2 or coarser; None: the profile's (PROFILES), else tau
     a_min: int = 64  # crop px; a smaller mask escalates
     eps: float = 0.25  # stop-rule slope factor
-    sla_ms: float = 500.0
+    sla_ms: float | None = None  # the governor's segment p95 limit; None: SLA_MS_BY_PROFILE's for the profile, else SLA_MS
     max_candidates: int = 20
     chaos: tuple[str, ...] = ()
     planner_every: int = 5
@@ -215,6 +224,8 @@ class Job:
         cfg = config or JobConfig()
         name = cfg.profile or profile_for(self.segmenter)
         self.cfg = replace(cfg, profile=name, **{k: v for k, v in PROFILES[name].items() if getattr(cfg, k) is None})
+        if self.cfg.sla_ms is None:
+            self.cfg = replace(self.cfg, sla_ms=SLA_MS_BY_PROFILE.get(name, SLA_MS))
         self.id = job_id or "j_" + secrets.token_hex(3)
         self.planner = planner
         self.kill = kill
@@ -620,8 +631,8 @@ class Job:
             rejected = rejected_lines(seg, to_l0, (W, H))
             injected = None
             if "p95_spike" in cfg.chaos and self.step == SPIKE_STEP:
-                self.stats.record(f"segment:{model}", SPIKE_MS)
-                self.stats.record("segment", SPIKE_MS)
+                self.stats.record(f"segment:{model}", SPIKE_X * cfg.sla_ms)
+                self.stats.record("segment", SPIKE_X * cfg.sla_ms)
                 injected = "p95_spike"
                 self.drills.add(injected)
             y0, y1, x0, x1 = _rect_on(self.seen[level].shape, window, self.ov_scale)

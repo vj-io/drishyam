@@ -969,6 +969,25 @@ def test_a_job_takes_its_segmenters_profile_by_name_and_a_knob_set_explicitly_wi
     assert profile_for(rec) == ONNX and (rec.name, rec.sha256) == (ONNX, named(ONNX).sha256)
 
 
+def test_the_governor_limit_is_per_profile_and_only_v1_has_its_own(scene):
+    """agent.SLA_MS_BY_PROFILE: v1 on Lambda measured 0.56-1.14 s per look at p95, so its limit is 1500 ms and live jobs
+    keep the 512-px net the held-out runs used; every other profile keeps 500 ms; an explicit sla_ms wins."""
+    from drishyam.agent import SLA_MS, SLA_MS_BY_PROFILE
+
+    assert SLA_MS == 500.0 and SLA_MS_BY_PROFILE == {ONNX: 1500.0}
+    assert Job(scene, JobConfig(), segmenter=named(ONNX)).cfg.sla_ms == 1500.0
+    assert Job(scene, JobConfig(), clock=FakeClock()).cfg.sla_ms == 500.0  # classical
+    assert Job(scene, JobConfig(), segmenter=named("onnx:drishyam_dacl10k_v2a.onnx")).cfg.sla_ms == 500.0
+    assert Job(scene, JobConfig(), segmenter=named(ONNX, sha256="0" * 64)).cfg.sla_ms == 500.0  # other weights
+    assert Job(scene, JobConfig(sla_ms=250.0), segmenter=named(ONNX)).cfg.sla_ms == 250.0
+    # The slow-segmenter drill still trips the governor under v1's limit: its injected look scales with the limit.
+    job = Job(scene, JobConfig(chaos=("p95_spike",), pixel_cap=1.0, thumbs=False), segmenter=named(ONNX), clock=FakeClock())
+    st = steps(list(job.run()))
+    spike = next(s for s in st if s.get("injected") == "p95_spike")
+    after = next(s for s in st if s["step"] == spike["step"] + 1)
+    assert after["governor"]["cause"] == "p95>SLA" and "SLA 1500 ms" in after["governor"]["rationale"]
+
+
 def test_the_v2a_profile_is_the_one_its_dev_sweep_chose_and_only_for_its_weights(scene):
     """results/dev/onnx_v2a_profile_sweep.json: no candidate passed the rule, so v2a keeps v1's values; v1's weights
     under v2a's file name (or v2a's under v1's) were not what either profile measured."""

@@ -30,7 +30,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 from pydantic import Field
 
 from . import imaging, privacy
-from .agent import JobConfig, Look, compare
+from .agent import SLA_MS, SLA_MS_BY_PROFILE, JobConfig, Look, compare, profile_for
 from .cli import CAPS, kill_path, write_crops, write_json_atomic
 from .findings import Finding, now_iso, order_status
 from .findings import work_order as make_work_order
@@ -52,7 +52,6 @@ MAX_CANDIDATES = 20
 MAX_JOBS = 4  # the oldest job is dropped from memory beyond this; its run folder stays on disk
 MAX_FILE_BYTES = 128_000_000
 IOU_AGREE = 0.5  # PRD rule 3: a finer look that overlaps the coarser mask by less than this disagrees
-SLA_MS = JobConfig.sla_ms
 LOOKS = {
     "gaze",
     "verify",
@@ -200,7 +199,8 @@ def _call(s: Session, tool_name: str, args: dict, pixels: int = 0, why: str = ""
             "cause": "mcp-call",
             "planner": "llm",
         }
-        v = check(s.budget, s.stats, s.settings, pixels, SLA_MS, kill_path().exists())
+        sla = SLA_MS_BY_PROFILE.get(profile_for(s.segmenter), SLA_MS)  # as a Job's (agent.SLA_MS_BY_PROFILE)
+        v = check(s.budget, s.stats, s.settings, pixels, sla, kill_path().exists())
         if v.cause:  # a setting changed, or a cap was hit (bookkeeping still runs, and its reply says so)
             rec.update(cause=v.cause, rationale=_join(v.rationale, why))
             rec["governor"] = {"cause": v.cause, "rationale": v.rationale}
