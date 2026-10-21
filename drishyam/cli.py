@@ -192,6 +192,63 @@ def cmd_run(a) -> int:
     return 130 if interrupted else 0
 
 
+# ---- batch ----------------------------------------------------------------------------------------
+def cmd_batch(a) -> int:
+    from . import batch  # it imports this module
+
+    if a.report:
+        r = batch.refresh(Path(a.report), batch.signing_key())
+        print(f"{r['id']}: {r['status']}; {r['counts']['pending']} of {r['counts']['critical']} critical findings "
+              f"pending review; {len(r['not_assessed'])} areas or photos not assessed")
+        return 0
+    paths = batch.photo_list(a.photos)
+    if not paths:
+        raise ValueError(f"no JPEG or PNG photos in {' '.join(a.photos) or '(no folder given)'}")
+    key = batch.signing_key()
+    stop, interrupted = threading.Event(), []
+
+    def on_sigint(signum, frame):
+        if stop.is_set():
+            raise KeyboardInterrupt  # a second Ctrl-C aborts without waiting for the step
+        stop.set()
+        interrupted.append(True)
+        print("interrupt: halting the batch after this step (Ctrl-C again to abort)", file=sys.stderr)
+
+    show = lambda rec: print(f"{rec['decision']}  {Path(rec.get('photo', '')).name}  {rec['cause']}: "
+                             f"{rec['rationale']}", file=sys.stderr)
+    cfg = JobConfig(pixel_cap=a.photo_pixel_cap, usd_cap=a.photo_usd_cap, seconds_cap=a.photo_seconds_cap)
+    main_thread = threading.current_thread() is threading.main_thread()
+    old = signal.signal(signal.SIGINT, on_sigint) if main_thread else None
+    try:
+        bdir = batch.run_batch(paths, Path(a.out), cfg, a.usd_cap, a.seconds_cap,
+                               kill=lambda: stop.is_set() or governor.global_kill(), key=key,
+                               cost_model=a.cost_model, micro_arm=a.micro_arm, progress=show)
+    finally:
+        if old is not None:
+            signal.signal(signal.SIGINT, old)
+    r = json.loads((bdir / "inspection.json").read_text())
+    c = r["counts"]
+    print(f"{r['id']}: {r['status']}  {c['photos']} photos: {c['blocked']} blocked, {c['incomplete']} incomplete, "
+          f"{c['ready']} ready, {c['not assessed']} not assessed")
+    print(f"spent {r['spent']['seconds']:.2f} s (${r['spent']['usd']:.5f}), triage {r['spent']['triage_seconds']:.2f} s"
+          + (f"; stopped: {r['stop']['cause']}" if r["stop"] else ""))
+    print(f"report {bdir / 'inspection.md'} (signed: {bdir / 'inspection.json'})")
+    if c["pending"]:
+        print(f"{c['pending']} critical findings wait for a person: drishyam review <work order> <finding id> "
+              f"approve|reject --by NAME, then drishyam batch --report {bdir}")
+    return 130 if interrupted else 0
+
+
+def _total(text: str) -> float:
+    try:
+        v = float(text)
+    except ValueError:
+        v = float("nan")
+    if not 0 < v < float("inf"):
+        raise argparse.ArgumentTypeError("must be a positive number")
+    return v
+
+
 # ---- review, replay, kill -------------------------------------------------------------------------
 def cmd_review(a) -> int:
     path = Path(a.work_order)
@@ -314,6 +371,22 @@ def _parser() -> argparse.ArgumentParser:
         help="the cost table for --cost-model fixed: results/ARM/micro.json (default linux-aarch64, the published one)",
     )
     r.set_defaults(func=cmd_run)
+
+    b = sub.add_parser(
+        "batch", help="inspect a backlog: triage every photo, run the most promising first under one total budget; "
+        "writes runs/batch-<id>/inspection.json (signed), inspection.md, batch_trace.jsonl and one run folder per photo"
+    )
+    b.add_argument("photos", nargs="*", help="folders, photos, or .txt lists of photo paths")
+    b.add_argument("--usd-cap", type=_total, help="modelled $ for the whole batch (default: none)")
+    b.add_argument("--seconds-cap", type=_total, help="seconds for the whole batch, triage included (default: none)")
+    b.add_argument("--photo-pixel-cap", type=_cap("pixel_cap"), default=0.30, help="per photo, as run's --pixel-cap")
+    b.add_argument("--photo-usd-cap", type=_cap("usd_cap"), default=0.05, help="per photo, as run's --usd-cap")
+    b.add_argument("--photo-seconds-cap", type=_cap("seconds_cap"), default=20.0, help="per photo, as run's --seconds-cap")
+    b.add_argument("--out", default="runs", help="directory for the batch folder (default runs)")
+    b.add_argument("--cost-model", choices=("live", "fixed"), default="live", help="as run's --cost-model")
+    b.add_argument("--micro-arm", default="linux-aarch64", metavar="ARM", help="as run's --micro-arm")
+    b.add_argument("--report", metavar="DIR", help="after reviews: recompute DIR/inspection.json from its work orders")
+    b.set_defaults(func=cmd_batch)
 
     v = sub.add_parser("review", help="a human approves or rejects a pending_review finding")
     v.add_argument("work_order")
