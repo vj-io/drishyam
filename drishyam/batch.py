@@ -17,6 +17,11 @@ The batch approves nothing. Each photo's work order is reviewed with `drishyam r
 then recomputes the report from the work orders, refusing when the seal does not verify or when a critical finding the
 sealed report listed is gone, or changed state without a recorded review. Every decision is one line of
 batch_trace.jsonl with its cause and the measured values behind it, as each look is in a job's trace.
+
+`--router nova` (drishyam.router) adds a live LLM to steps 1-2: Amazon Nova Lite labels each photo's overview Clear,
+Requires zoom or Critical. Clear photos get no job and are listed as not assessed (cleared by the router, not looked at
+closely, with its reason); Critical photos run first, then Requires zoom, each in triage order; the router's $ is
+charged to the total. The default, `--router rule`, is the triage above alone.
 """
 
 from __future__ import annotations
@@ -34,6 +39,7 @@ from . import findings, imaging, planner, privacy
 from .agent import Job
 from .cli import fixed_cost_job, write_crops, write_json_atomic
 from .findings import DISCLAIMER, SEVERITY, now_iso
+from .router import LABELS, RANK, usd
 
 PHOTO_TYPES = {".jpg", ".jpeg", ".png"}
 SEAL_TTL_S = 10 * 365 * 24 * 3600  # a seal on a report, not a review token: it must outlast the review work
@@ -104,8 +110,9 @@ def run_photo(img, priv, cfg, make, root: Path, cost_model: str, micro_arm: str)
 
 
 def run_batch(paths, out: Path, cfg, usd_cap=None, seconds_cap=None, make=make_job, kill=lambda: False,
-              key: bytes = b"", cost_model="live", micro_arm="linux-aarch64", progress=None) -> Path:
-    """Triage, order and run `paths` under one total budget (None: no cap); returns the batch folder under `out`."""
+              key: bytes = b"", cost_model="live", micro_arm="linux-aarch64", progress=None, router=None) -> Path:
+    """Triage (with a `router.Router`, route too), order and run `paths` under one total budget (None: no cap);
+    returns the batch folder under `out`."""
     t_wall = time.perf_counter()
     while True:
         bdir = Path(out) / f"batch-{secrets.token_hex(3)}"
@@ -119,7 +126,7 @@ def run_batch(paths, out: Path, cfg, usd_cap=None, seconds_cap=None, make=make_j
     budget = min(math.inf if seconds_cap is None else seconds_cap,
                  math.inf if usd_cap is None else usd_cap * 3600 / cfg.usd_per_hour)
     photos = [{"photo": str(p), "index": i, "rank": None} for i, p in enumerate(paths)]
-    spent, stop = 0.0, None
+    spent, stop, routes, route_usd = 0.0, None, {}, 0.0
 
     def log(decision, cause, rationale, photo=None, **values):
         rec = {"type": "batch", "batch": bdir.name, "t": now_iso(), "decision": decision,
@@ -138,7 +145,8 @@ def run_batch(paths, out: Path, cfg, usd_cap=None, seconds_cap=None, make=make_j
             stop = ("kill-switch", "kill switch set during triage")
             break
         try:
-            t = triage(load(p["photo"])[0], cfg, make_one)
+            img = load(p["photo"])[0]
+            t = triage(img, cfg, make_one)
         except (OSError, ValueError) as exc:
             unusable(p, exc)
             log("triaged", "unreadable", str(exc), p)
@@ -147,9 +155,35 @@ def run_batch(paths, out: Path, cfg, usd_cap=None, seconds_cap=None, make=make_j
         spent += t["seconds"]
         log("triaged", "overview", f"{t['candidates']} candidates, prior sum {t['prior_sum']:g}, max "
             f"{t['prior_max']:g}", p, **t)
-    ranked = sorted((p for p in photos if "triage" in p), key=lambda p: (-p["triage"]["prior_sum"], p["index"]))
+        if router:
+            routes[p["index"]] = router.submit(p["photo"], img, t)
+    for p in photos:  # the router's replies, in file order; its $ is charged as seconds at the agent's $ per hour
+        if p["index"] not in routes:
+            continue
+        if not stop and kill():
+            stop = ("kill-switch", "kill switch set while the router ran")
+        if stop and routes[p["index"]].cancel():
+            continue
+        r = routes[p["index"]].result()
+        p["route"] = {k: r[k] for k in ("label", "reason", "status", "cause", "cached", "latency_ms", "usage")}
+        route_usd += usd(r["usage"])
+        spent += usd(r["usage"]) * 3600 / cfg.usd_per_hour
+        log("routed", "cached" if r["cached"] else r["status"], f"{r['label']}: {r['reason']}", p, label=r["label"],
+            detail=r["cause"], latency_ms=r["latency_ms"], usd=usd(r["usage"]))
+    if router and not stop:
+        for p in photos:
+            if p.get("route", {}).get("label") == "Clear":
+                p.update(outcome="cleared", reason=f"cleared by the router (not looked at closely): {p['route']['reason']}")
+                log("cleared", "router", p["route"]["reason"], p)
+    by_label = (lambda p: RANK.get(p.get("route", {}).get("label"), 1)) if router else (lambda p: 0)
+    ranked = sorted((p for p in photos if "triage" in p and "outcome" not in p),
+                    key=lambda p: (by_label(p), -p["triage"]["prior_sum"], p["index"]))
     if stop:
         log("killed", *stop)
+    elif router:
+        log("ordered", "router", f"Critical first, then Requires zoom, each by highest sum of candidate priors (ties: "
+            f"file order); {sum(p.get('outcome') == 'cleared' for p in photos)} photos cleared get no job",
+            order=[p["index"] for p in ranked])
     else:
         log("ordered", "triage-score", "highest sum of candidate priors first (ties: file order)",
             order=[p["index"] for p in ranked])
@@ -165,7 +199,8 @@ def run_batch(paths, out: Path, cfg, usd_cap=None, seconds_cap=None, make=make_j
             log("killed" if stop[0] == "kill-switch" else "budget-stop", *stop)
             continue
         cap = min(cfg.seconds_cap, budget - spent)
-        log("started", "rank", f"rank {rank} of {len(ranked)}: prior sum {p['triage']['prior_sum']:g} over "
+        label = f"{p['route']['label']}; " if "route" in p else ""
+        log("started", "rank", f"rank {rank} of {len(ranked)}: {label}prior sum {p['triage']['prior_sum']:g} over "
             f"{p['triage']['candidates']} candidates; seconds cap {cap:.3f} s ("
             f"{'per photo' if cap == cfg.seconds_cap else 'what the batch budget leaves'})", p, seconds_cap=cap)
         try:
@@ -193,7 +228,21 @@ def run_batch(paths, out: Path, cfg, usd_cap=None, seconds_cap=None, make=make_j
                          "cost_model": cost_model, **({"micro_arm": micro_arm} if cost_model == "fixed" else {})},
               "stop": stop and {"cause": stop[0], "rationale": stop[1]}, "photos": photos}
     tri = sum(p["triage"]["seconds"] for p in photos if "triage" in p)
+    if router:
+        rs = [p["route"] for p in photos if "route" in p]
+        lat = sorted(r["latency_ms"] for r in rs if not r["cached"])
+        pct = lambda q: lat[min(len(lat) - 1, int(q * len(lat)))] if lat else None
+        report["router"] = {
+            "name": router.name, "model": router.model, "prompt_key": router.key, "photos": len(rs),
+            "calls": len(lat), "cached": len(rs) - len(lat), "labels": {k: sum(r["label"] == k for r in rs) for k in LABELS},
+            "status": {k: sum(r["status"] == k for r in rs) for k in ("accepted", "rejected", "fallback")},
+            "causes": {c: sum(r["cause"] == c for r in rs) for c in sorted({r["cause"] for r in rs if r["cause"]})},
+            "input_tokens": sum(r["usage"].get("inputTokens", 0) for r in rs),
+            "output_tokens": sum(r["usage"].get("outputTokens", 0) for r in rs), "usd": route_usd,
+            "latency_ms": {"p50": pct(0.5), "p95": pct(0.95), "max": lat[-1] if lat else None}}
     report["spent"] = {"seconds": spent, "usd": spent * cfg.usd_per_hour / 3600, "triage_seconds": tri,
+                       **({"router_usd": route_usd, "router_seconds": route_usd * 3600 / cfg.usd_per_hour}
+                          if router else {}),
                        "pixels": sum(p.get("pixels", 0) + p.get("triage", {}).get("pixels", 0) for p in photos),
                        "wall_seconds": time.perf_counter() - t_wall}  # decode and privacy blur too: not charged
     write(bdir, derive(bdir, report), key)
@@ -208,8 +257,9 @@ def derive(bdir: Path, report: dict) -> dict:
     for p in report["photos"]:
         if "run_dir" not in p:
             p["status"] = "not assessed"
-            na.append({"photo": p["photo"], "reason": p["reason"],
-                       "action": "run it in a later batch" if p["outcome"] == "not-reached" else "check the file"})
+            na.append({"photo": p["photo"], "reason": p["reason"], "action": {
+                "not-reached": "run it in a later batch", "cleared": "look at it, or run it with --router rule"}.get(
+                p["outcome"], "check the file")})
             continue
         wo_path = f"{p['run_dir']}/work_order.json"
         wo = json.loads((bdir / wo_path).read_text())
@@ -223,8 +273,10 @@ def derive(bdir: Path, report: dict) -> dict:
     statuses = [p["status"] for p in report["photos"]]
     counts = {s: statuses.count(s) for s in ("blocked", "incomplete", "ready", "not assessed")}
     status = "blocked" if pending else "incomplete" if na else "ready"
-    return {**report, "status": status, "counts": {"photos": len(statuses), **counts, "critical": len(queue),
-                                                   "pending": pending}, "queue": queue, "not_assessed": na}
+    cleared = sum(p.get("outcome") == "cleared" for p in report["photos"])
+    return {**report, "status": status, "counts": {"photos": len(statuses), **counts, "cleared": cleared,
+                                                   "critical": len(queue), "pending": pending},
+            "queue": queue, "not_assessed": na}
 
 
 def _digest(report: dict) -> dict:
@@ -283,10 +335,22 @@ def markdown(r: dict) -> str:
     cap = r["budget"]["seconds_budget"]
     lines = [f"# Inspection {r['id']}: {r['status']}", "", r["disclaimer"], "",
              f"{c['photos']} photos: {c['blocked']} blocked, {c['incomplete']} incomplete, {c['ready']} ready, "
-             f"{c['not assessed']} not assessed. Spent {s['seconds']:.2f} s (${s['usd']:.5f})"
+             f"{c['not assessed']} not assessed"
+             f"{f' ({cl} of them cleared by the router, not looked at closely)' if (cl := c.get('cleared')) else ''}"
+             f". Spent {s['seconds']:.2f} s (${s['usd']:.5f})"
              f"{f' of {cap:.2f} s' if cap is not None else ''}, triage {s['triage_seconds']:.2f} s, "
              f"{s['pixels']:,} px." + (f" Stopped: {r['stop']['cause']}: {r['stop']['rationale']}." if r["stop"] else ""),
-             "", f"## Human queue: {c['pending']} of {c['critical']} critical findings pending review", ""]
+             ""]
+    if ro := r.get("router"):
+        causes = ", ".join(f"{k}: {n}" for k, n in ro["causes"].items())
+        lines += [(f"Router {ro['name']} ({ro['model']}): {ro['photos']} photos labelled "
+                   f"({', '.join(f'{n} {k}' for k, n in ro['labels'].items())}); {ro['calls']} calls, {ro['cached']} "
+                   f"cached; {ro['status']['rejected'] + ro['status']['fallback']} fell back to the rule triage"
+                   f"{f' ({causes})' if causes else ''}; ${ro['usd']:.5f}, charged to the budget as "
+                   f"{s['router_seconds']:.2f} s; latency p50 {ro['latency_ms']['p50']} ms, p95 "
+                   f"{ro['latency_ms']['p95']} ms. A Clear photo was not looked at closely: it is listed under Not "
+                   "assessed."), ""]
+    lines += [f"## Human queue: {c['pending']} of {c['critical']} critical findings pending review", ""]
     if r["queue"]:
         lines += ["| photo | finding | class | confidence | state | work order |", "|---|---|---|---|---|---|"]
         lines += [f"| {name(q['photo'])} | {q['finding']} | {q['cls']} | {q['confidence']:.2f} | {q['state']} | "
@@ -296,11 +360,14 @@ def markdown(r: dict) -> str:
     lines += ["", f"## Not assessed: {len(r['not_assessed'])}", ""]
     lines += [f"- {name(n['photo'])}: {n['reason']} ({n['action']}"
               f"{', box ' + str(n['box']) if 'box' in n else ''})" for n in r["not_assessed"]]
-    lines += ["", "## Photos, in the order run", "", "| rank | photo | candidates | prior sum | status | s | findings |",
-              "|---|---|---|---|---|---|---|"]
+    ro = bool(r.get("router"))
+    lines += ["", "## Photos, in the order run", "",
+              f"| rank | photo |{' router |' * ro} candidates | prior sum | status | s | findings |",
+              f"|---|---|{'---|' * ro}---|---|---|---|---|"]
     for p in sorted(r["photos"], key=lambda p: (p["rank"] is None, p["rank"] or 0, p["index"])):
         t, secs = p.get("triage", {}), round(p["seconds"], 2) if "seconds" in p else "-"
-        lines.append(f"| {p['rank'] or '-'} | {name(p['photo'])} | {t.get('candidates', '-')} | "
+        lab = f" {p.get('route', {}).get('label', '-')} |" if ro else ""
+        lines.append(f"| {p['rank'] or '-'} | {name(p['photo'])} |{lab} {t.get('candidates', '-')} | "
                      f"{t.get('prior_sum', '-')} | {p['status']} | {secs} | {p.get('findings', '-')} |")
     return "\n".join(lines) + "\n"
 
