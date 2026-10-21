@@ -115,7 +115,7 @@ Critical findings (exposed rebar; spalling above 40 000 px²) wait in `pending_r
 or with `drishyam review`, can approve or reject them; nothing the agent, the MCP tools or the planner can call reaches
 that transition.
 
-No LLM runs in the live demo. The deployed agent is the rule policy above (the stack sets no
+No LLM runs in the live demo (the batch CLI's optional Nova Lite router is in section 10). The deployed agent is the rule policy above (the stack sets no
 `DRISHYAM_PLANNER_URL`), and the planner failure drills use planners scripted to time out or answer junk. The LLM
 path is the MCP server: section 10 links a recorded session in which Claude chose each call from the measured
 values.
@@ -767,6 +767,16 @@ and every photo it did not reach listed as not assessed. Its ordering is not sho
 (`results/dev/batch_triage.json`: triage against random order ×1.23, CI 0.64–1.64; against file order ×1.45,
 CI 0.53–4.00, under a rule stated before the run), and its up-front pass makes it slower to the first critical than
 that file order; the per-photo agent sets the ceiling.
+
+`drishyam batch --router nova` maps every photo through Amazon Nova Lite on Bedrock: the blurred overview and the OpenCV measurements go in, a strict JSON label (Clear, Requires zoom, Critical) comes back, any failure falls back to
+the rule triage, and accepted replies are cached by sha256. It then reduces: Clear photos are listed as not assessed,
+Critical ones run first, and the router's $ is charged to the budget. Under the rule committed before any paid call
+the result is harm (`results/dev/router_eval.json`): critical recall 0.181 against the triage's 0.497 (×0.36,
+CI 0.13–0.67) and random order's 0.331 (×0.55, CI 0.21–0.88). Free of its $, its order is no measurable gain (×1.14,
+CI 0.98–1.44), and its clears missed 9 of 81 photos holding a critical defect (0.111, CI 0.060–0.198), so the rule
+triage stays the default. On a 2,536-photo backlog (`results/backlog_2536/summary.md`) it cleared 867 photos (40 of
+them holding a critical defect), ran 587 and queued 684 critical findings for a person, for $0.316 of Bedrock within a
+$0.50 budget. The batch's report stays blocked until a person reviews them.
 
 ## 11. Responsible use and limits
 
