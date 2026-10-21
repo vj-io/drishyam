@@ -1,0 +1,183 @@
+{
+  "id": "wo_0a56df",
+  "job": "j_0a56df",
+  "created": "2026-10-21T15:20:42Z",
+  "findings": [
+    {
+      "id": "f1",
+      "cls": "spalling",
+      "confidence": 0.8866,
+      "measure": {
+        "length_px": 407.6,
+        "width_px": 101.82,
+        "area_px": 41508,
+        "orientation_deg": 176.6
+      },
+      "box": [
+        1362,
+        1300,
+        472,
+        438
+      ],
+      "step": 4,
+      "level": 1,
+      "region": "g2",
+      "critical": true,
+      "state": "pending_review",
+      "verify_iou": null,
+      "steps": [
+        4
+      ],
+      "critical_step": 4,
+      "critical_area_px": 41508,
+      "critical_rule": "spalling 41,508 px\u00b2 >= 40,000 px\u00b2",
+      "verified": null
+    },
+    {
+      "id": "f2",
+      "cls": "exposed_rebar",
+      "confidence": 0.6471,
+      "measure": {
+        "length_px": 443.4,
+        "width_px": 52.93,
+        "area_px": 23472,
+        "orientation_deg": 164.7
+      },
+      "box": [
+        1408,
+        1450,
+        456,
+        216
+      ],
+      "step": 2,
+      "level": 2,
+      "region": "g1",
+      "critical": true,
+      "state": "pending_review",
+      "verify_iou": null,
+      "steps": [
+        2
+      ],
+      "critical_step": 2,
+      "critical_area_px": 23472,
+      "critical_rule": "exposed_rebar: always critical",
+      "verified": null
+    },
+    {
+      "id": "f3",
+      "cls": "corrosion",
+      "confidence": 0.9658,
+      "measure": {
+        "length_px": 572.6,
+        "width_px": 173.35,
+        "area_px": 99268,
+        "orientation_deg": 176.4
+      },
+      "box": [
+        1328,
+        1446,
+        568,
+        232
+      ],
+      "step": 4,
+      "level": 1,
+      "region": "g2",
+      "critical": false,
+      "state": "draft",
+      "verify_iou": null,
+      "steps": [
+        4
+      ],
+      "critical_step": null,
+      "critical_area_px": null,
+      "critical_rule": null,
+      "verified": null
+    },
+    {
+      "id": "f4",
+      "cls": "crack",
+      "confidence": 0.9518,
+      "measure": {
+        "length_px": 1084.6,
+        "width_px": 30.15,
+        "area_px": 32704,
+        "orientation_deg": 135.2
+      },
+      "box": [
+        2426,
+        868,
+        362,
+        394
+      ],
+      "step": 11,
+      "level": 1,
+      "region": "g3",
+      "critical": false,
+      "state": "draft",
+      "verify_iou": null,
+      "steps": [
+        11
+      ],
+      "critical_step": null,
+      "critical_area_px": null,
+      "critical_rule": null,
+      "verified": null
+    },
+    {
+      "id": "f5",
+      "cls": "spalling",
+      "confidence": 0.9646,
+      "measure": {
+        "length_px": 373.6,
+        "width_px": 152.91,
+        "area_px": 57128,
+        "orientation_deg": 147.7
+      },
+      "box": [
+        494,
+        1874,
+        312,
+        298
+      ],
+      "step": 15,
+      "level": 1,
+      "region": "g4",
+      "critical": true,
+      "state": "pending_review",
+      "verify_iou": null,
+      "steps": [
+        15
+      ],
+      "critical_step": 15,
+      "critical_area_px": 57128,
+      "critical_rule": "spalling 57,128 px\u00b2 >= 40,000 px\u00b2",
+      "verified": null
+    }
+  ],
+  "gaze_path": [
+    [
+      1840,
+      1226,
+      2
+    ],
+    [
+      1840,
+      1226,
+      1
+    ],
+    [
+      2488,
+      1080,
+      1
+    ],
+    [
+      784,
+      1738,
+      1
+    ]
+  ],
+  "not_assessed": [],
+  "approvals": [],
+  "disclaimer": "AI-assisted, not an inspection. Measurements are image pixels, not millimetres.",
+  "status": "blocked"
+}

@@ -716,7 +716,14 @@ handed the exposed-rebar finding to a human with the disagreement as the reason;
 a spalling finding; at step 20 the remaining pixel budget ended the search. Its prompt states the decision rules
 (entropy above 0.5 means zoom, IoU below 0.5 means disagreement; [prompt.txt](mcp-session/prompt.txt)), so the
 session shows the tools carrying measured evidence to an LLM more than autonomous planning. The transcript also
-notes the large spall it missed.
+notes the large spall it missed. On the live v1 engine, [mcp-session-v1/transcript.md](mcp-session-v1/transcript.md)
+records two more sessions with the same bridge and rules, plus L1 as v1's finest level. On `bridge_03.jpg`
+a verify measured spalling IoU 0.468 between L2 and L1, and L1 read the bars that L2 called exposed rebar as
+corrosion, so Claude handed both critical findings to a human with those reasons. It also spent a look on the crack
+the rule agent's stop rule left unvisited: 4 of the 4 ground-truth boxes against the rule agent's 3, at the same
+17.1 % of the pixels, in one session whose client had read the ground truth beforehand. On the team's `real_01.jpg`,
+where the overview proposes no candidate and the rule agent takes no look, Claude gazed at a faint line it saw in the
+heatmap, and v1 flagged one crack and nothing else; the measured width (34-69 px) is the mask's, not the hairline's.
 
 ### Across a backlog
 
