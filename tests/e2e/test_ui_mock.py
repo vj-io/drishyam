@@ -153,11 +153,15 @@ def killed_tail(sent):
             **{k: last[k] for k in ("pixels_used", "pixels_frac", "usd_used", "seconds_used")}}
     pending = [f for f in found.values() if f["critical"] and f["state"] == "pending_review"]
     regions = {s["region"] for s in steps}
-    order = {**DONE["work_order"], "findings": list(found.values()), "status": "blocked" if pending else "ready",
+    unvisited = [c for c in EVENTS[1]["candidates"] if c["id"] not in regions]
+    gaps = [{"step": len(steps) + 1, "box": c["box"], "reason": "not looked at: kill-switch halted the job first",
+             "action": "check-by-eye", "region": c["id"]} for c in unvisited]  # not assessed, never clean
+    order = {**DONE["work_order"], "findings": list(found.values()), "not_assessed": gaps,
+             "status": "blocked" if pending else "incomplete" if gaps else "ready",
              "gaze_path": [[s["decision"]["args"][k] for k in ("x", "y", "level")] for s in steps]}
     done = {**DONE, "status": "halted", "cause": "kill-switch", "work_order": order,
             "coverage": DONE["coverage"] if steps else 0.0,  # the first look is a survey of the whole photo
-            "unvisited": [c["id"] for c in EVENTS[1]["candidates"] if c["id"] not in regions],
+            "unvisited": [c["id"] for c in unvisited],
             "summary": {"steps": len(steps), "pixels_used": last["pixels_used"], "pixels_frac": last["pixels_frac"],
                         "usd": last["usd_used"], "seconds": last["seconds_used"], "findings": len(found),
                         "critical_pending": len(pending)}}
@@ -816,6 +820,8 @@ def test_live_api_contract(browser, base):
     expect(p.locator("#job-text")).to_contain_text("Halted by KILL")
     expect(p.locator(".trace__line .chip", has_text=re.compile("^kill-switch$"))).to_have_count(1)
     expect(p.locator("#resume")).to_be_visible()
+    expect(p.locator("#recap")).to_contain_text(re.compile(r"Not assessed: \d+ candidate regions? (was|were) never looked at"))
+    expect(p.locator("#done")).not_to_contain_text("is ready")  # the regions KILL left are not a clean result
     s.check_clean()
     s.context.close()
     print("ok  live API path: query, replay header, sha256 headers, review tokens, /api/kill -> kill-switch, privacy.boxes, halt step")

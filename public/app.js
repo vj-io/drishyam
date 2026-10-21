@@ -57,15 +57,27 @@ const STOPPED = {
   'cap-hit': 'budget spent', 'kill-switch': 'you pressed KILL', 'planner:stop': 'the planner proposed stopping',
 };
 // a kill-switch halt before any look can only be the operator-wide switch: the server reads a page's KILL after a look
-const stopWords = (cause, looks) => (cause === 'kill-switch' && !looks ? 'the kill switch was already set' : STOPPED[cause] ?? cause);
+const stopWords = (cause, looks) => (cause === 'kill-switch' && !looks ? 'the kill switch was already set'
+  : cause === 'exhausted' && !looks ? 'no candidate region was proposed' : STOPPED[cause] ?? cause);
 
 // ---- the four steps: Waiting / Running / Done, each with a sentence in plain words -------------------
 const pendingCount = () => (S.order?.findings ?? []).filter((f) => f.critical && f.state === 'pending_review').length;
+/** What the work order marks not assessed (its not_assessed areas), in words; '' when nothing is. */
+function gapText() {
+  const na = S.order?.not_assessed ?? [];
+  if (!na.length) return '';
+  if (!S.overview?.candidates?.length) return 'no candidate region was proposed, so the whole photo is not assessed';
+  const skipped = na.filter((a) => a.region).length;
+  const unread = na.length - skipped;
+  return [skipped ? `${skipped} candidate region${skipped === 1 ? ' was' : 's were'} never looked at` : '',
+    unread ? `${unread} area${unread === 1 ? '' : 's'} could not be read` : ''].filter(Boolean).join(' and ');
+}
 
 function syncSteps() {
   const run = S.mode === 'running' ? 'running' : S.done ? 'done' : 'waiting';
   const pending = pendingCount();
-  const states = [S.image ? 'done' : 'waiting', run, run, S.done && !pending ? 'done' : 'waiting'];
+  const gap = S.done ? gapText() : '';
+  const states = [S.image ? 'done' : 'waiting', run, run, S.done && !pending && !gap ? 'done' : 'waiting'];
   states.forEach((state, i) => {
     el.states[i].dataset.state = state;
     el.states[i].textContent = { waiting: 'Waiting', running: 'Running', done: 'Done' }[state];
@@ -75,6 +87,8 @@ function syncSteps() {
     ? (S.mode === 'running' ? 'Findings appear here as the agent makes them. Anything critical waits for your sign-off when the run ends.'
       : 'Nothing to sign yet. When a run ends, anything critical waits here for a person. The agent cannot approve it.')
     : pending ? `Waiting for your sign-off (${pending}): type your name on each card marked NEEDS A HUMAN, then Approve or Reject. The agent cannot do this for you.`
+      : gap ? `${!S.overview?.candidates?.length ? 'Not ready' : `${critical ? 'Signed' : 'Nothing critical in what it looked at'}, but not ready`}: `
+        + `${gap}. The work order marks this as not assessed, so a person should look there. It does not say the wall is clean.`
       : critical ? 'Signed: ready to send. Download the signed work order below.'
         : 'Nothing critical was found, so nothing needs your sign-off. The work order is ready.';
 }
@@ -83,12 +97,14 @@ function syncSteps() {
 function doneKey() {
   const d = S.done;
   if (d?.status === 'halted') return d.cause === 'cap-hit' ? 'budget' : 'halted';
-  if (d?.status === 'awaiting_review' && S.order?.status === 'ready') return 'signed';
+  if (d?.status === 'awaiting_review' && S.order?.status !== 'blocked') return 'signed';
+  if (S.order?.status === 'incomplete') return 'incomplete';  // done, but part of the photo is not assessed
   return d?.status ?? 'completed';
 }
 const PILL = {
   idle: 'ready', running: 'running', killed: 'killed', stopped: 'stopped', error: 'error',
   awaiting_review: 'needs sign-off', signed: 'signed', completed: 'done', halted: 'halted', budget: 'budget spent',
+  incomplete: 'needs a look',
 };
 
 function setMode(mode, text) {
@@ -478,7 +494,8 @@ function tokenExp(token) {
 }
 
 function buildDone() {
-  const { summary: sm, coverage, unvisited, cause } = S.done;
+  const { summary: sm, coverage_looked: looked, unvisited, cause } = S.done;
+  const coverage = looked ?? S.done.coverage;  // a recording older than coverage_looked: its coverage counts the survey look
   const pill = h('span', { class: 'pill' });
   const orderState = h('span', { class: 'note' });
   const specs = [
@@ -500,14 +517,15 @@ function buildDone() {
     orderState,
     h('div', { class: 'tiles' }, specs.map((s) => s.pair[0])),
     h('div', { class: 'meter' },
-      h('div', { class: 'meter__head' }, h('span', {}, 'salient area seen at any level (incl. survey)'), h('span', {}, coverNum)),
-      h('div', { class: 'meter__track', role: 'progressbar', 'aria-label': 'Saliency-weighted coverage at any level', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': Math.round(coverage * 100) }, cover)),
+      h('div', { class: 'meter__head' }, h('span', {}, looked == null ? 'salient area seen at any level (incl. survey)' : 'salient area looked at closely (the survey look does not count)'), h('span', {}, coverNum)),
+      h('div', { class: 'meter__track', role: 'progressbar', 'aria-label': looked == null ? 'Saliency-weighted coverage at any level' : 'Saliency-weighted share looked at closely', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': Math.round(coverage * 100) }, cover)),
     h('div', {}, h('h4', { class: 'label' }, 'not zoomed into'),
       unvisited?.length ? h('p', { class: 'chips' }, unvisited.map((r) => {
         const b = h('button', { class: 'chip chip--look chip--btn', type: 'button' }, `${r}: check it yourself`);
         b.addEventListener('click', () => showBox(box(r)));
         return b;
-      })) : h('p', { class: 'note' }, 'none: every candidate region was looked at')),
+      })) : h('p', { class: 'note' }, S.overview?.candidates?.length ? 'none: every candidate region was looked at'
+        : 'none proposed: no region stood out, so check the whole photo yourself')),
     privacy ? h('p', { class: 'note' }, `privacy: ${privacy.faces_blurred ?? 0} faces and ${privacy.people_blurred ?? 0} people blurred`) : null,
     h('div', { class: 'done__dl' }, order, log)));
   S.ui = { pill, orderState, pending: specs[5].pair[1] };
@@ -528,8 +546,10 @@ function updateDone() {
   const signers = [...new Set((S.order.approvals ?? []).map((a) => a.reviewer).filter(Boolean))];
   el.tbChecked.textContent = signers.length ? signers.join(', ') : 'human reviewer';
   const critical = S.order.findings.some((f) => f.critical);
+  const gap = gapText();
   S.ui.orderState.textContent = pending
     ? `Waiting for your sign-off (${pending}): work order ${S.order.id} is ${S.order.status} until a person approves or rejects each critical finding.`
+    : gap ? `Work order ${S.order.id} is ${S.order.status}: ${gap}. A person should look there.`
     : critical ? `Signed: ready to send. Work order ${S.order.id} is ${S.order.status}.`
       : `Work order ${S.order.id} is ${S.order.status}: nothing critical needed a sign-off.`;
   countUp(S.ui.pending, pending);
@@ -542,6 +562,7 @@ function recap() {
   for (const s of S.steps) kinds[kindOf(s.cause)] += 1;
   const sm = S.done.summary;
   const crit = S.order.findings.filter((f) => f.critical).length;
+  const gap = gapText();
   const why = [[kinds.vision, 'from what OpenCV measured in the photo'], [kinds.kill, 'from the kill switch'], [kinds.governor, 'from the governor’s timing and budget checks'],
     [kinds.planner, 'from the planner drill (the rule planner’s choice stood)'], [kinds.replay, 'replayed from before KILL']]
     .filter(([n]) => n).map(([n, t]) => `${n} ${t}`);
@@ -572,7 +593,10 @@ function recap() {
       h('li', {}, h('b', {}, String(S.steps.length)), ` decision${S.steps.length === 1 ? '' : 's'} (${looks ? looks : 'no'} look${looks === 1 ? '' : 's'}${stopped}), `
         + `${S.steps.length === 1 ? 'with its' : 'every one with a'} recorded cause: ${why.join(', ')}.`),
       h('li', {}, h('b', {}, String(crit)), ` critical finding${crit === 1 ? ' was' : 's were'} sent to a person: the agent is not allowed to approve ${crit === 1 ? 'it' : 'them'}.`),
-      h('li', {}, h('b', {}, `${Math.round(S.done.coverage * 100)} %`), ' of the salient area was seen at some level (the first survey look counts).'),
+      S.done.coverage_looked == null
+        ? h('li', {}, h('b', {}, `${Math.round(S.done.coverage * 100)} %`), ' of the salient area was seen at some level (the first survey look counts).')
+        : h('li', {}, h('b', {}, `${Math.round(S.done.coverage_looked * 100)} %`), ' of the salient area was looked at closely (the first survey look does not count).'),
+      gap ? h('li', {}, h('b', {}, 'Not assessed'), `: ${gap}. The work order marks this for a person to look at; it does not say the wall is clean.`) : null,
       h('li', {}, h('b', {}, `$${sm.usd.toFixed(6)}`), ` modelled for ${sm.seconds} s of ${agentTime()} (${modelled() ? 'seconds from a fixed cost table' : 'wall time'} × $0.339/h, not billed).`)),
     h('div', { class: 'recap__next' },
       pendingCount() ? h('p', {}, sign, ' takes you to the first card that needs a person: type your name, then Approve or Reject.') : null,
@@ -594,8 +618,10 @@ function finish(ev) {
       : 'Halted before its first look: the kill switch was already set, so there is no look to resume. Run starts it again.')
     : S.slow && !Q.skip ? `The agent took ${sm.seconds} s${modelled() ? ' (modelled)' : ''}${paced()}; we replayed it slowly so you can read it${serverTotal(sm.seconds)}.`
       : `Done in ${sm.seconds} s of ${agentTime()}: ${sm.steps} looks, ${(sm.pixels_frac * 100).toFixed(1)} % of the pixels${serverTotal(sm.seconds)}.`));
+  const gap = gapText();
   narrate(n ? `${n} critical finding${n === 1 ? ' needs' : 's need'} you. Sign ${n === 1 ? 'it' : 'them'} off in step 4: the agent cannot.`
-    : 'Nothing critical was found, so nothing needs your sign-off.',
+    : gap ? `Not assessed: ${gap}. A person should look there; this is not a clean result.`
+      : 'Nothing critical was found, so nothing needs your sign-off.',
   `It stopped because ${stopWords(ev.cause, sm.steps)}${S.steps.length ? `: step ${S.steps.at(-1).step} says why` : ''}.`);
   findings.setReady();
   findings.refresh();

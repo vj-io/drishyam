@@ -188,3 +188,13 @@ def test_work_order_lists_what_was_not_assessed():
     na = [{"step": 3, "box": [0, 0, 512, 512], "reason": "glare", "action": "re-shoot"}]
     assert F.work_order("j_x", [], [], na)["not_assessed"] == na
     assert F.work_order("j_x", [], [])["not_assessed"] == []
+
+
+def test_an_order_with_areas_not_assessed_is_incomplete_not_ready():
+    """ready only when nothing is left for a person: no critical finding pending and no area not assessed."""
+    na = [{"step": 0, "box": [0, 0, 64, 64], "reason": "no candidate region was proposed", "action": "check-by-eye"}]
+    assert F.work_order("j_x", [], [], na)["status"] == "incomplete"
+    wo = F.work_order("j_x", [make()], [[1, 2, 1]], na)
+    assert wo["status"] == "blocked"  # a pending critical finding comes first
+    _, wo2 = F.apply_review(F.sign(wo, KEY), KEY, "f1", "approve", "Ann")
+    assert wo2["status"] == "incomplete"

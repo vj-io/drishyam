@@ -636,7 +636,7 @@ def test_replay_carries_the_gaze_size_the_governor_set(scene, monkeypatch):
 
 def test_killed_job_resumes_into_the_same_job(scene):
     full = Job(scene, JobConfig(thumbs=False, pixel_cap=1.0), clock=FakeClock())
-    list(full.run())
+    full_done = list(full.run())[-1]
     for k in (1, 2, 3):
         holder = {}
         cut = holder["job"] = Job(scene, JobConfig(thumbs=False, pixel_cap=1.0), clock=FakeClock(),
@@ -645,8 +645,9 @@ def test_killed_job_resumes_into_the_same_job(scene):
         replay = [[s["decision"]["action"], *(s["decision"]["args"][x] for x in ("x", "y", "level", "size"))]
                   for s in trace if s["decision"]["action"] != "halt"]
         resumed = Job(scene, JobConfig(thumbs=False, pixel_cap=1.0), clock=FakeClock(), replay=replay)
-        list(resumed.run())
+        done = list(resumed.run())[-1]
         assert resumed.gaze_path == full.gaze_path
+        assert done["coverage_looked"] == full_done["coverage_looked"]  # the replayed survey is no closer a look
         assert sorted((f.cls, f.critical) for f in resumed.findings) == sorted((f.cls, f.critical) for f in full.findings)
 
 
@@ -837,12 +838,66 @@ def test_quality_refused_windows_are_not_assessed(scene, monkeypatch):
     monkeypatch.setattr(agent.imaging, "quality", glare_on_second_look)
     _, events = run(scene, pixel_cap=0.3)
     refused = [s for s in steps(events) if s.get("quality", {}).get("ok") is False]
-    (na,) = events[-1]["work_order"]["not_assessed"]
+    (na,) = [a for a in events[-1]["work_order"]["not_assessed"] if a["action"] == "re-shoot"]  # not the unvisited
     assert len(refused) == 1 and na["step"] == refused[0]["step"] == 2
     assert na["reason"] == "glare" and na["action"] == "re-shoot" and inside_image(na["box"], scene.shape)
     x, y, w, h = refused[0]["window"]
     bx, by, bw, bh = na["box"]
     assert x <= bx and y <= by and bx + bw <= x + w and by + bh <= y + h
+
+
+def test_a_photo_with_no_candidate_region_is_not_assessed_not_ready():
+    """The team's wall photo IMG_2332 (public/samples/real_01.jpg): the overview proposes no candidate, so no look
+    runs. That is not a clean wall: the whole photo is not assessed and the work order is not ready. The job's own
+    status and cause stay what the evals publish (completed, exhausted)."""
+    from pathlib import Path
+
+    img = cv2.imread(str(Path(__file__).resolve().parent.parent / "public" / "samples" / "real_01.jpg"))
+    H, W = img.shape[:2]
+    _, events = run(img)
+    done, wo = events[-1], events[-1]["work_order"]
+    assert events[1]["candidates"] == [] and done["summary"]["steps"] == 0
+    assert (done["status"], done["cause"]) == ("completed", "exhausted")
+    assert wo["not_assessed"] == [{"step": 0, "box": [0, 0, W, H], "reason": "no candidate region was proposed",
+                                   "action": "check-by-eye"}]
+    assert wo["status"] == "incomplete" and done["coverage_looked"] == 0.0
+
+
+def unvisited_not_assessed(done, shape):
+    """The work order's not_assessed entries for candidates no look reached, checked against `unvisited`."""
+    na = [a for a in done["work_order"]["not_assessed"] if "region" in a]
+    assert all(a["action"] == "check-by-eye" and inside_image(a["box"], shape) for a in na)
+    assert sorted(a["region"] for a in na) == sorted(r for r in done["unvisited"] if r.startswith("r"))
+    return na
+
+
+@pytest.mark.parametrize("after", [1, 2])
+def test_a_killed_job_lists_every_unvisited_candidate_as_not_assessed(scene, after):
+    """KILL after the survey look (and after one look past it): every candidate no look of its own reached goes to
+    the work order as not assessed, with the halt as its reason, so the order is not ready; coverage_looked leaves
+    out what only the survey saw, while coverage (any level, survey included) keeps its old meaning."""
+    job = Job(scene, JobConfig(thumbs=False, pixel_cap=1.0), clock=FakeClock(),
+              kill=lambda: len(job.gaze_path) >= after)
+    events = list(job.run())
+    done = events[-1]
+    assert (done["status"], done["cause"]) == ("halted", "kill-switch") and steps(events)[0]["cause"] == "survey"
+    na = unvisited_not_assessed(done, scene.shape)
+    assert na and all(a["reason"] == "not looked at: kill-switch halted the job first" for a in na)
+    assert done["work_order"]["status"] == "incomplete"
+    assert done["coverage"] == 1.0 and done["coverage_looked"] < 1.0
+    assert (done["coverage_looked"] == 0.0) == (after == 1)  # the survey alone looked at nothing closely
+
+
+@pytest.mark.parametrize("cap", [0.1, 0.3])
+def test_a_cap_hit_job_lists_every_unvisited_candidate_as_not_assessed(scene, cap):
+    """A cap that halts the job (before any look at 0.1, after three at 0.3) leaves its unvisited candidates not
+    assessed in the work order, with the cap as the reason."""
+    _, events = run(scene, pixel_cap=cap)
+    done = events[-1]
+    assert (done["status"], done["cause"]) == ("halted", "cap-hit")
+    na = unvisited_not_assessed(done, scene.shape)
+    assert na and all(a["reason"] == "not looked at: cap-hit halted the job first" for a in na)
+    assert done["work_order"]["status"] == "incomplete" and done["coverage_looked"] < 1.0
 
 
 # ---- ablation switches (FR-21): one test each ----------------------------------------------------------

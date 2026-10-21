@@ -43,6 +43,9 @@ const HALT = {
 };
 // A kill-switch halt as the job's first record: only the operator-wide switch can do that (a page's KILL is read after a look).
 const KILLED_FIRST = 'The kill switch was already set, so it stopped before its first look. Nothing was looked at, so there is nothing to resume.';
+// Out of candidates before any look: the overview proposed none (with one, the first look would have gone there).
+const NONE_PROPOSED = 'No region stood out in the overview, so it proposed none and looked at nothing closely. That is not a clean '
+  + 'result: the work order marks the whole photo as not assessed, for a person to look at.';
 /** The stop rule's bar was its floor (ε × v0 ÷ t̂) rather than ε × value so far ÷ cost so far: "... (floor: eps x v0 / t_hat)". */
 const floorBound = (rationale) => /\(floor[:)]/.test(String(rationale ?? ''));
 const FLOOR = ' The bar it fell under was the floor, the least any look must promise: ε × v0 ÷ t̂, where v0 is the value of a look'
@@ -50,6 +53,7 @@ const FLOOR = ' The bar it fell under was the floor, the least any look must pro
 /** Why a job stopped; `rationale` (the halt record's) says which term of the stop rule bound; `looked`: whether any look
     came before the halt (a halt record numbered 1 had none). */
 export const haltText = (cause, rationale, looked = true) => (cause === 'kill-switch' && !looked ? KILLED_FIRST
+  : cause === 'exhausted' && !looked ? NONE_PROPOSED
   : (HALT[cause] ?? `It stopped (${cause}).`) + (cause === 'stop-rule' && floorBound(rationale) ? FLOOR : ''));
 
 /** Where a candidate's severity came from, as the agent records it after the number: "spalling seen at L2", "no class
@@ -168,7 +172,8 @@ const CLAUSES = [
   [/^80% of the \$ cap spent$/, () => '80 % of the $ budget is spent'],
   [/^verifying critical classes only$/, () => 'so only critical damage is double-checked'],
   [/^quality gate: (\w+)$/, (m) => `the view failed the quality check (${m[1]}), so it does not trust this look`],
-  [/^every candidate has been looked at$/, () => 'every candidate region has been looked at'],
+  [/^every candidate has been looked at$/, (m, s) => (s.step > 1 ? 'every candidate region has been looked at'
+    : 'no candidate region was proposed, so nothing was looked at closely and the whole photo is not assessed')],
   [/^best score (\S+) < lambda (\S+)/, (m) => (floorBound(m.input)
     ? `the next look would be worth less than it costs: its score ${dec(m[1])} is under the floor ${dec(m[2])} (the least any look must promise, ε × v0 ÷ t̂)`
     : 'the next look would be worth less than it costs')],

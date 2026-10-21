@@ -19,7 +19,7 @@ from playwright.sync_api import expect, sync_playwright
 
 ROOT = Path(__file__).resolve().parents[2]
 SHOTS = Path(os.environ.get("DRISHYAM_SHOTS", "/tmp/drishyam-e2e"))
-DONE = ("needs sign-off", "signed", "done", "halted", "budget spent")
+DONE = ("needs sign-off", "signed", "done", "halted", "budget spent", "needs a look")
 OPTIONAL = ("/results/",)  # the page shows a pending state without these
 JARGON = re.compile(r"\b\d+(?:\.\d+)?e[-+]?\d+\b|\b\w+_\w+\b")  # scientific notation, snake_case (p95_spike too)
 RATE_LIMITED = "Too many jobs from this address: 10 starts per 2 minutes. Wait a minute and retry."
@@ -289,6 +289,8 @@ def run(base, server_log=None):
         page.get_by_role("button", name="Our other wall photo").click()
         expect(page.locator("#gallery .thumb[data-file='real_01.jpg']")).to_have_attribute("aria-pressed", "true", timeout=15000)
         expect(page.locator("#recap .recap__real")).to_contain_text("flagged nothing", timeout=30000)
+        expect(page.locator("#recap")).to_contain_text("Not assessed: no candidate region was proposed, so the whole photo is not assessed")
+        expect(page.locator("#job-pill")).to_have_text("needs a look", ignore_case=True)  # not "done": no look ran
         assert sum("/api/jobs" in u for u in p.requests) == jobs
         p.clean()
         print("ok  real photos: the v1 runs replayed from their recordings (no server job), labelled, recap says what it flagged")

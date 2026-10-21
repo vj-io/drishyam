@@ -367,7 +367,7 @@ class FakeTable:
 
 
 @pytest.mark.parametrize("store", ["in-process", "dynamodb"])
-def test_kill_endpoint_halts_a_running_job(photo, monkeypatch, store):
+def test_kill_endpoint_halts_a_running_job(photo, scene, monkeypatch, store):
     """TestClient buffers whole streams, so the kill lands first; the job must halt after its first look.
     With DRISHYAM_KILL_TABLE (AWS) the flag lives in DynamoDB instead of this process; same contract."""
     import time
@@ -388,6 +388,10 @@ def test_kill_endpoint_halts_a_running_job(photo, monkeypatch, store):
     looks = [e for e in events if e["type"] == "step" and e["decision"]["action"] != "halt"]
     assert events[0]["job"] == "j_abc123" and events[0]["kill_token"] == token
     assert events[-1]["cause"] == "kill-switch" and events[-1]["status"] == "halted" and len(looks) == 1
+    done = lines(post(jpeg(scene), params="?pixel_cap=1"))[-1]  # same job id and flag; KILL after its survey look
+    signed = findings.verify(done["token"], KEY)  # the signed order lists what KILL left unvisited: not ready
+    assert done["cause"] == "kill-switch" and signed["status"] == "incomplete" and "coverage_looked" in done
+    assert {a["region"] for a in signed["not_assessed"]} == {r for r in done["unvisited"] if r.startswith("r")} != set()
     assert client.post("/api/kill", json={"job": "j_zzzzzz", "kill_token": "a" * 24}).status_code == 400
     assert client.post("/api/kill", json={"job": "j_abcdef", "kill_token": "short"}).status_code == 400
     if store == "dynamodb":
