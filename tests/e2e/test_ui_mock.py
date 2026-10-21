@@ -1391,7 +1391,8 @@ def test_contract_fields_in_words(browser, base):
         .map((reason) => m.reviewKind({ reason }));
       const unseen = m.brief({ step: 2, cause: 'best-score', rationale: 'argmax score 4.1e-03: prior 0.81, severity 1 (not seen yet), uncertainty 0.00, unseen 1.00, t_hat 61 ms; lambda 3.0e-03' });
       const finest = ['entropy 0.62 > 0.5, crack, exposed_rebar drafted here', 'exposed_rebar area 40 px < A_min 64, exposed_rebar not drafted']
-        .map((saw) => m.brief({ step: 3, cause: 'best-score', rationale: `new crack mask at L1; L1 is the finest level for onnx:drishyam_dacl10k.onnx (min_view 0.3): ${saw}; no finer look` }));
+        .map((saw) => m.brief({ step: 3, cause: 'best-score', rationale: `new crack mask at L1; L1 is the finest level for onnx:drishyam_dacl10k.onnx (min_view 0.3): ${saw}; no finer look` }))
+        .concat(m.brief({ step: 4, cause: 'best-score', rationale: 'entropy 0.79 > 0.5 at L2; iou 0.227 < 0.5 between L2 and L1 not settled: L1 is the finest level for onnx:drishyam_dacl10k.onnx (min_view 0.3), no finer look' }));
       return { kinds, unseen, finest }; }""")
     assert said["kinds"] == ["critical", "disagree", "unconfirmed", "class-change", "ambiguous"], said["kinds"]  # a trace recorded before `kind`
     assert "severity 1 (the default: no look has shown it yet)" in said["unseen"], said["unseen"]
@@ -1399,6 +1400,7 @@ def test_contract_fields_in_words(browser, base):
         assert "is the finest this engine looks (every look spans at least 30" in f and not re.search(r"\b\w+_\w+\b", f), f
     assert "unsure what it saw (0.62, over 0.5), it drafts crack, exposed rebar here" in said["finest"][0], said["finest"][0]
     assert "the exposed rebar is tiny (40 px, under 64 px), the exposed rebar is not drafted" in said["finest"][1], said["finest"][1]
+    assert "1:4 and 1:2 looks disagree (23\u00a0% overlap), and it cannot settle it: 1/2 size is the finest" in said["finest"][2], said["finest"][2]
     s.to(".win--findings")
     s.shot("desktop-contract-findings.png")
     s.check_clean()

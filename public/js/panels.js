@@ -157,6 +157,9 @@ const CLAUSES = [
     return `${size(+m[1])} is the finest this engine looks (every look spans at least ${pct(m[2])} of the photo’s long side): ${saw}, ${kept}`;
   }],
   [/^no finer look$/, () => 'and there is no finer look to confirm it'],
+  [/^iou ([\d.e+-]+) < [\d.]+ between L(\d) and L(\d) not settled: L(\d) is the finest level for \S+ \(min_view ([\d.]+)\), no finer look$/,
+    (m) => `the ${scale(m[2])} and ${scale(m[3])} looks disagree (${pct(m[1])} overlap), and it cannot settle it: ${size(+m[4])} is `
+      + `the finest this engine looks (every look spans at least ${pct(m[5])} of the photo’s long side), so there is no finer look`],
   [/^p95\(segment\) (\d+) ms > SLA (\d+) ms$/, (m) => `the segmenter got slow (${m[1]} ms, limit ${m[2]} ms)`],
   [/^model -> (\w+)$/, (m) => `so it switches to the ${m[1]} model`],
   [/^one level coarser/, () => 'so it looks one level coarser'],
