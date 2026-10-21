@@ -211,6 +211,54 @@ What the numbers say:
   photo had an accepted reply (p50 1.2 s on the first pass, 1.7 s for the last 10, the slowest 3.0 s). No reply was
   rejected once the ```json fence was accepted.
 
+On this dev backlog the live router is a net loss: one Nova Lite call per photo costs about a third of what running
+the photo's job in full costs. On top of that it skips photos the agent would have found critical defects in.
+`--router rule` stays the default.
+
+### A 2,536-photo backlog, end to end
+
+[results/backlog_2536/summary.md](../results/backlog_2536/summary.md) (numbers in
+[summary.json](../results/backlog_2536/summary.json); made by [evals/backlog_2536.py](../evals/backlog_2536.py)).
+The backlog is the size of the St. Johns Bridge inspection and uses dev-safe photos only. It holds 1,220 fresh
+synthetic photos with damage (seed 2536, used by no evaluation) and 1,216 without (seeds 2537, 2539, 2541 and 2543),
+all 4608x3456 (CODEBRIM's commonest size) and labelled. The 100 CODEBRIM dev photos are mixed in, and all 2,536 are
+listed in a seeded shuffle. Two seeds were dropped on the way: `evals.synth` died at this size in efflorescence()
+on seed 2536 (photo 200) and seed 2538 (photo 137). The damage set is therefore the first 1,220 mixes of
+`stratify(1280, 2536)` that render; 5 of 1,225 could not be drawn. It ran as
+
+```bash
+DRISHYAM_ONNX=models/drishyam_dacl10k.onnx DRISHYAM_ONNX_FP16=models/drishyam_dacl10k.fp16.onnx AWS_PROFILE=drishyam \
+  drishyam batch data/backlog_2536/backlog.txt --router nova --cost-model fixed \
+  --micro-arm local-macos-x86-dacl10k-retime --usd-cap 0.50
+```
+
+with a stated total of $0.50, modelled: v1's compute at $0.339 an hour plus the router's Bedrock $.
+
+| | |
+| --- | --- |
+| Triaged and routed | 2,536 (2,436 calls; the 100 CODEBRIM photos came from the dev run's cache) |
+| Router labels | 867 Clear, 1,664 Requires zoom, 5 Critical; 8 fell back to the triage (30 s timeouts), 0 rejected |
+| Run | 587 photos (the 5 Critical, then 582 Requires zoom); 1,082 not reached; 867 cleared, not looked at |
+| Queued for a person | 684 critical findings, all pending review; they hit 607 of the 1,568 labelled critical defects |
+| Wrongly cleared | 40 of the 746 photos holding a labelled critical defect (0.054, Wilson CI 0.040-0.072); 294 of the 746 were run |
+| Labels against the labels | accuracy 0.43; it cleared 675 of the 1,218 photos with no labelled defect and 152 of the 572 with only non-critical ones |
+| $ | Bedrock $0.316 (4.94 M input and 79 k output tokens) and $0.184 of modelled compute: $0.500 of the $0.50 |
+| Time | 72 minutes on the wall; routing was charged 3,352 s, 63 % of the 5,310 s budget; triage 168 s |
+| Router latency | p50 1.35 s, p95 4.7 s, slowest 30 s (the timeout) |
+
+The batch ends `blocked`: 684 critical findings wait for `drishyam review`, and 1,949 photos are listed as not
+assessed, each with its reason (cleared by the router, with its one-line reason, or not reached: budget-stop). As on
+dev, routing took most of the budget. The router cleared half of the clean photos, but also 40 photos that hold a
+labelled critical defect.
+
+### Cost
+
+Bedrock spend for all of this work: CloudWatch counts 2,816 Nova Lite invocations in account 242441136319, with
+5,430,840 input and 90,472 output tokens: **$0.35** at the list price. That covers an access check, two pilots, the
+dev passes including the calls that timed out and so were not counted in the reports, one probe, and the 2,536-photo
+run. The cost estimate was written before the first paid call: $0.31 expected, $0.83 worst case, 5 USD cap. No other
+AWS resource was created.
+
 ## Not done
 
 - No MCP tool: a read-only `batch_status` would be small, but it would change the MCP allow-list of twelve that

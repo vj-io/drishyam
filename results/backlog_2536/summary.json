@@ -1,0 +1,169 @@
+{
+ "batch": "batch-19ef1b",
+ "created": "2026-10-21T20:26:37Z",
+ "photos": 2536,
+ "by_split": {
+  "synthetic damage": 1220,
+  "synthetic clean": 1216,
+  "codebrim dev100": 100
+ },
+ "budget": {
+  "usd_cap": 0.5,
+  "seconds_cap": null,
+  "seconds_budget": 5309.734513274336,
+  "usd_per_hour": 0.339,
+  "per_photo": {
+   "pixel_cap": 0.3,
+   "usd_cap": 0.05,
+   "seconds_cap": 20.0
+  },
+  "cost_model": "fixed",
+  "micro_arm": "local-macos-x86-dacl10k-retime"
+ },
+ "stop": {
+  "cause": "budget-stop",
+  "rationale": "5310.240 s spent of the 5309.735 s budget (triage included)"
+ },
+ "status": "blocked",
+ "counts": {
+  "photos": 2536,
+  "blocked": 303,
+  "incomplete": 5,
+  "ready": 279,
+  "not assessed": 1949,
+  "cleared": 867,
+  "critical": 684,
+  "pending": 684
+ },
+ "triaged": 2536,
+ "routed": 2536,
+ "router_labels": {
+  "Clear": 867,
+  "Requires zoom": 1664,
+  "Critical": 5
+ },
+ "router_status": {
+  "accepted": 2528,
+  "rejected": 0,
+  "fallback": 8
+ },
+ "router_causes": {
+  "timeout": 8
+ },
+ "run": 587,
+ "cleared": 867,
+ "not_reached": 1082,
+ "unusable": 0,
+ "run_by_label": {
+  "Clear": 0,
+  "Requires zoom": 582,
+  "Critical": 5
+ },
+ "criticals_queued": 684,
+ "criticals_pending": 684,
+ "labelled_critical_defects": 1568,
+ "labelled_critical_defects_queued": 607,
+ "photos_with_labelled_critical": 746,
+ "photos_with_labelled_critical_run": 294,
+ "photos_with_labelled_critical_cleared": 40,
+ "miss_rate": 0.05361930294906166,
+ "miss_rate_ci": [
+  0.0396,
+  0.0722
+ ],
+ "agreement": {
+  "accuracy": 0.43375394321766564,
+  "confusion_gt_by_router": {
+   "Clear": {
+    "Clear": 675,
+    "Requires zoom": 543,
+    "Critical": 0
+   },
+   "Requires zoom": {
+    "Clear": 152,
+    "Requires zoom": 420,
+    "Critical": 0
+   },
+   "Critical": {
+    "Clear": 40,
+    "Requires zoom": 701,
+    "Critical": 5
+   }
+  },
+  "by_split": {
+   "synthetic damage": {
+    "Clear": {
+     "Clear": 0,
+     "Requires zoom": 0,
+     "Critical": 0
+    },
+    "Requires zoom": {
+     "Clear": 141,
+     "Requires zoom": 385,
+     "Critical": 0
+    },
+    "Critical": {
+     "Clear": 33,
+     "Requires zoom": 660,
+     "Critical": 1
+    }
+   },
+   "synthetic clean": {
+    "Clear": {
+     "Clear": 674,
+     "Requires zoom": 542,
+     "Critical": 0
+    },
+    "Requires zoom": {
+     "Clear": 0,
+     "Requires zoom": 0,
+     "Critical": 0
+    },
+    "Critical": {
+     "Clear": 0,
+     "Requires zoom": 0,
+     "Critical": 0
+    }
+   },
+   "codebrim dev100": {
+    "Clear": {
+     "Clear": 1,
+     "Requires zoom": 1,
+     "Critical": 0
+    },
+    "Requires zoom": {
+     "Clear": 11,
+     "Requires zoom": 35,
+     "Critical": 0
+    },
+    "Critical": {
+     "Clear": 7,
+     "Requires zoom": 41,
+     "Critical": 4
+    }
+   }
+  }
+ },
+ "usd": {
+  "router_bedrock": 0.31560108000000026,
+  "compute_modelled": 0.18444652325767658,
+  "total_modelled": 0.5000476032576768
+ },
+ "router_tokens": {
+  "input": 4942210,
+  "output": 79452,
+  "calls": 2436,
+  "cached": 100
+ },
+ "router_latency_ms": {
+  "p50": 1348.1,
+  "p95": 4700.6,
+  "max": 30010.6
+ },
+ "seconds": {
+  "charged": 5310.240034594798,
+  "triage": 168.27783324411763,
+  "router_charged": 3351.5158938053123,
+  "wall": 4302.010744707019
+ }
+}

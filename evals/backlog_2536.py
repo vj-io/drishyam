@@ -137,7 +137,54 @@ def summarise(bdir: Path) -> dict:
     }
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "summary.json").write_text(json.dumps(out, indent=1) + "\n")
+    (OUT / "summary.md").write_text(markdown(out))
     return out
+
+
+def markdown(o: dict) -> str:
+    c, lab, u, s, cf = o["counts"], o["router_labels"], o["usd"], o["seconds"], o["agreement"]["confusion_gt_by_router"]
+    rows = [
+        ("Photos triaged and routed", (f"{o['routed']:,} ({o['router_tokens']['calls']:,} Nova Lite calls, "
+                                      f"{o['router_tokens']['cached']} from the cache)")),
+        ("Router labels", (f"{lab['Clear']:,} Clear, {lab['Requires zoom']:,} Requires zoom, {lab['Critical']} Critical; "
+                          f"{o['router_status']['fallback']} fell back to the triage ({', '.join(f'{k}: {n}' for k, n in o['router_causes'].items())}), "
+                          f"{o['router_status']['rejected']} rejected")),
+        ("Photos run", (f"{o['run']} ({o['run_by_label']['Critical']} Critical, then {o['run_by_label']['Requires zoom']} "
+                       f"Requires zoom in triage order); {o['not_reached']:,} not reached; {o['cleared']} cleared, not "
+                       f"looked at; {o['unusable']} unusable")),
+        ("Critical findings queued for a person", (f"{o['criticals_queued']} ({o['criticals_pending']} pending review); "
+                                                  f"they hit {o['labelled_critical_defects_queued']} of the "
+                                                  f"{o['labelled_critical_defects']:,} labelled critical defects")),
+        ("Photos with a labelled critical defect", (f"{o['photos_with_labelled_critical']}: "
+                                                   f"{o['photos_with_labelled_critical_run']} run, "
+                                                   f"{o['photos_with_labelled_critical_cleared']} cleared by the router "
+                                                   f"(miss rate {o['miss_rate']:.3f}, Wilson CI {o['miss_rate_ci'][0]:.3f}-"
+                                                   f"{o['miss_rate_ci'][1]:.3f})")),
+        ("Router labels against the labels", (f"accuracy {o['agreement']['accuracy']:.2f}; cleared {cf['Clear']['Clear']} "
+                                             f"of {sum(cf['Clear'].values()):,} photos with no labelled defect and "
+                                             f"{cf['Requires zoom']['Clear']} of {sum(cf['Requires zoom'].values())} with "
+                                             f"only non-critical ones")),
+        ("$", (f"Bedrock ${u['router_bedrock']:.3f} ({o['router_tokens']['input']:,} input, "
+              f"{o['router_tokens']['output']:,} output tokens); compute ${u['compute_modelled']:.3f} modelled; total "
+              f"${u['total_modelled']:.3f} of ${o['budget']['usd_cap']:.2f}")),
+        ("Time", (f"{s['wall'] / 60:.0f} min on the wall; the router's $ charged as {s['router_charged']:,.0f} s "
+                 f"({s['router_charged'] / o['budget']['seconds_budget']:.0%} of the {o['budget']['seconds_budget']:,.0f} "
+                 f"s budget); triage {s['triage']:.0f} s")),
+        ("Router latency", (f"p50 {o['router_latency_ms']['p50'] / 1000:.2f} s, p95 "
+                           f"{o['router_latency_ms']['p95'] / 1000:.2f} s, slowest {o['router_latency_ms']['max'] / 1000:.1f} s")),
+        ("Status", (f"{o['status']}: {c['pending']} critical findings wait for `drishyam review`; {c['not assessed']:,} "
+                   f"photos not assessed")),
+    ]
+    return "\n".join([
+        f"# {o['photos']:,} photos through `drishyam batch --router nova`", "",
+        ("A backlog the size of one real drone inspection (docs/report.md, section 1), from dev-safe photos only "
+        f"(evals/backlog_2536.py): {o['by_split']['synthetic damage']:,} synthetic photos with damage (seed 2536) and "
+        f"{o['by_split']['synthetic clean']:,} without (seeds 2537, 2539, 2541, 2543), 4608x3456 and labelled, plus the "
+        f"{o['by_split']['codebrim dev100']} CODEBRIM dev photos, in a seeded shuffle (seed {SHUFFLE_SEED}). v1 on the "
+        f"fixed costs of results/{o['budget']['micro_arm']}, default per-photo caps, a total budget of "
+        f"${o['budget']['usd_cap']:.2f} (the agent's compute at ${o['budget']['usd_per_hour']} an hour plus the router's "
+        f"Bedrock $). Batch {o['batch']}, {o['created']}; the numbers: [summary.json](summary.json)."), "",
+        "| | |", "| --- | --- |", *(f"| {k} | {v} |" for k, v in rows), ""])
 
 
 def main(argv=None) -> None:
