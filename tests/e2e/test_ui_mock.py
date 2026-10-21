@@ -27,7 +27,8 @@ Scenarios (a real Chromium, the document served with the production CSP header):
   severity they set, a floor-bound stop), 16. focus, contrast and repeats at 1440 and 375 px, 17. the phone tool row
   at 320/360/375 px (no overlap, no shift when the crop shows), 18. the film's player: poster, its captions track off
   (the captions are burned in) and loading when turned on, nothing of the MP4 fetched before Play, the hero link, and
-  inside 375 px, 19. Try KILL in the job bar before any run, 20. the hero without v1's summaries.
+  inside 375 px, 19. Try KILL in the job bar before any run, 20. the hero without v1's summaries, 21. a ready order
+  whose looks saw under half of the salient area says the rest was not looked at closely.
 Any CSP violation, console error or page error fails the run. wait_for_function is avoided on purpose
 (it is blocked by a strict CSP): every wait uses locators or polls page.evaluate.
 """
@@ -1259,6 +1260,43 @@ def test_halt_governor_note_and_critical_trigger(browser, base):
     print("ok  halt governor note and critical trigger rendered")
 
 
+def test_partial_look_is_not_a_clean_result(browser, base):
+    """A ready work order with nothing critical, whose looks saw under half of the salient area closely (the real
+    wall replay real_02: 21 %), says how much was looked at and that the rest was not, never "nothing critical needed
+    a sign-off" as if the wall were checked. A recording older than coverage_looked says "seen at some level"; at
+    half or more the order reads as before."""
+    for extra, seen in (({"coverage": 1.0, "coverage_looked": 0.21}, "looked at closely"), ({"coverage": 0.21}, "seen at some level"),
+                        ({"coverage": 1.0, "coverage_looked": 0.5}, None)):
+        events = [e for e in map(json.loads, JOB_LINES) if e["type"] != "review_request"]
+        for e in events:
+            if e["type"] == "finding":
+                e["finding"].update(critical=False, state="draft", critical_step=None, critical_rule=None)
+        done = {k: v for k, v in events[-1].items() if k not in ("coverage", "coverage_looked")}
+        done.update(status="completed", cause="exhausted", **extra)
+        done["summary"]["critical_pending"] = 0
+        done["work_order"].update(status="ready", not_assessed=[],
+                                  findings=[{**f, "critical": False, "state": "draft"} for f in done["work_order"]["findings"]])
+        events[-1] = done
+        reset_live([{"lines": [json.dumps(e) for e in events], "delay": 0}])
+        s = Session(browser, f"partial-{done['coverage']}-{done.get('coverage_looked')}", viewport={"width": 1440, "height": 900})
+        p = s.page
+        p.goto(f"{base}/")
+        expect(p.locator("#look")).to_be_enabled(timeout=T)
+        s.fast()
+        expect(p.locator("#job-pill")).to_have_text("done", timeout=T)
+        note = p.locator("#done .stack > .note").first
+        if seen is None:
+            expect(note).to_have_text(f"Work order {WO_ID} is ready: nothing critical needed a sign-off.")
+        else:
+            part = f"21 % of the salient area was {seen} and nothing critical was found there; the rest was not looked at closely."
+            expect(note).to_have_text(f"Work order {WO_ID} is ready: {part}")
+            expect(p.locator("#say-4")).to_contain_text(f"Ready: {part}")
+            expect(p.locator("#narrator")).to_contain_text(f"Ready: {part}")
+        s.check_clean()
+        s.context.close()
+    print("ok  a ready order at 21 % of the salient area says the rest was not looked at closely")
+
+
 def test_planner_status_shows_the_fallback_chip(browser, base):
     """The API keeps a look's own cause and puts a failed planner consultation in `planner_status`: the trace
     still flags that look `planner-fallback`."""
@@ -1615,6 +1653,7 @@ if __name__ == "__main__":
             test_pending_states(browser, base)
             test_video_player(browser, base)
             test_halt_governor_note_and_critical_trigger(browser, base)
+            test_partial_look_is_not_a_clean_result(browser, base)
             test_planner_status_shows_the_fallback_chip(browser, base)
             test_kill_before_the_first_record(browser, base)
             test_kill_the_server_never_confirms(browser, base)
