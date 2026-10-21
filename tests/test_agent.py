@@ -1,4 +1,5 @@
 import time
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -995,7 +996,7 @@ def test_the_classical_profile_is_the_agent_every_classical_number_ran_with(scen
         "usd_per_hour": USD_PER_HOUR, "thumbs": True, "max_steps": 200, "use_uncertainty": True,
         "seed_from_looks": True, "v0": 2.0, "survey": True, "verify": True, "absorb": True, "order": "score", "seed": 0,
         "governor": True, "fill": False, "survey_value": True,
-        "t_hat_ms": None, "tau_confirm_lo": 0.35, "tau_confirm_hi": 0.65}
+        "t_hat_ms": None, "fallback_l2": False, "tau_confirm_lo": 0.35, "tau_confirm_hi": 0.65}
 
 
 def test_a_job_takes_its_segmenters_profile_by_name_and_a_knob_set_explicitly_wins(scene, monkeypatch):
@@ -1250,3 +1251,183 @@ def test_a_planner_cannot_zoom_past_the_profiles_finest_level():
     asked = [s for s in steps(list(job.run())) if s["cause"] == "planner:change_level"]
     assert asked and all(s["decision"]["args"]["level"] == 1 and s["rationale"].startswith(
         "look closer (L0 is finer than this segmenter's finest L1)") for s in asked)
+
+
+# ---- zero-candidate fallback (JobConfig.fallback_l2) ---------------------------------------------------------------
+FALLBACK_COSTS = {"pyrDown": 30.0, "saliency": 15.0, "warp": 2.0, "quality": 3.0, "segment:accurate": 560.0,
+                  "segment:fast": 190.0}  # a fixed cost table (ms per call) for evals.harness.FixedCostJob
+FOLLOW_UPS = {"entropy>tau", "area<A_min", "verify-new-mask", "iou<0.5"}  # the rules' own follow-up looks
+SAMPLE_PHOTOS = sorted((Path(__file__).resolve().parent.parent / "public" / "samples").glob("*.jpg"))
+
+
+def soft_disc(w, h):
+    """A grainy grey photo with one soft dark disc: its saliency stays under the 0.5 threshold, so the overview proposes
+    no candidate, while a segmenter that reads dark pixels (`Sure`) segments the disc; the grain passes the quality
+    gate's sharpness test even at L2."""
+    m = np.zeros((h, w), np.float32)
+    cv2.circle(m, (w // 2, h // 3), w // 12, 1.0, -1)
+    g = 170 - 80 * cv2.GaussianBlur(m, (0, 0), 20) + np.random.default_rng(0).normal(0, 16, (h, w))
+    return np.repeat(np.clip(g, 0, 255)[..., None], 3, axis=2).astype(np.uint8)
+
+
+def fixed_job(img, seg=None, kill=lambda: False, replay=None, **cfg):
+    from evals.harness import FixedCostJob
+
+    return FixedCostJob(img, JobConfig(thumbs=False, **cfg), FALLBACK_COSTS, segmenter=seg, kill=kill, replay=replay,
+                        job_id="j_test")
+
+
+def looks_of(events):
+    return [s for s in steps(events) if s["decision"]["action"] != "halt"]
+
+
+def covers(window, shape) -> bool:
+    x, y, w, h = window
+    return x <= 0 and y <= 0 and x + w >= shape[1] and y + h >= shape[0]
+
+
+def test_with_the_flag_a_photo_with_no_candidate_gets_one_whole_photo_l2_look():
+    """No candidate: with fallback_l2 the job spends one look at L2 whose window spans the whole photo, with the
+    profile's accurate net, cause fallback-l2, its pixels and fixed-cost ms charged like any look's; what it drafts is
+    reported like any look's finding (a critical one goes to a human) and the photo stays not assessed. Under v1's
+    profile L2 is the finest level on a 4000-px photo, so it is the only look. Off (the default): no look, as before."""
+    from evals import harness
+
+    img, (H, W) = soft_disc(4000, 3000), (3000, 4000)
+    job = fixed_job(img, Sure(ONNX), fallback_l2=True)
+    ev = list(job.run())
+    ov, done = ev[1], ev[-1]
+    assert ov["candidates"] == [] and job.cfg.profile == ONNX
+    (s,) = looks_of(ev)
+    assert (s["cause"], s["decision"]["action"], s["model"]) == ("fallback-l2", "gaze", "accurate")
+    a = s["decision"]["args"]
+    assert (a["level"], a["size"]) == (2, 1000) and covers(s["window"], img.shape)  # 1000 px at L2: 4000 L0 px
+    assert s["pixels_used"] == ov["pixels_used"] + 1000**2
+    assert s["seconds_used"] == pytest.approx((30 + 15 + 2 + 3 + 560) / 1000)
+    (f,) = job.findings
+    assert f.cls == "spalling" and f.step == s["step"] and f.critical and f.state == "pending_review"
+    assert any(e["type"] == "review_request" and e["finding_id"] == f.id and e["kind"] == "critical" for e in ev)
+    assert (done["status"], done["cause"]) == ("awaiting_review", "exhausted")
+    assert {"step": 0, "box": [0, 0, W, H], "reason": "no candidate region was proposed",
+            "action": "check-by-eye"} in done["work_order"]["not_assessed"] and done["work_order"]["status"] == "blocked"
+    assert done["coverage_looked"] == 0.0  # one whole-photo look is not a close one
+    off = list(fixed_job(img, Sure(ONNX)).run())
+    assert looks_of(off) == [] and off[-1]["summary"]["findings"] == 0
+    # the eval path (evals.dev_sweep, evals.harness): the switch reaches the job, and the look's boxes are scored
+    r = harness.run_drishyam(img, 0.3, FALLBACK_COSTS, segmenter=Sure(ONNX), fallback_l2=True)
+    assert r["switches"]["fallback_l2"] is True and [t["cause"] for t in r["trace"]] == ["fallback-l2", "exhausted"]
+    assert r["preds"] and {p["cls"] for p in r["preds"]} == {"spalling"} and r["wall_s"] == pytest.approx(0.61)
+    assert harness.run_drishyam(img, 0.3, FALLBACK_COSTS, segmenter=Sure(ONNX))["switches"]["fallback_l2"] is False
+
+
+@pytest.mark.parametrize("name, size, cap", [("real_01", 750, 0.3), ("concrete_1024", 512, 1.0)])
+def test_the_fallback_look_is_the_first_and_only_whole_photo_look_its_follow_ups_are_the_rules(name, size, cap):
+    """The team's wall photo (public/samples/real_01.jpg) and a small plain one propose no candidate. With the flag,
+    exactly one look has cause fallback-l2: the first, at L2, spanning the photo (750 px for the 3000-px photo; never
+    a smaller gaze than 512 px, which at L2 already spans 2048 px, so on a 1024 x 768 photo it is 33 % of the pixels
+    and only a cap above that lets it run); any other look is a follow-up the usual rules queue (escalate, verify) at
+    the normal 512-px gaze."""
+    from .conftest import concrete
+
+    img = cv2.imread(str(SAMPLE_PHOTOS[0].parent / "real_01.jpg")) if name == "real_01" else concrete(768, 1024, 2)
+    ev = run(img, fallback_l2=True, pixel_cap=cap)[1]
+    st = looks_of(ev)
+    assert ev[1]["candidates"] == [] and st[0]["cause"] == "fallback-l2"
+    assert [s["cause"] for s in st].count("fallback-l2") == 1
+    assert (st[0]["decision"]["args"]["level"], st[0]["decision"]["args"]["size"]) == (2, size)
+    assert covers(st[0]["window"], img.shape)
+    assert all(s["cause"] in FOLLOW_UPS and s["decision"]["args"]["size"] == 512 for s in st[1:])
+
+
+def test_the_fallback_never_acts_on_a_photo_with_a_candidate(scene):
+    """The fallback acts only when the overview proposes nothing: with a candidate, the flag changes no event."""
+    import json
+
+    on, off = (json.dumps(_no_wall_clock(run(scene, fallback_l2=f)[1]), sort_keys=True) for f in (True, False))
+    assert on == off and '"fallback-l2"' not in on
+
+
+@pytest.mark.parametrize("stop", [{"kill": True}, {"pixel_cap": 0.05}, {"seconds_cap": 0.04}, {"usd_cap": 1e-6}])
+def test_the_fallback_look_obeys_kill_and_every_cap(stop):
+    """The governor checks the fallback look like any other before it runs: KILL, or a pixel cap it would exceed (1000
+    x 1000 px at L2 is 8.3 % of a 4000 x 3000 photo), or the seconds or $ caps already spent (the overview costs 45 ms
+    on this table), halts the job with no look, and the whole photo stays not assessed."""
+    stop = dict(stop)
+    kill = stop.pop("kill", False)
+    job = fixed_job(soft_disc(4000, 3000), Sure(ONNX), kill=lambda: kill, fallback_l2=True, **stop)
+    ev = list(job.run())
+    done = ev[-1]
+    assert looks_of(ev) == [] and not job.findings
+    assert (done["status"], done["cause"]) == ("halted", "kill-switch" if kill else "cap-hit")
+    assert done["summary"]["pixels_used"] <= job.budget.pixels_cap
+    assert done["work_order"]["not_assessed"][-1]["reason"] == "no candidate region was proposed"
+
+
+def test_a_job_killed_after_the_fallback_look_resumes_into_the_same_job():
+    """KILL after the fallback look, then resume with the trace's decisions ([action, x, y, level, size]): the replay
+    accepts the look's own size (larger than a normal gaze), the follow-up it queues runs at 512 px, and the resumed
+    job is the uninterrupted one, its photo still not assessed."""
+    img = soft_disc(3000, 2250)  # L1 is the finest level under v1's profile here: the drafted mask is verified there
+    full = fixed_job(img, Sure(ONNX), fallback_l2=True)
+    full_done = list(full.run())[-1]
+    assert [s["cause"] for s in full.trace][:2] == ["fallback-l2", "verify-new-mask"]
+    holder = {}
+    cut = holder["job"] = fixed_job(img, Sure(ONNX), kill=lambda: len(holder["job"].gaze_path) >= 1, fallback_l2=True)
+    ev = list(cut.run())
+    assert ev[-1]["cause"] == "kill-switch" and ev[-1]["coverage_looked"] == 0.0
+    replay = [[s["decision"]["action"], *(s["decision"]["args"][k] for k in ("x", "y", "level", "size"))]
+              for s in looks_of(ev)]
+    assert replay == [["gaze", 1500, 1125, 2, 750]]
+    resumed = fixed_job(img, Sure(ONNX), replay=replay, fallback_l2=True)
+    done = list(resumed.run())[-1]
+    assert resumed.gaze_path == full.gaze_path
+    assert [s["decision"]["args"]["size"] for s in resumed.trace[:2]] == [750, 512]
+    assert [(f.cls, f.box) for f in resumed.findings] == [(f.cls, f.box) for f in full.findings]
+    assert done["work_order"]["not_assessed"] == full_done["work_order"]["not_assessed"]
+    with pytest.raises(ValueError):  # only the whole-photo L2 look may be larger than a gaze
+        validate_replay([["gaze", 1500, 1125, 1, 750]], img.shape)
+    with pytest.raises(ValueError):
+        validate_replay([["gaze", 1500, 1125, 2, 751]], img.shape)
+
+
+def without_fallback(monkeypatch):
+    """drishyam.agent without its lines marked `# fallback`: the agent before the zero-candidate fallback, provided
+    every line the fallback added carries the mark (and no line it needs was edited)."""
+    import re
+    import sys
+    import types
+
+    from drishyam import agent
+
+    src = Path(agent.__file__).read_text()
+    kept = "".join(ln for ln in src.splitlines(keepends=True) if not re.search(r"#\s*fallback\b", ln))
+    mod = types.ModuleType("drishyam._agent_without_fallback")
+    mod.__package__ = "drishyam"
+    monkeypatch.setitem(sys.modules, mod.__name__, mod)
+    exec(compile(kept, "drishyam/agent.py without the fallback", "exec"), mod.__dict__)  # noqa: S102 -- our own source
+    assert "fallback_l2" in agent.JobConfig.__dataclass_fields__ and "fallback_l2" not in mod.JobConfig.__dataclass_fields__
+    return mod
+
+
+def _no_wall_clock(x):
+    if isinstance(x, dict):
+        return {k: _no_wall_clock(v) for k, v in x.items() if k not in ("t", "cpu_pct", "created")}
+    return [_no_wall_clock(v) for v in x] if isinstance(x, list) else x
+
+
+@pytest.mark.parametrize("name", [*(p.stem for p in SAMPLE_PHOTOS), "soft_disc", "soft_disc@v1"])
+def test_with_the_flag_off_every_event_is_the_agents_before_the_fallback(name, monkeypatch):
+    """Every bundled sample (real_01 has no candidate) and a synthetic photo with none, on the classical engine (and the
+    disc under v1's profile): with fallback_l2 off (the default), the whole event stream (thumbnails, timings on the
+    job's clock) equals the agent's with the fallback's lines removed."""
+    import json
+
+    from drishyam import agent
+
+    off = without_fallback(monkeypatch)
+    paths = {p.stem: p for p in SAMPLE_PHOTOS}
+    img = cv2.imread(str(paths[name])) if name in paths else soft_disc(3000, 2250)
+    seg = Sure(ONNX) if name.endswith("@v1") else None
+    streams = [json.dumps(_no_wall_clock(list(mod.Job(img, mod.JobConfig(), clock=FakeClock(), job_id="j_test",
+                                                       segmenter=seg).run())), sort_keys=True) for mod in (agent, off)]
+    assert streams[0] == streams[1]
