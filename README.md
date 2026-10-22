@@ -33,7 +33,7 @@ drifts from that file or, for the Lambda timings, from [docs/aws.md](docs/aws.md
 | v2c | 0.48 (0.44–0.53) | 0.28 | 0.23 (0.07) | 0.57 (0.54–0.61) | 22 of 51 | 3.71 |
 | classical engine | 0.19 (0.16–0.23) | 0.12 | 0.08 (0.03) | 0.48 (0.44–0.52) | 34 of 51 | 1.73 |
 
-- **v1 runs live since 2026-10-21**, with the v1-policy2 look policy since 2026-10-22 (deployed commit adf9474, smoke-tested: [docs/aws.md](docs/aws.md)). It was
+- **v1 runs live since 2026-10-21**, with the v1-policy2 look policy since 2026-10-22 (deployed commit c1830c4, smoke-tested: [docs/aws.md](docs/aws.md)). It was
   chosen on the dev splits only ([results/dev/model_choice_dev.json](results/dev/model_choice_dev.json)); held out
   it is again the only model with no measurable loss against any other. These are its second scorings (one earlier,
   unpublished). Its CC BY-NC 4.0 weights are release assets of v1.1.0, not in git.
