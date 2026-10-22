@@ -110,7 +110,11 @@ async def gaze_with_rebar(d, job):
 async def test_tool_list_is_the_allow_list(d):
     names = {t.name for t in (await d.client.list_tools()).tools}
     assert names == TOOLS and len(names) == 12
-    assert not any(w in n for n in names for w in ("approve", "reject", "decide", "close", "shell", "write"))
+    assert not any(w in n for n in names for w in ("approve", "reject", "decide", "close", "shell", "write", "resolve",
+                                                   "check", "found", "eye", "not_assessed"))
+    # and no tool takes an argument that could carry a person's decision or resolution
+    params = {p for t in (await d.client.list_tools()).tools for p in t.inputSchema.get("properties", {})}
+    assert not params & {"decision", "reviewer", "resolution", "not_assessed", "note", "outcome"}, params
 
 
 async def test_every_tool_on_a_bridge_photo(d, tmp_path):
@@ -199,6 +203,28 @@ async def test_a_human_decision_survives_a_redraft(d, tmp_path):
     f1 = next(f for f in again["work_order"]["findings"] if f["id"] == "f1")
     assert f1["state"] == "approved" and again["work_order"]["status"] == "ready"
     assert again["work_order"]["approvals"][0]["reviewer"] == "A. Engineer"
+
+
+async def test_a_check_by_eye_survives_a_redraft(d, tmp_path, monkeypatch):
+    """A person's resolution of a not-assessed entry stands when the agent redrafts, matched by the entry itself; the
+    redraft never resolves an entry, and one the person did not resolve stays open."""
+    root = tmp_path / "images"
+    root.mkdir()
+    img = concrete(600, 800, 5)
+    img[:180] = 252  # a blown-out band: the overview lists it as not assessed
+    cv2.imwrite(str(root / "sky.png"), img)
+    monkeypatch.setenv("DRISHYAM_IMAGE_ROOT", str(root))
+    job = await d.open(root / "sky.png")
+    await d.ok("overview", job=job)
+    first = (await d.ok("draft_work_order", job=job))[0]["work_order"]
+    assert first["status"] == "incomplete" and len(first["not_assessed"]) == 1
+    wo_path = tmp_path / "runs" / job / "work_order.json"
+    again = (await d.ok("draft_work_order", job=job))[0]["work_order"]
+    assert again["status"] == "incomplete" and "resolution" not in again["not_assessed"][0]  # the agent resolves nothing
+    assert cli.main(["review", str(wo_path), "na0", "nothing-found", "--by", "A. Engineer"]) == 0
+    again = (await d.ok("draft_work_order", job=job))[0]["work_order"]
+    assert again["status"] == "ready" and again["not_assessed"][0]["resolution"]["reviewer"] == "A. Engineer"
+    assert again["approvals"][0]["not_assessed"] == 0
 
 
 async def test_paths_outside_the_roots_are_refused(d, tmp_path, monkeypatch):

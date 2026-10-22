@@ -28,7 +28,8 @@ Scenarios (a real Chromium, the document served with the production CSP header):
   at 320/360/375 px (no overlap, no shift when the crop shows), 18. the film's player: poster, its captions track off
   (the captions are burned in) and loading when turned on, nothing of the MP4 fetched before Play, the hero link, and
   inside 375 px, 19. Try KILL in the job bar before any run, 20. the hero without v1's summaries, 21. a ready order
-  whose looks saw under half of the salient area says the rest was not looked at closely.
+  whose looks saw under half of the salient area says the rest was not looked at closely, 22. a person checks the
+  needs-a-look entry by eye (Defect found, with a note) and the order becomes ready, at 1440 and 375 px.
 Any CSP violation, console error or page error fails the run. wait_for_function is avoided on purpose
 (it is blocked by a strict CSP): every wait uses locators or polls page.evaluate.
 """
@@ -299,11 +300,20 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             body = json.loads(raw)
             LIVE["reviews"].append({**body, "signed": signed})
             order = LIVE["order"]
-            for f in order["findings"]:
-                if f["id"] == body["finding_id"]:
-                    f["state"] = "approved" if body["decision"] == "approve" else "rejected"
-            order["approvals"].append({"finding_id": body["finding_id"], "decision": body["decision"], "reviewer": body["reviewer"], "at": "2026-10-24T17:05:00Z"})
-            order["status"] = "blocked" if any(f["critical"] and f["state"] == "pending_review" for f in order["findings"]) else "ready"
+            at = "2026-10-24T17:05:00Z"
+            if "not_assessed" in body:  # checked by eye (docs/api-contract.md, "Checked by eye")
+                entry = order["not_assessed"][body["not_assessed"]]
+                if "resolution" in entry:
+                    return self.reply(409, {"error": f"not_assessed entry {body['not_assessed']} is already resolved"})
+                entry["resolution"] = {"decision": body["decision"], "reviewer": body["reviewer"], "at": at, "note": body.get("note", "")}
+                order["approvals"].append({"not_assessed": body["not_assessed"], "decision": body["decision"], "reviewer": body["reviewer"], "at": at})
+            else:
+                for f in order["findings"]:
+                    if f["id"] == body["finding_id"]:
+                        f["state"] = "approved" if body["decision"] == "approve" else "rejected"
+                order["approvals"].append({"finding_id": body["finding_id"], "decision": body["decision"], "reviewer": body["reviewer"], "at": at})
+            order["status"] = ("blocked" if any(f["critical"] and f["state"] == "pending_review" for f in order["findings"])
+                               else "incomplete" if any("resolution" not in n for n in order.get("not_assessed", [])) else "ready")
             LIVE["tokens"] += 1
             self.reply(200, {"token": f"tok-{LIVE['tokens']}", "work_order": order})
         else:
@@ -1328,6 +1338,67 @@ def test_partial_look_is_not_a_clean_result(browser, base):
     print("ok  a ready order at 21 % of the salient area says the rest was not looked at closely")
 
 
+NEEDS_LOOK = {"step": 4, "box": [880, 860, 380, 300], "action": "check-by-eye", "kind": "needs-a-look", "cls": "spalling",
+              "confidence": 0.55, "reason": "spalling at L1, confidence 0.55 under the floor 0.6: not a critical finding; "
+              "not confirmed by its L1 confirm look"}
+
+
+def test_a_person_checks_the_needs_a_look_entry_by_eye(browser, base):
+    """v1-policy2 held a critical mask under its floor, so the work order is incomplete: its needs-a-look entry waits in
+    step 4 with a Checked by eye control (the cards' name field, Nothing found / Defect found). A person signs it, the
+    request carries the entry's index, and the order becomes ready, which the page then says."""
+    for size, phone in (({"width": 1440, "height": 900}, False), ({"width": 375, "height": 812}, True)):
+        events = [e for e in map(json.loads, JOB_LINES) if e["type"] != "review_request"]
+        for e in events:
+            if e["type"] == "finding":
+                e["finding"].update(critical=False, state="draft", critical_step=None, critical_rule=None)
+        done = events[-1]
+        done.update(status="completed", cause="exhausted")
+        done["summary"]["critical_pending"] = 0
+        done["work_order"].update(status="incomplete", not_assessed=[NEEDS_LOOK],
+                                  findings=[{**f, "critical": False, "state": "draft"} for f in done["work_order"]["findings"]])
+        reset_live([{"lines": [json.dumps(e) for e in events], "delay": 0}])
+        LIVE["order"] = json.loads(json.dumps(done["work_order"]))
+        s = Session(browser, f"needs-look-{size['width']}", viewport=size, is_mobile=phone, has_touch=phone)
+        p = s.page
+        p.goto(f"{base}/")
+        expect(p.locator("#look")).to_be_enabled(timeout=T)
+        s.fast()
+        expect(p.locator("#job-pill")).to_have_text("needs a look", timeout=T)
+        expect(p.locator("#state-4")).to_have_text("Waiting")
+        expect(p.locator("#say-4")).to_contain_text("1 possible critical defect was too uncertain to draft")
+        check = p.locator(".check")
+        expect(check).to_have_count(1)
+        expect(check.locator(".check__what")).to_contain_text("Spalling, confidence 55 %, under the floor 0.6")
+        expect(check.locator(".review__t")).to_have_text("Checked by eye")
+        check.get_by_role("button", name="Defect found").click()
+        expect(check.locator(".finding__err")).to_contain_text("reviewer name")  # the name is required, as on the cards
+        assert not LIVE["reviews"]
+        s.to(".check", "center")
+        s.shot(f"needs-look-{size['width']}-before.png")
+        check.get_by_label("Reviewer").fill("A. Engineer")
+        check.get_by_label("Note (optional)").fill("spall at the bearing")
+        check.get_by_role("button", name="Defect found").click()
+        expect(check.locator(".review")).to_contain_text("defect found by A. Engineer at 2026-10-24 17:05 UTC", timeout=T)
+        expect(check.locator(".review")).to_contain_text("spall at the bearing")
+        (sent,) = LIVE["reviews"]
+        assert {k: v for k, v in sent.items() if k != "token"} == {
+            "not_assessed": 0, "decision": "defect-found", "reviewer": "A. Engineer", "note": "spall at the bearing", "signed": True}
+        assert sent["token"] == DONE["token"]  # the done event's signed order
+        expect(p.locator("#job-pill")).to_have_text("signed")
+        expect(p.locator("#state-4")).to_have_text("Done")
+        expect(p.locator("#say-4")).to_contain_text("Checked by eye: ready to send")
+        expect(p.locator("#done .stack > .note").first).to_contain_text(f"Work order {WO_ID} is ready")
+        expect(p.locator("#done .stack > .note").first).to_contain_text("1 defect found by eye")
+        expect(check.get_by_role("button", name="Defect found")).to_have_count(0)
+        s.to(".check", "center")
+        s.shot(f"needs-look-{size['width']}-after.png")
+        assert not hscroll_offenders(p)["off"], hscroll_offenders(p)
+        s.check_clean()
+        s.context.close()
+    print("ok  a person checks the needs-a-look entry by eye and the order becomes ready")
+
+
 def test_planner_status_shows_the_fallback_chip(browser, base):
     """The API keeps a look's own cause and puts a failed planner consultation in `planner_status`: the trace
     still flags that look `planner-fallback`."""
@@ -1698,6 +1769,7 @@ if __name__ == "__main__":
             test_video_player(browser, base)
             test_halt_governor_note_and_critical_trigger(browser, base)
             test_partial_look_is_not_a_clean_result(browser, base)
+            test_a_person_checks_the_needs_a_look_entry_by_eye(browser, base)
             test_planner_status_shows_the_fallback_chip(browser, base)
             test_kill_before_the_first_record(browser, base)
             test_kill_the_server_never_confirms(browser, base)
