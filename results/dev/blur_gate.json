@@ -3745,5 +3745,58 @@
  "adopted": false,
  "notes": [
   "The run (evals.blur_gate at e2c6aaf) wrote its per-split results under the key `splits`, as the rule's commands said, over the rule's own `splits` field (the split descriptions and the sha256 check). After the run the descriptions were restored from 45c3ef7 and the results moved, unchanged, to `split_results`; the script now writes `split_results` and refuses to write a key the rule already holds. No number, clause or verdict changed."
- ]
+ ],
+ "real_01_fallback_look": {
+  "laplacian": {
+   "level": 2,
+   "size": 750,
+   "sharpness": 5.1,
+   "reblur": 0.2035,
+   "ok": false,
+   "reason": "blur",
+   "looks": [
+    [
+     2,
+     "fallback-l2",
+     "blur"
+    ]
+   ],
+   "looks_refused_blur": 1,
+   "boxes": 0,
+   "classes": {},
+   "signoffs": 0,
+   "needs_look": 0,
+   "status": "completed",
+   "halt": "exhausted"
+  },
+  "both": {
+   "level": 2,
+   "size": 750,
+   "sharpness": 5.1,
+   "reblur": 0.2035,
+   "ok": true,
+   "reason": null,
+   "looks": [
+    [
+     2,
+     "fallback-l2",
+     null
+    ],
+    [
+     1,
+     "verify-new-mask",
+     null
+    ]
+   ],
+   "looks_refused_blur": 0,
+   "boxes": 4,
+   "classes": {
+    "crack": 4
+   },
+   "signoffs": 0,
+   "needs_look": 0,
+   "status": "completed",
+   "halt": "exhausted"
+  }
+ }
 }
