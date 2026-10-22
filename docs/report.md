@@ -24,7 +24,7 @@ photos; chance is the same model's boxes moved to random places, and IoU-only dr
 | v2c | 0.48 (0.44–0.53) | 0.28 | 0.23 (0.07) | 0.57 (0.54–0.61) | 22 of 51 | 3.71 |
 | classical engine | 0.19 (0.16–0.23) | 0.12 | 0.08 (0.03) | 0.48 (0.44–0.52) | 34 of 51 | 1.73 |
 
-- **v1 runs live since 2026-10-21**, with the v1-policy2 look policy since 2026-10-22 (deployed commit a4419e2, smoke-tested: [aws.md](aws.md)). It was chosen on the
+- **v1 runs live since 2026-10-21**, with the v1-policy2 look policy since 2026-10-22 (deployed commit 6e0a6cd, smoke-tested: [aws.md](aws.md)). It was chosen on the
   dev splits only (`results/dev/model_choice_dev.json`); held out it is again the only model with no measurable
   loss against any other. These are its second scorings (one earlier, unpublished). Its CC BY-NC 4.0 weights are
   release assets of v1.1.0, not in git.
@@ -848,6 +848,14 @@ CI 0.98–1.44), and its clears missed 9 of 81 photos holding a critical defect 
 triage stays the default. On a 2,536-photo backlog (`results/backlog_2536/summary.md`) it cleared 867 photos (40 of
 them holding a critical defect), ran 587 and queued 684 critical findings for a person, for $0.316 of Bedrock within a
 $0.50 budget. The batch's report stays blocked until a person reviews them.
+
+`drishyam batch --batch-yield` (off by default) changes the plan from what the jobs measure: under budget pressure,
+a job leaves its photo once its best next look is worth less than the next photo's first look (Charnov's marginal
+value theorem, 1976; no LLM). Forced looks are never cut, and what a yield skips is listed as not assessed. Under the
+rule committed before its run (`results/dev/batch_yield.json`, 190 dev photos, v1-policy2), it shows no measurable
+difference: critical recall 0.551 against the triage's 0.481 at half the budget (×1.15, CI 0.995–1.47), 93 photos
+reached instead of 64, and 413 not-assessed entries instead of 173. It stays off. A real batch on 24 photos matched
+the replay exactly.
 
 ## 11. Responsible use and limits
 

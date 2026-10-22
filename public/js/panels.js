@@ -20,7 +20,7 @@ export const pad = (n) => `#${String(n).padStart(2, '0')}`;
 export const px = (v) => (num(v) ? v.toLocaleString('en-US', { maximumFractionDigits: 0 }) : '–');
 
 // ---- plain words -------------------------------------------------------------------------------
-const size = (L) => (L ? `1/${2 ** L} size` : 'full resolution');
+export const size = (L) => (L ? `1/${2 ** L} size` : 'full resolution');
 const scale = (L) => `1:${2 ** L}`;
 const pct = (v) => `${Math.round(Number(v) * 100)}\u00a0%`;  // a no-break space: "19 %" never splits across lines
 const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
@@ -405,9 +405,11 @@ export class Trace {
 
 const row = (k, v) => (v == null || v === '' ? null : h('div', {}, h('dt', {}, k), h('dd', {}, v)));
 
-export function renderStepDetail(root, step, planner) {
+/** `ran`: a job has started (its first record arrived), so there are steps to pick; before that the panel says what will fill it. */
+export function renderStepDetail(root, step, planner, ran = true) {
   if (!step) {
-    root.replaceChildren(h('p', { class: 'note' }, 'No step picked yet. Scrub the replay slider, click a numbered circle on the photo or click a trace line.'));
+    root.replaceChildren(h('p', { class: 'note' }, ran ? 'No step picked yet. Scrub the replay slider, click a numbered circle on the photo or click a trace line.'
+      : 'Press Run; each step’s reasons appear here.'));
     return;
   }
   const a = step.decision?.args ?? {};

@@ -334,6 +334,63 @@ def test_an_unreadable_photo_is_listed_and_the_rest_still_run(tmp_path):
     assert photos["a_real_01.jpg"]["outcome"] == "assessed" and r.report["status"] == "incomplete"
 
 
+@pytest.mark.parametrize("on", [False, True])
+def test_batch_yield_logs_next_ev_on_every_started_line_and_hands_it_to_the_job(tmp_path, on):
+    """--batch-yield at 1.2 s in total (per-photo pixel cap 0.3): before any job has run next_ev is 0 (no mean yet).
+    Then the seconds left are fewer than the photos left x the mean job so far, so c's next_ev is the next queued
+    photo's (b's) triage prior_max, cited in its rationale, and c's job leaves its photo (batch-yield) with what it did
+    not look at listed as not assessed; b's is a's prior_max (0, no candidate) and a is last. Off, the default: next_ev
+    0 on every started line and no job yields."""
+    r = run([str(backlog(tmp_path / "photos")), "--cost-model", "fixed", "--seconds-cap", "1.2",
+             *(["--batch-yield"] if on else [])], tmp_path / "runs")
+    assert r.rc == 0
+    started, photos = decisions(r.trace, "started"), by_name(r.report)
+    prior_max = {t["photo"]: t["prior_max"] for t in decisions(r.trace, "triaged")}
+    assert [Path(t["photo"]).name for t in started] == ["d_bridge_05.jpg", "c_bridge_03.jpg", "b_bridge_07.jpg",
+                                                        "a_real_01.jpg"]
+    nev = [t["next_ev"] for t in started]
+    c = photos["c_bridge_03.jpg"]
+    if not on:
+        assert nev == [0.0] * 4 and all(p["cause"] != "batch-yield" for p in photos.values())
+        assert all("batch-yield" not in t["rationale"] for t in started)
+        return
+    assert nev == [0.0, prior_max[started[2]["photo"]], 0.0, 0.0] and nev[1] > 0
+    assert "batch-yield: " in started[1]["rationale"] and f"next_ev {nev[1]:g}" in started[1]["rationale"]
+    assert c["cause"] == "batch-yield" and photos["d_bridge_05.jpg"]["cause"] != "batch-yield"
+    halt = cli.read_trace(r.dir / c["run_dir"] / "trace.jsonl")[-2]
+    assert halt["cause"] == "batch-yield" and f"next_ev {nev[1]:.4g}" in halt["rationale"]
+    assert any(n["photo"] == c["photo"] and n["reason"] == "not looked at: batch-yield halted the job first"
+               for n in r.report["not_assessed"])
+
+
+def test_the_batch_yield_replay_matches_a_real_batch_with_the_rule(tmp_path):
+    """evals/batch_yield.py replays the batch-yield arm exactly from one full run per photo: at 1.2 s on the four
+    samples (c's job yields, a's is cut by the budget), it agrees with run_batch(batch_yield=True) on every job's looks,
+    cause and seconds, each next_ev, the critical findings queued and the not-assessed entries."""
+    from evals import batch_triage, batch_yield
+
+    folder = backlog(tmp_path / "photos")
+    paths = sorted(folder.iterdir())
+    photos = [{**batch_yield.photo_task({"id": p.name, "path": str(p), "boxes": []}, make=batch_triage.make),
+               "file_index": i} for i, p in enumerate(paths)]
+    causes = {}
+    for budget in (1.0, 1.2):
+        sim = batch_yield.replay(photos, batch_yield.triage_order(photos), budget, True, True, detail=True)
+        causes[budget] = [j["cause"] for j in sim["jobs"]]
+        bdir = batch.run_batch(paths, tmp_path / f"runs{budget}", JobConfig(thumbs=False), seconds_cap=budget,
+                               key=KEY.encode(), cost_model="fixed", micro_arm=batch_triage.MICRO_ARM, batch_yield=True)
+        real = json.loads((bdir / "inspection.json").read_text())
+        ran = sorted((p for p in real["photos"] if "run_dir" in p), key=lambda p: p["rank"])
+        assert [(p["steps"], p["cause"], p["seconds"]) for p in ran] == [
+            (j["looks"], j["cause"], j["seconds"]) for j in sim["jobs"]]
+        assert [t["next_ev"] for t in decisions(cli.read_trace(bdir / "batch_trace.jsonl"), "started")] == [
+            j["next_ev"] for j in sim["jobs"]]
+        assert (sim["critical"], sim["not_assessed"], sim["spent_s"]) == (
+            real["counts"]["critical"], len(real["not_assessed"]), real["spent"]["seconds"])
+    # c yields at both; at 1.0 a's one look leaves nothing of the budget, so the governor halts it after that look
+    assert causes[1.0][1] == causes[1.2][1] == "batch-yield" and (causes[1.0][3], causes[1.2][3]) == ("cap-hit", "exhausted")
+
+
 def test_the_dev_eval_replay_matches_a_real_batch(tmp_path):
     """evals/batch_triage.py replays any order from one full run per photo (a job capped lower takes the same looks
     up to the cap). At 0.8 s the second photo is cut short by the budget: the replay must agree with run_batch on

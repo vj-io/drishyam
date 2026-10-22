@@ -33,7 +33,7 @@ drifts from that file or, for the Lambda timings, from [docs/aws.md](docs/aws.md
 | v2c | 0.48 (0.44–0.53) | 0.28 | 0.23 (0.07) | 0.57 (0.54–0.61) | 22 of 51 | 3.71 |
 | classical engine | 0.19 (0.16–0.23) | 0.12 | 0.08 (0.03) | 0.48 (0.44–0.52) | 34 of 51 | 1.73 |
 
-- **v1 runs live since 2026-10-21**, with the v1-policy2 look policy since 2026-10-22 (deployed commit a4419e2, smoke-tested: [docs/aws.md](docs/aws.md)). It was
+- **v1 runs live since 2026-10-21**, with the v1-policy2 look policy since 2026-10-22 (deployed commit 6e0a6cd, smoke-tested: [docs/aws.md](docs/aws.md)). It was
   chosen on the dev splits only ([results/dev/model_choice_dev.json](results/dev/model_choice_dev.json)); held out
   it is again the only model with no measurable loss against any other. These are its second scorings (one earlier,
   unpublished). Its CC BY-NC 4.0 weights are release assets of v1.1.0, not in git.
@@ -153,6 +153,7 @@ unchanged per-photo agent in order of evidence under one total budget, list ever
 assessed, and write a signed inspection report with one queue of critical findings for a person. On the 90-photo dev
 backlog the ordering is no measurable gain (×1.23 against random order, 95 % CI 0.64–1.64).
 `--router nova` adds a live LLM router: Amazon Nova Lite on Bedrock labels each photo's blurred overview Clear, Requires zoom or Critical, Clear photos get no job and are listed as not assessed, and any bad reply, timeout or error falls back to the triage. On dev it loses under the rule committed before any paid call: its Bedrock $ leaves it 19 photos at half the full-run budget, so it queues 0.18 of the critical defects against the triage's 0.50 (×0.36, CI 0.13–0.67), and it cleared 9 of 81 photos holding a critical defect, so `--router rule` stays the default. A 2,536-photo backlog ran end to end in 72 min for $0.32 of Bedrock: 867 cleared, 587 run, 684 critical findings queued for a person ([batch.md](docs/batch.md#a-live-llm-router---router-nova)).
+`--batch-yield` (off by default) lets a job leave its photo under budget pressure once its next look is worth less than the next photo's first, Charnov's marginal value rule; no LLM is added. On the 190-photo dev backlog it shows no measurable difference under the rule committed before its run: 0.55 of the critical defects against the triage's 0.48 at half the budget (×1.15, CI 0.995–1.47), with 413 not-assessed entries instead of 173, so it stays off ([batch.md](docs/batch.md#leaving-a-photo-for-the-next-one---batch-yield-dev-only)).
 
 ```bash
 uv run drishyam batch public/samples --seconds-cap 30

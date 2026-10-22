@@ -4,7 +4,7 @@ The web demo (the FastAPI app and the static site) runs on AWS only, as one CDK 
 `us-east-1`: the API on Lambda arm64 (Graviton) and the static site in a private S3 bucket, both reached
 only through CloudFront and AWS WAF.
 
-**Status: deployed** on 2026-10-21 (India time) to `us-east-1`, last from commit a4419e2 on 2026-10-22 (below). The v1 deploy
+**Status: deployed** on 2026-10-21 (India time) to `us-east-1`, last from commit 6e0a6cd on 2026-10-22 (below). The v1 deploy
 itself came from commit dda3080, with the v1 segmenter
 (`ONNX=models/drishyam_dacl10k.onnx ONNX_FP16=models/drishyam_dacl10k.fp16.onnx RESERVED=none scripts/aws.sh deploy`)
 and the submission film in the site bucket (`video/drishyam.mp4`, served with byte ranges). The smoke run
@@ -30,7 +30,19 @@ the second job after 2 steps, and `tests/e2e/test_ui_live.py https://d1xg58guluu
 smoke 2026-10-21T04:21:29Z https://d1xg58guluup8c.cloudfront.net commit=02219a2e435ea90058fcb87f03d69f30cc3f2b4d package=r7K9s9XZtHmkq0+f2OtXiTy1CUyFo5xf2GzQkv6UJMs= ttfb_first=0.857872s ttfb_warm=0.728508s step_p95_ms=973.3 result=pass
 ```
 
-The current build: the site was redeployed from commit a4419e2 on 2026-10-22, release 1.1.1: version 1.1.1 in
+The current build: the site was redeployed from commit 6e0a6cd on 2026-10-22: release 1.1.1's code with the site
+fixes from a UI audit (the hero's empty column, diagrams that opened raw SVGs, gallery cards that overflowed, wide
+screens, the recorded run's label, KILL states, labels for v1-policy2) and the batch-yield knob, off by default.
+`tests/e2e/test_ui_live.py https://d1xg58guluup8c.cloudfront.net` passed twice against it, and then its smoke run
+(`WAF_LOOP=1`) passed: a job on `bridge_03.jpg` ended `awaiting_review` after 6 steps, KILL halted the second job
+after 3 steps, both 403 checks held, the WAF answered 429 at the 13th empty-bodied job start, and the step p95 was
+644.1 ms over 6 steps:
+
+```
+smoke 2026-10-22T15:17:18Z https://d1xg58guluup8c.cloudfront.net commit=6e0a6cd69b6f1cf0ede404325adb9e8cdb0199f5 package=eMZQt3HHvTk2tTQSsUlqpDv27dzY+8tu0pLV/6ib3L4= ttfb_first=1.268720s ttfb_warm=1.232319s step_p95_ms=644.1 result=pass
+```
+
+Before it, the site was redeployed from commit a4419e2 on 2026-10-22, release 1.1.1: version 1.1.1 in
 `/api/health` and the film re-recorded on the live site (4:08, `video/drishyam.mp4` in the bucket, 123,597,576 bytes).
 `tests/e2e/test_ui_live.py https://d1xg58guluup8c.cloudfront.net` passed twice against it, and then its smoke run
 (`WAF_LOOP=1`) passed: a job on `bridge_03.jpg` ended `awaiting_review` after 6 steps, KILL halted the second job

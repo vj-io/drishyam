@@ -131,6 +131,7 @@ Event types, in order:
 
 {"type": "done", "status": "awaiting_review",           // completed | halted | awaiting_review
  "cause": "stop-rule",                                  // stop-rule | exhausted | cap-hit | kill-switch | planner:stop
+                                                        // | batch-yield (drishyam batch --batch-yield only)
  "summary": {"steps": 14, "pixels_used": 1950000, "pixels_frac": 0.289, "usd": 0.0008,
              "seconds": 8.4, "findings": 3, "critical_pending": 1},
  "coverage": 0.62, "unvisited": ["r9", "r10"],           // salient area seen at any level, the survey included
@@ -258,7 +259,10 @@ Step `decision.action` values: `gaze` (first look at a region, or the survey), `
 `confirm-critical` (v1-policy2's confirm look, below), `planner:<strategy>`, `replay`, and `random-order` (only under
 the `order="random"` ablation).
 `governor.cause` values: `p95>SLA`, `warp-spike`, `usd≥80%`. Halt `cause` values: `stop-rule`,
-`exhausted`, `cap-hit`, `kill-switch`, `planner:stop`. `planner_status.status` is `accepted`,
+`exhausted`, `cap-hit`, `kill-switch`, `planner:stop`, and `batch-yield` (only in `drishyam batch --batch-yield`,
+[batch.md](batch.md): the job left its photo for the next one; a halted job, so what it did not look at is not
+assessed). A `best-score` step also carries `value`, the look's expected value before dividing by t_hat (prior x
+severity x (1 + uncertainty) x unseen), which batch-yield compares with the next photo's. `planner_status.status` is `accepted`,
 `rejected` or `fallback` (a timeout or a network error), as on the `planner` event. A planner's
 `change_level` / `reverify` queues its own look, which carries `planner:<strategy>`; the look already
 chosen on that step keeps its own cause. A `switch_model: accurate` proposal is rejected while a

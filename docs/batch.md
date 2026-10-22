@@ -8,7 +8,7 @@ person. It approves nothing.
 ```bash
 drishyam batch FOLDER [MORE FOLDERS, PHOTOS OR .txt LISTS] [--usd-cap TOTAL] [--seconds-cap TOTAL] \
     [--photo-pixel-cap 0.3] [--photo-usd-cap 0.05] [--photo-seconds-cap 20] [--cost-model live|fixed] [--out runs] \
-    [--router rule|nova]
+    [--router rule|nova] [--batch-yield]
 # a person reviews each critical finding in its photo's work order, as for one photo
 drishyam review runs/batch-<id>/<job>/work_order.json f1 approve --by "A. Engineer"
 # then the batch report is recomputed from the work orders and signed again
@@ -43,7 +43,8 @@ step. Each run leaves `runs/batch-<id>/`:
    left as its seconds cap, so the last photo can halt early on `cap-hit`: its unlooked regions are in its own work
    order and so in the batch's not-assessed list. Like a job's own cap, the total can be passed by up to one look.
    When nothing is left, the batch stops (`budget-stop`) and every photo not reached is listed as not assessed with
-   that reason.
+   that reason. `--batch-yield` (off by default) lets a job leave its photo early for the next one: see
+   [below](#leaving-a-photo-for-the-next-one---batch-yield-dev-only).
 4. **Report.** Each photo's status (`ready`, `incomplete`, `blocked`, or `not assessed`), the human queue (every
    critical finding across all photos, by severity, then confidence), the not-assessed list (photos never reached or
    unusable, zero-candidate photos, the regions a halted job did not look at, glare and dark areas, quality-gate
@@ -259,6 +260,79 @@ dev passes including the calls that timed out and so were not counted in the rep
 run. The cost estimate was written before the first paid call: $0.31 expected, $0.83 worst case, 5 USD cap. No other
 AWS resource was created.
 
+## Leaving a photo for the next one: `--batch-yield` (dev only)
+
+Without it, the plan is fixed at triage: every job runs to its own stop rule or its cap, whatever the rest of the
+backlog offers. `--batch-yield` (off by default) adds the patch-leaving rule of optimal foraging, Charnov's marginal
+value theorem (E. L. Charnov, 1976, *Theoretical Population Biology* 9(2): 129-136): leave a patch once its next
+gain falls below what the next patch offers. No model and no LLM is added.
+
+- **The value of a look** is the agent's own expected value before dividing by t_hat: prior x severity x (1 +
+  uncertainty) x unseen. Every `best-score` step now records it as `value`.
+- **What the next photo offers** is its triage `prior_max`, the value of its first look with severity 1, entropy 0 and
+  unseen 1. Under v1-policy2 the regions are grid tiles whose prior is their best candidate's, so the best tile's prior
+  is still `prior_max` (a test pins it).
+- **When it applies.** Only under budget pressure: the seconds left are fewer than the photos left (this one included)
+  times the mean seconds of the jobs run so far. Before the first job has run, and for the last photo, it is off. Each
+  `started` line of batch_trace.jsonl logs `next_ev` (0 when off), and its rationale cites the numbers when it is set.
+- **What it cuts.** Once a photo has had a look, a best-score look worth less than `next_ev` halts the job with cause
+  `batch-yield`. Forced looks (the survey, the rules' follow-ups, the confirm look, the fallback, replays) are never
+  cut. A yielded job is halted: every candidate it did not look at goes to its work order as not assessed ("not looked
+  at: batch-yield halted the job first"), so nothing it skipped reads as clean.
+- **Off, nothing moves.** At `next_ev` 0 every event stream equals the agent's with the rule's lines removed, apart from
+  `value` (tests/test_agent.py), so `drishyam run`, the site, MCP and every published number are unchanged.
+
+`python -m evals.batch_yield` wrote [results/dev/batch_yield.json](../results/dev/batch_yield.json). It uses the
+router evaluation's 190 dev photos in the same shuffle, with v1 at its profile with v1-policy2 on the same fixed
+costs. Each job runs once in full, and every arm is replayed exactly from those runs: a job given a seconds cap or a
+`next_ev` takes the same looks up to its halt, and is credited with the work order it would leave there. A real
+`run_batch(batch_yield=True)` on the first 24 photos matched the replay in every job's looks, cause and seconds, in
+every `next_ev`, and in the 8 yields, 20 critical defects queued and 57 not-assessed entries.
+
+**The rule, committed before any output (b93fc86, 15:34:42 +05:30; the run started at 15:34:56).** The primary
+metric is critical recall within half the seconds the 190 jobs take in full (249.6 of 499.1 s). Gain: the paired
+95 % bootstrap CI (1000 resamples within each split) of triage + batch-yield / triage lies above 1. Harm: below 1.
+Adoption: only on a gain with no more false critical findings on the clean split.
+
+**Verdict: no measurable difference, so `--batch-yield` stays off.** The point estimate favours it, but the CI
+includes 1 (its lower end is 0.995).
+
+At the primary budget:
+
+| Arm | Critical recall (of 370) | IoU-only | Photos reached | Not-assessed entries | Batch-yield halts | Critical findings per photo | Matching no label (clean split) |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| triage | 0.481 (178) | 0.100 | 64 | 173 | 0 | 1.66 | 46 (0) |
+| triage + batch-yield | 0.551 (204) | 0.122 | 93 | 413 | 57 | 1.27 | 48 (0) |
+| random order | 0.323 (119.6) | 0.089 | 95.5 | 215.7 | - | 0.83 | 29.9 (0) |
+
+Recall ratios, with paired 95 % bootstrap CIs:
+
+| Budget | batch-yield vs triage | IoU-only, the same | triage vs random (after the router run) |
+| --- | --- | --- | --- |
+| a quarter (124.8 s) | 1.31 (1.03-1.97) | 1.30 (1.04-1.70) | 1.01 (0.52-1.62) |
+| **half (249.6 s), primary** | **1.15 (0.995-1.47)** | 1.22 (0.98-1.46) | 1.49 (1.15-1.73) |
+| three quarters (374.3 s) | 1.02 (0.96-1.08) | 1.11 (0.95-1.34) | 1.24 (1.16-1.29) |
+
+What the numbers say:
+
+- **It spreads the budget.** At half the budget it reaches 93 photos instead of 64 and queues 26 more labelled
+  critical defects, but the interval includes no change. The quarter budget's CI lies above 1, but that budget is
+  reported, not part of the verdict.
+- **The price is more not assessed.** Each yield lists the candidates it skipped, so the report holds 413 entries
+  instead of 173. The first critical is queued at the same moment (8.0 s), since the first job never yields.
+- **No more false alarms.** Critical findings matching no label: 48 against 46; on the clean split, 0 in both arms.
+- **`prior_max` undervalues the next photo.** v1 runs the survey first, and its seeds raise the first best-score
+  look's value: over the 184 photos with one, that value over `prior_max` has quartiles 1.00, 1.73 and 3.80. The rule
+  therefore yields less often than the value it stands for would. A better estimate would be a new rule, run again.
+- **Triage beats random order under v1-policy2.** ×1.49 (CI 1.15-1.73), computed after the router run. Its triage arm
+  differs from router_eval's (0.481 against 0.497) because that run predates v1-policy2. With policy2's knobs off,
+  the 190 jobs reproduce router_eval's per-photo seconds and its triage arm exactly, except one zero-candidate photo
+  where the fallback look now runs (`identity_check_after_run`, added after the run).
+
+The 2,536-photo backlog with and without the rule was not run. Each `--router rule` run at $0.50 would take about
+2.2 hours on this machine (the router run's 40 min of triage plus about 1,690 jobs at 3.2 s each), over the 90 minutes
+allowed.
+
 ## Not done
 
 - No MCP tool: a read-only `batch_status` would be small, but it would change the MCP allow-list of twelve that
@@ -276,3 +350,6 @@ AWS resource was created.
   in the report is a floor (CloudWatch's token counts for the model are the bill).
 - The cache has no expiry or size cap (one small JSON file per photo).
 - Each Clear is one model's judgement of a thumbnail; nothing re-checks a sample of the cleared photos.
+- Candidates a batch-yield defers are never revisited: there is no second pass. The dev run spent its whole budget
+  (no time was left over to give one), so none was built.
+- `--batch-yield` runs from the CLI only: no web or MCP path sets `next_ev`.

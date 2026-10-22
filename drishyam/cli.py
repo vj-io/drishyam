@@ -228,7 +228,8 @@ def cmd_batch(a) -> int:
     try:
         bdir = batch.run_batch(paths, Path(a.out), cfg, a.usd_cap, a.seconds_cap,
                                kill=lambda: stop.is_set() or governor.global_kill(), key=key,
-                               cost_model=a.cost_model, micro_arm=a.micro_arm, progress=show, router=rt)
+                               cost_model=a.cost_model, micro_arm=a.micro_arm, progress=show, router=rt,
+                               batch_yield=a.batch_yield)
     finally:
         if old is not None:
             signal.signal(signal.SIGINT, old)
@@ -398,6 +399,9 @@ def _parser() -> argparse.ArgumentParser:
     b.add_argument("--router", choices=("rule", "nova"), default="rule",
                    help="rule (default): triage order only; nova: Amazon Nova Lite on Bedrock labels each overview Clear, "
                    "Requires zoom or Critical (AWS credentials; Clear photos get no job and are listed as not assessed)")
+    b.add_argument("--batch-yield", action="store_true",
+                   help="under budget pressure, a photo's job ends once its best next look is worth less than the next "
+                   "photo's first look (cause batch-yield; what it skipped is listed as not assessed). Off by default")
     b.add_argument("--report", metavar="DIR", help="after reviews: recompute DIR/inspection.json from its work orders")
     b.set_defaults(func=cmd_batch)
 

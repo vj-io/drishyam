@@ -9,6 +9,8 @@
    charged, on the job's own clock, to one total (the $ cap is the same budget in seconds: the agent models $ from
    seconds); each job gets at most what is left as its seconds cap, and the batch stops when nothing is left. The kill
    switch (`drishyam kill`, Ctrl-C) stops it between photos, and inside a job at its next step (the governor's check).
+   `--batch-yield` (off by default) adds the patch-leaving rule (Charnov 1976): under budget pressure a job leaves its
+   photo once its best next look is worth less than the next photo's first look (JobConfig.next_ev).
 4. Report. inspection.json, sealed with findings.sign (HMAC), and inspection.md: each photo's status, the human queue
    (every critical finding, by severity then confidence), everything not assessed (photos never reached or unusable,
    and each work order's own list), and the totals.
@@ -118,9 +120,10 @@ def run_photo(img, priv, cfg, make, root: Path, cost_model: str, micro_arm: str)
 
 
 def run_batch(paths, out: Path, cfg, usd_cap=None, seconds_cap=None, make=make_job, kill=lambda: False,
-              key: bytes = b"", cost_model="live", micro_arm="linux-aarch64", progress=None, router=None) -> Path:
+              key: bytes = b"", cost_model="live", micro_arm="linux-aarch64", progress=None, router=None,
+              batch_yield=False) -> Path:
     """Triage (with a `router.Router`, route too), order and run `paths` under one total budget (None: no cap);
-    returns the batch folder under `out`."""
+    returns the batch folder under `out`. `batch_yield`: the patch-leaving rule (JobConfig.next_ev) under pressure."""
     t_wall = time.perf_counter()
     while True:
         bdir = Path(out) / f"batch-{secrets.token_hex(3)}"
@@ -197,6 +200,7 @@ def run_batch(paths, out: Path, cfg, usd_cap=None, seconds_cap=None, make=make_j
     else:
         log("ordered", "triage-score", "highest sum of candidate priors first (ties: file order)",
             order=[p["index"] for p in ranked])
+    jobs = []  # the seconds of each job run so far
     for rank, p in enumerate(ranked, 1):
         p["rank"] = rank
         if stop:
@@ -210,18 +214,28 @@ def run_batch(paths, out: Path, cfg, usd_cap=None, seconds_cap=None, make=make_j
             continue
         cap = min(cfg.seconds_cap, budget - spent)
         label = f"{p['route']['label']}; " if "route" in p else ""
+        # batch-yield: under budget pressure (fewer seconds left than the photos left, this one included, times the
+        # mean seconds of the jobs run so far) the job leaves its photo once its best look is worth less than the next
+        # photo's first look: that photo's triage prior_max (prior x severity 1 x (1 + entropy 0) x unseen 1)
+        left, mean = len(ranked) - rank + 1, sum(jobs) / len(jobs) if jobs else None
+        pressed = batch_yield and mean is not None and budget - spent < left * mean
+        next_ev = ranked[rank]["triage"]["prior_max"] if pressed and rank < len(ranked) else 0.0
+        why = (f"; batch-yield: {budget - spent:.3f} s left < {left} photos x {mean:.3f} s a job so far, so next_ev "
+               f"{next_ev:g}, the next photo's prior max" if next_ev else "")
         log("started", "rank", f"rank {rank} of {len(ranked)}: {label}prior sum {p['triage']['prior_sum']:g} over "
             f"{p['triage']['candidates']} candidates; seconds cap {cap:.3f} s ("
-            f"{'per photo' if cap == cfg.seconds_cap else 'what the batch budget leaves'})", p, seconds_cap=cap)
+            f"{'per photo' if cap == cfg.seconds_cap else 'what the batch budget leaves'}){why}", p, seconds_cap=cap,
+            next_ev=next_ev)
         try:
             img, priv = load(p["photo"])  # decoded again: a backlog does not fit in memory
         except (OSError, ValueError) as exc:
             unusable(p, exc)
             log("finished", "unreadable", str(exc), p)
             continue
-        r = run_photo(img, priv, replace(cfg, seconds_cap=cap), make_one, bdir, cost_model, micro_arm)
+        r = run_photo(img, priv, replace(cfg, seconds_cap=cap, next_ev=next_ev), make_one, bdir, cost_model, micro_arm)
         p.update(outcome="assessed", **r)
         spent += r["seconds"]
+        jobs.append(r["seconds"])
         log("finished", r["cause"], f"{r['steps']} looks, {r['findings']} findings, {r['critical_pending']} critical "
             f"pending; {r['seconds']:.3f} s", p, **{k: r[k] for k in ("run_dir", "steps", "seconds", "pixels")})
         if r["cause"] == "kill-switch":
