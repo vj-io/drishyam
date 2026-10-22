@@ -339,7 +339,7 @@ def test_checking_every_entry_by_eye_makes_the_batch_ready(copy):
     resolve_all(copy, PHOTOS)
     rc, out = refresh(copy)
     rep = batch.verify_report(copy, KEY.encode())
-    assert rc == 0 and rep["status"] == "ready" and "status ready" in out
+    assert rc == 0 and rep["status"] == "ready" and f"{rep['id']}: ready;" in out and "0 of them not yet" in out
     assert rep["counts"]["ready"] == len(PHOTOS) and all("resolution" in n for n in rep["not_assessed"])
     first = sum(Path(n["photo"]).name == "a_real_01.jpg" for n in na)  # resolved before the first refresh
     refreshed = decisions(cli.read_trace(copy / "batch_trace.jsonl"), "refreshed")

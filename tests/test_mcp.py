@@ -113,7 +113,8 @@ async def test_tool_list_is_the_allow_list(d):
     assert not any(w in n for n in names for w in ("approve", "reject", "decide", "close", "shell", "write", "resolve",
                                                    "check", "found", "eye", "not_assessed"))
     # and no tool takes an argument that could carry a person's decision or resolution
-    params = {p for t in (await d.client.list_tools()).tools for p in t.inputSchema.get("properties", {})}
+    params = {p for t in (await d.client.list_tools()).tools for p in t.input_schema.get("properties", {})}
+    assert {"job", "gaze_id", "why"} <= params  # the schemas were read
     assert not params & {"decision", "reviewer", "resolution", "not_assessed", "note", "outcome"}, params
 
 
