@@ -238,7 +238,12 @@ def policy2_read(p2: list[dict], v1: list[dict], records: list[dict]) -> dict:
             if keep else {}}
     looks = {k: dict(collections.Counter(f"{t['action']}:{t['cause']}" for r in merged for t in r["configs"][k]["trace"]
                                          if t["action"] != "halt")) for k in keys if "trace" in merged[0]["configs"][k]}
-    return {"baselines_same_as_v1s_run": same, "rows": rows, "matrix": matrix, "hard": hard, "looks_by_action_cause": looks}
+    share = lambda c, pick: r4(sum(v for a, v in c.items() if pick(a)) / max(1, sum(c.values())))
+    rates = {k: {"escalation_rate": share(c, lambda a: a.startswith("escalate:")),
+                 "verify_rate": share(c, lambda a: a.startswith("verify:")),
+                 "confirm_rate": share(c, lambda a: a == "verify:confirm-critical")} for k, c in looks.items()}
+    return {"baselines_same_as_v1s_run": same, "rows": rows, "matrix": matrix, "hard": hard, "looks_by_action_cause": looks,
+            "rates": rates}
 
 
 def markdown(out: dict) -> str:
@@ -374,6 +379,16 @@ def main(argv=None) -> dict:
                       "verdict_vs_v1": verdicts_vs(pairs, c, b), "read": {s: acted[f"{c} {s}"] for s in done},
                       "leakage": f"the check ran again before this run (runs/heldout/leakage-{tag}.json): the same counts "
                                  "as the published leakage block"}
+            if {"codebrim", "synth", "clean"} <= set(done):  # the dev rule's clauses as written, read on the counterparts
+                rd = out[c]["read"]
+                out[c]["dev_rule_on_held_out"] = {
+                    "clauses": policy2.clauses({"synth_dev": rd["synth"]["rows"], "real": rd["codebrim"]["rows"],
+                                                "clean": rd["clean"]["rows"]}, c),
+                    "note": ("results/dev/policy2_sweep.json's clauses (evals.policy2.clauses, unchanged) on the held-out "
+                             "counterparts of its splits (synth200 for synth_dev, CODEBRIM eval200 for dev100, the clean set "
+                             "for the clean dev split), against v1 at the 30 % cap. Reported, not a decision: the "
+                             "configuration was adopted on dev. Sign-offs here count critical findings by each finding's "
+                             "final measure on both sides (v1's runs did not record them).")}
     Path(REPO / a.out).write_text(json.dumps(out, indent=1, ensure_ascii=False) + "\n")
     print(markdown(out), statement, sep="\n\n")
     return out

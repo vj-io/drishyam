@@ -16595,5 +16595,32 @@
   "chosen": "g_s60",
   "adopted": true
  },
- "decision": "Adopted by the rule as stated: two of the 8 eligible configurations pass every clause, g_s60 (grid on, confirm look at the same level, floor 0.6, critical classes x2, merge on) and g_f60 (the same with the confirm look one level finer); g_s60 finds one more critical-class box with its drafted tier (223 of 395 against 222), so it is chosen and becomes v1's default (agent.POLICY2). The four floor-0.7 configurations lose critical-class recall on CODEBRIM dev100 measurably; the two at floor 0.6 without the grid do not cut critical boxes measurably. What it changes on dev100 at the 30 % cap, against v1 as it was: sign-offs (critical findings) per photo 2.12 to 1.34 (CI of the difference -1.08 to -0.50), critical boxes per photo 7.24 to 6.38 (-1.52 to -0.28), 0.14 needs-a-look entries per photo (0.49 boxes) for a person to check by eye, recall of what a person is shown 0.480 to 0.490 (x1.02, CI 0.99-1.05), drafted critical-class recall 0.532 to 0.523 (x0.98, CI 0.95-1.02: not measurably lower, and not higher), verify looks 7.9 % to 12.2 % of looks (4.5 % are confirm looks, 0.27 per photo), escalations unchanged (6.7 % to 6.5 %), pixels 0.142 to 0.145, modelled ms per job 3379 to 3470. On synth_dev nothing measurable moved (no confirm look fired: v1's critical masks there are confident or absent); on the clean split v1's one box on one photo is gone (0.033 to 0 per photo). What it does not do: it does not raise critical-class recall (pooled over both splits it finds 223 of 395 critical-class boxes against v1's 226), it does not match L2 tiling on dev100 (0.490 against 0.511 at 0.145 against 0.102 of the pixels; at the 10 % cap 0.434, x0.85 of tiling, CI 0.76-0.92, at 0.89 of its pixels; v1 0.430, x0.84), and the grid by itself changed little (grid alone: recall 0.483, pixels 0.137, ms 3181). The reduction in the human gate comes from the floor and the merge; the grid makes the floor's cut of critical boxes measurable (n_s60 and n_f60 do not pass that clause)."
+ "decision": "Adopted by the rule as stated: two of the 8 eligible configurations pass every clause, g_s60 (grid on, confirm look at the same level, floor 0.6, critical classes x2, merge on) and g_f60 (the same with the confirm look one level finer); g_s60 finds one more critical-class box with its drafted tier (223 of 395 against 222), so it is chosen and becomes v1's default (agent.POLICY2). The four floor-0.7 configurations lose critical-class recall on CODEBRIM dev100 measurably; the two at floor 0.6 without the grid do not cut critical boxes measurably. What it changes on dev100 at the 30 % cap, against v1 as it was: sign-offs (critical findings) per photo 2.12 to 1.34 (CI of the difference -1.08 to -0.50), critical boxes per photo 7.24 to 6.38 (-1.52 to -0.28), 0.14 needs-a-look entries per photo (0.49 boxes) for a person to check by eye, recall of what a person is shown 0.480 to 0.490 (x1.02, CI 0.99-1.05), drafted critical-class recall 0.532 to 0.523 (x0.98, CI 0.95-1.02: not measurably lower, and not higher), verify looks 7.9 % to 12.2 % of looks (4.5 % are confirm looks, 0.27 per photo), escalations unchanged (6.7 % to 6.5 %), pixels 0.142 to 0.145, modelled ms per job 3379 to 3470. On synth_dev nothing measurable moved (no confirm look fired: v1's critical masks there are confident or absent); on the clean split v1's one box on one photo is gone (0.033 to 0 per photo). What it does not do: it does not raise critical-class recall (pooled over both splits it finds 223 of 395 critical-class boxes against v1's 226), it does not match L2 tiling on dev100 (0.490 against 0.511 at 0.145 against 0.102 of the pixels; at the 10 % cap 0.434, x0.85 of tiling, CI 0.76-0.92, at 0.89 of its pixels; v1 0.430, x0.84), and the grid by itself changed little (grid alone: recall 0.483, pixels 0.137, ms 3181). The reduction in the human gate comes from the floor and the merge; the grid makes the floor's cut of critical boxes measurable (n_s60 and n_f60 do not pass that clause).",
+ "after_merge_6a36f44": {
+  "what": "integrate/v1.1 at 6a36f44 (CV_ARGMAX and CV_BOOL_MASKS on in drishyam.segment, the Nova router, a privacy blur change) was merged at 975df7f after the dev runs and after the held-out read (which ran at 44d891d). v1 as it was (every policy2 knob off), v1-policy2 (v1's default) and the baselines were run again on every dev split at the merged commit (runs/policy2/identity.sh) and compared photo for photo with the dev sweep's jobs: boxes, findings, needs-a-look boxes, pixels, modelled seconds, traces, halts, sign-offs.",
+  "result": {
+   "synth_dev": {
+    "cur@0.3 = off@0.3": "identical",
+    "g_s60@0.3 = p2@0.3": "identical",
+    "downscale = downscale": "identical",
+    "tiling@L2 = tiling@L2": "identical",
+    "tiling@L1 = tiling@L1": "identical"
+   },
+   "clean": {
+    "cur@0.3 = off@0.3": "identical",
+    "g_s60@0.3 = p2@0.3": "identical",
+    "downscale = downscale": "identical",
+    "tiling@L2 = tiling@L2": "identical",
+    "tiling@L1 = tiling@L1": "identical"
+   },
+   "real": {
+    "cur@0.3 = off@0.3": "identical",
+    "g_s60@0.3 = p2@0.3": "identical",
+    "downscale = downscale": "identical",
+    "tiling@L2 = tiling@L2": "identical",
+    "tiling@L1 = tiling@L1": "identical"
+   }
+  },
+  "reading": "identical on all 190 dev photos: no dev number changes with the merge, so nothing was re-chosen"
+ }
 }
