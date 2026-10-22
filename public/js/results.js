@@ -295,7 +295,7 @@ function renderBench(sum, id, file, note, model, iou = false, extra = null) {
   const series = withModel ? [...SERIES, MODEL] : SERIES;
   const policies = withModel ? { ...sum.policies, model: model.sum.policies.drishyam } : sum.policies;
   const plot = h('div', {}, chart(policies, series, iou), legend(series), marks(policies, series, iou), dataTable(policies, series),
-    withModel ? h('p', { class: 'note' }, `Dashed red: Drishyam with v1, the dacl10k-trained segmenter the live demo runs since 2026-10-21, on the same images; the other lines use the classical engine.${model.text ? ` v1 held out: ${model.text}` : ''}`) : null);
+    withModel ? h('p', { class: 'note' }, `Dashed red: Drishyam with v1, the dacl10k-trained segmenter the live demo runs since 2026-10-21, on the same images, with its first look policy (v1-policy2, live since 2026-10-22, is under FIG. 4.2); the other lines use the classical engine.${model.text ? ` v1 held out: ${model.text}` : ''}`) : null);
   NARROW.addEventListener('change', () => plot.firstElementChild.replaceWith(chart(policies, series, iou)));
   root.replaceChildren(h('div', { class: 'stack' },
     h('p', { class: 'dataset' }, h('span', { class: 'dataset__k' }, 'dataset'), h('b', {}, String(sum.dataset ?? 'unlabelled'))),

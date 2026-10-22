@@ -4,7 +4,7 @@ The web demo (the FastAPI app and the static site) runs on AWS only, as one CDK 
 `us-east-1`: the API on Lambda arm64 (Graviton) and the static site in a private S3 bucket, both reached
 only through CloudFront and AWS WAF.
 
-**Status: deployed** on 2026-10-21 (India time) to `us-east-1`, last from commit f12f50f (below). The v1 deploy
+**Status: deployed** on 2026-10-21 (India time) to `us-east-1`, last from commit adf9474 on 2026-10-22 (below). The v1 deploy
 itself came from commit dda3080, with the v1 segmenter
 (`ONNX=models/drishyam_dacl10k.onnx ONNX_FP16=models/drishyam_dacl10k.fp16.onnx RESERVED=none scripts/aws.sh deploy`)
 and the submission film in the site bucket (`video/drishyam.mp4`, served with byte ranges). The smoke run
@@ -30,7 +30,19 @@ the second job after 2 steps, and `tests/e2e/test_ui_live.py https://d1xg58guluu
 smoke 2026-10-21T04:21:29Z https://d1xg58guluup8c.cloudfront.net commit=02219a2e435ea90058fcb87f03d69f30cc3f2b4d package=r7K9s9XZtHmkq0+f2OtXiTy1CUyFo5xf2GzQkv6UJMs= ttfb_first=0.857872s ttfb_warm=0.728508s step_p95_ms=973.3 result=pass
 ```
 
-The current build: the site was redeployed from commit f12f50f on 2026-10-21: the app code of 4fe8e30 plus the
+The current build: the site was redeployed from commit adf9474 on 2026-10-22, the first build with v1-policy2,
+v1's look policy chosen on dev and read once held out ([report, section 8](report.md#8-evaluation)), the
+zero-candidate fallback, and the OpenCV 5 flags `CV_ARGMAX` and `CV_BOOL_MASKS` (output-identical). The segmenter is
+still v1 on `ENGINE_NEW`. Its smoke run (`WAF_LOOP=1`, checks 1 to 5 and 7) passed: `/api/health` reported commit
+adf9474 from `aws-lambda` on `aarch64`, a job on `bridge_03.jpg` ended `awaiting_review` after 6 steps, KILL halted
+the second job after 3 steps, both 403 checks held, and the WAF answered 429 at the 16th empty-bodied job start. The
+step p95 was 1091.9 ms over 6 steps, under the 1500 ms limit, so the governor kept v1 on the 512-px net:
+
+```
+smoke 2026-10-22T04:49:02Z https://d1xg58guluup8c.cloudfront.net commit=adf94742a77a447d33fa633557ce9a97dfe59bf7 package=7OEG4ckT8LB95g7eWrj1Lv+D77os1Uu2zEgPl023EBg= ttfb_first=1.269052s ttfb_warm=1.226468s step_p95_ms=1091.9 result=pass
+```
+
+The build before it: the site was deployed again from commit f12f50f on 2026-10-21: the app code of 4fe8e30 plus the
 re-rendered film. 4fe8e30 adds v1's governor limit of
 1500 ms (`agent.SLA_MS_BY_PROFILE`, set from the step p95s above, not from recall), work orders that mark a photo
 with no candidate region, and the regions a KILL or a cap left unvisited, as not assessed, and the site fixes from

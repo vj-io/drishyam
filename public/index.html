@@ -76,7 +76,7 @@
         <a class="btn" id="own" href="#step-photo">Try your own photo</a>
         <a class="cta__link" id="video-link" href="#video">Watch the 4-minute film</a>
       </div>
-      <p class="note" id="rebar-note">On the guided run&rsquo;s photo the live v1 engine sent the exposed rebar to a person at step 2 (our runs of 2026-10-21). One photo is not its accuracy: on our synthetic test photos it finds 0.02 of the exposed rebar (FIG. 4.1).</p>
+      <p class="note" id="rebar-note">On the guided run&rsquo;s photo the live engine, with the v1-policy2 look policy since 2026-10-22, scores the exposed rebar 0.58, under its 0.6 confidence floor; its confirm look does not confirm it, so the work order sends it to a person to check by eye rather than as a critical finding (v1&rsquo;s first look policy made it a critical finding at step 2, our runs of 2026-10-21; the spalling is still critical). One photo is not its accuracy: on our synthetic test photos it finds 0.02 of the exposed rebar (FIG. 4.1).</p>
       <p class="stakes">The US has 624,939 bridges (FHWA, 2026), and the rule is a routine inspection at intervals of up to 24 months (23 CFR 650.311). One drone inspection of a single bridge produced 2,536 photos. Someone has to look at every one. <a href="https://github.com/vj-io/drishyam/blob/main/docs/impact-sources.md" rel="noopener noreferrer">Sources</a></p>
       <ol class="claims" aria-label="How to use it">
         <li>Pick a photo</li>
@@ -522,6 +522,7 @@
     <div class="win__bar"><span class="win__fig" aria-hidden="true">FIG. 4.2</span><h3 class="win__title" id="t-bench-real">Recall vs pixels: real bridge photos (CODEBRIM)</h3></div>
     <div class="win__body" id="bench-real"><p class="note">Loading benchmarks&hellip;</p></div>
     <p class="note win__cite">CODEBRIM: Mundt, Majumder, Murali, Panetsos and Ramesh, &ldquo;Meta-learning Convolutional Neural Architectures for Multi-target Concrete Defect Classification with the COncrete DEfect BRidge IMage Dataset&rdquo;, CVPR 2019. Its licence does not allow sharing the photos, so only the numbers appear here.</p>
+    <p class="note" id="policy2-note"><b>Live since 2026-10-22: v1-policy2.</b> The same v1 segmenter with a look policy chosen on the dev splits only and scored once on these held-out photos. On CODEBRIM it sends 8.75 critical boxes per photo to a person instead of 9.60 (0.91×, CI 0.84–0.98) and about 1.15 critical findings instead of 2.17; recall is unchanged (0.99×, CI 0.97–1.01), on synth200 0.98× (0.95–1.00). It still does not beat L2 tiling: 0.98× its recall at 1.40× its pixels, and 0.83× (0.76–0.89) at the 10 % cap (<a href="https://github.com/vj-io/drishyam/blob/main/docs/report.md#8-evaluation" rel="noopener noreferrer">report, section 8</a>).</p>
   </section>
   <section class="win pop" aria-labelledby="t-bench-cool">
     <div class="win__bar"><span class="win__fig" aria-hidden="true">FIG. 4.3</span><h3 class="win__title" id="t-bench-cool">COOL on Graviton: not run</h3></div>

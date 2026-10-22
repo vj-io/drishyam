@@ -27,6 +27,9 @@ const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
 const dec = (v) => Number(v).toPrecision(2);  // 3.98e-04 -> 0.00040: no scientific notation on screen
 /** A damage class in words ("exposed rebar"), and as a label ("Exposed rebar"). */
 export const words = (cls) => String(cls).replaceAll('_', ' ');
+/** agent.py's held masks, "exposed_rebar 0.58, spalling 0.55", in words. */
+const held = (list) => list.split(', ').map((x) => x.split(' ')).map(([c, v], i) => `the ${words(c)} (${i ? '' : 'confidence '}${v})`).join(' and ');
+const be = (list) => (list.includes(', ') ? 'are' : 'is');
 export const label = (cls) => cap(words(cls));
 
 /** What kind of evidence a cause is: the photo itself (OpenCV), KILL, the governor, the planner drill, or a replay. */
@@ -161,6 +164,16 @@ const CLAUSES = [
     return `${size(+m[1])} is the finest this engine looks (every look spans at least ${pct(m[2])} of the photo’s long side): ${saw}, ${kept}`;
   }],
   [/^no finer look$/, () => 'and there is no finer look to confirm it'],
+  // agent.py, v1-policy2: a critical mask under the confidence floor is held for one confirm look, or goes to a person
+  [/^(.+) under the floor ([\d.]+) at L(\d) \(step (\d+)\): confirming at L(\d), centred on the mask$/, (m) => `${held(m[1])} seen at step ${m[4]} `
+    + `${m[1].includes(', ') ? 'were' : 'was'} under the confidence floor ${m[2]}, so it takes one confirm look at ${size(+m[5])}, centred on it`],
+  [/^confirm look: (.+) of (.+) confirmed$/, (m) => (m[1] === 'none' ? 'and the confirm look did not confirm it, so a person checks it by eye'
+    : `and the confirm look confirmed the ${m[1].split(', ').map(words).join(' and ')}`)],
+  [/^(.+) under the floor ([\d.]+): held for a confirm look at L(\d)$/, (m) => `${held(m[1])} ${be(m[1])} under the confidence floor ${m[2]}, `
+    + `so it is held for a confirm look at ${size(+m[3])} instead of becoming a critical finding`],
+  [/^(.+) under the floor ([\d.]+): sent to a person, needs a look$/, (m) => `${held(m[1])} ${be(m[1])} under the confidence floor ${m[2]}, `
+    + 'so it goes to a person to check by eye'],
+  [/^no candidate region was proposed: one L(\d) look of (\d+) px spans the photo$/, (m) => `no candidate region was proposed, so it takes one look over the whole photo at ${size(+m[1])}`],
   [/^iou ([\d.e+-]+) < [\d.]+ between L(\d) and L(\d) not settled: L(\d) is the finest level for \S+ \(min_view ([\d.]+)\), no finer look$/,
     (m) => `the ${scale(m[2])} and ${scale(m[3])} looks disagree (${pct(m[1])} overlap), and it cannot settle it: ${size(+m[4])} is `
       + `the finest this engine looks (every look spans at least ${pct(m[5])} of the photo’s long side), so there is no finer look`],

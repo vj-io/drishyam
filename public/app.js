@@ -68,8 +68,10 @@ function gapText() {
   if (!na.length) return '';
   if (!S.overview?.candidates?.length) return 'no candidate region was proposed, so the whole photo is not assessed';
   const skipped = na.filter((a) => a.region).length;
-  const unread = na.length - skipped;
+  const doubt = na.filter((a) => !a.region && / under the floor /.test(a.reason ?? '')).length;  // agent.py: a held critical mask
+  const unread = na.length - skipped - doubt;
   return [skipped ? `${skipped} candidate region${skipped === 1 ? ' was' : 's were'} never looked at` : '',
+    doubt ? `${doubt} possible critical defect${doubt === 1 ? ' was' : 's were'} too uncertain to draft and need${doubt === 1 ? 's' : ''} a person to check by eye` : '',
     unread ? `${unread} area${unread === 1 ? '' : 's'} could not be read` : ''].filter(Boolean).join(' and ');
 }
 /** A ready work order with nothing critical whose looks saw under half of the salient area closely, in words; '' otherwise. */

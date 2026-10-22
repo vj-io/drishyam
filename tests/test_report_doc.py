@@ -148,7 +148,7 @@ def classical_quotes() -> list:
             f"the stop rule ends {halts('synth', '1.0')['stop-rule']} of 200 synthetic jobs"]
 
 
-GLANCE = (("v1", "**v1 (live)**"), ("v1-policy2", "v1-policy2 (code default, not deployed)"), ("v2a", "v2a"),
+GLANCE = (("v1", "v1 (first look policy)"), ("v1-policy2", "**v1-policy2 (live)**"), ("v2a", "v2a"),
           ("v2b", "v2b"), ("v2c", "v2c"), ("classical-v1", "classical engine"))
 INSPECTION_PHOTOS = 2536  # one detailed drone inspection of one bridge (docs/impact-sources.md, ODOT SPR 787)
 
@@ -472,6 +472,14 @@ def test_real_photo_miss_is_the_trace():
     lower = max(seen, key=lambda path: min(y for _, y in path))
     assert f["cls"] == "crack" and min(y for _, y in lower) <= f["box"][1] + f["box"][3]
     assert f"a {f['box'][2]} × {f['box'][3]} px box on part of the lower crack" in flat(REPORT)
+
+
+def test_site_states_v1_policy2_as_the_json():
+    """The site's FIG. 4.2 note on the live look policy quotes the same held-out read as the glance blocks."""
+    html = (REPO / "public/index.html").read_text()
+    note = html.split('id="policy2-note">')[1].split("</p>")[0]
+    q = policy2_quotes()
+    assert [w for w in (q[0][len("it sends "):], q[2], q[5]) if w not in note] == []
 
 
 def test_docs_link_only_files_that_exist():
