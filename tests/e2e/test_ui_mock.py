@@ -1539,7 +1539,10 @@ def test_contract_fields_in_words(browser, base):
       const held = ['exposed_rebar 0.58 under the floor 0.6 at L2 (step 2): confirming at L1, centred on the mask; confirm look: none of exposed_rebar confirmed',
         'new corrosion mask at L3; confirming at L2; exposed_rebar 0.58, spalling 0.41 under the floor 0.6: held for a confirm look at L1',
         'no candidate region was proposed: one L2 look of 512 px spans the photo'].map((rationale) => m.brief({ step: 3, cause: 'best-score', rationale }));
-      return { kinds, unseen, finest, held }; }""")
+      const detail = ['exposed_rebar 0.58 under the floor 0.6 at L2 (step 2): confirming at L1, centred on the mask; confirm look: none of exposed_rebar confirmed',
+        'new corrosion mask at L3; confirming at L2; exposed_rebar 0.58 under the floor 0.6: held for a confirm look at L1']
+        .map((rationale, i) => m.explain({ step: 3 - i, cause: i ? 'verify' : 'confirm-critical', rationale, decision: { action: 'verify', args: { level: 1 } } }).join(' '));
+      return { kinds, unseen, finest, held, detail }; }""")
     assert said["kinds"] == ["critical", "disagree", "unconfirmed", "class-change", "ambiguous"], said["kinds"]  # a trace recorded before `kind`
     assert "severity 1 (the default: no look has shown it yet)" in said["unseen"], said["unseen"]
     for f in said["finest"]:  # the v1 engine's held verify (agent.py), in words: no profile name, no min_view
@@ -1547,6 +1550,8 @@ def test_contract_fields_in_words(browser, base):
     assert "unsure what it saw (0.62, over 0.5), it drafts crack, exposed rebar here" in said["finest"][0], said["finest"][0]
     assert "the exposed rebar is tiny (40 px, under 64 px), the exposed rebar is not drafted" in said["finest"][1], said["finest"][1]
     assert "1:4 and 1:2 looks disagree (23\u00a0% overlap), and it cannot settle it: 1/2 size is the finest" in said["finest"][2], said["finest"][2]
+    for f in said["detail"]:  # the step detail's "Why this look" for v1-policy2's confirm look and the look that held the mask
+        assert not re.search(r"\b\w+_\w+\b", f) and "under the confidence floor 0.6" in f, f
     for f in said["held"]:  # v1-policy2's held masks and the zero-candidate fallback (agent.py), in words
         assert not re.search(r"\b\w+_\w+\b|\bL\d\b", f), f
     assert said["held"][0] == ("The exposed rebar (confidence 0.58) seen at step 2 was under the confidence floor 0.6, so it takes one "

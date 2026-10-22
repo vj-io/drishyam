@@ -110,7 +110,7 @@ function lookText(s) {
   if ((m = why.match(/entropy ([\d.]+) > ([\d.]+) at L\d/))) return `It was unsure what it saw (entropy ${m[1]} > ${m[2]}), so it zooms in 2× on the same spot${now}.`;
   if ((m = why.match(/(\w+) area (\d+) px < (\d+) at L\d/))) return `The ${words(m[1])} it found is tiny (${m[2]} px < ${m[3]} px), so it zooms in 2× to measure it properly${now}.`;
   if ((m = why.match(/iou ([\d.]+) < 0\.5 between L(\d) and L(\d)/))) return `Its L${m[2]} and L${m[3]} looks disagree (overlap ${m[1]} < 0.5), so it takes one more, finer look${now}.`;
-  if ((m = why.match(/new (\w+) mask at L(\d); confirming at L(\d)/))) return `A new ${words(m[1])} mask appeared at L${m[2]}, so it double-checks it one level finer (L${m[3]}) before trusting it.`;
+  if ((m = why.match(/new (\w+) mask at L(\d); confirming at L(\d)/))) return `A new ${words(m[1])} mask appeared at L${m[2]}, so it double-checks it one level finer (L${m[3]}) before trusting it.${heldText(why)}`;
   const x = (m = why.match(/argmax score [^:]+: ([^;]+)/)) && terms(m[1]);
   if (x?.prior && x.unseen && x.t) {
     const why2 = [`damage looks likely there (prior ${x.prior})`, x.sev && `it weighs ${severity(x)}`, x.u && `it is unsure there (uncertainty ${x.u})`,
@@ -118,8 +118,13 @@ function lookText(s) {
     return `Region ${s.region} is now the best value for the time: ${why2}, and a look costs about ${x.t} ms. So it looks there next${now}.`;
   }
   if (String(s.cause).startsWith('planner:')) return `The planner asked to ${s.cause.slice(8).replace('_', ' ')}, and the validator allowed it${now}.`;
-  return why || 'No reason was recorded.';
+  return why ? brief(s) : 'No reason was recorded.';  // any other look: its clauses in words (an unknown one as recorded)
 }
+/** agent.py, v1-policy2: the clause holding a critical mask under the floor, in words after the look's own sentence. */
+const heldText = (why) => {
+  const c = why.split('; ').find((x) => / under the floor /.test(x));
+  return c ? ` ${brief({ rationale: c })}` : '';
+};
 
 /** One step in plain English, as its sentences: governor or planner notes first (the main one when there is one),
     then the look (or the halt), then the quality gate. */
