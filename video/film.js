@@ -130,11 +130,12 @@ const TITLES = { open: 'Cold open', team: 'Team', problem: 'Problem and user', l
 const LIT = D.lit, ENTRY = `${LIT.competition} · ${LIT.award} entry`;
 const RECTAG = `rec ${LIT.recorded} · ${D.health.segmenter}`;   // the footage's date and engine, in the bar of each window that plays it
 const PT = window.PRIVATE && window.PRIVATE.team && window.portraitChapter && window.PORTRAITS ? window.PRIVATE.team : null;   // the team's photos and portraits (private)
-const STRIPB = { open: `recorded ${LIT.recorded}, classical engine · synthetic sample photo bridge_03`,
+const ENGINE = `trained ${D.model.name}, look policy v1-policy2`, ENG = `${D.model.name} · v1-policy2`;   // the live site's engine when the footage was recorded, and now (build.py data())
+const STRIPB = { open: `recorded ${LIT.recorded} · ${ENG} · synthetic photo bridge_03`,
   team: PT ? `our photos, drawn by OpenCV 5: ${PT.calls.map((c) => `<code>${c}</code>`).join(', ')}` : ENTRY,
   real: D.real.length ? `video/live · jobs ${D.real.map((r) => r.job).join(', ')} · ${D.real[0].engine}` : '',
-  problem: 'sources: docs/impact-sources.md', live: `recorded ${LIT.recorded}, classical engine · the site now runs ${D.model.name}`,
-  break: `drills injected on purpose · recorded ${LIT.recorded}, classical engine`,
+  problem: 'sources: docs/impact-sources.md', live: `recorded ${LIT.recorded} on the live site · ${ENG}`,
+  break: `injected drills · recorded ${LIT.recorded} · ${ENG}`,
   mcp: 'docs/mcp-session: a recorded Claude session', arch: 'docs/architecture.png · docs/agent-loop.svg · public/docs/aws-simple.svg',
   results: 'public/results/*.json · results/heldout_models.json', failures: 'public/results/failures.json', limits: 'pixels, not millimetres', repro: D.urls.repo.replace('https://', ''), end: '' };
 
@@ -177,7 +178,7 @@ const RAILNOTE = {
   team: () => (PT ? `<b>${LIT.award}</b> entry, ${LIT.competition}. Feature regions placed by hand; every line traced by OpenCV at the pyramid level the window’s tag names.` : ''),
   real: (t) => { const R = D.real[D.real.length > 1 && t >= at('q2') - 0.6 ? 1 : 0];
     return `The team’s own photo, <b>${R.image}</b>. Job <b>${R.job}</b>: the trained segmenter <b>${D.model.name}</b>, ${R.profile}. “By eye” is the team’s reading, not ground truth.`; },
-  live: () => `Live job <b>${D.guided.job}</b> on ${D.health.host}, ${D.health.arch}, OpenCV ${D.health.opencv}, recorded ${LIT.recorded} with the <b>${D.health.segmenter}</b> engine; the agent took ${fmt(D.guided.seconds)} s. Retimed to the voice: the speed is in the window bar.`,
+  live: () => `Live job <b>${D.guided.job}</b> on ${D.health.host}, ${D.health.arch}, OpenCV ${D.health.opencv}, recorded ${LIT.recorded}: <b>${ENGINE}</b>; the agent took ${fmt(D.guided.seconds)} s. Retimed to the voice: the speed is in the window bar.`,
   break: () => 'Faults injected on purpose: a malformed planner reply, a slowed segmenter, a planner that stalls.',
   mcp: () => 'Calls, values and reasons are copied from <b>exchange.jsonl</b>. The rules were in Claude’s prompt; every value was measured by the tools.',
   results: (t) => (t < at('r6') - 0.2 ? 'Classical segmenter, governor off, fixed per-call costs from the arm64 benchmark.'
@@ -212,7 +213,7 @@ function buildOpen() {
     await fw.draw(Math.max(t, F.warp.open.t0));
   });
   cue(s.t0 + 0.05, 'slam'); fw.clicksSfx();
-  railcall(1, (D.guided.pixels_frac * 100).toFixed(1) + ' %', `of the pixels read; ${D.guided.critical} critical findings. Classical engine, recorded ${LIT.recorded}`, at('o1') + 0.6, end('o2') + 0.3);
+  railcall(1, (D.guided.pixels_frac * 100).toFixed(1) + ' %', `of the pixels read; ${D.guided.critical} critical finding, and the rebar sent to a person to check by eye. Trained ${D.model.name}, recorded ${LIT.recorded}`, at('o1') + 0.6, end('o2') + 0.3);
 }
 
 // a camera over a board: keyframes [film t, cx, cy, width, push?], eased moves, a push-in while a view is held (a key's own push overrides the board's)
@@ -338,8 +339,8 @@ function buildLive() {
   const hwin = el('div', 'abs', hw); css(hwin, { left: '0px', top: '0px', width: '1530px', height: '330px' });
   const H = new Footage(hwin, 1530, 330, D.urls.health.replace('https://', ''), { t0: s.t0, t1: s.t1, pts: [{ t: s.t0, f: 0 }, { t: s.t1, f: 1 }] }, [{ T: s.t0, c: [640, 360, 1280] }], { cursor: false, rec: RECTAG });
   H.A.src = '../brag-output/work/walkrec/' + wk.shots[0]; loads.push(H.A.decode().catch(() => {})); css(H.A, { width: '1280px', height: '720px' });
-  // the response's "segmenter" field: the next key after "build" on the same line (the JSON is monospaced)
-  const BK = '"build":"stock (not COOL)"', [BB] = F.health_boxes[BK], CH = BB[2] / BK.length, SEG = [BB[0] + BB[2] + CH, BB[1], `"segmenter":"${D.health.segmenter}"`.length * CH, BB[3]];
+  // the response's "segmenter" field, where record.py --health measured it
+  const [SEG] = F.health_boxes[`"segmenter":"${D.health.segmenter}"`];
   H.draw = function (t) {
     // l0: the camera goes in on the segmenter field and pushes while it is said, then back out for l1's three callouts
     const zin = eio(seg(t, LINE.l0.t + 0.2, LINE.l0.t + 1.1)) * (1 - eio(seg(t, at('l1') - 0.7, at('l1') + 0.2)));
@@ -363,28 +364,32 @@ function buildLive() {
   });
   const foot = el('div', 'abs src', hw, `commit ${D.health.commit.slice(0, 7)} · the response is saved in video/live/health.json`); css(foot, { left: '0px', top: '720px', fontSize: '22px' });
   const l0 = LINE.l0, dOut = at('l1') + 0.3, TS = l0.t + 0.9;   // the field lights at TS, its card follows; both cards leave as l1 begins
-  const segHl = el('div', 'hl', H.overlays); css(segHl, { border: '0', boxShadow: 'none', background: 'rgba(255,154,138,.5)' });
-  const segPath = svgEl('path', { fill: 'none', stroke: '#FF9A8A', 'stroke-width': 3.5, pathLength: 1, 'stroke-dasharray': 1 }, lead);
+  const segHl = el('div', 'hl', H.overlays); css(segHl, { border: '0', boxShadow: 'none', background: 'rgba(255,200,87,.42)' });
+  const segPath = svgEl('path', { fill: 'none', stroke: '#FFC857', 'stroke-width': 3.5, pathLength: 1, 'stroke-dasharray': 1 }, lead);
   cue(TS, 'tick', 2);
-  const disc = [['THEN · this footage, recorded ' + LIT.recorded, D.health.segmenter, `the classical engine, commit ${D.health.commit.slice(0, 7)} (video/live/health.json)`, 'var(--red)', TS + 0.45],
-    ['NOW · the live site', `trained ${D.model.name}`, `${D.aws.now.segmenter}, commit ${D.aws.now.commit.slice(0, 7)} (video/live/aws-smoke.log)`, 'var(--amber)', l0.t + l0.dur * l0.say.indexOf('the site now') / l0.say.length]]
+  // l0: what the footage ran (the /api/health recorded with it), and its look policy
+  const disc = [['RECORDED · this footage, ' + LIT.recorded, `trained ${D.model.name}`, `${D.health.segmenter}, commit ${D.health.commit.slice(0, 7)}, the site's /api/health that day (video/live/health.json)`, 'var(--amber)', TS + 0.45],
+    [`LOOK POLICY · since ${LIT.policy.split('since ')[1]}`, 'v1-policy2', `a critical mask under the confidence floor ${D.guided.held[2]} gets one confirm look, or goes to a person`, 'var(--amber)', l0.t + l0.dur * l0.say.indexOf('its new look') / l0.say.length]]
     .map(([lab, big, sub, col, T], i) => { const b = el('div', 'box', hw, `<div class="lab">${lab}</div><div class="h1" style="font-size:76px;margin:16px 0 14px;white-space:nowrap;color:${col}">${big}</div><div class="mono" style="font-size:21px;line-height:1.35">${sub}</div>`);
       css(b, { left: 30 + i * 760 + 'px', top: '440px', width: '710px', height: '250px', padding: '22px 26px', borderColor: col }); cue(T, i ? 'switch' : 'thud'); return { b, T }; });
   hls.forEach((h) => cue(h.T, 'tick', 4 + h.i));
   // b. the guided run on the live site
   const fw2 = el('div', 'abs', S.e); css(fw2, { inset: 0 });
-  const cw = ev['click:Watch it inspect a bridge'];
+  const cw = ev['click:Watch it inspect a bridge'], N = Object.keys(ev).filter((k) => k.startsWith('approved:')).length;   // N approvals in the sign-off
   const fw = new Footage(fw2, 1530, 836, D.urls.live.replace('https://', ''), F.warp.live, [
     KF(cw - 1.9, 560, 470, 1150), KF(cw + 0.15, 330, 560, 900),
     KF(ev['step:1'] - 0.6, 380, 560, 1060), KF(ev['step:2'] + 0.4, 340, 560, 900),
-    KF(ev['step:3'] + 0.3, 900, 380, 760), KF(ev['step:4'] + 0.3, 930, 700, 760),
-    KF(ev['step:5'] + 0.3, 420, 560, 1000), KF(ev['done:guided'] + 0.3, 560, 330, 1080),
-    KF(ev['click:Sign them off'], 640, 560, 1240), KF(ev['click:Sign them off'] + 2.6, 330, 720, 840),
-    KF(ev['click:Approve#0'] + 0.6, 330, 760, 720), KF(ev['approved:1'] - 1.6, 330, 560, 760), KF(ev['approved:2'] + 0.4, 640, 470, 1240), KF(ev['approved:2'] + 2.2, 940, 420, 900)], { rec: RECTAG });
-  railcall(2, `${fmt(D.guided.entropy1)} &gt; ${D.guided.tau}`, 'entropy at L3: unsure, so it zooms in', at('l4') + 0.3, end('l4') + 0.3);
-  railcall(4, `IoU ${fmt(D.guided.iou, 3)}`, `mask IoU, L1 vs L0, under ${D.guided.iou_min}: unconfirmed. Exposed rebar always goes to a person`, at('l6') + 0.3, end('l6') + 0.3);
-  railcall('×', `${D.guided.missed.join(', ')} missed`, `the stop left regions ${D.guided.unvisited.join(' and ')} unvisited; the ${D.guided.missed[0]} in ${D.guided.unvisited[0]} was never seen`, at('l7') + LINE.l7.dur * 0.4, end('l7') + 0.3);
-  railcall('✓', 'a person', 'approves each critical finding; the server signs', at('l9') + 0.3, end('l9') + 0.3);
+    KF(ev['step:2'] + 2.0, 950, 735, 660),   // step 2's decision: the spalling critical, the rebar held for a confirm look
+    KF(ev['step:3'] + 0.3, 950, 355, 640), KF(ev['step:3'] + 1.8, 950, 750, 660),   // the confirm look, then "a person checks it by eye"
+    KF(ev['step:4'] + 0.3, 420, 560, 1000), KF(ev['done:guided'] + 0.3, 560, 330, 1080),
+    KF(ev['click:Sign them off'], 640, 560, 1240), KF(ev['click:Sign them off'] + 1.4, 330, 720, 840),
+    KF(ev[`approved:${N - 1}`] + 0.3, 420, 700, 900), KF(ev[`approved:${N - 1}`] + 1.2, 945, 400, 700),
+    KF(ev[`approved:${N - 1}`] + 3.6, 640, 580, 1240)], { rec: RECTAG });   // under l11, out to both stamps: APPROVED and the order SIGNED
+  const [hcls, hconf, floor, hlev] = D.guided.held, [ccls, cstep, crule] = D.guided.crit;
+  railcall(cstep, `${fmt(hconf)} &lt; ${floor}`, `${hcls.replace('_', ' ')} at L${hlev}, under the floor: held for a confirm look; the ${ccls} is critical`, at('l4') + 0.3, end('l4') + 0.3);
+  railcall(cstep + 1, 'check by eye', `its L${D.guided.confirm_level} confirm look did not confirm it: a needs-a-look entry, not a critical finding`, at('l6') + 0.2, end('l6') + 0.3);
+  railcall(D.guided.halt_step, `${D.guided.critical} critical`, `every candidate region looked at (${D.guided.stop[0]}); the ${D.guided.drafts.join(' and ')} are drafts, no sign-off`, at('l7') + LINE.l7.dur * 0.4, end('l7') + 0.3);
+  railcall('✓', 'a person', `approves the ${ccls}; the server signs. The order stays ${D.guided.order[0]}: the rebar is still to check by eye`, at('l9') + 0.3, end('l9') + 0.3);
   railcall('!', `HTTP ${D.tamper.status}`, D.tamper.error, at('l11') + 1.4, end('l11') + 0.6);
   // c. the tampered token, answered by the server
   const term = el('div', 'term', S.e); css(term, { right: '28px', bottom: '28px', width: '980px', zIndex: 9 });
@@ -413,7 +418,7 @@ function buildLive() {
     term.innerHTML = [L1, L2].map((l, i) => (ty(i * 0.4) >= full(l).length ? l : full(l).slice(0, ty(i * 0.4)))).join('\n') + (t > T0 + 1.6 ? '\n' + L3 : '\n<span class="caret"></span>');
   });
   cue(at('l11') + 0.2, 'type', 1.0); cue(at('l11') + 1.6, 'alert'); fw.clicksSfx();
-  for (const k of ['approved:0', 'approved:1', 'approved:2']) { const T = filmOf(fw.S, ev[k] + 0.2); if (T) cue(T, 'stamp'); }
+  for (let k = 0; k < N; k++) { const T = filmOf(fw.S, ev[`approved:${k}`] + 0.2); if (T) cue(T, 'stamp'); }
   for (const e of F.events.filter((e) => e.kind === 'type')) { const T = filmOf(fw.S, e.t0); if (T) cue(T, 'type', 0.5); }
 }
 
@@ -426,9 +431,9 @@ function buildBreak() {
     KF(ev['step-break:6'] + 0.3, 900, 330, 760), KF(ev['click:Try KILL'] - 0.8, 400, 640, 900),
     KF(ev['click:KILL'] - 0.9, 900, 140, 900), KF(ev['done:kill'] + 0.6, 760, 300, 1100),
     KF(ev['click:Resume'] + 0.1, 760, 300, 1060), KF(ev['step-resume:2'], 930, 560, 820), KF(ev['step-resume:3'] + 1.2, 380, 560, 900)], { rec: RECTAG });
-  railcall(1, `p95 ${Math.round(D.break.p95)} ms`, `segmenter slowed on purpose: the governor picks the ${D.break.model} model`, at('b1') + 0.4, end('b1') + 0.3);
+  railcall(1, `p95 ${Math.round(D.break.p95)} ms`, `segmenter slowed on purpose, over its ${D.break.sla} ms limit: the governor picks the ${D.break.model} model`, at('b1') + 0.4, end('b1') + 0.3);
   railcall(2, `“${D.break.planner_bad}”`, 'the planner drill’s reply: rejected by the allow-list', at('b2') + 0.3, end('b2') + 0.3);
-  railcall(3, D.kill.cause, 'halted before the next look; Resume replays', at('b3') + 0.3, end('b3') + 0.4);
+  railcall(3, D.kill.cause, `halted after ${D.kill.steps} looks; Resume replayed them, looked on, then the ${D.resume.stop[0].replace('-', ' ')} ended it with ${D.resume.stop[1].join(', ') || 'no region'} unvisited`, at('b3') + 0.3, end('b3') + 0.4);
   S.draws.push(async (t) => { await fw.draw(t); });
   fw.clicksSfx(); cue(at('b2') + 0.6, 'glitch'); cue(at('b3') + 0.5 * LINE.b3.dur, 'thud');
 }
@@ -829,8 +834,8 @@ function buildShort() {
   // caption and the URL sit between them; the v1 card fills the lower third
   const top = el('div', 'abs', stage, `<div class="h1" style="font-size:112px">DRISHYAM</div><div class="lab" style="font-size:24px;margin-top:10px">one photo · a few looks · one human</div>`);
   css(top, { left: '108px', top: '236px', width: '864px' });
-  // the footage's engine and date, on screen for the whole cut: the live site has run v1 since (the film's l0 line)
-  const rec = el('div', 'abs lab', stage, `recorded ${LIT.recorded} on the ${D.health.segmenter} engine<br><span class="amber">the site now runs the trained ${M.name}</span>`);
+  // the footage's date and engine, on screen for the whole cut (the film's l0 line), and what the run left for a person besides the sign-off
+  const rec = el('div', 'abs lab', stage, `recorded ${LIT.recorded} · live site · ${ENG}<br><span class="amber">the rebar went to a person to check by eye</span>`);
   css(rec, { left: '108px', top: '390px', width: '864px', fontSize: '22px', lineHeight: '1.5', color: 'var(--line-2)' });
   // the run (steps 1-4, retimed to line 1), a cut to the reviewer field, the typing at real time, a jump cut to the Approve
   // click, the stamp at real time; the settled frame holds to the end

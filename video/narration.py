@@ -54,19 +54,20 @@ def lines(D):
 
     W = lambda n: (words(n), f"{int(n):,}")
     P = lambda x: (f"{words(round(100 * x))} percent", f"{round(100 * x)} %")
-    Dc = lambda x, d=2: (dec(x, d), f"{x:.{d}f}")
     P95 = ("p ninety-five", "p95")
+    RB = ("reebar", "rebar")   # Kokoro reads "rebar" as ri-BAR (its phonemes); respelt for the voice only
 
     g, br, k, imp, h, m, a = D["guided"], D["break"], D["kill"], D["impact"], D["health"], D["mcp"], D["aws"]
     s, lg, cb, cl, ab = D["syn"], D["large"], D["codebrim"], D["clean"], D["abl"]
     assert h["opencv"].startswith("5.") and h["arch"] == "aarch64" and h["host"] == "aws-lambda", h
     CV = ("five", "5")   # OpenCV's major version, from /api/health
 
-    # 1. cold open, over the live guided run (recorded 2026-10-18 on the classical engine: o1 says which, l0 says when)
+    # 1. cold open, over the live guided run (recorded 2026-10-22 on the live site's trained v1: o1 says which, l0 says when)
     assert round(1 / g["pixels_frac"]) == 4, "o1 says a quarter"
-    assert h["segmenter"].startswith("classical"), "o1 and l0 say the footage ran the classical engine"
-    add("open", "o1", "Its classical engine read a quarter of the pixels and flagged ", W(g["critical"]), " critical findings.")
-    add("open", "o2", "It will not sign them off. A person must.")
+    assert h["segmenter"] == D["model_segmenter"] and h["segmenter"].startswith("onnx:"), "o1 and l0 say the footage ran the trained engine"
+    assert g["critical"] == 1, "o1 says one critical finding, o2 'it'"
+    add("open", "o1", "Its trained engine read a quarter of the pixels and flagged ", W(g["critical"]), " critical finding.")
+    add("open", "o2", "It will not sign it off. A person must.")
 
     # 2. team
     add("team", "t1", "Drishyam, an Agentic Vision entry to the OpenCV AI Competition, powered by AWS.")
@@ -81,31 +82,39 @@ def lines(D):
     add("problem", "p2", "One drone inspection took more than ", (f"{words(hund)} hundred", f"{hund * 100:,}"), " photos of one bridge.")
     add("problem", "p3", "Drishyam is for the engineer reviewing them: it zooms in only where needed.")
 
-    # 4. the app working, live (recorded 2026-10-18, when the site ran the classical engine: l0 says so before it plays)
+    # 4. the app working, live (recorded 2026-10-22 on the site as it runs now: the trained v1 with v1-policy2, l0 says so before it plays)
     md = D.get("model")
-    assert D["lit"]["recorded"] == "2026-10-18", "l0 says October eighteenth"
+    assert D["lit"]["recorded"] == "2026-10-22", "l0 says October twenty-second"
     assert md and md["name"] == "v1" and a["now"]["segmenter"] == D["model_segmenter"] and a["now"]["segmenter"].startswith("onnx:"), "l0 and a4 say the site now runs the trained v1"
-    add("live", "l0", "Recorded ", ("October eighteenth", "18 October"), " on the classical engine; the site now runs the trained v1.")
+    assert h["segmenter"] == a["now"]["segmenter"], "l0: the footage ran the engine the live site runs (its last smoke run's /api/health)"
+    assert "v1-policy2 look policy since 2026-10-22" in D["lit"]["policy"], "l0 says its look policy is new"
+    add("live", "l0", "Recorded ", ("October twenty-second", "22 October"), " on the live site: the trained v1 and its new look policy.")
     add("live", "l1", "Live on AWS: OpenCV ", CV, " on an arm Lambda.")
     assert sum(g["privacy"]) == 0, "l2 says there was nothing to blur in this photo"
     add("live", "l2", "Watch it inspect a bridge; a privacy pass finds nothing to blur.")
-    add("live", "l3", f"One survey look at the whole photo, at one {ORD[g['survey_div']]} size.")
-    assert g["tau"] == 0.5 and g["entropy1"] > g["tau"]
-    add("live", "l4", "Entropy ", Dc(g["entropy1"]), ", above ", ("one half", "0.5"), ": unsure, so it zooms in.")
-    add("live", "l5", "It moves to the best region and double-checks one level finer.")   # agent.py: a verify look goes one level finer
-    assert g["iou"] < g["iou_min"] == 0.5 and g["rebar_rule"].startswith("exposed_rebar: always critical")
-    add("live", "l6", "The masks disagree: unconfirmed. Exposed rebar always goes to a person.")
-    assert g["missed"] == ["crack"] and len(g["unvisited"]) == 2
-    add("live", "l7", "A second spall; then it stops, the next look not worth its cost, and misses a crack it never visited.")
-    add("live", "l9", "Only a person can approve; then the server signs the work order.")
+    assert g["survey_found"] == ["corrosion", "spalling"], "l3 says it finds spalling and corrosion"
+    add("live", "l3", f"One survey look at the whole photo, at one {ORD[g['survey_div']]} size, finds spalling and corrosion.")
+    # v1-policy2: the rebar's confidence is under the floor, so it is held for one confirm look (build.py data() asserts the trace)
+    (ccls, cstep, _), (hcls, hconf, floor, hlev) = g["crit"], g["held"]
+    assert ccls == "spalling" and hcls == "exposed_rebar" and hconf < floor and hlev == g["survey_level"] - 1 and cstep == 2, (g["crit"], g["held"])
+    add("live", "l4", "One level finer, the spalling is big enough to be critical, but the ", RB, " scores under the confidence floor.")
+    assert g["confirm_level"] == hlev - 1
+    add("live", "l5", "It takes one confirm look, centred on the ", RB, ", and does not confirm it.")
+    assert "not a critical finding; not confirmed" in g["eye"] and g["gt"][1] == ["exposed_rebar"], "l6 says the rebar goes to a person, not as a critical finding"
+    add("live", "l6", "So the ", RB, " goes to a person to check by eye, not as a critical finding.")
+    assert g["after"] == [3, ["crack"]] and g["stop"][0] == "exhausted" and g["stop"][2] == [] and "crack" in g["gt"][0], g["after"]
+    add("live", "l7", "Three more looks find a crack; with every region looked at, it stops.")
+    assert g["order"] == ["incomplete", g["critical"]], "l9 says the order stays incomplete after the one approval"
+    add("live", "l9", "Only a person can approve the spalling; the order stays incomplete until someone checks the ", RB, ".")
     L[-1]["pause"] = 0.5   # the footage cuts from the end of the run to the sign-off here (build.py footage_warp)
-    add("live", "l11", "Change one character of the signature: the server refuses it.")
+    add("live", "l11", "Change one character of the order's signature: the server refuses it.")
 
     # 5. failure handling and human control
     add("break", "b0", "Now, break it.")
     add("break", "b1", f"Slow the segmenter, and the governor switches to the {br['model']} model.")
     add("break", "b2", "The planner drill sends a shell command; the allow-list rejects it.")
-    add("break", "b3", "KILL halts it before the next look; Resume replays the moves and carries on.")
+    assert D["kill"]["cause"] == "kill-switch" and D["resume"]["replayed"] == D["kill"]["steps"] < D["resume"]["looks"], (D["kill"], D["resume"])
+    add("break", "b3", "KILL halts it before the next look; Resume replays the moves and carries on.")   # where Resume stopped is on the rail card
     add("break", "b4", "No language model runs live; these planners are scripted to fail.")
 
     # 6. an LLM driving the OpenCV tools over MCP (the rail note: the rules were in its prompt, the values measured)

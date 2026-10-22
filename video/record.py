@@ -5,7 +5,8 @@ https://d1xg58guluup8c.cloudfront.net, plus a log of where the mouse went and wh
 
 Flow (4 job starts, under the WAF's 10 per IP per 120 s): the guided run on bridge_03 ("Watch it inspect a
 bridge"), the human sign-off of each critical finding, "Now break it", "Try KILL" + KILL + Resume, then a
-tampered work-order token sent to /api/review. Each run's trace is saved through the page's own "Download
+tampered work-order token sent to /api/review. The work order after the sign-off (its status and approvals) goes to
+video/live/order_status.json. Each run's trace is saved through the page's own "Download
 trace.ndjson" button, with the token fields and embedded images removed, to video/live/<run>.ndjson (the source of every live-run
 number the video quotes).
 
@@ -101,6 +102,10 @@ def main():
             loc.scroll_into_view_if_needed(timeout=5000)
             pg.wait_for_timeout(250)
             r = loc.bounding_box()
+            if r["y"] < 140:   # scrolled to the top edge, under the sticky run bar (KILL, y 78-130): a click there hits the bar
+                loc.evaluate("e => e.scrollIntoView({ block: 'center', behavior: 'instant' })")
+                pg.wait_for_timeout(250)
+                r = loc.bounding_box()
             return loc, r
 
         def move(sel, label):
@@ -175,7 +180,7 @@ def main():
             watch(1.5)
         watch(2.0)
         order = json.loads(download("order", "Download work_order.json"))
-        (OUT / "order_status.json").write_text(json.dumps({"status": order["work_order"]["status"],
+        (LIVE / "order_status.json").write_text(json.dumps({"status": order["work_order"]["status"],   # the film's l9 reads it
                                                            "approvals": strip(order["work_order"].get("approvals", []))}, indent=1))
         token = order["token"]
 
@@ -227,10 +232,12 @@ def health():
         pg = b.new_page(viewport={"width": W, "height": 720}, device_scale_factor=2)
         pg.goto(BASE + "/api/health", wait_until="load"); pg.wait_for_timeout(1500)
         text = pg.evaluate("document.querySelector('pre')?.textContent || document.body.innerText")
+        seg = f'"segmenter":"{json.loads(text)["segmenter"]}"'   # the film's l0 camera goes in on this field
         boxes = pg.evaluate("""keys => { const pre = document.querySelector('pre'), node = pre.firstChild, out = {};
           for (const k of keys) { const i = node.textContent.indexOf(k); if (i < 0) continue; const r = document.createRange();
             r.setStart(node, i); r.setEnd(node, i + k.length); const rs = [...r.getClientRects()].map(q => [q.x, q.y, q.width, q.height].map(Math.round));
-            out[k] = rs; } return out; }""", ['"opencv":"5.0.0"', '"arch":"aarch64"', '"host":"aws-lambda"', '"build":"stock (not COOL)"'])
+            out[k] = rs; } const b = pre.getBoundingClientRect(); out.pre = [[b.x, b.y, b.width, b.height].map(Math.round)];   // the whole response: the film's leader lines start under it
+          return out; }""", ['"opencv":"5.0.0"', '"arch":"aarch64"', '"host":"aws-lambda"', '"build":"stock (not COOL)"', seg])
         b.close()
     LIVE.mkdir(parents=True, exist_ok=True)
     (LIVE / "health.json").write_text(text.strip() + "\n")

@@ -75,11 +75,6 @@ def dims(dataset):
     return [int(m[1]), int(m[2])]
 
 
-def inside(a, b):
-    """box a [x, y, w, h] lies inside box b"""
-    return a[0] >= b[0] and a[1] >= b[1] and a[0] + a[2] <= b[0] + b[2] and a[1] + a[3] <= b[1] + b[3]
-
-
 def overlaps(a, b):
     return a[0] < b[0] + b[2] and b[0] < a[0] + a[2] and a[1] < b[1] + b[3] and b[1] < a[1] + a[3]
 
@@ -236,24 +231,34 @@ def data(model=MODEL, reals=REALS):
     # the live runs recorded by video/record.py (token fields removed)
     f = "video/live/guided.ndjson"; ev = ndjson(f)
     done = next(e for e in ev if e["type"] == "done"); steps = [e for e in ev if e["type"] == "step"]
-    job = next(e for e in ev if e["type"] == "job")
-    rr = next(e for e in ev if e["type"] == "review_request" and e.get("iou") is not None and e.get("level_b") == 0)
-    zoom = next(e for e in steps if e["cause"] == "entropy>tau")
-    tau = float(re.search(r"> ([\d.]+) at L", zoom["rationale"])[1])
-    iou_min = float(re.search(r"< ([\d.]+) between L1 and L0", rr["reason"])[1])
-    # the finding the verify left unconfirmed: exposed rebar, handed to a person by rule at its first look, before any verify
-    fin = {e["finding"]["id"]: e["finding"] for e in ev if e["type"] == "finding"}   # last state of each finding
-    f1 = fin[rr["finding_id"]]
-    first_rr = next(i for i, e in enumerate(ev) if e["type"] == "review_request" and e["finding_id"] == f1["id"])
-    assert f1["cls"] == "exposed_rebar" and f1["critical_rule"].startswith("exposed_rebar: always critical") and f1["verified"] is False, f1
-    assert first_rr < ev.index(rr), "the rebar's review request came before the verify"
-    # what the stop left out: the unvisited candidates, and any ground-truth box inside them that no finding touches
-    cand = {c["id"]: c["box"] for e in ev if e["type"] == "overview" for c in e["candidates"]}
+    job = next(e for e in ev if e["type"] == "job"); wo = done["work_order"]
+    first, fin = {}, {}   # first and last state of each finding
+    for e in ev:
+        if e["type"] == "finding":
+            first.setdefault(e["finding"]["id"], e["finding"]); fin[e["finding"]["id"]] = e["finding"]
+    # v1-policy2 (docs/api-contract.md): a critical mask under the confidence floor is held for one confirm look; not
+    # confirmed, it goes to a person as a needs-a-look entry (check by eye), not as a critical finding
+    held = next(e for e in steps if "held for a confirm look" in e["rationale"])
+    m = re.search(r"(\w+) ([\d.]+) under the floor ([\d.]+): held for a confirm look at L(\d)", held["rationale"])
+    conf = next(e for e in steps if e["cause"] == "confirm-critical")
+    assert conf["step"] == held["step"] + 1 and conf["decision"]["args"]["level"] == int(m[4]) == held["decision"]["args"]["level"] - 1, (held, conf)
+    assert conf["rationale"].endswith(f"confirm look: none of {m[1]} confirmed"), conf["rationale"]
+    eye = [x for x in wo["not_assessed"] if x.get("kind") == "needs-a-look"]
+    assert [(x["cls"], x["action"], x["step"]) for x in eye] == [(m[1], "check-by-eye", held["step"])] and m[1] not in {x["cls"] for x in fin.values()}, eye
+    crit = [x for x in fin.values() if x["critical"]]
+    assert [x["cls"] for x in crit] == ["spalling"] and crit[0]["critical_step"] == held["step"] and wo["status"] == "blocked", crit
+    after = [e for e in steps if e["step"] > conf["step"] and e["decision"]["action"] != "halt"]
+    halt = next(e for e in steps if e["decision"]["action"] == "halt")
+    # what the run left for a person, against the synthetic photo's ground truth: every box touched by a finding of its
+    # class, or by the needs-a-look entry of its class; nothing else missed
     gt = next(x for x in load("public/samples/index.json") if x["file"] == "bridge_03.jpg")
     assert gt["synthetic"] and gt["width"] == job["width"], gt
-    missed = [b for b in gt["boxes"] if any(inside(b["box"], cand[r]) for r in done["unvisited"])
-              and not any(overlaps(b["box"], x["box"]) for x in fin.values())]
-    assert [b["cls"] for b in missed] == ["crack"], missed
+    hit = lambda b, xs: any(x["cls"] == b["cls"] and overlaps(b["box"], x["box"]) for x in xs)
+    by_find = [b["cls"] for b in gt["boxes"] if hit(b, fin.values())]
+    by_eye = [b["cls"] for b in gt["boxes"] if not hit(b, fin.values()) and hit(b, eye)]
+    assert by_eye == [m[1]] and len(by_find) + len(by_eye) == len(gt["boxes"]), (by_find, by_eye)
+    o = load("video/live/order_status.json")   # the work order after the sign-off (record.py)
+    assert o["status"] == "incomplete" and [a["finding_id"] for a in o["approvals"]] == [x["id"] for x in crit], o
     lv = job["levels"]
     assert all(lv[k + 1] == [half(x) for x in lv[k]] for k in range(len(lv) - 1)), f"each pyramid level halves the last, rounding up: {lv}"
     assert lv[0][0] % lv[3][0] == 0 and steps[0]["cause"] == "survey" and steps[0]["rationale"].startswith("one L3 look"), steps[0]
@@ -261,25 +266,34 @@ def data(model=MODEL, reals=REALS):
                    "critical": src("guided run: critical findings", done["summary"]["critical_pending"], f, "done.summary.critical_pending"),
                    "seconds": src("guided run: agent seconds", done["summary"]["seconds"], f, "done.summary.seconds"),
                    "survey_div": src("survey look: full width / L3 width", lv[0][0] // lv[3][0], f, "job.levels[0][0] / job.levels[3][0]"),
+                   "survey_level": steps[0]["decision"]["args"]["level"],
                    "privacy": src("privacy pass: faces, people, vehicles blurred", [job["privacy"][k] for k in ("faces_blurred", "people_blurred", "vehicles_blurred")], f, "job.privacy"),
-                   "entropy1": src("step 2 entropy (the zoom decision)", steps[0]["observation"]["entropy"], f, f"step[1].observation.entropy; step[2] rationale '{zoom['rationale']}'"),
-                   "tau": src("entropy threshold", tau, f, "step[cause=entropy>tau].rationale"),
-                   "iou": src("step 4 verify: mask IoU L1 vs L0", rr["iou"], f, "review_request[level_a=1, level_b=0].iou"),
-                   "iou_min": src("verify threshold", iou_min, f, f"review_request reason '{rr['reason']}'"),
-                   "rebar_rule": src("why the rebar goes to a person", f1["critical_rule"], f, f"finding {f1['id']}.critical_rule; its first review_request precedes the verify"),
-                   "unvisited": src("unvisited candidates at the stop", done["unvisited"], f, "done.unvisited"),
-                   "missed": src("ground truth inside them that no finding touches", [b["cls"] for b in missed], "public/samples/index.json", "bridge_03 boxes inside overview.candidates[unvisited]"),
+                   "survey_found": src("survey look: what it drafted", sorted(x["cls"] for x in first.values() if x["step"] == 1 and x["state"] == "draft"), f, "finding[step=1], first state"),
+                   "crit": src("the critical finding: class, step, rule", [crit[0]["cls"], crit[0]["critical_step"], crit[0]["critical_rule"]], f, "finding[critical].cls, critical_step, critical_rule"),
+                   "held": src("held for a confirm look: class, confidence, floor, at level", [m[1], float(m[2]), float(m[3]), held["decision"]["args"]["level"]], f, f"step[{held['step']}].rationale '...{m[0]}'"),
+                   "confirm_level": src("its confirm look: level, outcome", [conf["decision"]["args"]["level"], f"none of {m[1]} confirmed"], f, f"step[{conf['step']}] cause confirm-critical, rationale")[0],
+                   "eye": src("sent to a person to check by eye (work order not_assessed, needs-a-look)", eye[0]["reason"], f, "done.work_order.not_assessed[kind=needs-a-look]"),
+                   "after": src("looks after the confirm look, and what they drafted", [len(after), sorted({x["cls"] for x in fin.values() if x["step"] in {e['step'] for e in after}})], f, "step[step > confirm, not halt]; finding.step"),
+                   "drafts": sorted(x["cls"] for x in fin.values() if not x["critical"]),
+                   "stop": src("why it stopped", [halt["cause"], halt["rationale"], done["unvisited"]], f, "step[action=halt].cause, rationale; done.unvisited"),
+                   "halt_step": src("the step that stopped it", halt["step"], f, "step[action=halt].step"),
+                   "gt": src("ground truth (synthetic): boxes touched by a finding of their class / by the needs-a-look entry", [by_find, by_eye], "public/samples/index.json", "bridge_03 boxes against the findings and not_assessed"),
+                   "order": src("the work order after the sign-off: status, approvals", [o["status"], len(o["approvals"])], "video/live/order_status.json", "status, approvals"),
                    "job": done.get("job") or ev[0]["job"]}
     f = "video/live/break.ndjson"; ev = ndjson(f)
     pl = next(e for e in ev if e["type"] == "planner" and e["status"] == "rejected")
     gov = next(e for e in ev if e["type"] == "step" and e.get("model") == "fast")
     D["break"] = {"planner_bad": src("planner drill: rejected strategy", re.search(r"strategy '([^']+)'", pl["reason"])[1], f, "planner[status=rejected].reason"),
                   "p95": src("governor drill: segmenter p95 (ms)", gov["runtime"]["p95_ms"]["segment:accurate"], f, f"step[{gov['step']}].runtime.p95_ms['segment:accurate']"),
-                  "model": src("governor drill: model switched to", gov["model"], f, f"step[{gov['step']}].model"), "step": gov["step"]}
+                  "model": src("governor drill: model switched to", gov["model"], f, f"step[{gov['step']}].model"), "step": gov["step"],
+                  "sla": src("governor drill: the segmenter's SLA (ms)", int(re.search(r"> SLA (\d+) ms; model -> fast", gov["governor"]["rationale"])[1]), f, f"step[{gov['step']}].governor.rationale")}
     f = "video/live/kill.ndjson"; ev = ndjson(f); done = next(e for e in ev if e["type"] == "done")
-    D["kill"] = {"cause": src("KILL drill: halt cause", done["cause"], f, "done.cause"), "steps": done["summary"]["steps"]}
+    D["kill"] = {"cause": src("KILL drill: halt cause", done["cause"], f, "done.cause"), "steps": src("KILL drill: looks before the halt", done["summary"]["steps"], f, "done.summary.steps")}
     f = "video/live/resume.ndjson"; ev = ndjson(f)
-    D["resume"] = {"replayed": src("Resume: steps marked replay", sum(1 for e in ev if e["type"] == "step" and e["cause"] == "replay"), f, "step[cause=replay] count")}
+    done = next(e for e in ev if e["type"] == "done")
+    D["resume"] = {"replayed": src("Resume: steps marked replay", sum(1 for e in ev if e["type"] == "step" and e["cause"] == "replay"), f, "step[cause=replay] count"),
+                   "looks": done["summary"]["steps"],
+                   "stop": src("Resume: why it stopped, regions left unvisited", [done["cause"], done["unvisited"]], f, "done.cause, done.unvisited")}
     f = "video/live/tamper.json"; t = load(f)
     D["tamper"] = {"status": src("tampered token: HTTP status", t["status"], f, "status"), "error": src("tampered token: error", t["response"]["error"], f, "response.error")}
     f = "video/live/health.json"; h = load(f)
@@ -388,7 +402,7 @@ def data(model=MODEL, reals=REALS):
     D["lit"] = {
         "competition": src("competition", in_text("README.md", "OpenCV AI Competition 2026, powered by AWS"), "README.md", "line 3"),
         "award": src("entry", in_text("docs/PRD.md", "Agentic Vision"), "docs/PRD.md", "awards line"),
-        "sanskrit": src("name", in_text("README.md", "Sanskrit: that which is seen"), "README.md", "line 5"),
+        "sanskrit": src("name", in_text("public/index.html", "Sanskrit: that which is seen"), "public/index.html", "the hero's name gloss"),
         "team": src("team and roles", in_text("README.md", "Vaibhav Jangid, lead engineer (agent policy, OpenCV pipeline, evaluation, AWS deployment)",
                                               "Bhavya Dhoot, design, demo and presentation (site design, video)"), "README.md", "Team"),
         "cites": src("problem-sheet citations", in_text("docs/impact-sources.md", "FHWA, Bridge Condition by Highway System 2026", "23 CFR 650.311", "SPR 787", "Table 4.1"), "docs/impact-sources.md", "sections 1, 2, 5"),
@@ -396,6 +410,7 @@ def data(model=MODEL, reals=REALS):
         "graviton": src("Lambda CPU", in_text("docs/aws.md", "arm64 (Graviton)"), "docs/aws.md", "line 4"),
         "behind": src("health card: what the Lambda sits behind", in_text("README.md", "behind CloudFront"), "README.md", "Live demo line"),
         "stack": src("reproduce sheet: what the CDK stack is", in_text("infra/drishyam_stack.py", "Lambda arm64 behind CloudFront and WAF"), "infra/drishyam_stack.py", "stack description"),
+        "policy": src("the live engine's look policy, and since when", in_text("public/index.html", "with the v1-policy2 look policy since 2026-10-22"), "public/index.html", "#rebar-note"),
         "title": src("cold-open title", in_text("public/index.html", "ONE PHOTO, A FEW LOOKS, ONE HUMAN"), "public/index.html", "the site's figure note"),
         "limits": src("limits, in the site's words", in_text("public/index.html", "Pixels, not millimetres", "AI-assisted, not an inspection", "Only a person can approve",
                                                              "Its licence does not allow sharing the photos"), "public/index.html", "footer note, Human sign-off, the CODEBRIM citation"),
@@ -586,6 +601,7 @@ def footage_warp(placed, scenes, ev):
     du = {l["id"]: l["dur"] for l in placed}
     W = {}
     sc = scenes["live"]
+    last = max(int(k.split(":")[1]) for k in ev if k.startswith("approved:"))   # the last approval of the sign-off
     hs = at["l1"] + du["l1"] + 0.25      # the health still first, then the site
     cw = ev["click:Watch it inspect a bridge"]
     W["live"] = {"t0": round(hs, 3), "t1": sc["t1"], "pts": [
@@ -594,14 +610,14 @@ def footage_warp(placed, scenes, ev):
         ["cut", cw + 0.2, cw + 2.9],
         [at["l3"] - 0.25, ev["step:1"]],
         [at["l4"] - 0.25, ev["step:2"]],
-        [at["l5"] - 0.25, ev["step:3"]],
-        [at["l6"] - 0.25, ev["step:4"]],
-        [at["l7"] - 0.25, ev["step:5"]],
+        [at["l5"] - 0.25, ev["step:3"]],   # l5 and l6 both read step 3 (the confirm look and what it sent to a person): slowed, as the bar says
+        [at["l7"] - 0.25, ev["step:4"]],
         [at["l7"] + du["l7"] + 0.1, ev["done:guided"] + 0.3],   # l9 waits (its pause) for the cut to the sign-off
         ["cut", ev["done:guided"] + 2.6, ev["click:Sign them off"] - 1.4],
         [at["l9"] - 0.2, ev["click:Sign them off"]],
-        [at["l11"] - 0.3, ev["approved:2"] + 0.9],
-        [sc["t1"], ev["approved:2"] + 2.5],
+        [at["l9"] + 0.5 * du["l9"], ev[f"approved:{last}"] + 0.2],   # the approval lands as l9 turns to the order it leaves incomplete
+        [at["l11"] - 0.3, ev[f"approved:{last}"] + 2.0],
+        [sc["t1"], ev[f"approved:{last}"] + 3.9],   # the page is still until it scrolls on to "Now break it"
     ]}
     sc = scenes["break"]
     cb = ev["click:Now break it"]
@@ -705,14 +721,14 @@ REQS = [   # competition requirement -> where the film covers it (scene ids or n
     ("Narrated (offline Kokoro voice af_heart) with burned-in captions; the same cues in public/video/drishyam.vtt", ["open", "end"]),
     ("The team: Vaibhav Jangid, Bhavya Dhoot. Each real photo, then the window's looks turn it into OpenCV line art (Canny, findContours, approxPolyDP); name cards without the private inputs", ["team"]),
     ("Problem and user, with sources on screen", ["problem"]),
-    ("Disclosed before the demo plays: the footage was recorded 2026-10-18 on the classical engine; the site now runs the trained v1", ["l0"]),
+    ("Disclosed before the demo plays: the footage was recorded 2026-10-22 on the live site, the trained v1 with its v1-policy2 look policy, the build the site runs now", ["l0"]),
     ("/api/health on the live site: opencv 5.0.0, aarch64, aws-lambda", ["l1"]),
-    ("The application working: the guided run on bridge_03 ('Watch it inspect a bridge'), recorded live, with what it missed", ["l2", "l3", "l4", "l5", "l6", "l7"]),
+    ("The application working: the guided run on bridge_03 ('Watch it inspect a bridge'), recorded live, with what it sent to a person to check by eye (the rebar under the confidence floor, not confirmed)", ["l2", "l3", "l4", "l5", "l6", "l7"]),
     ("Plain-words trace (the NOTE and 'What it decided and why' panels)", ["l3", "l4", "l5", "l6", "l7"]),
-    ("Human sign-off: reviewer name, Approve, APPROVED stamp, work order signed", ["l9"]),
+    ("Human sign-off: reviewer name, Approve, APPROVED stamp, work order signed and still incomplete (the rebar to check by eye)", ["l9"]),
     ("Human control: a tampered work-order token refused (403)", ["l11"]),
     ("Failure handling: 'Now break it' (slowed segmenter -> governor; malformed planner reply -> allow-list)", ["b0", "b1", "b2"]),
-    ("Human control: 'Try KILL' (KILL halts with kill-switch, Resume replays)", ["b3"]),
+    ("Human control: 'Try KILL' (KILL halts with kill-switch, Resume replays, then the stop rule ends it with a region unvisited)", ["b3"]),
     ("Honesty: no LLM runs in the live demo; the drill planners are scripted", ["b4"]),
     ("An LLM driving the OpenCV tools over MCP: IoU 0.00 at call 6 -> human; IoU 0.72 at call 18 -> confirmed; call 20 budget", ["mcp"]),
     ("Architecture: docs/agent-loop.svg, public/docs/aws-simple.svg, docs/architecture.png (AWS path and OpenCV layer)", ["arch"]),
@@ -925,12 +941,12 @@ def film_poster(scenes, placed):
     return round(l5["t"] + 0.5 * l5["dur"], 2)
 
 
-SHORT_LINES = ["Only a person can approve a critical finding.", "Try it live: the site now runs the trained v1."]
+SHORT_LINES = ["Only a person can approve a critical finding.", "Try it live: the trained v1."]   # "on AWS." at a line end reads as "oz" (phonemes)
 
 
 def short(D, scenes, placed):
     """The 15-20 s 9:16 cut: the cold open, the sign-off (the typing jump-cut) to the settled stamp, then the URL; three lines of voice."""
-    assert D["model"]["name"] == "v1" and D["aws"]["now"]["segmenter"] == D["model_segmenter"], "the short's last line says the site now runs v1"
+    assert D["model"]["name"] == "v1" and D["aws"]["now"]["segmenter"] == D["model_segmenter"], "the short's last line says the live site runs the trained v1"
     narrate_short([next(l["say"] for l in placed if l["id"] == "o1"), *SHORT_LINES])
     fast(VIDEO / "short.html", "--width", 1080, "--height", 1920, "--dump-sfx", WORK / "short-sfx.json")
     dur = json.loads((WORK / "short-sfx.json").read_text())["dur"]
