@@ -201,6 +201,12 @@ class JobConfig:
     # batch-yield: photo has had a look, a best-score look whose ev (`_score`) is below it halts the job, cause batch-yield.
     # batch-yield: Forced looks (survey, follow-ups, confirm, fallback, replay) are never cut. 0: off, the agent as before.
     next_ev: float = 0.0  # batch-yield
+    # blur-gate: how the quality gate judges blur (imaging.quality): "laplacian", a Laplacian variance under
+    # blur-gate: SHARPNESS_MIN, as published; "both", that and a re-blur ratio (imaging.reblur, Crete-Roffet et al.
+    # blur-gate: 2007) above REBLUR_MAX, which does not move with the view's contrast or pyramid level, so it only takes
+    # blur-gate: back refusals of faint, sharp views. "laplacian" unless the rule stated before its dev run passes
+    # blur-gate: (results/dev/blur_gate.json).
+    blur_gate: str = "laplacian"  # blur-gate
 
 
 @dataclass
@@ -728,7 +734,9 @@ class Job:
             self.settings.size = min(size, cfg.size)  # fallback: a whole-photo look's gaze is its own, not the next look's
             cx, cy, window = self._window(r.cx, r.cy, level, size)
             (crop, to_l0), warp_ms = self._timed("warp", imaging.gaze, pyr, cx, cy, level, size=size)
-            q, _ = self._timed("quality", imaging.quality, crop)
+            q, _ = self._timed("quality", imaging.quality, crop,
+                               **({} if cfg.blur_gate == "laplacian" else {"gate": cfg.blur_gate}),  # blur-gate
+                               )
             model = self.settings.model
             # Background wherever the view runs past the image: gaze fills that by reflection (a mirrored defect).
             valid = imaging.footprint(to_l0, (W, H), size)
@@ -858,6 +866,7 @@ class Job:
                 "window": window,
                 "observation": {"entropy": seg.entropy, "saliency_max": sal_max, "mask_area_px": int(sum(seg.areas.values())),
                                 "sharpness": q["sharpness"], "exposure": q["exposure"],
+                                **({"reblur": q["reblur"]} if "reblur" in q else {}),  # blur-gate
                                 "classes": {c: a for c, a in seg.areas.items() if a}},
                 "quality": {"ok": q["ok"], "reason": q["reason"]},
                 "runtime": self.stats.snapshot(self.budget.usd_used),

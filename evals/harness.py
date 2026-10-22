@@ -76,7 +76,7 @@ PER_IMAGE_OPS = ("pyrDown", "saliency", "downscale")  # their cost grows with th
 REPO = Path(__file__).resolve().parents[1]
 SWITCHES = ("order", "seed", "use_uncertainty", "seed_from_looks", "v0", "survey", "verify",
             "governor", "fallback_l2", "grid", "crit_weight", "crit_floor", "crit_confirm",
-            "merge_critical")  # JobConfig fields a variant may flip
+            "merge_critical", "blur_gate")  # JobConfig fields a variant may flip
 ABLATION_CAPS = (0.3, 1.0)
 ABLATIONS = {  # FR-21: each variant flips one switch of the compared agent (governor off, as in every comparison)
     "full": {},

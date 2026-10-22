@@ -867,3 +867,44 @@ def test_dev_sweep_rows_carry_critical_class_recall_and_policy2s_gate_counts(tmp
     assert cur["recall_all"] == cur["recall"] and cur["look_per_image"] == 0 and "crit_recall_vs_tiling_L2_ci" in cur
     assert all(same[f"{k}_diff_vs_ref_ci"] == [0.0, 0.0] for k in ("crit", "signoffs", "reviews", "look", "all"))
     assert same["recall_all_vs_ref_ci"] == [1.0, 1.0] and "crit_diff_vs_ref_ci" in rows["p2@1.0"]
+
+
+def test_blur_gate_eval_scores_every_look_as_its_gate_read_it(tmp_path, monkeypatch):
+    """evals.blur_gate end to end on tiny synthetic splits (the classical engine on its own cost table): each photo's
+    jobs under both gates; every look of the Laplacian job rendered again as its gate read it (the sharpness its step
+    recorded is asserted) and scored by both gates as it is and blurred by sigma 2 view px, which the Laplacian gate
+    refuses here; the gate counts and the agent rows' paired CIs the clauses read; the verdict's words; and the fallback
+    look of a photo with no candidate, as the rule reports real_01's."""
+    from evals import blur_gate as bg
+
+    from .test_agent import soft_disc
+
+    synth.build_dataset(tmp_path / "tiny", n=3, seed=3, width=2048, height=1536)  # smaller: no look fits the 30 % cap
+    monkeypatch.setattr(bg, "ENGINE", "classical-v1")
+    monkeypatch.setattr(bg, "MICRO_ARM", "local-macos-x86")
+    res = bg.run_dev({s: (tmp_path / "tiny", 3, 3, None) for s in ("synth_dev", "clean", "real")}, 1, log=print)
+    s = res["splits"]["synth_dev"]
+    views = [v for p in res["views"][:3] for v in p["views"]]
+    assert s["gate"]["photos"] == 3 and s["gate"]["views"] == len(views) > 0
+    assert res["pooled"]["views"] == 3 * len(views)
+    assert all(v["reason"]["laplacian"][1] == "blur" and v["reblur"][1] > v["reblur"][0] for v in views)
+    assert s["gate"]["refused_blurred"]["laplacian"] == len(views) and len(s["gate"]["blurred_diff_ci"]) == 2
+    assert s["gate"]["as_is_diff"] <= 0 and s["gate"]["blurred_diff"] <= 0  # both-gates only takes refusals back
+    assert {"vs_ref_ci", "boxes_diff_vs_ref_ci", "images_with_any_vs_ref_ci"} <= set(s["agent"]["both"])
+    assert "vs_ref_ci" not in s["agent"]["laplacian"]
+    # the calibration: the largest REBLUR_MAX (0.005 grid) at which the both-gates gate refuses as many blurred views
+    view = lambda lap, rb: {"level": 1, "reblur": rb, "reason": {"laplacian": lap, "both": [None, None]}}
+    cal = bg.threshold([{"views": [view([None, "blur"], [0.3, 0.5]), view(["blur", "blur"], [0.3, 0.45]),
+                                   view([None, None], [0.25, 0.6])]}])
+    assert (cal["reblur_max"], cal["refused_as_is"], cal["refused_blurred"]) == (
+        0.445, {"laplacian": 1, "both": 0}, {"laplacian": 2, "both": 2})
+    assert set(bg.clauses(res["splits"])) == {"recall_holds_synth_dev", "recall_holds_real", "clean_boxes_do_not_rise",
+                                              "clean_share_with_a_box_does_not_rise"}
+    verdict = lambda a, b: bg.verdict({"as_is_diff_ci": a, "blurred_diff_ci": b})
+    assert verdict([-0.2, -0.1], [-0.1, 0.0]) == "Gain" and verdict([0.1, 0.2], [0.0, 0.0]) == "Harm"
+    assert verdict([-0.2, 0.0], [0.0, 0.0]) == "no measurable difference"
+    assert verdict([-0.2, -0.1], [-0.2, -0.1]) == "Harm"  # fewer refused as they are, but fewer blurred ones too
+    cv2.imwrite(str(tmp_path / "disc.png"), soft_disc(3000, 2250))
+    look = bg.fallback_look(tmp_path / "disc.png", harness.cost_rows("local-macos-x86", "classical-v1"))
+    assert set(look) == {"laplacian", "both"} and all(x["level"] == 2 and x["looks"] for x in look.values())
+    assert all(sum(x["classes"].values()) == x["boxes"] for x in look.values())
