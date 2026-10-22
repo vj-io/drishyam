@@ -136,6 +136,37 @@ def test_review_refuses_drafts_unknown_ids_and_bad_reviewer_names(copy, capsys):
     assert "reviewer must be" in capsys.readouterr().err
 
 
+def test_review_checks_each_not_assessed_entry_by_eye(copy, capsys):
+    """`drishyam review WO na<i> nothing-found|defect-found --by NAME [--note TEXT]`: the order is ready only once every
+    critical finding is decided and every not-assessed entry is resolved; each refusal leaves the file untouched."""
+    wo = copy / "work_order.json"
+    na = json.loads(wo.read_text())["not_assessed"]
+    assert na, "the small cap leaves candidates not assessed"
+    for fid in pending(wo):
+        assert review(wo, fid) == 0
+    for i in range(len(na)):
+        decision, note = ("defect-found", ["--note", "  spall at the\tbearing "]) if i == 0 else ("nothing-found", [])
+        assert cli.main(["review", str(wo), f"na{i}", decision, "--by", "A. Engineer", *note]) == 0
+        doc = json.loads(wo.read_text())
+        assert doc["status"] == ("ready" if i == len(na) - 1 else "incomplete")
+    assert f"na{len(na) - 1} checked by eye by A. Engineer: nothing-found; work order ready" in capsys.readouterr().out
+    r = doc["not_assessed"][0]["resolution"]
+    assert (r["decision"], r["reviewer"], r["note"]) == ("defect-found", "A. Engineer", "spall at the bearing")
+    assert [a["not_assessed"] for a in doc["approvals"] if "not_assessed" in a] == list(range(len(na)))
+    assert {k: v for k, v in doc["not_assessed"][0].items() if k != "resolution"} == na[0]
+    before = wo.read_bytes()
+    for argv, said in ((["na0", "nothing-found"], "already resolved: defect-found by A. Engineer"),
+                       ([f"na{len(na)}", "nothing-found"], f"no not_assessed entry {len(na)} in this work order"),
+                       (["na0", "approve"], "na0 takes nothing-found or defect-found"),
+                       (["f1", "nothing-found"], "f1 takes approve or reject"),
+                       (["f1", "approve", "--note", "x"], "a note goes with nothing-found or defect-found"),
+                       (["na-1", "nothing-found"], "a finding id (f1) or a not-assessed entry (na0)"),
+                       (["na0x", "nothing-found"], "a finding id (f1) or a not-assessed entry (na0)")):
+        assert cli.main(["review", str(wo), *argv, "--by", "B. Boss"]) == 1, argv
+        assert said in capsys.readouterr().err, argv
+    assert wo.read_bytes() == before
+
+
 def test_review_writes_atomically(copy, monkeypatch):
     wo = copy / "work_order.json"
     critical = pending(wo)[0]

@@ -15,7 +15,7 @@ photos; chance is the same model's boxes moved to random places, and IoU-only dr
 `tests/test_report_doc.py` fails if a number here drifts from that file or, for the Lambda timings, from
 [aws.md](aws.md).
 
-| Segmenter | CODEBRIM recall (95 % CI) | chance | IoU-only (chance) | synth200 recall (95 % CI) | clean photos with a box | critical boxes per CODEBRIM photo |
+| Segmenter | CODEBRIM recall (95 % CI) | chance | IoU-only (chance) | synth200 recall (95 % CI) | clean photos with a box | critical boxes per CODEBRIM photo (parts of findings) |
 | --- | --- | --- | --- | --- | --- | --- |
 | v1 (first look policy) | 0.49 (0.44–0.54) | 0.30 | 0.25 (0.08) | 0.64 (0.61–0.67) | 0 of 51 | 9.60 |
 | **v1-policy2 (live)** | 0.49 (0.44–0.53) | 0.31 | 0.26 (0.09) | 0.62 (0.59–0.66) | 0 of 51 | 8.75 |
@@ -24,11 +24,16 @@ photos; chance is the same model's boxes moved to random places, and IoU-only dr
 | v2c | 0.48 (0.44–0.53) | 0.28 | 0.23 (0.07) | 0.57 (0.54–0.61) | 22 of 51 | 3.71 |
 | classical engine | 0.19 (0.16–0.23) | 0.12 | 0.08 (0.03) | 0.48 (0.44–0.52) | 34 of 51 | 1.73 |
 
-- **v1 runs live since 2026-10-21**, with the v1-policy2 look policy since 2026-10-22 (deployed commit 6e0a6cd, smoke-tested: [aws.md](aws.md)). It was chosen on the
+A person signs critical findings, not boxes: about 2.17 per CODEBRIM photo under v1's first policy and 1.15 under
+v1-policy2, the live one (section 8). The last column counts boxes: each connected part of a finding's mask, in every
+look that drew it, that is critical by class and area. That is the unit the scorer matches, and one finding has
+several.
+
+- **v1 runs live since 2026-10-21**, with the v1-policy2 look policy since 2026-10-22 (deployed commit a2b8688, smoke-tested: [aws.md](aws.md)). It was chosen on the
   dev splits only (`results/dev/model_choice_dev.json`); held out it is again the only model with no measurable
   loss against any other. These are its second scorings (one earlier, unpublished). Its CC BY-NC 4.0 weights are
   release assets of v1.1.0, not in git.
-- **v1-policy2, live since 2026-10-22 (deployed commit adf9474):** one configuration chosen on the dev splits by a rule committed before its run and scored once held out (v1's third read; section 8). On CODEBRIM it sends 8.75 critical boxes per photo to a person instead of 9.60 (0.91×, CI 0.84–0.98) and about 1.15 critical findings instead of 2.17, and it lists 0.20 masks per photo as needs-a-look for a person to check by eye; recall is unchanged (0.99×, CI 0.97–1.01), on synth200 0.98× (0.95–1.00); critical-class recall is not higher (0.99×, 0.96–1.02; exposed rebar 0.14 against 0.16). On CODEBRIM verify now fires on 14.1 % of looks (5.0 % confirm looks) instead of 9.4 %, escalation on 5.8 %. It still does not beat L2 tiling: 0.98× its recall at 1.40× its pixels, and 0.83× (0.76–0.89) at the 10 % cap.
+- **v1-policy2, live since 2026-10-22 (first deployed from commit adf9474):** one configuration chosen on the dev splits by a rule committed before its run and scored once held out (v1's third read; section 8). On CODEBRIM a person signs about 1.15 critical findings per photo instead of 2.17, and the critical boxes fall to 8.75 per photo from 9.60 (0.91×, CI 0.84–0.98); it lists 0.20 masks per photo as needs-a-look for a person to check by eye; recall is unchanged (0.99×, CI 0.97–1.01), on synth200 0.98× (0.95–1.00); critical-class recall is not higher (0.99×, 0.96–1.02; exposed rebar 0.14 against 0.16). On CODEBRIM verify now fires on 14.1 % of looks (5.0 % confirm looks) instead of 9.4 %, escalation on 5.8 %. It still does not beat L2 tiling: 0.98× its recall at 1.40× its pixels, and 0.83× (0.76–0.89) at the 10 % cap.
 - **What the held-out runs measured:** the governor off and the 512-px FP32 net on every look. Live, the v1
   profile's SLA is 1500 ms, so looks stay on the 512-px FP32 net unless steps exceed 1.5 s. v1's finest look is L1
   (half size) on a 2048-px photo and L2 on a 4608-px one, so on these photos it never looks at full resolution.
@@ -39,8 +44,9 @@ photos; chance is the same model's boxes moved to random places, and IoU-only dr
   [synth_dacl10k](../public/results/synth_dacl10k/summary.json) summaries).
 - **Against the classical engine,** v1 finds 2.54× (2.16–3.01) its recall on CODEBRIM and 1.34× (1.24–1.45) on
   synth200, and puts no box on a clean photo where the classical engine puts 7.08 per photo. But chance is high on
-  CODEBRIM because its boxes are large; it sends 5.5 times the critical boxes to the human gate (at that rate, about 24,000
-  for a 2,536-photo bridge inspection, an extrapolation from CODEBRIM photos); its modelled ms per CODEBRIM job are 1.99× (CI 1.92–2.06); and on the
+  CODEBRIM because its boxes are large; it sends 5.5 times the critical boxes to the human gate (boxes, not the
+  findings a person signs; the one measured backlog of 2,536 photos, 2,436 of them synthetic, queued 684 critical
+  findings from the 587 photos it ran and left 1,949 not assessed); its modelled ms per CODEBRIM job are 1.99× (CI 1.92–2.06); and on the
   Lambda its step p95 was 0.52 to 1.14 s, against 67.7 to 88.0 ms.
 - **Where v1 fails:** on synthetic photos it finds no efflorescence (0.00) and almost no exposed rebar (0.02), where
   the classical engine finds 0.16 and 0.57; on one of our own wall photos it flagged nothing although a hairline
@@ -67,7 +73,8 @@ about half with the trained v1 segmenter, which the demo runs since 2026-10-21 (
 ## 2. Users
 
 The PRD names three. An **inspection engineer** reviewing a photo backlog uploads a photo and gets findings with
-the crop, the class, pixel length, width and area, and the numbered gaze step that found each one, so the evidence
+the crop, the class, pixel length, width (with v1, its mask's width, not the crack's: section 11) and area, and the
+numbered gaze step that found each one, so the evidence
 comes before any score. Critical findings (exposed rebar, spalling above 40,000 px²) wait for that engineer's
 approval, which the agent cannot give or downgrade, and a per-job budget in pixels, dollars and seconds sets what
 the triage of a backlog may cost. **Judges** need a trace in which an OpenCV output changes the next tool call,
@@ -89,7 +96,9 @@ drills use scripted planners, section 3). Dropped: the Hugging Face Space mirror
 Each job is a loop of camera moves over an image pyramid (L0 = full resolution, L4 = 1/16):
 
 1. **Overview.** `pyrDown` to L4; a saliency prior at L3 from `cvtColor`, `GaussianBlur`, `Sobel`, black-hat
-   `morphologyEx`, `adaptiveThreshold`, CLAHE and a rust-hue `inRange`; up to 20 ranked candidate windows.
+   `morphologyEx`, `adaptiveThreshold`, CLAHE and a rust-hue `inRange`; up to 20 ranked candidate windows. When it
+   proposes none, the job takes one look at L2 whose window spans the whole photo (cause `fallback-l2`, on by default
+   since 2026-10-21, live since 2026-10-22), and the work order still lists the photo as not assessed.
 2. **Gaze.** `warpPerspective` renders a 512² virtual-PTZ view whose pixels map back to L0 exactly: pan and zoom.
    The agent always passes yaw = pitch = 0; only the MCP tool exposes yaw and pitch, as a synthetic rotation with
    f = view size, not a calibrated rectification.
@@ -99,10 +108,15 @@ Each job is a loop of camera moves over an image pyramid (L0 = full resolution, 
    maps, no weights) runs behind the same interface, and every policy comparison in section 8 uses it.
 5. **Decide.** The next look is `argmax p·s·(1+u)·a / t̂` (prior × severity × uncertainty × unseen area ÷ predicted
    ms). Escalate one level finer, centred on what it saw, when entropy > τ or the mask is below A_min; verify a new
-   confident mask one level finer by mask IoU; log findings with length, width, area and orientation in pixels.
+   confident mask one level finer by mask IoU; log findings with length, width, area and orientation in pixels (with
+   v1, a crack's width is its mask's, not the crack's: section 11).
    With v1 a look spans at least 0.3 of the photo's long side (its profile's `min_view`), so its finest level is L1
    (half size) on a 2048-px photo and L2 on a 4608-px one; a look there is not escalated, and a mask first drafted
-   there is not verified one level finer.
+   there is not verified one level finer. v1's live look policy is v1-policy2 (section 8): first looks on the tiling
+   grid's tiles that hold a candidate, exposed rebar and spalling weighted 2× in s, a mask that would make a new
+   critical finding under confidence 0.6 held for one confirm look at its level (cause `confirm-critical`; if that
+   look does not confirm it, a person checks it by eye as a needs-a-look entry), and overlapping critical findings of
+   one class merged.
 6. **Govern.** Before every step: kill switch, pixel / $ / seconds caps, p95 latency against the SLA (500 ms; 1500
    ms for the v1 profile; switch to the fast model, then a coarser level), warp spikes, and a $ ≥ 80 % mode that verifies only critical classes.
 7. **Stop** when the best remaining expected value per ms falls below a quarter of the realised value per ms so far,
@@ -115,7 +129,9 @@ Each job is a loop of camera moves over an image pyramid (L0 = full resolution, 
 
 Critical findings (exposed rebar; spalling above 40 000 px²) wait in `pending_review`. Only a human, in the web review
 or with `drishyam review`, can approve or reject them; nothing the agent, the MCP tools or the planner can call reaches
-that transition.
+that transition. The same holds for an area the agent could not assess: only a person resolves it, checked by eye
+(nothing found or defect found, with an optional note), and a work order is `ready` only when every critical finding
+is decided and every such area is resolved ([api-contract.md, Checked by eye](api-contract.md#checked-by-eye)).
 
 No LLM runs in the live demo (the batch CLI's optional Nova Lite router is in section 10). The deployed agent is the rule policy above (the stack sets no
 `DRISHYAM_PLANNER_URL`), and the planner failure drills use planners scripted to time out or answer junk. The LLM
@@ -129,7 +145,9 @@ values.
 Three clients reach one agent core: the browser through CloudFront and an arm64 Lambda (section 5), and the CLI and
 the MCP server locally. The core (policy, governor, optional planner behind an allow-list validator, human gate)
 drives the OpenCV layer and emits an NDJSON trace and a signed work order. Every cv2 call in the figure also exists
-in OpenCV 4.x except the starred `ENGINE_NEW` argument (section 6). Sources: [architecture.svg](architecture.svg)
+in OpenCV 4.x except the two starred uses: the `ENGINE_NEW` argument, and a NumPy bool mask read as `CV_Bool` by
+`copyTo` (`CV_BOOL_MASKS`, on since 2026-10-22; section 6). `drishyam batch` (section 10) runs on the CLI only; its
+optional Nova Lite router on Amazon Bedrock is off by default and not on the web path. Sources: [architecture.svg](architecture.svg)
 and [architecture.mmd](architecture.mmd); the agent loop above is [agent-loop.svg](agent-loop.svg).
 
 ## 5. AWS deployment
@@ -152,16 +170,14 @@ limits and the cost table, is [aws.md](aws.md).
   AppErrors) and X-Ray tracing. The alarms and a 20 USD monthly budget publish to one SNS topic, whose email
   subscription is confirmed: a test alarm (AppErrors set to ALARM by hand) reached the owner's email on 2026-10-21.
   The alarms have no OK action, so a recovery sends no email.
-- **Smoke test** (`scripts/aws.sh smoke`, `scripts/smoke.sh`): `smoke 2026-10-21T11:38:30Z result=pass`, against
-  the deployed build of commit f12f50f (4fe8e30's app code and the re-rendered film), the commit `/api/health`
-  reports, with segmenter
-  `onnx:drishyam_dacl10k.onnx` on aarch64: a job on `bridge_03.jpg` streamed to its `done` event; KILL, sent after
-  step 2 streamed, halted the second job after 3 steps with cause `kill-switch`; a `POST` without the body hash and a
-  direct Function URL call both got 403; and the step p95 was 666.4 ms over one job's 4 steps, under v1's 1500 ms
-  limit. The live browser suite (`tests/e2e/test_ui_live.py`) passed against this deploy, and twice against 4fe8e30.
-  An earlier run, on commit c06fdf9, also checked the WAF, which answered 429 at the 20th empty-bodied job start (WAF evaluates
-  rates about every 10 s, so it blocks late). With v1 a step's p95 was 0.52 to 1.14 s over the eleven smoke runs since
-  the v1 deploy, against 67.7 to 88.0 ms for the classical engine before it ([aws.md](aws.md) quotes the runs).
+- **Smoke test** (`scripts/aws.sh smoke` with `WAF_LOOP=1`, `scripts/smoke.sh`): `smoke 2026-10-22T17:17:47Z
+  result=pass`, against the live build, commit a2b8688, the commit `/api/health` reports: a job on `bridge_03.jpg`
+  ended `awaiting_review` after 6 steps; KILL, sent after step 2 streamed, halted the second job after 3 steps; a
+  `POST` without the body hash and a direct Function URL call both got 403; the WAF answered 429 at the 15th
+  empty-bodied job start (WAF evaluates rates about every 10 s, so it blocks late); and the step p95 was 994.9 ms over
+  6 steps, under v1's 1500 ms limit. The live browser suite (`tests/e2e/test_ui_live.py`) passed three of the four
+  times it ran against this deploy: once its guided run took 40.8 s, over the suite's 40 s limit ([aws.md](aws.md)). With v1 a step's p95 was 0.52 to 1.14 s over the eleven v1 smoke runs to f12f50f, and every later run
+  [aws.md](aws.md) quotes falls in that range, against 67.7 to 88.0 ms for the classical engine before it.
 - **Cost.** Spent so far: 0.62 USD before credits, month to date on 2026-10-21 (Cost Explorer; 0.59 of it the WAF),
   0.00 USD after them. The list-price estimate is about 10 USD a month at 1,000 jobs a month, 8 of it the WAF ([aws.md](aws.md)). The $ shown
   in the UI and the evals is *modelled*: timed op milliseconds × 0.339 USD/h, the c8g.2xlarge rate plus the COOL
@@ -655,7 +671,8 @@ score, overlapping critical findings of one class merged, and the zero-candidate
 ([API contract](api-contract.md)). The rule, a grid of 8 configurations and 5 ablations, the metrics and the commands
 were committed before any of them ran ([results/dev/policy2_sweep.json](../results/dev/policy2_sweep.json), commit
 54b5601); two passed every clause, and the one that found more critical-class boxes became v1's default in the code
-(`drishyam.agent.POLICY2`), and the live site runs it since 2026-10-22 (deployed commit adf9474, [aws.md](aws.md)). It was then scored **once** on
+(`drishyam.agent.POLICY2`), and the live site runs it since 2026-10-22 (first deployed from commit adf9474; the live
+build is a2b8688, [aws.md](aws.md)). It was then scored **once** on
 the held-out sets with v1's recipe and cost table (`runs/heldout/run_policy2.sh`, at commit 44d891d; the leakage
 check first, the same counts). This is v1's third read of CODEBRIM eval200 and synth200 and its second of the clean
 set; a held-out run of v1 with the fallback alone was started and stopped, and its output was never read or used.
@@ -664,8 +681,8 @@ v1-policy2 and for the baselines, so the read stands for the merged code; it was
 rule also holds on the held-out counterparts (`dev_rule_on_held_out`). The baselines in its run are v1's run's, box
 for box.
 
-What it changes. On CODEBRIM it sends 8.75 critical boxes per photo to a person instead of 9.60 (0.91×, CI 0.84–0.98) and about 1.15 critical findings instead of 2.17 (each finding's final measure on both sides, since v1's runs did not record
-sign-offs; v1-policy2's exact count is 1.17), and it lists 0.20 masks per photo as needs-a-look for a person to check by eye. Its recall is unchanged (0.99×, CI 0.97–1.01), on synth200 0.98× (0.95–1.00). Its critical-class recall is not higher (0.99×, 0.96–1.02; exposed rebar 0.14 against 0.16).
+What it changes. On CODEBRIM a person signs about 1.15 critical findings per photo instead of 2.17, and the critical boxes fall to 8.75 per photo from 9.60 (0.91×, CI 0.84–0.98). A box is one connected part of a finding's mask in one look, several per finding; findings are counted by each finding's final measure on both sides, since v1's runs did not record
+sign-offs (v1-policy2's exact count is 1.17). It lists 0.20 masks per photo as needs-a-look for a person to check by eye. Its recall is unchanged (0.99×, CI 0.97–1.01), on synth200 0.98× (0.95–1.00). Its critical-class recall is not higher (0.99×, 0.96–1.02; exposed rebar 0.14 against 0.16).
 On CODEBRIM verify now fires on 14.1 % of looks (5.0 % confirm looks) instead of 9.4 %, escalation on 5.8 %, because the confirm looks fire on CODEBRIM's large photos, where v1's finest level is
 L2 and a mask drafted there got no verify before; on synth200 they almost never fire (v1's critical masks there are
 confident or absent). Against L2 tiling on CODEBRIM it does not do better: 0.98× its recall at 1.40× its pixels, and 0.83× (0.76–0.89) at the 10 % cap. Every clean photo stays box-free.
@@ -730,7 +747,8 @@ On the dev splits only, each read by a rule written down before its run:
 
 ## 9. Failures
 
-Twelve measured failures from the synthetic run, two in each of six categories (FIG. 5 on the live site; [public/results/failures.json](../public/results/failures.json)). The rule column is the gallery generator's current text (`evals/failures.py`); `make eval` rewrites failures.json, not this table, so after a re-run `python -m tests.test_report_doc` prints the rows to copy here, and `tests/test_report_doc.py` fails until they match:
+Twelve measured failures from the classical engine's published synthetic run (synth200, agent of commit 832299b; not
+the live v1), two in each of six categories (FIG. 5 on the live site; [public/results/failures.json](../public/results/failures.json)). The rule column is the gallery generator's current text (`evals/failures.py`); `make eval` rewrites failures.json, not this table, so after a re-run `python -m tests.test_report_doc` prints the rows to copy here, and `tests/test_report_doc.py` fails until they match:
 
 | Plate | Category | What happened | Rule that would catch it |
 | --- | --- | --- | --- |
@@ -752,7 +770,7 @@ reported as corrosion or spalling) are published as text only, because the licen
 [public/results/codebrim/failures_text.json](../public/results/codebrim/failures_text.json), also under FIG. 5 on
 the site.
 
-### A real photo: a hairline crack nothing looked at
+### A real photo: a hairline crack the agent does not flag
 
 ![Our photo of a painted plaster wall (IMG_2332), no ground truth](../public/samples/thumbs/real_01.jpg)
 
@@ -760,10 +778,25 @@ the site.
 hairline crack runs corner to corner. Run with the v1 segmenter (weights sha256 `c49416c1...`, the fixed cost table
 `results/local-macos-x86-dacl10k-retime/`, 30 % cap; `public/samples/real_01.ndjson`), the overview proposed no
 candidate window, so the job ended after the overview, at 0.0157 of the pixels, with cause `exhausted` ("every
-candidate has been looked at", true of an empty list) and no finding. The segmenter never saw the photo: the miss is
-the saliency prior's, which at L3 (1/8 scale) found no region worth a look. The rule that would catch it, not
-implemented and not measured: when the overview proposes nothing, spend one coarse survey look on the whole photo,
-so every photo reaches the segmenter at least once. On the other wall photo (`real_02.jpg`, IMG_2330, two cracks by
+candidate has been looked at", true of an empty list) and no finding. That recording predates the zero-candidate
+fallback: the segmenter never saw the photo, and the miss is the saliency prior's, which at L3 (1/8 scale) found no
+region worth a look.
+
+The rule written for it is implemented, on by default since 2026-10-21 and live since 2026-10-22
+(`JobConfig.fallback_l2`): when the overview proposes nothing, the job takes one look at L2 whose window spans the
+whole photo (cause `fallback-l2`), and the photo stays not assessed whatever that look drafts. It was adopted by a rule
+committed before its dev run ([results/dev/zero_candidate_fallback.json](../results/dev/zero_candidate_fallback.json),
+v1 at the 30 % cap), and that pass rests on 1 of 190 dev photos: no synth_dev or clean dev photo had zero candidates,
+so the false-alarm clause was never exercised. On the one CODEBRIM dev photo it acted on, the fallback look and a
+verify drafted 2 crack boxes and found its 1 labelled box, which the run without it missed: recall ×1.0025 (CI
+1.00–1.0093) over CODEBRIM dev100, +1183.3 modelled ms on that photo, no critical box. It is not shown to help in
+general. Held out it is part of v1-policy2's one read (section 8); a run of v1 with the fallback alone was stopped
+unread. On `real_01` it does not catch the crack: at the current code the fallback look's v1 mask shows crack pixels,
+but the quality gate refuses the view as blur (Laplacian variance under 12: the smooth paint gives it little
+texture), so nothing is drafted, and the work order lists the photo twice, `check-by-eye` and `re-shoot`, a re-shoot
+instruction that is wrong for this sharp photo. The site's **Watch it on a real wall** replays the older recording.
+
+On the other wall photo (`real_02.jpg`, IMG_2330, two cracks by
 eye) the same engine took one look and drafted one crack, a 678 × 70 px box on part of the lower crack; the upper
 crack got no finding. With no ground truth neither photo is scored.
 
@@ -805,7 +838,7 @@ Failure drills, each runnable from the UI (`chaos` toggles) and covered by tests
 | --- | --- |
 | 20 planner timeouts + 20 malformed planner replies | 40 / 40 recovered by the rule planner (`test_20_timeouts_and_20_malformed_all_recover`) |
 | Forced p95 spike on the segmenter | the next step's cause is `p95>SLA` and its model is `fast` (`test_forced_p95_spike_changes_next_steps_model`) |
-| KILL during a live job | kill sent during step 3 → step 4 halted with cause `kill-switch` (`test_kill_endpoint_halts_a_running_job`, the live e2e run; on the deployed site, check 3 of `scripts/smoke.sh`, sent once step 2 has streamed: halted after 3 steps in the f12f50f smoke run, section 5) |
+| KILL during a live job | kill sent during step 3 → step 4 halted with cause `kill-switch` (`test_kill_endpoint_halts_a_running_job`, the live e2e run; on the deployed site, check 3 of `scripts/smoke.sh`, sent once step 2 has streamed: halted after 3 steps in the a2b8688 smoke run, section 5) |
 | $ and pixel caps | the job halts inside one step with coverage and unvisited regions reported (`test_pixel_cap_is_never_exceeded`, `test_seconds_and_usd_caps_halt`) |
 | Agent tries to approve its own critical finding | `ForbiddenTransition` (`test_agent_cannot_decide_or_downgrade`) |
 
@@ -824,7 +857,8 @@ a verify measured spalling IoU 0.468 between L2 and L1, and L1 read the bars tha
 corrosion, so Claude handed both critical findings to a human with those reasons. It also spent a look on the crack
 the rule agent's stop rule left unvisited: 4 of the 4 ground-truth boxes against the rule agent's 3, at the same
 17.1 % of the pixels, in one session whose client had read the ground truth beforehand. On the team's `real_01.jpg`,
-where the overview proposes no candidate and the rule agent takes no look, Claude gazed at a faint line it saw in the
+where the overview proposes no candidate (the rule agent then took no look; since the zero-candidate fallback it
+takes one whole-photo look, which the blur gate refuses), Claude gazed at a faint line it saw in the
 heatmap, and v1 flagged one crack and nothing else; the measured width (34-69 px) is the mask's, not the hairline's.
 
 ### Across a backlog
@@ -845,9 +879,10 @@ Critical ones run first, and the router's $ is charged to the budget. Under the 
 the result is harm (`results/dev/router_eval.json`): critical recall 0.181 against the triage's 0.497 (×0.36,
 CI 0.13–0.67) and random order's 0.331 (×0.55, CI 0.21–0.88). Free of its $, its order is no measurable gain (×1.14,
 CI 0.98–1.44), and its clears missed 9 of 81 photos holding a critical defect (0.111, CI 0.060–0.198), so the rule
-triage stays the default. On a 2,536-photo backlog (`results/backlog_2536/summary.md`) it cleared 867 photos (40 of
-them holding a critical defect), ran 587 and queued 684 critical findings for a person, for $0.316 of Bedrock within a
-$0.50 budget. The batch's report stays blocked until a person reviews them.
+triage stays the default. On a 2,536-photo backlog (`results/backlog_2536/summary.md`; 2,436 synthetic photos and the
+100 CODEBRIM dev photos) it cleared 867 photos (40 of them holding a critical defect), ran 587 and queued 684 critical
+findings for a person, for $0.316 of Bedrock within a $0.50 budget, and listed 1,949 photos as not assessed (cleared
+or not reached). The batch's report stays blocked until a person reviews them.
 
 `drishyam batch --batch-yield` (off by default) changes the plan from what the jobs measure: under budget pressure,
 a job leaves its photo once its best next look is worth less than the next photo's first look (Charnov's marginal
@@ -861,7 +896,9 @@ the replay exactly.
 
 - Evidence-first UI: crop, measurements and gaze step before any confidence
   number; an "AI-assisted, not an inspection" banner on every finding.
-- Pixels only. No millimetres without a scale reference; no safety ratings. Criticality is a pixel-area threshold
+- Pixels only. No millimetres without a scale reference; no safety ratings. With v1 a crack's width is its mask's
+  width, not the crack's: the mask is 15 to 17 crop pixels wide at every level, so the width scales with the look's
+  level (in the MCP v1 session, 34 and 69 px for one hairline on `real_01`; section 10). Criticality is a pixel-area threshold
   (spalling ≥ 40,000 px²), so it changes with camera resolution and distance.
 - Faces, people and vehicles are blurred (YuNet, NanoDet) before analysis or
   display; a photo mostly filled by a person is refused.
@@ -873,14 +910,17 @@ the replay exactly.
   every policy at about 0.2 recall. Of the dacl10k models, v1 (the dev choice) is deployed since 2026-10-21. Held out,
   with the governor off and the 512-px FP32 net on every look, it finds 0.49 of CODEBRIM's defects at the 30 % cap
   against the classical engine's 0.19 (chance 0.30; IoU-only 0.25 against a chance of 0.08), with twice the critical
-  boxes of the retrained models for the human gate; its held-out ms are modelled from x86 tables, and on the Lambda
+  boxes of the retrained models (boxes, not the findings a person signs: section 8); its held-out ms are modelled from x86 tables, and on the Lambda
   its step p95 was 0.52 to 1.14 s (sections 5 and 8).
 - The ablations show that at the 30 % cap the uncertainty term, the seeding and the governor change nothing
   measurable, that the uncertainty term and the seeding earn a little recall only uncapped on the 2048×1536 set, and
   that image-driven gaze order beats random order only on the larger photos (section 8).
-- On one of our own wall photos the overview proposed no region, so no look was taken and a hairline crack visible
-  by eye was missed (section 9). Its work order has no finding, but it lists the whole photo as `not_assessed`
-  (action `check-by-eye`) and reads `incomplete`, not `ready`, so it does not pass for a clean wall.
+- On one of our own wall photos the overview proposed no region and a hairline crack visible by eye was missed
+  (section 9): the recorded run took no look, and with the zero-candidate fallback the one whole-photo look is refused
+  by the blur gate. Its work order has no finding, but it lists the whole photo as `not_assessed`
+  (action `check-by-eye`) and reads `incomplete`, not `ready`, until a person checks the photo by eye and records it
+  (the web review's Checked by eye, or `drishyam review <work order> na0 nothing-found|defect-found`), so it does not
+  pass for a clean wall.
 - COOL on Graviton was not run (section 6).
 - The arm64 timings come from GitHub's `ubuntu-24.04-arm` runner (`results/linux-aarch64/`, Neoverse-N2, one
   thread for the cost table), a GitHub Actions VM, not the deployed Lambda; on the Lambda the only numbers are the

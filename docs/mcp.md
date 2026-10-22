@@ -22,7 +22,7 @@ npx @modelcontextprotocol/inspector uv run --directory /abs/path/to/drishyam dri
 | `gaze(job, x, y, level, yaw=0, pitch=0, why="")` | Virtual-PTZ look at an L0 pixel at pyramid level 0-3. Returns a gaze id, window, quality gate and a JPEG of the crop (at most 512 px). |
 | `enhance(job, gaze_id, why="")` | CLAHE re-look. Replaces that gaze's crop; segment again afterwards. |
 | `segment(job, gaze_id, model)` | Per-class areas, confidence, entropy, latency. `model` is `accurate` or `fast`. Crack components that are one straight line (formwork, joints) are dropped and listed under `rejected`, as in the agent's step records. |
-| `measure(job, gaze_id, cls)` | Length, width, area, orientation of one class, in L0 pixels. |
+| `measure(job, gaze_id, cls)` | Length, width, area, orientation of one class, in L0 pixels. With v1 a crack's width is its mask's, not the crack's. |
 | `verify(job, gaze_id, why="")` | Looks one level finer at the same centre, segments, and compares with the coarser look's best class (`cls`): `iou` is that class's mask against the finer look's mask of the same class, `class_now` the finer look's best class, `iou_any` the two looks' best masks whatever their classes, and `kind` is `agree` (iou ≥ 0.5), `class-change` (the same place seen as another class: iou_any ≥ 0.5) or `disagree`. All null when the finer look fails the quality gate or shows none of the coarser mask. |
 | `runtime_stats(job)` | p50/p95 per op, CPU %, $ so far, budget against caps, what the governor changed. |
 | `set_budget(job, pixel_cap, usd_cap, seconds_cap, why="")` | Lowers caps (0.02-1.0, 0.0001-0.05, 1-30). Raising one is refused. |

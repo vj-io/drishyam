@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Drishyam · bridge-photo inspection agent</title>
-<meta name="description" content="For bridge inspectors reviewing high-resolution photos: Drishyam finds cracks, spalling and exposed rebar by zooming in only where it needs to, and hands every critical finding to a human. OpenCV AI Competition 2026, powered by AWS · Agentic Vision entry.">
+<meta name="description" content="For bridge inspectors reviewing high-resolution photos: Drishyam chooses where to look, zooms in where its segmenter is unsure, drafts cracks, spalling and other defects for review, and hands every critical finding to a person to sign off. OpenCV AI Competition 2026, powered by AWS · Agentic Vision entry.">
 <meta property="og:title" content="Drishyam: an agent that looks where it matters, then asks a human">
-<meta property="og:description" content="For bridge inspectors reviewing high-resolution photos: it finds cracks, spalling and exposed rebar by zooming in only where it needs to, and hands every critical finding to a human to sign off.">
+<meta property="og:description" content="For bridge inspectors reviewing high-resolution photos: it chooses where to look, zooms in where its segmenter is unsure, drafts cracks, spalling and other defects for review, and hands every critical finding to a person to sign off.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://d1xg58guluup8c.cloudfront.net/">
 <meta property="og:image" content="https://d1xg58guluup8c.cloudfront.net/og.png">
@@ -68,7 +68,7 @@
       <h1 class="wordmark" id="h-top">DRISHYAM</h1>
       <p class="namegloss">Sanskrit: that which is seen</p>
       <div class="dim dim--word" aria-hidden="true"><span>one photo &middot; a few looks &middot; one human</span></div>
-      <p class="lede">For bridge inspectors reviewing high-resolution photos: it finds cracks, spalling and exposed rebar by zooming in only where it needs to, and hands every critical finding to a human to sign off.</p>
+      <p class="lede">For bridge inspectors reviewing high-resolution photos: it chooses where to look, zooms in where its segmenter is unsure, drafts cracks, spalling and other defects for review, and hands every critical finding to a person to sign off.</p>
       <p class="gloss">It works like a PTZ camera (pan-tilt-zoom), done in software: it pans and zooms across one big photo instead of moving a real camera.</p>
       <div class="cta">
         <button class="btn btn--amber btn--xl" id="guided" type="button"><span>Watch it inspect a bridge <span class="cta__time">(under 40 s)</span></span></button>
@@ -391,6 +391,7 @@
         <p class="banner"><b>AI-assisted, not an inspection.</b> Measurements are image pixels, not millimetres.</p>
         <p class="note" id="findings-empty">No findings yet. Each finding shows its evidence first (the crop and pixel measurements), its confidence last.</p>
         <div class="fgroups" id="findings"></div>
+        <div class="fgroups" id="checks"></div>
       </div>
     </section>
 
@@ -574,7 +575,7 @@
       <div class="win__bar"><span class="win__fig" aria-hidden="true">FIG. 6.1</span><h3 class="win__title" id="t-guard">Five protections, all in the demo above</h3></div>
       <div class="win__body">
         <ol class="guards">
-          <li><b>Human sign-off.</b> Exposed rebar, and spalling of 40,000 px&sup2; or more, are critical. Only a person can approve or reject them; the work order stays blocked until they do. The agent, the MCP tools and the planner have no approve path; only the web review and <code>drishyam review</code> have one. Neither checks who is using it: the reviewer&rsquo;s name is self-asserted, and any client holding the signed work order, a script included, can send a review (<a href="https://github.com/vj-io/drishyam/blob/main/docs/security.md#known-limits-stated-not-hidden" rel="noopener noreferrer">security.md, Known limits</a>).</li>
+          <li><b>Human sign-off.</b> Exposed rebar, and spalling of 40,000 px&sup2; or more, are critical. Only a person can approve or reject them; the work order stays blocked until they do. An area the agent could not assess keeps the work order incomplete until a person checks it by eye (nothing found, or defect found). The agent, the MCP tools and the planner have no approve or check path; only the web review and <code>drishyam review</code> have one. Neither checks who is using it: the reviewer&rsquo;s name is self-asserted, and any client holding the signed work order, a script included, can send a review (<a href="https://github.com/vj-io/drishyam/blob/main/docs/security.md#known-limits-stated-not-hidden" rel="noopener noreferrer">security.md, Known limits</a>).</li>
           <li><b>KILL.</b> The KILL button tells the server to halt before the next look. The trace records the cause <i>kill-switch</i> and the state is kept, so Resume replays the looks made so far.</li>
           <li><b>Failure drills.</b> Three switches break things on purpose: a slow segmenter (the governor switches to the fast model), a planner that never answers (the rule planner takes over) and a planner that sends a shell command (the allow-list validator rejects it).</li>
           <li><b>Privacy blur.</b> Faces, people and vehicles are found with OpenCV DNN models and blurred before any look is taken. A photo in which one person fills more than a quarter of the frame is refused: this inspects structures, not people.</li>
@@ -592,7 +593,7 @@
             <tbody>
               <tr>
                 <td data-label="The agent may">Look, zoom, re-run, switch model, change level, batch, draft work orders, request review.</td>
-                <td data-label="Only a human may">Approve or reject a critical finding (exposed rebar; spalling above the area threshold). Raise a job cap.</td>
+                <td data-label="Only a human may">Approve or reject a critical finding (exposed rebar; spalling above the area threshold). Mark an area the agent could not assess as checked by eye. Raise a job cap.</td>
                 <td data-label="Never">Run shell commands, call tools outside the MCP allow-list, output millimetres or safety ratings, act on text read from images.</td>
               </tr>
             </tbody>

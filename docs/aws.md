@@ -4,7 +4,7 @@ The web demo (the FastAPI app and the static site) runs on AWS only, as one CDK 
 `us-east-1`: the API on Lambda arm64 (Graviton) and the static site in a private S3 bucket, both reached
 only through CloudFront and AWS WAF.
 
-**Status: deployed** on 2026-10-21 (India time) to `us-east-1`, last from commit 6e0a6cd on 2026-10-22 (below). The v1 deploy
+**Status: deployed** on 2026-10-21 (India time) to `us-east-1`, last from commit a2b8688 on 2026-10-22 (below). The v1 deploy
 itself came from commit dda3080, with the v1 segmenter
 (`ONNX=models/drishyam_dacl10k.onnx ONNX_FP16=models/drishyam_dacl10k.fp16.onnx RESERVED=none scripts/aws.sh deploy`)
 and the submission film in the site bucket (`video/drishyam.mp4`, served with byte ranges). The smoke run
@@ -13,8 +13,8 @@ from `aws-lambda` on `aarch64` with OpenCV 5.0.0 (`stock (not COOL)`), segmenter
 commit dda3080, a job on `bridge_03.jpg` streamed to `done` (`awaiting_review`, 6 steps), KILL halted a second job
 after 3 steps, an unsigned `POST` through CloudFront got 403, the raw Function URL got 403, and the WAF answered 429
 at the 18th empty-bodied job start. The startup log has `DRISHYAM_CV_THREADS=2: cv2.getNumThreads() = 2`. The step
-p95 was 1138.9 ms over 6 steps: with v1 a step costs 0.52 to 1.14 s at p95 over the eleven smoke runs since the v1
-deploy, against 67.7 to 88.0 ms for the classical engine. At that deploy the governor's 500 ms target sent most
+p95 was 1138.9 ms over 6 steps: with v1 a step costs 0.52 to 1.14 s at p95 over the eleven v1 smoke runs to
+f12f50f (`video/live/aws-smoke.log`; each later run below falls in that range), against 67.7 to 88.0 ms for the classical engine. At that deploy the governor's 500 ms target sent most
 later looks to the fast FP16 net; the v1 limit is now 1500 ms (below). The summary line, copied here because `runs/aws-smoke.log` is git-ignored (UTC; earlier lines are
 in `video/live/aws-smoke.log`):
 
@@ -30,7 +30,24 @@ the second job after 2 steps, and `tests/e2e/test_ui_live.py https://d1xg58guluu
 smoke 2026-10-21T04:21:29Z https://d1xg58guluup8c.cloudfront.net commit=02219a2e435ea90058fcb87f03d69f30cc3f2b4d package=r7K9s9XZtHmkq0+f2OtXiTy1CUyFo5xf2GzQkv6UJMs= ttfb_first=0.857872s ttfb_warm=0.728508s step_p95_ms=973.3 result=pass
 ```
 
-The current build: the site was redeployed from commit 6e0a6cd on 2026-10-22: release 1.1.1's code with the site
+The current build: the site was redeployed from commit a2b8688 on 2026-10-22: a person can check by eye each area
+the agent could not assess (nothing found or defect found, with an optional note; the work order is re-signed and
+reads `ready` once every such area is resolved), the stale claims the v1.1.1 re-grade found are corrected, and the
+figures are at REV 1.1.1. `tests/e2e/test_ui_live.py https://d1xg58guluup8c.cloudfront.net` ran twice before the
+smoke run: the first passed (guided run 35.9 s), the second failed one assertion, its guided run taking 40.8 s
+against the suite's 40 s limit (the site's button says under 40 s). Run twice more once the WAF block had cleared,
+it passed both times (guided runs 36.6 s and 35.3 s). This build changes no agent decision (the same traces and
+work orders on all 10 bundled samples, both engines), so we read the slow run as Lambda step latency, which was
+higher on this deploy's smoke run than on the build before (step p95 994.9 ms against 644.1 ms). The smoke run
+(`WAF_LOOP=1`) passed: a job on `bridge_03.jpg` ended `awaiting_review` after 6 steps, KILL halted the second job
+after 3 steps, both 403 checks held, the WAF answered 429 at the 15th empty-bodied job start, and the step p95 was
+994.9 ms over 6 steps:
+
+```
+smoke 2026-10-22T17:17:47Z https://d1xg58guluup8c.cloudfront.net commit=a2b86883638f0ab0a57ba436d869b8fda4d7c0c8 package=o/3zW0v3pgjX6cA+IzCnrI8Q/OdpDPne05+vfQeQrMI= ttfb_first=1.283786s ttfb_warm=1.287439s step_p95_ms=994.9 result=pass
+```
+
+Before it, the site was redeployed from commit 6e0a6cd on 2026-10-22: release 1.1.1's code with the site
 fixes from a UI audit (the hero's empty column, diagrams that opened raw SVGs, gallery cards that overflowed, wide
 screens, the recorded run's label, KILL states, labels for v1-policy2) and the batch-yield knob, off by default.
 `tests/e2e/test_ui_live.py https://d1xg58guluup8c.cloudfront.net` passed twice against it, and then its smoke run
@@ -146,6 +163,10 @@ Lambda concurrency quota is below 105 (the owner's account has 10), it stops and
 the shorter is to run it as `RESERVED=none scripts/aws.sh deploy` (see [Operate](#operate)). Left
 running, the stack costs about what the [Cost estimate](#cost-estimate) says, mostly the WAF; `destroy`
 removes it, except the `CDKToolkit` bootstrap stack and one small log group (see [Operate](#operate)).
+As written, `deploy` ships the classical engine (no weights). The live site's configuration is v1: download its
+weights first ([README, Run it](../README.md#run-it)), then deploy with
+`ONNX=models/drishyam_dacl10k.onnx ONNX_FP16=models/drishyam_dacl10k.fp16.onnx scripts/aws.sh deploy` (with
+`RESERVED=none` on a small quota, as above).
 
 ## Architecture
 

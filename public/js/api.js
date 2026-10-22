@@ -82,12 +82,16 @@ const REVIEW_ERRORS = {
   409: 'This finding is no longer pending review.',
   429: 'Too many requests from this address. Wait a minute and retry.',
 };
+const CHECKED = 'This area was already checked by eye.';  // a 409 on a check by eye
 
-export async function postReview(body) {
-  if (MOCK) return mockReview(body);
+/** A decision ({finding_id, decision: approve|reject}) or a check by eye ({not_assessed, decision: nothing-found|
+    defect-found, note}). A `recorded` job (a saved trace) was signed by another server, so the page settles it itself. */
+export async function postReview(body, recorded = false) {
+  if (MOCK || recorded) return mockReview(body);
   const res = await post('/api/review', JSON.stringify(body), { 'Content-Type': 'application/json' });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(`${res.status}: ${res.status === 429 ? throttled(data, REVIEW_ERRORS[429]) : REVIEW_ERRORS[res.status] ?? data.error ?? 'review failed'}`);
+  const said = body.not_assessed != null && res.status === 409 ? CHECKED : REVIEW_ERRORS[res.status];
+  if (!res.ok) throw new Error(`${res.status}: ${res.status === 429 ? throttled(data, REVIEW_ERRORS[429]) : said ?? data.error ?? 'review failed'}`);
   return data;
 }
 
@@ -117,12 +121,21 @@ async function* mockStream(url, replayCount, signal) {
   }
 }
 
-async function mockReview({ finding_id, decision, reviewer }) {
+async function mockReview({ finding_id, not_assessed: index, decision, reviewer, note = '' }) {
   await sleep(350);
-  const f = mockOrder?.findings.find((x) => x.id === finding_id);
-  if (!f || f.state !== 'pending_review') throw new Error(`409: ${REVIEW_ERRORS[409]}`);
-  f.state = decision === 'approve' ? 'approved' : 'rejected';
-  mockOrder.approvals.push({ finding_id, decision, reviewer, at: new Date().toISOString().replace(/\.\d+Z$/, 'Z') });
-  mockOrder.status = mockOrder.findings.some((x) => x.critical && x.state === 'pending_review') ? 'blocked' : 'ready';
+  const at = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+  if (index != null) {  // checked by eye, as drishyam/findings.py resolve_entry records it
+    const a = mockOrder?.not_assessed?.[index];
+    if (!a || a.resolution) throw new Error(`409: ${CHECKED}`);
+    a.resolution = { decision, reviewer, at, note };
+    mockOrder.approvals.push({ not_assessed: index, decision, reviewer, at });
+  } else {
+    const f = mockOrder?.findings.find((x) => x.id === finding_id);
+    if (!f || f.state !== 'pending_review') throw new Error(`409: ${REVIEW_ERRORS[409]}`);
+    f.state = decision === 'approve' ? 'approved' : 'rejected';
+    mockOrder.approvals.push({ finding_id, decision, reviewer, at });
+  }
+  mockOrder.status = mockOrder.findings.some((x) => x.critical && x.state === 'pending_review') ? 'blocked'  // order_status
+    : (mockOrder.not_assessed ?? []).some((a) => !a.resolution) ? 'incomplete' : 'ready';
   return { token: `mock.signed.work-order.${++mockTokens}`, work_order: structuredClone(mockOrder) };
 }

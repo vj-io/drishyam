@@ -120,11 +120,19 @@ STALE_CLAIMS = {
     "halted after 2 steps in the": "the f12f50f smoke's KILL halted after 3 steps",
     "zoom until": "v1 zooms in where it is unsure, no finer than L1 or L2 on these photos",
     "l0 · re-segment": "v1 verifies one level finer, never at L0 on a 2048- or 4608-px photo",
+    # the 2026-10-22 re-grade of v1.1.1
+    "segmenter never ran": "fallback_l2 (on since 2026-10-21) gives a zero-candidate photo one whole-photo L2 look",
+    "rule agent takes no look": "the same: the rule agent takes the fallback look (and a recording before it took none)",
+    "so no look was taken": "the same",
+    "close or downgrade": "findings.decide accepts approve and reject only",
+    "about 24,000": "a person signs critical findings, not boxes; the measured 2,536-photo backlog queued 684",
+    "rev 1.1.0": "the figures are REV 1.1.1",
+    "deployed commit adf9474": "the deployed commit is the one docs/aws.md names first; adf9474 first deployed v1-policy2",
 }
 # A deploy older than the live one is named only in the history that records it (and 03af85b as the model's install
 # commit in models/README.md), never as the current build.
 OLD_COMMITS = {"02219a2": {"docs/aws.md"}, "03af85b": {"models/README.md"}}
-FIGURES = [REPO / "docs/architecture.mmd", REPO / "docs/architecture.svg"]
+FIGURES = [REPO / f"docs/{f}" for f in ("architecture.mmd", "architecture.svg", "agent-loop.mmd", "agent-loop.svg")]
 # The lines as the release had them: the check must flag each one.
 OLD_CLAIMS = [
     "That one starts cold (about 3 s with v1), a short job can finish first.",
@@ -133,6 +141,13 @@ OLD_CLAIMS = [
     "sent once step 2 has streamed: halted after 2 steps in the 02219a2 smoke run, section 5",
     "2. Zoom until it’s sure",
     "VERIFY L0 · RE-SEGMENT",
+    "on `real_01` it saw no region worth a look and flagged nothing: the overview proposed no candidate, so the segmenter never ran",
+    "on our wall photo, where the rule agent takes no look, it looked along the faint line",
+    "On one of our own wall photos the overview proposed no region, so no look was taken and a hairline crack was missed.",
+    "the agent, the planner and MCP cannot approve, reject, close or downgrade a critical finding",
+    "it sends 5.5 times the critical boxes to the human gate (at that rate, about 24,000 for a 2,536-photo bridge inspection)",
+    "DRAWN 2026-10-21 · SCALE NTS · REV 1.1.0",
+    "v1-policy2, live since 2026-10-22 (deployed commit adf9474)",
 ]
 
 

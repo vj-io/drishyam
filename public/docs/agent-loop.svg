@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1340 1236" width="1340" height="1236" role="img" aria-labelledby="t d">
 <title id="t">Drishyam agent loop</title>
-<desc id="d">Perception (OpenCV measurements), decision (rule policy with trace causes, optional LLM planner behind an allow-list validator with rule fallback, MCP client as an alternative decision-maker, governor), action (look, log finding, halt) and the human gate. The amber edge is a measured step: entropy 0.80 &gt; tau 0.5 at step 3 made step 4 an escalation one level finer.</desc>
+<desc id="d">Perception (OpenCV measurements), decision (rule policy with trace causes, optional LLM planner behind an allow-list validator with rule fallback, MCP client as an alternative decision-maker, governor), action (look, log finding, halt) and the human gate. v1's live look policy is v1-policy2 (grid first looks, critical classes weighted 2x, a confirm-critical look for a critical mask under confidence 0.6, else a needs-a-look entry for a person); a photo whose overview proposes no candidate gets one whole-photo L2 look (fallback-l2) and stays not assessed. findings.decide accepts approve and reject only, from a human; findings.resolve_entry, a person's check by eye of a not-assessed area, also only from a human. The amber edge is a measured step: entropy 0.80 &gt; tau 0.5 at step 3 made step 4 an escalation one level finer.</desc>
 <style>
   .bg { fill: #072247; }
   .sheet { fill: #0F3B73; stroke: #E8F1FF; stroke-width: 3; }
@@ -117,19 +117,21 @@
 <text x="510" y="256" xml:space="preserve">governor check() still runs before each call</text>
 <text x="510" y="272" xml:space="preserve">no approve tool: it cannot clear a review</text>
 </g>
-<g class="node" data-box="500 356 380 184">
-<rect class="box" x="500" y="356" width="380" height="184"/>
-<text x="510" y="376" class="h" xml:space="preserve">RULE POLICY · agent.py Job.run</text>
-<line class="band" x1="500" y1="386" x2="880" y2="386"/>
-<text x="510" y="400" xml:space="preserve"><tspan class="ca">survey</tspan>          → gaze: one coarse look first</text>
-<text x="510" y="416" xml:space="preserve"><tspan class="ca">best-score</tspan>      → gaze argmax p·s·(1+u)·a/t̂</text>
-<text x="510" y="432" xml:space="preserve"><tspan class="ca">entropy&gt;tau</tspan>     → escalate one level finer</text>
-<text x="510" y="448" xml:space="preserve"><tspan class="ca">area&lt;A_min</tspan>      → escalate one level finer</text>
-<text x="510" y="464" xml:space="preserve">                → mask ≥ A_min: log findings</text>
-<text x="510" y="480" xml:space="preserve"><tspan class="ca">verify-new-mask</tspan> → verify one level finer</text>
-<text x="510" y="496" xml:space="preserve"><tspan class="ca">iou&lt;0.5</tspan>         → verify again, or review</text>
-<text x="510" y="512" xml:space="preserve"><tspan class="ca">stop-rule</tspan>       → halt: best &lt; ε·value/cost</text>
-<text x="510" y="528" xml:space="preserve"><tspan class="ca">exhausted</tspan>       → halt: no candidate left</text>
+<g class="node" data-box="500 324 380 216">
+<rect class="box" x="500" y="324" width="380" height="216"/>
+<text x="510" y="344" class="h" xml:space="preserve">RULE POLICY · agent.py Job.run</text>
+<line class="band" x1="500" y1="354" x2="880" y2="354"/>
+<text x="510" y="368" xml:space="preserve"><tspan class="ca">survey</tspan>           → gaze: one coarse look first</text>
+<text x="510" y="384" xml:space="preserve"><tspan class="ca">fallback-l2</tspan>      → no candidate: whole photo, L2</text>
+<text x="510" y="400" xml:space="preserve"><tspan class="ca">best-score</tspan>       → gaze argmax p·s·(1+u)·a/t̂</text>
+<text x="510" y="416" xml:space="preserve"><tspan class="ca">entropy&gt;tau</tspan>      → escalate one level finer</text>
+<text x="510" y="432" xml:space="preserve"><tspan class="ca">area&lt;A_min</tspan>       → escalate one level finer</text>
+<text x="510" y="448" xml:space="preserve">                 → mask ≥ A_min: log findings</text>
+<text x="510" y="464" xml:space="preserve"><tspan class="ca">verify-new-mask</tspan>  → verify one level finer</text>
+<text x="510" y="480" xml:space="preserve"><tspan class="ca">iou&lt;0.5</tspan>          → verify again, or review</text>
+<text x="510" y="496" xml:space="preserve"><tspan class="ca">confirm-critical</tspan> → conf &lt; 0.6: confirm at same L</text>
+<text x="510" y="512" xml:space="preserve"><tspan class="ca">stop-rule</tspan>        → halt: best &lt; ε·value/cost</text>
+<text x="510" y="528" xml:space="preserve"><tspan class="ca">exhausted</tspan>        → halt: no candidate left</text>
 </g>
 <g class="node" data-box="500 564 380 132">
 <rect class="box" x="500" y="564" width="380" height="132"/>
@@ -169,9 +171,9 @@
 <text x="970" y="200" class="h" xml:space="preserve">LOOK · imaging.gaze</text>
 <line class="band" x1="960" y1="210" x2="1280" y2="210"/>
 <text x="970" y="224" xml:space="preserve"><tspan class="cv">cv2.warpPerspective</tspan>: 512² at (x, y, L)</text>
-<text x="970" y="240" xml:space="preserve">gaze: L from survey or best-score</text>
-<text x="970" y="256" xml:space="preserve">escalate, verify: L-1, centred on</text>
-<text x="970" y="272" xml:space="preserve">what the last look measured</text>
+<text x="970" y="240" xml:space="preserve">survey, best-score: gaze at level L</text>
+<text x="970" y="256" xml:space="preserve">fallback-l2: one L2 view of the photo</text>
+<text x="970" y="272" xml:space="preserve">escalate, verify: L-1; confirm: same L</text>
 <text x="970" y="288" xml:space="preserve">its crop →     in PERCEPTION</text>
 </g>
 <circle class="n" cx="1063.6" cy="284" r="10"/>
@@ -204,14 +206,14 @@
 <path class="edge plain" d="M420 216H460M420 312H460M420 520H460M460 216V422A6 6 0 0 1 460 434V520"/>
 <path class="edge " d="M460 372 L500 372"/>
 <path class="edge " d="M420 772 L500 772"/>
-<path class="edge hot" d="M420 428 L500 428"/>
+<path class="edge hot" d="M420 412 L500 412"/>
 <path class="edge alt" d="M880 232 L960 232"/>
-<path class="edge hot" d="M880 428 L915 428 L915 280 L960 280"/>
+<path class="edge hot" d="M880 412 L915 412 L915 280 L960 280"/>
 <path d="M960 368H917" fill="none" stroke="#FFC857" stroke-width="1.5" stroke-dasharray="3 3"/>
-<path class="edge " d="M880 460 L960 460"/>
+<path class="edge " d="M880 444 L960 444"/>
 <path class="edge " d="M880 508 L905 508 L905 744 L960 744"/>
 <path class="edge " d="M880 772 L960 772"/>
-<rect class="frame" x="60" y="880" width="1240" height="208"/>
+<rect class="frame" x="60" y="880" width="1240" height="224"/>
 <circle class="n" cx="82" cy="900" r="11"/>
 <text class="nt" x="82" y="904" text-anchor="middle">4</text>
 <text x="100" y="904" class="fl" xml:space="preserve">HUMAN</text>
@@ -220,39 +222,40 @@
 <rect class="box gate" x="80" y="916" width="360" height="136"/>
 <text x="90" y="936" class="h" xml:space="preserve">NO OTHER PATH</text>
 <line class="band" x1="80" y1="946" x2="440" y2="946"/>
-<text x="90" y="960" xml:space="preserve">the agent, the planner and MCP</text>
-<text x="90" y="976" xml:space="preserve">cannot approve, reject, close or</text>
-<text x="90" y="992" xml:space="preserve">downgrade a critical finding:</text>
-<text x="90" y="1008" xml:space="preserve">findings.decide raises</text>
-<text x="90" y="1024" xml:space="preserve">ForbiddenTransition unless</text>
-<text x="90" y="1040" xml:space="preserve">actor='human'</text>
+<text x="90" y="960" xml:space="preserve">the agent, the planner and MCP cannot</text>
+<text x="90" y="976" xml:space="preserve">approve, reject or check by eye:</text>
+<text x="90" y="992" xml:space="preserve">findings.decide and resolve_entry raise</text>
+<text x="90" y="1008" xml:space="preserve">ForbiddenTransition unless actor='human';</text>
+<text x="90" y="1024" xml:space="preserve">a later look never makes a critical</text>
+<text x="90" y="1040" xml:space="preserve">finding non-critical</text>
 </g>
 <g class="node" data-box="500 916 380 136">
 <rect class="box gate" x="500" y="916" width="380" height="136"/>
 <text x="510" y="936" class="h" xml:space="preserve">INSPECTOR (a person)</text>
 <line class="band" x1="500" y1="946" x2="880" y2="946"/>
 <text x="510" y="960" xml:space="preserve">sees the crop and px measurements first</text>
-<text x="510" y="976" xml:space="preserve">approve / reject: web review or</text>
+<text x="510" y="976" xml:space="preserve">approve / reject, check by eye: web or</text>
 <text x="510" y="992" xml:space="preserve">drishyam review → decide(actor='human')</text>
 <text x="510" y="1008" xml:space="preserve"><tspan class="rd">KILL</tspan>: UI button or drishyam kill</text>
 <text x="510" y="1024" xml:space="preserve">→ <tspan class="ca">kill-switch</tspan> before the next look</text>
 <text x="510" y="1040" xml:space="preserve">(evidence before any confidence score)</text>
 </g>
-<g class="node" data-box="960 916 280 72">
-<rect class="box" x="960" y="916" width="280" height="72"/>
-<text x="970" y="936" class="h" xml:space="preserve">WORK ORDER</text>
+<g class="node" data-box="960 916 280 88">
+<rect class="box" x="960" y="916" width="280" height="88"/>
+<text x="970" y="936" class="h" xml:space="preserve">WORK ORDER · re-signed (HMAC)</text>
 <line class="band" x1="960" y1="946" x2="1240" y2="946"/>
-<text x="970" y="960" xml:space="preserve">blocked → ready when none pending</text>
-<text x="970" y="976" xml:space="preserve">re-signed (HMAC) after each review</text>
+<text x="970" y="960" xml:space="preserve">blocked: a critical finding pending</text>
+<text x="970" y="976" xml:space="preserve">incomplete: an area left unchecked</text>
+<text x="970" y="992" xml:space="preserve">ready: neither is left</text>
 </g>
-<g class="node" data-box="960 1004 280 72">
-<rect class="box gate" x="960" y="1004" width="280" height="72"/>
-<text x="970" y="1024" class="h" xml:space="preserve">PENDING_REVIEW</text>
-<line class="band" x1="960" y1="1034" x2="1240" y2="1034"/>
-<text x="970" y="1048" xml:space="preserve">exposed_rebar; spalling ≥ 40 000 px²</text>
-<text x="970" y="1064" xml:space="preserve">the work order stays blocked</text>
+<g class="node" data-box="960 1020 280 72">
+<rect class="box gate" x="960" y="1020" width="280" height="72"/>
+<text x="970" y="1040" class="h" xml:space="preserve">PENDING_REVIEW</text>
+<line class="band" x1="960" y1="1050" x2="1240" y2="1050"/>
+<text x="970" y="1064" xml:space="preserve">exposed_rebar; spalling ≥ 40 000 px²</text>
+<text x="970" y="1080" xml:space="preserve">the work order stays blocked</text>
 </g>
-<path class="edge red" d="M1240 480 L1265 480 L1265 1040 L1240 1040"/>
+<path class="edge red" d="M1240 480 L1265 480 L1265 1056 L1240 1056"/>
 <rect class="lbg" x="1159.6" y="857" width="100.4" height="16"/>
 <text x="1256" y="868" class="el red" text-anchor="end" xml:space="preserve">review_request</text>
 <path class="edge " d="M1100 824 L1100 916"/>
@@ -265,7 +268,10 @@
 <path class="edge red" d="M690 916 L690 824"/>
 <rect class="lbg" x="696.0" y="857" width="34.4" height="16"/>
 <text x="700" y="868" class="el red" xml:space="preserve">KILL</text>
-<text x="60" y="1156" class="fs" xml:space="preserve">A planner event's status is accepted, rejected or fallback; a failed proposal's step cause is planner-fallback.</text>
+<text x="60" y="1130" class="fs" xml:space="preserve">v1-policy2, v1's live look policy: first looks one per grid tile that holds a candidate; exposed rebar and spalling weighted 2× in s; a mask that would make a new critical</text>
+<text x="60" y="1146" class="fs" xml:space="preserve">finding under confidence 0.6 gets one confirm-critical look at its level, and if that look does not confirm it, a person checks it by eye (needs-a-look, not assessed).</text>
+<text x="60" y="1162" class="fs" xml:space="preserve">fallback-l2: a photo whose overview proposes no candidate gets one L2 look spanning it, and stays not assessed whatever that look drafts.</text>
+<text x="60" y="1179" class="fs" xml:space="preserve">A planner event's status is accepted, rejected or fallback; a failed proposal's step cause is planner-fallback.</text>
 <text x="60" y="1196" class="fs" xml:space="preserve"><tspan class="cv">cv2.call</tspan> OpenCV call · <tspan class="ca">cause</tspan> trace cause · amber: the measured qualifying edge · dashed sky: alternative driver · red: human gate, kill</text>
-<text x="1280" y="1196" class="fs" text-anchor="end" xml:space="preserve">SHEET A-2 · DRAWN 2026-10-18 · SCALE NTS</text>
+<text x="1280" y="1179" class="fs" text-anchor="end" xml:space="preserve">SHEET A-2 · DRAWN 2026-10-22 · SCALE NTS · REV 1.1.1</text>
 </svg>

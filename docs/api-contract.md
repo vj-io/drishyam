@@ -337,8 +337,8 @@ classical engine finds on CODEBRIM (0.153; v1 x3.13, CI 2.37-4.31). They differ 
 photos: v1 put a box on 1, v2a on 5, v2b on 13, and v2a and v2b each put measurably more boxes on them than v1
 (+0.67 and +1.23 per photo). v1 sends more critical boxes to the human gate on CODEBRIM (7.24 per photo against
 4.22 and 3.94), and its modelled ms per CODEBRIM job are 1.05 times v2a's (CI 1.03-1.08; both tables were timed in
-one window). On dev only, the recommendation is v1 for the live engine, which runs it since 2026-10-21 (deployed commit
-f12f50f): it is the one model with no measurable loss against any other, at 2.00 times the classical engine's modelled ms per
+one window). On dev only, the recommendation is v1 for the live engine, which runs it since 2026-10-21 (first deployed
+from commit f12f50f; the live build is a2b8688): it is the one model with no measurable loss against any other, at 2.00 times the classical engine's modelled ms per
 CODEBRIM job on this Mac (CI 1.89-2.11). v2b's ms there are about 2.5 times v2a's, but timed in one window a v2b
 look costs 0.87 to 1.04 times a v2a look: its table was timed at a higher machine load. v2c, compared later under the
 same criterion (five models; the reading of "each of the others" and v2c's own rule were committed before any v2c
@@ -376,8 +376,8 @@ It takes the normal look path: the governor checks KILL and the caps first (a pi
 `cap-hit`, with no look; on a 1024 × 768 photo the look is 33 % of the pixels), it is charged its pixels and its
 fixed-cost ms, the rules queue its follow-ups (an escalation or a verify one level finer where the profile allows it),
 and what it drafts is reported like any look's findings, critical ones held for a person. The photo keeps its
-`not_assessed` entry (`no candidate region was proposed`) whatever the look drafts, so its work order is never
-`ready`, and `coverage_looked` does not count the look. A resume replays it (`[action, x, y, 2, size]`; that size,
+`not_assessed` entry (`no candidate region was proposed`) whatever the look drafts, so its work order is not
+`ready` until a person has checked the photo by eye ([Checked by eye](#checked-by-eye)), and `coverage_looked` does not count the look. A resume replays it (`[action, x, y, 2, size]`; that size,
 and only at L2, may exceed the 512-px gaze). Why: on our wall photo IMG_2332 (`public/samples/real_01.jpg`, no ground
 truth) the saliency prior peaks at 0.22 against its 0.5 threshold, and the v1 net sees a hairline crack on a
 whole-photo L2 view that a whole-photo L3 view misses; that photo motivated the rule and is not evidence for it. It
@@ -412,7 +412,7 @@ look (`off`), or whose confirm look never ran (a cap, KILL, `max_steps`) becomes
  "action": "check-by-eye", "kind": "needs-a-look", "cls": "spalling", "confidence": 0.55}
 ```
 
-so the order is never `ready` while one is there. `merge_critical`: a critical mask mostly inside (intersection over
+so the order is not `ready` while one is there until a person has checked it by eye ([Checked by eye](#checked-by-eye)). `merge_critical`: a critical mask mostly inside (intersection over
 the smaller box ≥ 0.5) a critical finding of its class joins it: one decision instead of two. Nothing here approves
 anything: every critical finding the agent keeps waits in `pending_review` for a person. A resumed job (replay) runs no
 confirm look: a mask the replayed looks hold goes to `needs-a-look` at once. v1 takes `grid` on, `crit_weight` 2,
@@ -510,8 +510,8 @@ A wrong token is accepted and kills nothing (no oracle). Returns `{"ok": true, "
  "profile": "classical-v1", "weights_sha256": null}
 ```
 
-`status` is `blocked` while any critical finding is `pending_review`, else `incomplete` while `not_assessed` lists
-anything (a person should look there), else `ready`; the done record's own `status` keeps its meaning. `profile` is
+`status` is `blocked` while any critical finding is `pending_review`, else `incomplete` while any `not_assessed`
+entry has no `resolution` (a person should look there: [Checked by eye](#checked-by-eye)), else `ready`; the done record's own `status` keeps its meaning. `profile` is
 the job's (see the step record) and `weights_sha256` the sha256 of the ONNX weights that made its looks (`null` for
 the classical engine); a work order the MCP tools draft has neither, since there the client chose every level.
 `not_assessed` lists every window the quality gate refused (`reason` `blur`, `glare` or `dark`; `box` clipped to the
@@ -520,6 +520,41 @@ no look at all, so an area the agent could not read never passes for a clean one
 lists the whole photo when the overview proposed no candidate (`reason` `no candidate region was proposed`, whatever
 the zero-candidate fallback look drafted) and, after
 a `kill-switch` or `cap-hit` halt, each candidate no look of its own reached (`region` names it).
+
+### Checked by eye
+
+A person resolves a `not_assessed` entry by checking that area by eye: `POST /api/review` with `not_assessed` (below),
+or `drishyam review <work order> na<i> nothing-found|defect-found --by NAME [--note TEXT]`. The entry then carries a
+`resolution`, and the resolution is appended to `approvals` like a decision on a finding, with `not_assessed` (the
+entry's 0-based index in `not_assessed`) in place of `finding_id`:
+
+```json
+"not_assessed": [{"step": 7, "box": [1820, 940, 610, 380], "reason": "spalling at L2, confidence 0.55 under the floor 0.6: not a critical finding; not confirmed by its L2 confirm look",
+                  "action": "check-by-eye", "kind": "needs-a-look", "cls": "spalling", "confidence": 0.55,
+                  "resolution": {"decision": "defect-found", "reviewer": "A. Engineer", "at": "2026-10-24T17:09:00Z",
+                                 "note": "spall over the bearing; no rebar showing"}}],
+"approvals": [{"not_assessed": 0, "decision": "defect-found", "reviewer": "A. Engineer", "at": "2026-10-24T17:09:00Z",
+               "prev_token_sha256": "<SHA-256 hex of the token this resolution was applied to>"}]
+```
+
+- `decision` is `nothing-found` (the person looked there and saw no defect) or `defect-found`. A `defect-found`
+  resolution is a human finding: who, when and the note, nothing more. It has no class, box of its own, confidence or
+  measurement, and the agent never turns it into one: no agent, planner or evaluation code reads `resolution`, and
+  the MCP server only carries it forward (below).
+- `reviewer` is self-asserted, as for approve. `note` is optional (`""` when none): at most 200 printable characters
+  once whitespace is folded.
+- A resolution is final. An entry is resolved once; the entry itself (step, box, reason, action) never changes.
+- `status`: `blocked` while any critical finding is `pending_review`; else `incomplete` while any entry has no
+  `resolution`; else `ready`. So an order is `ready` only when every critical finding is decided and every
+  not-assessed entry is resolved. A `defect-found` entry is resolved: the order is ready to act on, and the defect is
+  in it.
+- Nothing the agent writes carries `resolution`, so the agent's work orders and event streams are what they were, and
+  an order written before resolutions existed (no entry resolved, every approval a `finding_id`) verifies and computes
+  the same status as before. The work order has no schema or version field; the change is additive.
+- Only a person resolves an entry: `findings.resolve_entry` refuses any actor but `human`, and only `/api/review` and
+  `drishyam review` call it. The agent, the planner and the MCP tools have no path to it, as they have none to
+  approve: the MCP server's 12 allow-listed tools include none, and its `draft_work_order` keeps a resolution a person
+  already wrote into its file for an entry it lists again (same step, box and reason), as it keeps decisions.
 
 ### Downloaded work-order file
 
@@ -552,10 +587,28 @@ one, or one with `+` `/` for `-` `_`, is refused with 403 and cannot give a fork
 (`drishyam review` edits an unsigned `work_order.json` and writes no `prev_token_sha256`.)
 Errors: 400 malformed, 403 bad or expired signature, 409 finding not pending.
 
+A person who checked a `not_assessed` entry by eye ([Checked by eye](#checked-by-eye)) sends:
+
+```json
+{"token": "<signed work order>", "not_assessed": 0, "decision": "nothing-found", "reviewer": "A. Engineer",
+ "note": "looked at it on site: sound"}
+```
+
+`not_assessed` is the entry's 0-based index, `decision` is `nothing-found` or `defect-found`, `note` is optional. A
+body names `finding_id` with `approve` or `reject`, or `not_assessed` with `nothing-found` or `defect-found`, never
+both and never a note on approve or reject (400). Returns the re-signed order, with the entry's `resolution` set and
+the resolution appended to `approvals` with `prev_token_sha256`, exactly as for a decision. Errors: 400 malformed, an
+index the order does not list (`no not_assessed entry 5 in this work order (it lists 2)`), or a note over 200
+characters; 403 bad or expired signature; 409 entry already resolved (`not_assessed entry 0 is already resolved:
+nothing-found by A. Engineer at ...`). A token is refused or forked exactly as for approve: an edited token is 403,
+the returned token cannot resolve the same entry again (409), and one token signed into two resolutions gives two
+orders with the same `prev_token_sha256`.
+
 Each accepted review prints one log line; a refused one prints none. On AWS it is a CloudWatch EMF
 record, metric `Reviews` (namespace `Drishyam`, dimension `Decision`), with `wo`, `finding`, `Decision`
-and three SHA-256 hex digests: `reviewer_sha256` (of the reviewer name as stored), `token_in_sha256` (of
+(`not_assessed`, the index, in place of `finding` for a resolution; its `Decision` is `nothing-found` or
+`defect-found`, and its note is not logged) and three SHA-256 hex digests: `reviewer_sha256` (of the reviewer name as stored), `token_in_sha256` (of
 the request's token) and `token_out_sha256` (of the returned token). Neither the name nor a token is
 logged; one review's `token_out_sha256` is the next review's `token_in_sha256`.
-The agent has no route to this transition: only this human endpoint (or the
-`drishyam review` CLI) can approve or reject a critical finding.
+The agent has no route to either transition: only this human endpoint (or the
+`drishyam review` CLI) can approve or reject a critical finding, or resolve a not-assessed entry.

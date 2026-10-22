@@ -11,6 +11,9 @@ drishyam batch FOLDER [MORE FOLDERS, PHOTOS OR .txt LISTS] [--usd-cap TOTAL] [--
     [--router rule|nova] [--batch-yield]
 # a person reviews each critical finding in its photo's work order, as for one photo
 drishyam review runs/batch-<id>/<job>/work_order.json f1 approve --by "A. Engineer"
+# and checks each area a work order lists as not assessed by eye (na0 is its first not_assessed entry)
+drishyam review runs/batch-<id>/<job>/work_order.json na0 nothing-found --by "A. Engineer"
+drishyam review runs/batch-<id>/<job>/work_order.json na1 defect-found --by "A. Engineer" --note "spall at the bearing"
 # then the batch report is recomputed from the work orders and signed again
 drishyam batch --report runs/batch-<id>
 ```
@@ -48,13 +51,20 @@ step. Each run leaves `runs/batch-<id>/`:
 4. **Report.** Each photo's status (`ready`, `incomplete`, `blocked`, or `not assessed`), the human queue (every
    critical finding across all photos, by severity, then confidence), the not-assessed list (photos never reached or
    unusable, zero-candidate photos, the regions a halted job did not look at, glare and dark areas, quality-gate
-   refusals) and the totals ($, seconds, triage seconds, pixels). The batch is `blocked` while any critical finding
-   waits for a person, `incomplete` while anything is not assessed, and `ready` only when neither is left.
+   refusals) and the totals ($, seconds, triage seconds, pixels). An entry from a photo's work order also names
+   `work_order` and `index` (its place in that order's `not_assessed`, the `na<index>` `drishyam review` takes) and,
+   once a person checked it by eye, its `resolution` ([api-contract.md](api-contract.md#checked-by-eye)). The batch is
+   `blocked` while any critical finding waits for a person, `incomplete` while anything not assessed is unresolved
+   (photos not reached, unusable or cleared by the router have no work order, so they stay unresolved), and `ready`
+   only when neither is left.
 
 The human gate is the per-photo one. `drishyam batch --report DIR` verifies the seal, re-reads every photo's work
 order and seals the result again. It refuses when the seal does not verify, or when a critical finding the sealed
 report listed is gone, no longer critical, or left `pending_review` (or changed a decision) without a matching approval
-recorded in its work order. The key is `DRISHYAM_SIGNING_KEY` (32 characters or more, as for the web app), else a
+recorded in its work order; when a not-assessed entry the sealed report listed is gone or changed in its work order;
+and when an entry gained a resolution with no matching resolution recorded in its work order's `approvals`, or a
+resolution changed after it was recorded (a resolution is final). A report sealed before entries named `work_order`
+and `index` recomputes the same way. The key is `DRISHYAM_SIGNING_KEY` (32 characters or more, as for the web app), else a
 random key kept owner-only in `~/.drishyam/signing_key`, made on first use.
 
 ## Does triage help? (dev only)

@@ -15,9 +15,10 @@
    (every critical finding, by severity then confidence), everything not assessed (photos never reached or unusable,
    and each work order's own list), and the totals.
 
-The batch approves nothing. Each photo's work order is reviewed with `drishyam review`; `drishyam batch --report DIR`
-then recomputes the report from the work orders, refusing when the seal does not verify or when a critical finding the
-sealed report listed is gone, or changed state without a recorded review. Every decision is one line of
+The batch approves nothing. Each photo's work order is reviewed with `drishyam review` (a critical finding approved or
+rejected, an area not assessed checked by eye); `drishyam batch --report DIR` then recomputes the report from the work
+orders, refusing when the seal does not verify, when a critical finding the sealed report listed is gone or changed
+state without a recorded review, or when a not-assessed entry it listed is gone, changed, or resolved without one. Every decision is one line of
 batch_trace.jsonl with its cause and the measured values behind it, as each look is in a job's trace.
 
 `--router nova` (drishyam.router) adds a live LLM to steps 1-2: Amazon Nova Lite labels each photo's overview Clear,
@@ -291,12 +292,13 @@ def derive(bdir: Path, report: dict) -> dict:
         queue += [{"photo": p["photo"], "work_order": wo_path, "finding": f["id"], "cls": f["cls"],
                    "confidence": f["confidence"], "state": f["state"], "critical_rule": f["critical_rule"],
                    "box": f["box"]} for f in wo["findings"] if f["critical"]]
-        na += [{"photo": p["photo"], **n} for n in wo["not_assessed"]]
+        na += [{"photo": p["photo"], "work_order": wo_path, "index": i, **n} for i, n in enumerate(wo["not_assessed"])]
     queue.sort(key=lambda q: (-SEVERITY[q["cls"]], -q["confidence"]))
     pending = sum(q["state"] == "pending_review" for q in queue)
     statuses = [p["status"] for p in report["photos"]]
     counts = {s: statuses.count(s) for s in ("blocked", "incomplete", "ready", "not assessed")}
-    status = "blocked" if pending else "incomplete" if na else "ready"
+    # an entry a person checked by eye (its work order's `resolution`) is resolved; a photo with no work order never is
+    status = "blocked" if pending else "incomplete" if any("resolution" not in n for n in na) else "ready"
     cleared = sum(p.get("outcome") == "cleared" for p in report["photos"])
     return {**report, "status": status, "counts": {"photos": len(statuses), **counts, "cleared": cleared,
                                                    "critical": len(queue), "pending": pending},
@@ -345,6 +347,19 @@ def refresh(bdir: Path, key: bytes) -> dict:
             raise findings.ReviewError(f"{where} went from {q['state']} to {state} without a recorded review "
                                        "(drishyam review)")
         changed += 1
+    own = lambda n: {k: v for k, v in n.items() if k not in ("work_order", "index", "resolution")}
+    if [own(n) for n in old["not_assessed"]] != [own(n) for n in new["not_assessed"]]:
+        raise findings.ReviewError("an area the sealed report listed as not assessed is gone or changed in its work "
+                                   "order; only drishyam review resolves one")
+    for o, n in zip(old["not_assessed"], new["not_assessed"]):  # the same entries, in the same order
+        if o.get("resolution") == n.get("resolution"):
+            continue
+        recorded = json.loads((bdir / n["work_order"]).read_text())["approvals"]
+        if "resolution" in o or not any(a.get("not_assessed") == n["index"] and a["decision"] ==
+                                        n["resolution"]["decision"] for a in recorded):
+            raise findings.ReviewError(f"not assessed entry na{n['index']} in {n['work_order']} was resolved or changed "
+                                       "without a recorded check by eye (drishyam review)")
+        changed += 1
     write(bdir, new, key)
     with (bdir / "batch_trace.jsonl").open("a") as f:
         f.write(json.dumps({"type": "batch", "batch": new["id"], "t": now_iso(), "decision": "refreshed",
@@ -381,9 +396,16 @@ def markdown(r: dict) -> str:
                   f"{q['work_order']} |" for q in r["queue"]]
         lines += ["", ("A person decides each one: `drishyam review <this folder>/<work order> <finding> "
                        "approve|reject --by NAME`; `drishyam batch --report <this folder>` then recomputes this report.")]
-    lines += ["", f"## Not assessed: {len(r['not_assessed'])}", ""]
-    lines += [f"- {name(n['photo'])}: {n['reason']} ({n['action']}"
-              f"{', box ' + str(n['box']) if 'box' in n else ''})" for n in r["not_assessed"]]
+    na = r["not_assessed"]
+    checked = lambda n: (f"; checked by eye by {x['reviewer']}: {x['decision']}{': ' + x['note'] if x['note'] else ''}"
+                         if (x := n.get("resolution")) else "")
+    lines += ["", f"## Not assessed: {len(na)}, {sum('resolution' in n for n in na)} of them checked by eye", ""]
+    lines += [f"- {name(n['photo'])}{' na' + str(n['index']) if 'index' in n else ''}: {n['reason']} ({n['action']}"
+              f"{', box ' + str(n['box']) if 'box' in n else ''}){checked(n)}" for n in na]
+    if any("index" in n and "resolution" not in n for n in na):
+        lines += ["", ("A person checks each na entry by eye: `drishyam review <this folder>/<its photo's work order> "
+                       "na<i> nothing-found|defect-found --by NAME [--note TEXT]`; `drishyam batch --report <this "
+                       "folder>` then recomputes this report.")]
     ro = bool(r.get("router"))
     lines += ["", "## Photos, in the order run", "",
               f"| rank | photo |{' router |' * ro} candidates | prior sum | status | s | findings |",

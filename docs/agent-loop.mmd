@@ -4,6 +4,9 @@
 %% tests/test_agent.py::test_opencv_output_changes_the_next_tool_call (conftest scene, FakeClock, pixel_cap=1.0):
 %% step 3 measured entropy 0.80 at L1, so step 4 escalated to L0 with cause entropy>tau.
 %% PERCEPTION = OpenCV measurements; every DECISION step records a cause; HUMAN is the only path out of pending_review.
+%% v1-policy2 (v1's live look policy): grid first looks, exposed rebar and spalling 2x in s, a critical mask under
+%% confidence 0.6 held for one confirm-critical look (else needs-a-look for a person), critical findings of one class merged.
+%% REV 1.1.1 (2026-10-22).
 flowchart TB
     subgraph PERCEPTION["1 · PERCEPTION"]
         OV["overview, once per job<br/>cv2.pyrDown L0–L4, saliency at L3<br/>≤ 20 candidates with a prior p"]
@@ -16,7 +19,7 @@ flowchart TB
 
     subgraph DECISION["2 · DECISION"]
         GOV["governor check(), before every step<br/>kill-switch · cap-hit → halt<br/>p95#gt;SLA → fast model, then coarser<br/>warp-spike → smaller gaze · usd≥80% → critical only"]
-        RULE["rule policy, agent.py<br/>survey · best-score → gaze<br/>entropy#gt;tau · area#lt;A_min → escalate one level finer<br/>verify-new-mask · iou#lt;0.5 → verify one level finer<br/>stop-rule · exhausted → halt"]
+        RULE["rule policy, agent.py (v1: v1-policy2)<br/>survey · best-score → gaze<br/>fallback-l2: no candidate → one L2 look spanning the photo<br/>entropy#gt;tau · area#lt;A_min → escalate one level finer<br/>verify-new-mask · iou#lt;0.5 → verify one level finer<br/>confirm-critical: confidence #lt; 0.6 → confirm at the same level<br/>stop-rule · exhausted → halt"]
         LLM["LLM planner, optional, every 5 steps<br/>sees a numeric digest only"]
         VAL["validate()<br/>6-strategy allow-list"]
         FB["rule fallback<br/>cause planner-fallback:<br/>the rule choice stands"]
@@ -27,15 +30,15 @@ flowchart TB
     end
 
     subgraph ACTION["3 · ACTION"]
-        LOOK["look: cv2.warpPerspective 512² at x, y, level<br/>gaze · escalate L-1 · verify L-1"]
+        LOOK["look: cv2.warpPerspective 512² at x, y, level<br/>gaze · escalate L-1 · verify L-1 · confirm same L<br/>fallback-l2: one L2 view of the whole photo"]
         FIND["log finding<br/>px length, width, area"]
         HALT["halt → work order<br/>coverage, unvisited regions"]
     end
 
     subgraph HUMAN["4 · HUMAN"]
         PEND["pending_review<br/>exposed_rebar · spalling ≥ 40 000 px²"]
-        INSP(["inspector, a person<br/>approve or reject: decide(actor='human')"])
-        WO["work order<br/>blocked → ready, re-signed"]
+        INSP(["inspector, a person<br/>approve or reject: decide(actor='human')<br/>decide accepts approve and reject only<br/>check by eye: resolve_entry(actor='human')"])
+        WO["work order, re-signed (HMAC)<br/>blocked: a critical finding pending<br/>incomplete: an area left unchecked<br/>ready: neither is left"]
         KILL(["KILL: UI button or drishyam kill"])
     end
 
@@ -52,7 +55,7 @@ flowchart TB
     MCP -.->|"tool calls"| LOOK
     FIND -->|"critical: review_request"| PEND
     PEND --> INSP
-    INSP -->|"approve / reject"| WO
+    INSP -->|"approve / reject, check by eye"| WO
     HALT --> WO
     KILL -->|"kill-switch"| GOV
     LOOK -->|"crop of each look"| QG

@@ -3,7 +3,8 @@
 The rule this module exists to enforce: a critical finding (exposed rebar, or
 spalling above the area threshold, or a finding at a place another look saw as
 one of those: `Finding.hold`) can only leave `pending_review` through a
-human decision, and the agent can never make a finding less critical.
+human decision, and the agent can never make a finding less critical. Likewise
+only a person resolves a `not_assessed` entry (checked by eye: `resolve_entry`).
 """
 
 from __future__ import annotations
@@ -22,6 +23,8 @@ IOU_AGREE = 0.5  # PRD rule 3: a finer look whose mask overlaps the coarser one 
 DISCLAIMER = "AI-assisted, not an inspection. Measurements are image pixels, not millimetres."
 TOKEN_TTL_S = 7 * 24 * 3600
 REVIEWER_MAX = 64
+NOTE_MAX = 200
+RESOLUTIONS = ("nothing-found", "defect-found")  # a not_assessed entry a person checked by eye
 
 
 class ReviewError(Exception):
@@ -159,11 +162,37 @@ def work_order(job_id: str, findings: list[Finding], gaze_path: list[list[int]],
 
 
 def order_status(wo: dict) -> str:
-    """blocked while a critical finding awaits a person; incomplete while an area is not assessed (a person looks
-    there); ready only when neither is left."""
+    """blocked while a critical finding awaits a person; incomplete while an area is not assessed and no person has
+    checked it by eye (an entry without a `resolution`); ready only when neither is left."""
     if any(f["state"] == "pending_review" for f in wo["findings"]):
         return "blocked"
-    return "incomplete" if wo["not_assessed"] else "ready"
+    return "incomplete" if any("resolution" not in n for n in wo["not_assessed"]) else "ready"
+
+
+def clean_note(note: str) -> str:
+    note = " ".join((note or "").split())
+    if len(note) > NOTE_MAX or not note.isprintable():
+        raise ReviewError(f"note must be at most {NOTE_MAX} printable characters")
+    return note
+
+
+def resolve_entry(wo: dict, index, decision: str, actor: str, reviewer: str, note: str = "") -> dict:
+    """The only way a not_assessed entry is resolved: a person checked that area by eye. `actor` must be 'human'.
+    A defect-found resolution is a human finding: who, when and the note; nothing turns it into a confidence or a
+    measurement. Returns the audit entry for `approvals`; the caller re-computes the status."""
+    if decision not in RESOLUTIONS:
+        raise ReviewError("decision must be 'nothing-found' or 'defect-found'")
+    if actor != "human":
+        raise ForbiddenTransition("only a human may resolve a not-assessed entry")
+    na = wo["not_assessed"]
+    if type(index) is not int or not 0 <= index < len(na):
+        raise ReviewError(f"no not_assessed entry {index!r} in this work order (it lists {len(na)})")
+    if r := na[index].get("resolution"):
+        raise NotPending(f"not_assessed entry {index} is already resolved: {r['decision']} by {r['reviewer']} "
+                         f"at {r['at']}")
+    at = now_iso()
+    na[index]["resolution"] = {"decision": decision, "reviewer": reviewer, "at": at, "note": note}
+    return {"not_assessed": index, "decision": decision, "reviewer": reviewer, "at": at}
 
 
 def _b64(b: bytes) -> str:
@@ -216,5 +245,16 @@ def apply_review(token: str, key: bytes, finding_id: str, decision: str, reviewe
     decide(match[0], decision, actor="human")
     wo["approvals"].append({"finding_id": finding_id, "decision": decision, "reviewer": reviewer,
                             "at": now_iso(), "prev_token_sha256": hashlib.sha256(token.encode()).hexdigest()})
+    wo["status"] = order_status(wo)
+    return sign(wo, key), wo
+
+
+def apply_resolution(token: str, key: bytes, index, decision: str, reviewer: str, note: str = "") -> tuple[str, dict]:
+    """A person checked not_assessed entry `index` of a signed work order by eye; returns the re-signed order. The
+    resolution joins `approvals` with `prev_token_sha256`, chained and forked exactly as a decision (apply_review)."""
+    reviewer, note = clean_reviewer(reviewer), clean_note(note)
+    wo = verify(token, key)
+    entry = resolve_entry(wo, index, decision, "human", reviewer, note)
+    wo["approvals"].append({**entry, "prev_token_sha256": hashlib.sha256(token.encode()).hexdigest()})
     wo["status"] = order_status(wo)
     return sign(wo, key), wo

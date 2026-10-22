@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1340 1640" width="1340" height="1640" role="img" aria-labelledby="t d">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1340 1720" width="1340" height="1720" role="img" aria-labelledby="t d">
 <title id="t">Drishyam system architecture</title>
-<desc id="d">Clients (browser UI, drishyam CLI, MCP client) reach one agent core: the browser through CloudFront with OAC and WAF, a Lambda Function URL and an arm64 Lambda running the FastAPI web tier (deployed; v1, the dacl10k-trained segmenter, runs live since 2026-10-21), with the static site in a private S3 bucket behind the same distribution; the CLI and MCP server run it locally. The agent core (policy, governor, planner with allow-list validator, human gate) drives the OpenCV 5 layer and emits an NDJSON trace and a signed work order. DynamoDB holds the kill flag, Secrets Manager the signing key, CloudWatch the metrics and alarms, X-Ray the traces, AWS Budgets the spend alerts; alarms and budget alerts reach the owner's email through SNS.</desc>
+<desc id="d">Clients (browser UI, drishyam CLI, MCP client) reach one agent core: the browser through CloudFront with OAC and WAF, a Lambda Function URL and an arm64 Lambda running the FastAPI web tier (deployed; v1, the dacl10k-trained segmenter, runs live since 2026-10-21, with the v1-policy2 look policy since 2026-10-22; live build a2b8688), with the static site in a private S3 bucket behind the same distribution; the CLI and MCP server run it locally. The agent core (policy with the zero-candidate fallback and v1-policy2's confirm looks, governor, planner with allow-list validator, human gate whose decide accepts approve and reject only) drives the OpenCV 5 layer and emits an NDJSON trace and a signed work order. DynamoDB holds the kill flag, Secrets Manager the signing key, CloudWatch the metrics and alarms, X-Ray the traces, AWS Budgets the spend alerts; alarms and budget alerts reach the owner's email through SNS. The CLI's drishyam batch can route photos through Amazon Nova Lite on Bedrock (--router nova, off by default, CLI only) and has an off-by-default --batch-yield rule.</desc>
 <style>
   .bg { fill: #072247; }
   .sheet { fill: #0F3B73; stroke: #E8F1FF; stroke-width: 3; }
@@ -47,17 +47,17 @@
   <marker id="arr-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 1L10 5L0 9Z" fill="#FFC857"/></marker>
   <marker id="arr-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><path d="M0 1L10 5L0 9Z" fill="#FF9A8A"/></marker>
 </defs>
-<rect class="bg" width="1340" height="1640"/>
-<rect class="sheet" x="12" y="12" width="1316" height="1616"/>
-<rect x="13.5" y="13.5" width="1313" height="1613" fill="url(#g40)"/>
-<rect class="inner" x="18" y="18" width="1304" height="1604"/>
+<rect class="bg" width="1340" height="1720"/>
+<rect class="sheet" x="12" y="12" width="1316" height="1696"/>
+<rect x="13.5" y="13.5" width="1313" height="1693" fill="url(#g40)"/>
+<rect class="inner" x="18" y="18" width="1304" height="1684"/>
 <path class="cross" d="M17 26H35M26 17V35"/><circle class="cross" cx="26" cy="26" r="4.5"/>
 <path class="cross" d="M1305 26H1323M1314 17V35"/><circle class="cross" cx="1314" cy="26" r="4.5"/>
-<path class="cross" d="M17 1614H35M26 1605V1623"/><circle class="cross" cx="26" cy="1614" r="4.5"/>
-<path class="cross" d="M1305 1614H1323M1314 1605V1623"/><circle class="cross" cx="1314" cy="1614" r="4.5"/>
+<path class="cross" d="M17 1694H35M26 1685V1703"/><circle class="cross" cx="26" cy="1694" r="4.5"/>
+<path class="cross" d="M1305 1694H1323M1314 1685V1703"/><circle class="cross" cx="1314" cy="1694" r="4.5"/>
 <text x="60" y="74" class="sheet-title" xml:space="preserve">DRISHYAM · SYSTEM ARCHITECTURE</text>
 <text x="1280" y="56" class="fs" text-anchor="end" xml:space="preserve">FIG. A-1 · OpenCV 5 components, AWS services and agent components</text>
-<text x="1280" y="74" class="fs" text-anchor="end" xml:space="preserve">cv2 calls, modules and causes are real names in drishyam/ at v1.1.0 (ae16bd8)</text>
+<text x="1280" y="74" class="fs" text-anchor="end" xml:space="preserve">cv2 calls, modules and causes are real names in drishyam/ at v1.1.1 (a2b8688)</text>
 <line class="tbl" x1="36" y1="92" x2="1304" y2="92"/>
 <rect class="frame" x="60" y="108" width="460" height="156"/>
 <circle class="n" cx="82" cy="128" r="11"/>
@@ -80,7 +80,8 @@
 <circle class="n" cx="82" cy="320" r="11"/>
 <text class="nt" x="82" y="324" text-anchor="middle">2</text>
 <text x="100" y="324" class="fl" xml:space="preserve">ENTRY · AWS PATH</text>
-<text x="252.24" y="324" class="fs" xml:space="preserve">v1 live 2026-10-21, smoke-tested</text>
+<rect class="lbg" x="248" y="313" width="522" height="16"/>
+<text x="252.24" y="324" class="fs" xml:space="preserve">v1 live since 2026-10-21 · v1-policy2 since 2026-10-22 · a2b8688 smoke-tested</text>
 <g class="node" data-box="80 344 440 104">
 <rect class="box" x="80" y="344" width="440" height="104"/>
 <text x="90" y="364" class="h" xml:space="preserve">CLOUDFRONT DISTRIBUTION</text>
@@ -137,6 +138,13 @@
 <text x="590" y="648" xml:space="preserve">spend alerts → the same SNS topic</text>
 <text x="590" y="664" xml:space="preserve">account level, not on the request path</text>
 </g>
+<g class="node" data-box="580 688 340 72">
+<rect class="box alt" x="580" y="688" width="340" height="72"/>
+<text x="590" y="708" class="h" xml:space="preserve">AMAZON BEDROCK · NOVA LITE</text>
+<line class="band" x1="580" y1="718" x2="920" y2="718"/>
+<text x="590" y="732" xml:space="preserve">drishyam batch --router nova, CLI only</text>
+<text x="590" y="748" xml:space="preserve">off by default; not on the web path</text>
+</g>
 </g>
 <path class="edge " d="M300 448 L300 476"/>
 <path class="edge " d="M300 548 L300 576"/>
@@ -151,52 +159,59 @@
 <text class="nt" x="1002" y="324" text-anchor="middle">1</text>
 <text x="1020" y="324" class="fl" xml:space="preserve">CLIENTS · LOCAL</text>
 <text x="1163.6" y="324" class="fs" xml:space="preserve">no network</text>
-<g class="node" data-box="1000 344 280 120">
-<rect class="box" x="1000" y="344" width="280" height="120"/>
+<g class="node" data-box="1000 344 280 168">
+<rect class="box" x="1000" y="344" width="280" height="168"/>
 <text x="1010" y="364" class="h" xml:space="preserve">DRISHYAM CLI</text>
 <line class="band" x1="1000" y1="374" x2="1280" y2="374"/>
 <text x="1010" y="388" xml:space="preserve">run → Job.run() in-process</text>
-<text x="1010" y="404" xml:space="preserve">review → decide(actor='human')</text>
+<text x="1010" y="404" xml:space="preserve">review → decide or check by eye</text>
 <text x="1010" y="420" xml:space="preserve"><tspan class="rd">kill</tspan> → ~/.drishyam/KILL file</text>
 <text x="1010" y="436" xml:space="preserve">writes runs/&lt;job&gt;/trace.jsonl</text>
 <text x="1010" y="452" xml:space="preserve">and work_order.json</text>
+<text x="1010" y="468" xml:space="preserve">batch → triage, one budget, a queue</text>
+<text x="1010" y="484" xml:space="preserve">  --router rule (default) | nova</text>
+<text x="1010" y="500" xml:space="preserve">  --batch-yield (off by default)</text>
 </g>
-<g class="node" data-box="1000 500 255 136">
-<rect class="box" x="1000" y="500" width="255" height="136"/>
-<text x="1010" y="520" class="h" xml:space="preserve">MCP CLIENT · e.g. Claude Code</text>
-<line class="band" x1="1000" y1="530" x2="1255" y2="530"/>
-<text x="1010" y="544" xml:space="preserve">drishyam mcp: stdio JSON-RPC</text>
-<text x="1010" y="560" xml:space="preserve">12 allow-listed tools: no</text>
-<text x="1010" y="576" xml:space="preserve">approve, no file write, no shell</text>
-<text x="1010" y="592" xml:space="preserve">the client's LLM picks each call</text>
-<text x="1010" y="608" xml:space="preserve">in place of the agent.py policy</text>
-<text x="1010" y="624" xml:space="preserve">governor check() before a call</text>
+<g class="node" data-box="1000 532 255 136">
+<rect class="box" x="1000" y="532" width="255" height="136"/>
+<text x="1010" y="552" class="h" xml:space="preserve">MCP CLIENT · e.g. Claude Code</text>
+<line class="band" x1="1000" y1="562" x2="1255" y2="562"/>
+<text x="1010" y="576" xml:space="preserve">drishyam mcp: stdio JSON-RPC</text>
+<text x="1010" y="592" xml:space="preserve">12 allow-listed tools: no</text>
+<text x="1010" y="608" xml:space="preserve">approve, no file write, no shell</text>
+<text x="1010" y="624" xml:space="preserve">the client's LLM picks each call</text>
+<text x="1010" y="640" xml:space="preserve">in place of the agent.py policy</text>
+<text x="1010" y="656" xml:space="preserve">governor check() before a call</text>
 </g>
 <path class="edge " d="M300 744 L300 810"/>
 <rect class="lbg" x="306.0" y="784" width="199.4" height="16"/>
 <text x="310" y="795" class="el" xml:space="preserve">Job(image, cfg, kill=…).run()</text>
-<path class="edge " d="M1268 464 L1268 810"/>
-<path class="edge " d="M1127 636 L1127 810"/>
-<rect class="lbg" x="1133.0" y="713" width="74.0" height="16"/>
-<text x="1137" y="724" class="el" xml:space="preserve">tool calls</text>
-<rect class="frame" x="60" y="810" width="1240" height="190"/>
+<path class="edge " d="M1268 512 L1268 810"/>
+<path class="edge alt" d="M1000 490 L960 490 L960 724 L920 724"/>
+<path class="edge " d="M1127 668 L1127 810"/>
+<rect class="lbg" x="1133.0" y="729" width="74.0" height="16"/>
+<text x="1137" y="740" class="el" xml:space="preserve">tool calls</text>
+<rect class="frame" x="60" y="810" width="1240" height="238"/>
 <circle class="n" cx="82" cy="830" r="11"/>
 <text class="nt" x="82" y="834" text-anchor="middle">3</text>
 <text x="100" y="834" class="fl" xml:space="preserve">AGENT CORE · drishyam/</text>
 <text x="304.08" y="834" class="fs" xml:space="preserve">one codebase behind every client</text>
-<g class="node" data-box="80 846 285 136">
-<rect class="box" x="80" y="846" width="285" height="136"/>
+<g class="node" data-box="80 846 285 184">
+<rect class="box" x="80" y="846" width="285" height="184"/>
 <text x="90" y="866" class="h" xml:space="preserve">AGENT.PY · POLICY (Job.run)</text>
 <line class="band" x1="80" y1="876" x2="365" y2="876"/>
 <text x="90" y="890" xml:space="preserve"><tspan class="ca">survey</tspan>: one coarse look first</text>
 <text x="90" y="906" xml:space="preserve"><tspan class="ca">best-score</tspan>: argmax p·s·(1+u)·a/t̂</text>
-<text x="90" y="922" xml:space="preserve"><tspan class="ca">entropy&gt;tau</tspan>, <tspan class="ca">area&lt;A_min</tspan> → escalate</text>
-<text x="90" y="938" xml:space="preserve"><tspan class="ca">verify-new-mask</tspan>, <tspan class="ca">iou&lt;0.5</tspan> → verify</text>
-<text x="90" y="954" xml:space="preserve"><tspan class="ca">stop-rule</tspan>: best &lt; ε·value/cost</text>
-<text x="90" y="970" xml:space="preserve">every step logs a cause + rationale</text>
+<text x="90" y="922" xml:space="preserve">  (v1-policy2: grid, critical s ×2)</text>
+<text x="90" y="938" xml:space="preserve"><tspan class="ca">entropy&gt;tau</tspan>, <tspan class="ca">area&lt;A_min</tspan> → escalate</text>
+<text x="90" y="954" xml:space="preserve"><tspan class="ca">verify-new-mask</tspan>, <tspan class="ca">iou&lt;0.5</tspan> → verify</text>
+<text x="90" y="970" xml:space="preserve"><tspan class="ca">fallback-l2</tspan>: no candidate → L2 look</text>
+<text x="90" y="986" xml:space="preserve"><tspan class="ca">confirm-critical</tspan>: conf &lt; 0.6</text>
+<text x="90" y="1002" xml:space="preserve">  → confirm look, else needs-a-look</text>
+<text x="90" y="1018" xml:space="preserve"><tspan class="ca">stop-rule</tspan>: best &lt; ε·value/cost</text>
 </g>
-<g class="node" data-box="385 846 285 136">
-<rect class="box" x="385" y="846" width="285" height="136"/>
+<g class="node" data-box="385 846 285 184">
+<rect class="box" x="385" y="846" width="285" height="184"/>
 <text x="395" y="866" class="h" xml:space="preserve">GOVERNOR.PY · check() FIRST</text>
 <line class="band" x1="385" y1="876" x2="670" y2="876"/>
 <text x="395" y="890" xml:space="preserve"><tspan class="ca">kill-switch</tspan> → halt</text>
@@ -206,8 +221,8 @@
 <text x="395" y="954" xml:space="preserve"><tspan class="ca">usd≥80%</tspan> → verify critical only</text>
 <text x="395" y="970" xml:space="preserve">every override writes its cause</text>
 </g>
-<g class="node" data-box="690 846 285 136">
-<rect class="box" x="690" y="846" width="285" height="136"/>
+<g class="node" data-box="690 846 285 184">
+<rect class="box" x="690" y="846" width="285" height="184"/>
 <text x="700" y="866" class="h" xml:space="preserve">PLANNER.PY · OPTIONAL LLM</text>
 <line class="band" x1="690" y1="876" x2="975" y2="876"/>
 <text x="700" y="890" xml:space="preserve">sees Job.digest(): numbers only</text>
@@ -217,24 +232,28 @@
 <text x="700" y="954" xml:space="preserve">accepted → <tspan class="ca">planner:&lt;strategy&gt;</tspan></text>
 <text x="700" y="970" xml:space="preserve">HTTPS or loopback endpoint only</text>
 </g>
-<g class="node" data-box="995 846 285 136">
-<rect class="box gate" x="995" y="846" width="285" height="136"/>
+<g class="node" data-box="995 846 285 184">
+<rect class="box gate" x="995" y="846" width="285" height="184"/>
 <text x="1005" y="866" class="h" xml:space="preserve">FINDINGS.PY · HUMAN GATE</text>
 <line class="band" x1="995" y1="876" x2="1280" y2="876"/>
 <text x="1005" y="890" xml:space="preserve">exposed_rebar, spalling ≥ 40 000 px²</text>
 <text x="1005" y="906" xml:space="preserve">→ <tspan class="rd">pending_review</tspan></text>
-<text x="1005" y="922" xml:space="preserve">decide(): only actor='human'</text>
-<text x="1005" y="938" xml:space="preserve">agent, planner, MCP: no path out</text>
-<text x="1005" y="954" xml:space="preserve">work order HMAC-SHA256 sign/verify</text>
-<text x="1005" y="970" xml:space="preserve">re-signed after each human review</text>
+<text x="1005" y="922" xml:space="preserve">decide(): approve or reject only,</text>
+<text x="1005" y="938" xml:space="preserve">  and only actor='human'</text>
+<text x="1005" y="954" xml:space="preserve">resolve_entry(): check by eye,</text>
+<text x="1005" y="970" xml:space="preserve">  also only actor='human'</text>
+<text x="1005" y="986" xml:space="preserve">agent, planner, MCP: no path out</text>
+<text x="1005" y="1002" xml:space="preserve">work order HMAC-SHA256 sign/verify</text>
+<text x="1005" y="1018" xml:space="preserve">re-signed after each human review</text>
 </g>
+<g transform="translate(0 48)">
 <path class="edge " d="M300 1000 L300 1050"/>
 <rect class="lbg" x="306.0" y="1019" width="305.0" height="16"/>
 <text x="310" y="1030" class="el" xml:space="preserve">calls gaze · quality · segment_view · measure</text>
 <path class="edge " d="M860 1050 L860 1000"/>
 <rect class="lbg" x="866.0" y="1019" width="318.2" height="16"/>
 <text x="870" y="1030" class="el" xml:space="preserve">returns entropy, mask areas, IoU, sharpness, ms</text>
-<rect class="frame" x="60" y="1050" width="1240" height="370"/>
+<rect class="frame" x="60" y="1050" width="1240" height="386"/>
 <circle class="n" cx="82" cy="1070" r="11"/>
 <text class="nt" x="82" y="1074" text-anchor="middle">4</text>
 <text x="100" y="1074" class="fl" xml:space="preserve">OPENCV 5 LAYER</text>
@@ -318,32 +337,36 @@
 <path class="edge " d="M359 1320 L387 1320"/>
 <path class="edge " d="M666 1320 L694 1320"/>
 <path class="edge " d="M973 1320 L1001 1320"/>
-<text x="80" y="1404" class="fs" xml:space="preserve">★ OpenCV-5-specific: the engine=<tspan class="cv">cv2.dnn.ENGINE_NEW</tspan> argument (segment.py, OnnxSegmenter._load). Every other call above also exists in OpenCV 4.x.</text>
-<path class="edge " d="M60 914 L40 914 L40 1540 L60 1540"/>
-<rect class="frame" x="60" y="1460" width="800" height="140"/>
+<text x="80" y="1404" class="fs" xml:space="preserve">★ OpenCV-5-only: the engine=<tspan class="cv">cv2.dnn.ENGINE_NEW</tspan> argument (segment.py, OnnxSegmenter._load), and a NumPy bool mask read as CV_Bool by</text>
+<text x="80" y="1420" class="fs" xml:space="preserve"><tspan class="cv">cv2.copyTo</tspan> in segment.restrict (CV_BOOL_MASKS, on since 2026-10-22). Every other call above also exists in OpenCV 4.x.</text>
+</g>
+<path class="edge " d="M60 914 L40 914 L40 1604 L60 1604"/>
+<g transform="translate(0 64)">
+<rect class="frame" x="60" y="1460" width="800" height="156"/>
 <circle class="n" cx="82" cy="1480" r="11"/>
 <text class="nt" x="82" y="1484" text-anchor="middle">5</text>
 <text x="100" y="1484" class="fl" xml:space="preserve">OUTPUTS</text>
 <text x="174.48" y="1484" class="fs" xml:space="preserve">yielded by Job.run(): streamed or written</text>
-<g class="node" data-box="80 1496 370 88">
-<rect class="box" x="80" y="1496" width="370" height="88"/>
+<g class="node" data-box="80 1496 370 104">
+<rect class="box" x="80" y="1496" width="370" height="104"/>
 <text x="90" y="1516" class="h" xml:space="preserve">NDJSON TRACE</text>
 <line class="band" x1="80" y1="1526" x2="450" y2="1526"/>
 <text x="90" y="1540" xml:space="preserve">one line per step: decision, observation,</text>
 <text x="90" y="1556" xml:space="preserve">runtime p50/p95, cause, rationale</text>
 <text x="90" y="1572" xml:space="preserve">web: streamed · CLI/MCP: trace.jsonl</text>
 </g>
-<g class="node" data-box="470 1496 370 88">
-<rect class="box" x="470" y="1496" width="370" height="88"/>
+<g class="node" data-box="470 1496 370 104">
+<rect class="box" x="470" y="1496" width="370" height="104"/>
 <text x="480" y="1516" class="h" xml:space="preserve">WORK ORDER · work_order.json</text>
 <line class="band" x1="470" y1="1526" x2="840" y2="1526"/>
-<text x="480" y="1540" xml:space="preserve">findings, gaze_path, approvals;</text>
-<text x="480" y="1556" xml:space="preserve">blocked while any is <tspan class="rd">pending_review</tspan></text>
-<text x="480" y="1572" xml:space="preserve">web: HMAC-SHA256 token, 7-day expiry</text>
+<text x="480" y="1540" xml:space="preserve">findings, not_assessed, approvals;</text>
+<text x="480" y="1556" xml:space="preserve">blocked while any is <tspan class="rd">pending_review</tspan>,</text>
+<text x="480" y="1572" xml:space="preserve">incomplete while an area is unchecked,</text>
+<text x="480" y="1588" xml:space="preserve">else ready · web: HMAC token, 7-day expiry</text>
 </g>
-<rect class="tb" x="880" y="1460" width="420" height="140"/>
+<rect class="tb" x="880" y="1460" width="420" height="156"/>
 <line class="tbl" x1="880" y1="1504" x2="1300" y2="1504"/>
-<line class="tbl" x1="880" y1="1576" x2="1300" y2="1576"/>
+<line class="tbl" x1="880" y1="1592" x2="1300" y2="1592"/>
 <line class="tbl" x1="1150" y1="1460" x2="1150" y2="1504"/>
 <text x="896" y="1492" class="tbig" xml:space="preserve">DRISHYAM</text>
 <text x="1166" y="1488" class="fl" xml:space="preserve">SHEET A-1</text>
@@ -351,5 +374,6 @@
 <text x="926" y="1523" class="fs" xml:space="preserve">built and tested</text>
 <text x="896" y="1545" class="fs" xml:space="preserve"><tspan class="cv">cv2.call</tspan> OpenCV call · <tspan class="ca">cause</tspan> trace cause</text>
 <text x="896" y="1566" class="fs" xml:space="preserve"><tspan class="rd">red</tspan> human gate or kill · ★ OpenCV-5-only</text>
-<text x="896" y="1593" class="fs" xml:space="preserve">DRAWN 2026-10-21 · SCALE NTS · REV 1.1.0</text>
+<text x="896" y="1609" class="fs" xml:space="preserve">DRAWN 2026-10-22 · SCALE NTS · REV 1.1.1</text>
+</g>
 </svg>

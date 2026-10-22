@@ -1,13 +1,14 @@
 %% Drishyam system architecture: the same content as docs/architecture.svg.
 %% cv2 names are the calls made in drishyam/imaging.py, privacy.py, segment.py, measure.py and agent.py.
+%% REV 1.1.1 (2026-10-22), the code of the live build a2b8688.
 flowchart TB
     subgraph CLIENTS["1 · Clients"]
         UI["Browser UI<br/>public/index.html + app.js, strict CSP<br/>upload · live trace · review · KILL"]
-        CLI["drishyam CLI, local<br/>run → Job.run() in-process<br/>review → decide(actor='human') · kill → KILL file"]
+        CLI["drishyam CLI, local<br/>run → Job.run() in-process<br/>review → decide or check by eye (actor='human') · kill → KILL file<br/>batch → triage, one budget, one queue<br/>--router rule (default) | nova · --batch-yield (off by default)"]
         MCPC["MCP client, e.g. Claude Code, local<br/>drishyam mcp over stdio<br/>12 allow-listed tools: no approve, no shell"]
     end
 
-    subgraph AWS["2 · AWS path (deployed, us-east-1; v1 live since 2026-10-21, commit f12f50f)"]
+    subgraph AWS["2 · AWS path (deployed, us-east-1; v1 live since 2026-10-21, v1-policy2 since 2026-10-22; live build a2b8688)"]
         CF["CloudFront + Origin Access Control on both origins<br/>site from a private S3 bucket · /api/* to the Function URL<br/>AWS WAF rate-based rules<br/>POST bodies carry x-amz-content-sha256"]
         FURL["Lambda Function URL<br/>AuthType AWS_IAM · InvokeMode RESPONSE_STREAM"]
         LAMBDA["Lambda arm64 (Graviton) · Python 3.12<br/>AWS Lambda Web Adapter → FastAPI web tier, web.py<br/>CSP · HMAC-SHA256 work-order token · per-job kill token"]
@@ -15,13 +16,14 @@ flowchart TB
         SM["Secrets Manager<br/>DRISHYAM_SIGNING_KEY"]
         CW["CloudWatch + X-Ray<br/>EMF metrics · dashboard · traces · alarms → SNS → email (verified 2026-10-21)"]
         BUD["AWS Budgets<br/>spend alerts → the same SNS topic"]
+        BR["Amazon Bedrock, Nova Lite<br/>drishyam batch --router nova only: CLI, off by default<br/>not on the web path"]
     end
 
     subgraph CORE["3 · Agent core, drishyam/"]
-        POLICY["agent.py Job.run policy<br/>survey · best-score · entropy#gt;tau · area#lt;A_min<br/>verify-new-mask · iou#lt;0.5 · stop-rule"]
+        POLICY["agent.py Job.run policy (v1: v1-policy2, grid first looks, critical s ×2)<br/>survey · best-score · entropy#gt;tau · area#lt;A_min<br/>verify-new-mask · iou#lt;0.5 · stop-rule<br/>fallback-l2: no candidate → one whole-photo L2 look<br/>confirm-critical: confidence #lt; 0.6 → confirm look, else needs-a-look"]
         GOV["governor.py check() before every step<br/>kill-switch · cap-hit · p95#gt;SLA · warp-spike · usd≥80%"]
         PLAN["planner.py, optional LLM<br/>numeric digest → validate() allow-list<br/>on any failure the rule choice stands"]
-        GATE["findings.py human gate<br/>exposed_rebar, spalling ≥ 40 000 px² → pending_review<br/>only decide(actor='human') leaves it"]
+        GATE["findings.py human gate<br/>exposed_rebar, spalling ≥ 40 000 px² → pending_review<br/>only decide(actor='human') leaves it: approve or reject only<br/>resolve_entry(actor='human'): a not-assessed area checked by eye"]
         GOV --> POLICY
         PLAN --> POLICY
         POLICY --> GATE
@@ -34,7 +36,7 @@ flowchart TB
         SAL["saliency at L3<br/>cv2.createCLAHE · cv2.Sobel · cv2.morphologyEx BLACKHAT<br/>cv2.adaptiveThreshold · cv2.inRange · cv2.connectedComponentsWithStats"]
         GAZE["virtual PTZ gaze<br/>cv2.warpPerspective · cv2.perspectiveTransform"]
         QG["quality gate<br/>cv2.Laplacian variance, glare, dark"]
-        SEG["segment<br/>cv2.dnn.readNetFromONNX, engine=cv2.dnn.ENGINE_NEW (OpenCV 5 only): v1, the live engine<br/>fallback: the classical engine, no weights"]
+        SEG["segment<br/>cv2.dnn.readNetFromONNX, engine=cv2.dnn.ENGINE_NEW (OpenCV 5 only): v1, the live engine<br/>cv2.copyTo with a NumPy bool mask read as CV_Bool (OpenCV 5 only; CV_BOOL_MASKS, on)<br/>fallback: the classical engine, no weights"]
         MEAS["measure + verify<br/>cv2.morphologyEx HITMISS · cv2.minAreaRect · cv2.arcLength<br/>look_iou: cv2.warpPerspective + cv2.dilate"]
         DEC --> PRIV --> PYR --> SAL
         GAZE --> QG --> SEG --> MEAS
@@ -42,7 +44,7 @@ flowchart TB
 
     subgraph OUT["5 · Outputs"]
         TRACE["NDJSON trace, one line per step<br/>web: streamed · CLI/MCP: trace.jsonl"]
-        WO["work_order.json<br/>web: HMAC-SHA256 token, 7-day expiry"]
+        WO["work_order.json<br/>blocked · incomplete (not assessed) · ready<br/>web: HMAC-SHA256 token, 7-day expiry"]
     end
 
     UI -->|"HTTPS · NDJSON streams back"| CF
@@ -51,6 +53,7 @@ flowchart TB
     SM -->|"signing key"| LAMBDA
     LAMBDA -->|"EMF"| CW
     BUD ~~~ CW
+    CLI -.->|"--router nova"| BR
     LAMBDA -->|"Job(image, cfg, kill).run()"| CORE
     CLI -->|"in-process"| CORE
     MCPC -->|"tool calls"| CORE

@@ -309,6 +309,78 @@ def test_a_work_order_edited_around_the_review_is_refused(copy):
     assert refresh(copy)[0] == 0
 
 
+def resolve_all(bdir: Path, names, decision="nothing-found"):
+    for name in names:
+        wo = member(bdir, name)
+        doc = json.loads(wo.read_text())
+        for f in doc["findings"]:
+            if f["state"] == "pending_review":
+                assert cli.main(["review", str(wo), f["id"], "approve", "--by", "A. Engineer"]) == 0
+        for i, n in enumerate(doc["not_assessed"]):
+            if "resolution" not in n:
+                assert cli.main(["review", str(wo), f"na{i}", decision, "--by", "A. Engineer"]) == 0
+
+
+def test_checking_every_entry_by_eye_makes_the_batch_ready(copy):
+    """Each entry from a work order names its work order and index; `--report` recomputes with the resolutions, and the
+    batch is ready only once every critical finding is decided and every entry is resolved."""
+    rep = batch.verify_report(copy, KEY.encode())
+    na = rep["not_assessed"]
+    assert na and all(Path(copy / n["work_order"]).exists() and "resolution" not in n for n in na)
+    for n in na:  # the index is the entry's place in its own work order
+        listed = json.loads((copy / n["work_order"]).read_text())["not_assessed"][n["index"]]
+        assert listed == {k: v for k, v in n.items() if k not in ("photo", "work_order", "index")}
+    resolve_all(copy, ["a_real_01.jpg"], "defect-found")
+    assert refresh(copy)[0] == 0
+    rep = batch.verify_report(copy, KEY.encode())
+    assert by_name(rep)["a_real_01.jpg"]["status"] == "ready" and rep["status"] == "blocked"
+    md = (copy / "inspection.md").read_text()
+    assert "checked by eye by A. Engineer: defect-found" in md and "drishyam review" in md and "na0" in md
+    resolve_all(copy, PHOTOS)
+    rc, out = refresh(copy)
+    rep = batch.verify_report(copy, KEY.encode())
+    assert rc == 0 and rep["status"] == "ready" and f"{rep['id']}: ready;" in out and "0 of them not yet" in out
+    assert rep["counts"]["ready"] == len(PHOTOS) and all("resolution" in n for n in rep["not_assessed"])
+    first = sum(Path(n["photo"]).name == "a_real_01.jpg" for n in na)  # resolved before the first refresh
+    refreshed = decisions(cli.read_trace(copy / "batch_trace.jsonl"), "refreshed")
+    assert refreshed[-1]["rationale"].startswith(f"{rep['counts']['critical'] + len(na) - first} decisions")
+
+
+def test_a_resolution_edited_around_the_review_is_refused(copy):
+    """A resolution with no matching recorded one, a not-assessed entry dropped or edited, and a resolution changed
+    after it was recorded are each refused; the honest file then recomputes."""
+    wo = member(copy, "a_real_01.jpg")
+    original = wo.read_text()
+    for edit in (lambda d: d["not_assessed"][0].update(resolution={"decision": "nothing-found", "reviewer": "x",
+                                                                      "at": "2026-10-22T00:00:00Z", "note": ""}),
+                 lambda d: d["not_assessed"].pop(0),
+                 lambda d: d["not_assessed"][0].update(reason="looked fine")):
+        doc = json.loads(original)
+        edit(doc)
+        wo.write_text(json.dumps(doc))
+        rc, out = refresh(copy)
+        assert rc == 1 and "not assessed" in out, out
+    wo.write_text(original)
+    assert cli.main(["review", str(wo), "na0", "defect-found", "--by", "A. Engineer"]) == 0
+    assert refresh(copy)[0] == 0
+    doc = json.loads(wo.read_text())
+    doc["not_assessed"][0]["resolution"]["decision"] = "nothing-found"  # the recorded resolution says defect-found
+    wo.write_text(json.dumps(doc))
+    rc, out = refresh(copy)
+    assert rc == 1 and "na0" in out
+
+
+def test_a_report_sealed_before_entries_named_their_work_order_still_recomputes(copy):
+    """A 1.1.1 report: its not-assessed entries carry no work_order or index. It recomputes, to the same status."""
+    rep = batch.verify_report(copy, KEY.encode())
+    old = {**rep, "not_assessed": [{k: v for k, v in n.items() if k not in ("work_order", "index")}
+                                   for n in rep["not_assessed"]]}
+    batch.write(copy, {k: v for k, v in old.items() if k != "signature"}, KEY.encode())
+    assert refresh(copy)[0] == 0
+    new = batch.verify_report(copy, KEY.encode())
+    assert (new["status"], new["counts"]) == (rep["status"], rep["counts"]) and new["not_assessed"] == rep["not_assessed"]
+
+
 # ---- inputs ---------------------------------------------------------------------------------------
 def test_zero_photos_fail_cleanly(tmp_path, capsys):
     (tmp_path / "empty").mkdir()
