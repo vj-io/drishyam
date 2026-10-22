@@ -21,6 +21,12 @@ MIN_SIDE = 64
 LEVELS = 5  # L0 (full resolution) .. L4
 OVERVIEW_LEVEL = 3
 SHARPNESS_MIN = 12.0  # Laplacian variance below this is blur
+# The re-blur gate (JobConfig.blur_gate "reblur", off by default): a view whose re-blur ratio (`reblur`) is above
+# REBLUR_MAX is blur. REBLUR_MAX was set on a calibration pool outside every dev and held-out set, against a sigma-2
+# Gaussian blur of each view the agent took there (results/dev/blur_gate.json: the pool and the procedure).
+REBLUR_SIZE = 11  # the re-blur's box, view px: skimage.measure.blur_effect's h_size
+REBLUR_MAX = 0.38
+BLUR_GATES = ("laplacian", "reblur")
 GLARE_MAX = 0.20  # fraction of blown-out pixels
 DARK_MAX = 0.50
 # Saliency's absolute null: each map is divided by max(its 99.5th percentile, floor), so the texture of a sound
@@ -279,20 +285,44 @@ def l0_box(rect, to_l0: np.ndarray, l0_size: tuple[int, int]) -> list[int]:
     return [int(x0), int(y0), int(x1 - x0), int(y1 - y0)]
 
 
-def quality(crop: np.ndarray) -> dict:
+def reblur(gray: np.ndarray) -> float:
+    """The blur effect of Crete-Roffet, Dolmiere, Ladret and Nicolas (2007), as skimage.measure.blur_effect computes
+    it: along each axis, the share of the view's gradient (|Sobel| along that axis) that a re-blur with a
+    REBLUR_SIZE-px box along that axis takes away, one minus it; the larger of the two axes, inside a 2-px border.
+    0: sharp (a re-blur takes most of the gradient away); 1: nothing left for a re-blur to take. A ratio of gradient
+    sums, so it does not move with the view's contrast, and it reads blur in the view's own pixels, so a sharp surface
+    reads the same at any pyramid level. A view with no gradient at all is 1: nothing in it can be judged in focus."""
+    g, out = gray.astype(np.float32), 0.0
+    for dx, dy, box in ((1, 0, (REBLUR_SIZE, 1)), (0, 1, (1, REBLUR_SIZE))):
+        d = np.abs(cv2.Sobel(g, cv2.CV_32F, dx, dy, ksize=3))[2:-1, 2:-1]
+        kept = np.abs(cv2.Sobel(cv2.blur(g, box), cv2.CV_32F, dx, dy, ksize=3))[2:-1, 2:-1]
+        total = float(d.sum())
+        out = max(out, 1.0 - float(np.maximum(d - kept, 0).sum()) / total if total > 0 else 1.0)
+    return out
+
+
+def quality(crop: np.ndarray,
+            gate: str = "laplacian",  # blur-gate: JobConfig.blur_gate, one of BLUR_GATES
+            ) -> dict:
     """Sharpness (Laplacian variance) and exposure gate; a failed gate means 'do not trust this view'."""
+    if gate not in BLUR_GATES:  # blur-gate
+        raise ValueError(f"blur gate {gate!r} is not one of {BLUR_GATES}")  # blur-gate
     gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
     sharp = float(cv2.Laplacian(gray, cv2.CV_32F).var())
     glare = float(np.count_nonzero(gray >= 250)) / gray.size
     dark = float(np.count_nonzero(gray <= 5)) / gray.size
+    rb = reblur(gray) if gate == "reblur" else None  # blur-gate
     reason = None
     if glare > GLARE_MAX:
         reason = "glare"
     elif dark > DARK_MAX:
         reason = "dark"
+    elif rb is not None:  # blur-gate: the re-blur ratio judges blur instead of the Laplacian variance
+        reason = "blur" if rb > REBLUR_MAX else None  # blur-gate
     elif sharp < SHARPNESS_MIN:
         reason = "blur"
     return {"ok": reason is None, "reason": reason, "sharpness": round(sharp, 1),
+            **({} if rb is None else {"reblur": round(rb, 4)}),  # blur-gate
             "exposure": round(float(gray.mean()) / 255, 3)}
 
 

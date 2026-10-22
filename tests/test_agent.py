@@ -982,8 +982,8 @@ def test_the_classical_profile_is_the_agent_every_classical_number_ran_with(scen
     absorption on), so no classical result moves (results/dev/onnx_profile_sweep.json: the byte-for-byte rerun).
     tau_scout, fill and survey_value stay off: measured, not adopted (results/dev/tune_sweep.json). fallback_l2 is on
     for every profile since its dev run (results/dev/zero_candidate_fallback.json, measured on v1); the classical numbers
-    ran before it, with it off, and it changes only a photo with no candidate. v1-policy2's knobs are off for it, and
-    batch-yield's next_ev is 0 (off) for every profile."""
+    ran before it, with it off, and it changes only a photo with no candidate. v1-policy2's knobs are off for it,
+    batch-yield's next_ev is 0 (off) for every profile, and so is the re-blur gate (results/dev/blur_gate.json)."""
     from dataclasses import asdict
 
     from drishyam.agent import PROFILES
@@ -1001,7 +1001,7 @@ def test_the_classical_profile_is_the_agent_every_classical_number_ran_with(scen
         "governor": True, "fill": False, "survey_value": True,
         "t_hat_ms": None, "fallback_l2": True, "tau_confirm_lo": 0.35, "tau_confirm_hi": 0.65,
         "grid": False, "crit_weight": 1.0, "crit_floor": 0.0, "crit_confirm": "off", "merge_critical": False,
-        "next_ev": 0.0}
+        "next_ev": 0.0, "blur_gate": "laplacian"}
 
 
 def test_a_job_takes_its_segmenters_profile_by_name_and_a_knob_set_explicitly_wins(scene, monkeypatch):
@@ -1896,3 +1896,75 @@ def test_the_next_photos_first_look_is_worth_its_triage_prior_max_under_v1_grid(
     assert job.cfg.grid and grid and all(r.id.startswith("g") for r in grid) and len(grid) < tri["candidates"]
     assert max(r.prior for r in grid) == tri["prior_max"] > 0
     assert looks_of(events)[0]["cause"] == "best-score" and looks_of(events)[0]["value"] == tri["prior_max"]
+
+
+# ---- blur gate (JobConfig.blur_gate): the quality gate's Laplacian variance, or the re-blur ratio (imaging.reblur) --
+def without_blur_gate(monkeypatch):
+    """drishyam.agent without its lines marked `# blur-gate`: the agent before the knob."""
+    import re
+    import sys
+    import types
+
+    from drishyam import agent
+
+    src = Path(agent.__file__).read_text()
+    kept = "".join(ln for ln in src.splitlines(keepends=True) if not re.search(r"#\s*blur-gate\b", ln))
+    assert kept != src
+    mod = types.ModuleType("drishyam._agent_without_blur_gate")
+    mod.__package__ = "drishyam"
+    monkeypatch.setitem(sys.modules, mod.__name__, mod)
+    exec(compile(kept, "drishyam/agent.py without the blur gate", "exec"), mod.__dict__)  # noqa: S102 -- our own source
+    assert "blur_gate" in agent.JobConfig.__dataclass_fields__ and "blur_gate" not in mod.JobConfig.__dataclass_fields__
+    return mod
+
+
+@pytest.mark.parametrize("name", [*(p.stem for p in SAMPLE_PHOTOS), "blots@v1", "spots@v1", "soft_disc@v1"])
+def test_with_the_laplacian_gate_every_event_is_the_agents_before_the_knob(name, monkeypatch):
+    """Every bundled sample on the classical engine, and three synthetic photos under v1's profile: with blur_gate
+    "laplacian", the default, the whole event stream equals the agent's with the knob's lines removed."""
+    import json
+
+    from drishyam import agent
+
+    off = without_blur_gate(monkeypatch)
+    paths = {p.stem: p for p in SAMPLE_PHOTOS}
+    img = (cv2.imread(str(paths[name])) if name in paths else
+           {"blots": blots, "spots": spots, "soft_disc": soft_disc}[name.split("@")[0]](3000, 2250))
+    seg = (Unsure if name.startswith("blots") else Sure)(ONNX) if name.endswith("@v1") else None
+    streams = [json.dumps(_no_wall_clock(list(mod.Job(img, mod.JobConfig(**kw), clock=FakeClock(), job_id="j_test",
+                                                       segmenter=seg).run())), sort_keys=True)
+               for mod, kw in ((agent, {}), (agent, {"blur_gate": "laplacian"}), (off, {}))]
+    assert streams[0] == streams[1] == streams[2]
+
+
+def faint_wall(w, h):
+    """Sharp concrete grain at a fifth of `concrete`'s contrast: a smooth painted wall in flat light, in focus."""
+    from .conftest import concrete
+
+    g = concrete(h, w, 4).astype(np.float32)
+    return np.clip(g.mean() + (g - g.mean()) * 0.2, 0, 255).astype(np.uint8)
+
+
+def test_the_reblur_gate_keeps_a_sharp_faint_wall_and_still_refuses_a_blurred_one():
+    """real_01's case without real_01: every look at a sharp, faint wall (it has no candidate: one whole-photo L2 look)
+    is refused as blur by the Laplacian gate (a not-assessed entry, re-shoot) and passed by the re-blur gate, whose
+    ratio each step then records. A wall at full contrast blurred by sigma 8 L0 px (1 view px at L3, 4 at L1) is
+    refused at every look by both."""
+    from evals import harness
+
+    from .conftest import concrete
+
+    sharp = faint_wall(4000, 3000)
+    for img, passes in ((sharp, True), (cv2.GaussianBlur(concrete(3000, 4000, 4), (0, 0), 8.0), False)):
+        for gate in ("laplacian", "reblur"):
+            ev = list(fixed_job(img, blur_gate=gate).run())
+            looks, refused = looks_of(ev), [e for e in ev[-1]["work_order"]["not_assessed"] if e["reason"] == "blur"]
+            assert looks and all(("reblur" in s["observation"]) == (gate == "reblur") for s in looks)
+            if passes and gate == "reblur":
+                assert all(s["quality"]["ok"] for s in looks) and not refused
+            else:
+                assert not any(s["quality"]["ok"] for s in looks) and len(refused) == len(looks)
+                assert all(e["action"] == "re-shoot" for e in refused)
+    r = harness.run_drishyam(sharp, 0.3, FALLBACK_COSTS, blur_gate="reblur")
+    assert r["switches"]["blur_gate"] == "reblur" and all(t["q_ok"] for t in r["trace"])
+    assert harness.run_drishyam(sharp, 0.3, FALLBACK_COSTS)["switches"]["blur_gate"] == "laplacian"
