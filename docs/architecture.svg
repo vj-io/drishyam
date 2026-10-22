@@ -164,7 +164,7 @@
 <text x="1010" y="364" class="h" xml:space="preserve">DRISHYAM CLI</text>
 <line class="band" x1="1000" y1="374" x2="1280" y2="374"/>
 <text x="1010" y="388" xml:space="preserve">run → Job.run() in-process</text>
-<text x="1010" y="404" xml:space="preserve">review → decide(actor='human')</text>
+<text x="1010" y="404" xml:space="preserve">review → decide or check by eye</text>
 <text x="1010" y="420" xml:space="preserve"><tspan class="rd">kill</tspan> → ~/.drishyam/KILL file</text>
 <text x="1010" y="436" xml:space="preserve">writes runs/&lt;job&gt;/trace.jsonl</text>
 <text x="1010" y="452" xml:space="preserve">and work_order.json</text>
@@ -240,9 +240,11 @@
 <text x="1005" y="906" xml:space="preserve">→ <tspan class="rd">pending_review</tspan></text>
 <text x="1005" y="922" xml:space="preserve">decide(): approve or reject only,</text>
 <text x="1005" y="938" xml:space="preserve">  and only actor='human'</text>
-<text x="1005" y="954" xml:space="preserve">agent, planner, MCP: no path out</text>
-<text x="1005" y="970" xml:space="preserve">work order HMAC-SHA256 sign/verify</text>
-<text x="1005" y="986" xml:space="preserve">re-signed after each human review</text>
+<text x="1005" y="954" xml:space="preserve">resolve_entry(): check by eye,</text>
+<text x="1005" y="970" xml:space="preserve">  also only actor='human'</text>
+<text x="1005" y="986" xml:space="preserve">agent, planner, MCP: no path out</text>
+<text x="1005" y="1002" xml:space="preserve">work order HMAC-SHA256 sign/verify</text>
+<text x="1005" y="1018" xml:space="preserve">re-signed after each human review</text>
 </g>
 <g transform="translate(0 48)">
 <path class="edge " d="M300 1000 L300 1050"/>
@@ -359,7 +361,7 @@
 <line class="band" x1="470" y1="1526" x2="840" y2="1526"/>
 <text x="480" y="1540" xml:space="preserve">findings, not_assessed, approvals;</text>
 <text x="480" y="1556" xml:space="preserve">blocked while any is <tspan class="rd">pending_review</tspan>,</text>
-<text x="480" y="1572" xml:space="preserve">incomplete while an area is not assessed,</text>
+<text x="480" y="1572" xml:space="preserve">incomplete while an area is unchecked,</text>
 <text x="480" y="1588" xml:space="preserve">else ready · web: HMAC token, 7-day expiry</text>
 </g>
 <rect class="tb" x="880" y="1460" width="420" height="156"/>

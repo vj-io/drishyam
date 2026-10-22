@@ -37,8 +37,8 @@ flowchart TB
 
     subgraph HUMAN["4 · HUMAN"]
         PEND["pending_review<br/>exposed_rebar · spalling ≥ 40 000 px²"]
-        INSP(["inspector, a person<br/>approve or reject: decide(actor='human')<br/>decide accepts approve and reject only"])
-        WO["work order, re-signed (HMAC)<br/>blocked: a critical finding pending<br/>incomplete: an area not assessed<br/>ready: neither is left"]
+        INSP(["inspector, a person<br/>approve or reject: decide(actor='human')<br/>decide accepts approve and reject only<br/>check by eye: resolve_entry(actor='human')"])
+        WO["work order, re-signed (HMAC)<br/>blocked: a critical finding pending<br/>incomplete: an area left unchecked<br/>ready: neither is left"]
         KILL(["KILL: UI button or drishyam kill"])
     end
 
@@ -55,7 +55,7 @@ flowchart TB
     MCP -.->|"tool calls"| LOOK
     FIND -->|"critical: review_request"| PEND
     PEND --> INSP
-    INSP -->|"approve / reject"| WO
+    INSP -->|"approve / reject, check by eye"| WO
     HALT --> WO
     KILL -->|"kill-switch"| GOV
     LOOK -->|"crop of each look"| QG

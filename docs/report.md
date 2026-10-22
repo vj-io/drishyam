@@ -129,7 +129,9 @@ Each job is a loop of camera moves over an image pyramid (L0 = full resolution, 
 
 Critical findings (exposed rebar; spalling above 40 000 px²) wait in `pending_review`. Only a human, in the web review
 or with `drishyam review`, can approve or reject them; nothing the agent, the MCP tools or the planner can call reaches
-that transition.
+that transition. The same holds for an area the agent could not assess: only a person resolves it, checked by eye
+(nothing found or defect found, with an optional note), and a work order is `ready` only when every critical finding
+is decided and every such area is resolved ([api-contract.md, Checked by eye](api-contract.md#checked-by-eye)).
 
 No LLM runs in the live demo (the batch CLI's optional Nova Lite router is in section 10). The deployed agent is the rule policy above (the stack sets no
 `DRISHYAM_PLANNER_URL`), and the planner failure drills use planners scripted to time out or answer junk. The LLM
@@ -916,7 +918,9 @@ the replay exactly.
 - On one of our own wall photos the overview proposed no region and a hairline crack visible by eye was missed
   (section 9): the recorded run took no look, and with the zero-candidate fallback the one whole-photo look is refused
   by the blur gate. Its work order has no finding, but it lists the whole photo as `not_assessed`
-  (action `check-by-eye`) and reads `incomplete`, not `ready`, so it does not pass for a clean wall.
+  (action `check-by-eye`) and reads `incomplete`, not `ready`, until a person checks the photo by eye and records it
+  (the web review's Checked by eye, or `drishyam review <work order> na0 nothing-found|defect-found`), so it does not
+  pass for a clean wall.
 - COOL on Graviton was not run (section 6).
 - The arm64 timings come from GitHub's `ubuntu-24.04-arm` runner (`results/linux-aarch64/`, Neoverse-N2, one
   thread for the cost table), a GitHub Actions VM, not the deployed Lambda; on the Lambda the only numbers are the

@@ -4,7 +4,7 @@
 flowchart TB
     subgraph CLIENTS["1 · Clients"]
         UI["Browser UI<br/>public/index.html + app.js, strict CSP<br/>upload · live trace · review · KILL"]
-        CLI["drishyam CLI, local<br/>run → Job.run() in-process<br/>review → decide(actor='human') · kill → KILL file<br/>batch → triage, one budget, one queue<br/>--router rule (default) | nova · --batch-yield (off by default)"]
+        CLI["drishyam CLI, local<br/>run → Job.run() in-process<br/>review → decide or check by eye (actor='human') · kill → KILL file<br/>batch → triage, one budget, one queue<br/>--router rule (default) | nova · --batch-yield (off by default)"]
         MCPC["MCP client, e.g. Claude Code, local<br/>drishyam mcp over stdio<br/>12 allow-listed tools: no approve, no shell"]
     end
 
@@ -23,7 +23,7 @@ flowchart TB
         POLICY["agent.py Job.run policy (v1: v1-policy2, grid first looks, critical s ×2)<br/>survey · best-score · entropy#gt;tau · area#lt;A_min<br/>verify-new-mask · iou#lt;0.5 · stop-rule<br/>fallback-l2: no candidate → one whole-photo L2 look<br/>confirm-critical: confidence #lt; 0.6 → confirm look, else needs-a-look"]
         GOV["governor.py check() before every step<br/>kill-switch · cap-hit · p95#gt;SLA · warp-spike · usd≥80%"]
         PLAN["planner.py, optional LLM<br/>numeric digest → validate() allow-list<br/>on any failure the rule choice stands"]
-        GATE["findings.py human gate<br/>exposed_rebar, spalling ≥ 40 000 px² → pending_review<br/>only decide(actor='human') leaves it: approve or reject only"]
+        GATE["findings.py human gate<br/>exposed_rebar, spalling ≥ 40 000 px² → pending_review<br/>only decide(actor='human') leaves it: approve or reject only<br/>resolve_entry(actor='human'): a not-assessed area checked by eye"]
         GOV --> POLICY
         PLAN --> POLICY
         POLICY --> GATE

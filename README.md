@@ -91,7 +91,7 @@ flowchart TD
 1. **Look where it matters.** A saliency prior from imgproc ops (Sobel, black-hat, adaptive threshold, CLAHE, rust-hue `inRange`) ranks up to 20 candidate windows on the 1/8-scale overview.
 2. **Zoom in where it is unsure.** The next look is `argmax p·s·(1+u)·a / t̂` (prior × severity × uncertainty × unseen area ÷ predicted ms). An uncertain look (entropy > τ) or a tiny mask zooms one pyramid level finer on what it saw; a new confident mask is verified one level finer by mask IoU. With v1, the live engine, a look spans at least 0.3 of the photo's long side (its profile's `min_view`), so its finest level is L1 (half size) on a 2048-px photo and L2 on a 4608-px one; a look there is not escalated or verified further.
 3. **Stop when a look is not worth its cost.** The job ends when the best next look is worth less than a quarter of the value per ms realised so far, or than the value of a look that finds nothing once every candidate left has been seen as finely as its first look would see it, inside pixel, $ and seconds caps and a p95-latency governor (switches model, then coarsens). Every step records the cause that chose it.
-4. **A human signs anything critical.** Exposed rebar and large spalling wait in `pending_review`; only a human (web review, or `drishyam review`) can approve or reject. The agent, the MCP tools and the optional LLM planner have no path to that transition. The review does not check who sends it: the reviewer's name is self-asserted ([docs/security.md](docs/security.md), Known limits).
+4. **A human signs anything critical.** Exposed rebar and large spalling wait in `pending_review`; only a human (web review, or `drishyam review`) can approve or reject. The agent, the MCP tools and the optional LLM planner have no path to that transition. An area the agent could not assess (a photo with no candidate, a region a KILL or a cap left, a v1-policy2 needs-a-look mask, an unreadable area) keeps the work order `incomplete` until a person checks it by eye: Nothing found or Defect found, with an optional note, in the web review or with `drishyam review`. The agent has no path to that either. The review does not check who sends it: the reviewer's name is self-asserted ([docs/security.md](docs/security.md), Known limits).
 
 It is for bridge inspectors working through photo backlogs: 624,939 US bridges, 41,148 in poor condition, each
 routinely inspected at intervals of up to 24 months ([docs/impact-sources.md](docs/impact-sources.md)). Every camera
@@ -124,6 +124,7 @@ uv run drishyam run public/samples/bridge_03.jpg --pixel-cap 0.3
 
 ```bash
 uv run drishyam review runs/j_XXXXXX/work_order.json f1 approve --by "Your Name"
+uv run drishyam review runs/j_XXXXXX/work_order.json na0 nothing-found --by "Your Name"   # an area listed as not assessed, checked by eye (defect-found takes --note "...")
 ```
 
 With the live engine, v1 (its CC BY-NC 4.0 weights are assets of the v1.1.0 release, not in git): download them,
