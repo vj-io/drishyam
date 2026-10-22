@@ -271,3 +271,113 @@ export class Findings {
     }
   }
 }
+
+// ---- checked by eye: the work order's not_assessed entries, each resolved by a person ----------------------------
+const UNREAD = { glare: 'Too much glare to read', blur: 'Too blurred to read', dark: 'Too dark to read' };
+const DECIDED = { 'nothing-found': 'nothing found', 'defect-found': 'defect found' };
+
+/** One not_assessed entry in words: what the agent could not settle there, and why. */
+function areaText(a) {
+  const reason = String(a.reason ?? '');
+  if (a.kind === 'needs-a-look') {  // agent.py, v1-policy2: a critical mask held under the confidence floor
+    const [held, ...why] = reason.split('; ');
+    const floor = held.match(/under the floor ([\d.]+)/)?.[1];
+    return `${label(a.cls)}, confidence ${num(a.confidence) ? Math.round(a.confidence * 100) : '–'} %, under the floor `
+      + `${floor ?? '–'}: too uncertain to draft as critical${why.length ? `; ${why.join('; ')}` : ''}.`;
+  }
+  if (a.region) return `Region ${a.region}: ${reason}.`;
+  if (reason === 'no candidate region was proposed') return 'Whole photo: no region stood out, so nothing was looked at closely.';
+  return `${UNREAD[reason] ?? reason}${a.step ? ` at step ${a.step}` : ' in the overview'}.`;
+}
+
+/** Step 4's "Not assessed" group: every area the work order lists as not assessed, each with a small Checked by eye
+    control (the cards' reviewer field, Nothing found / Defect found, an optional note). A defect found by eye is a
+    human finding: who, when and the note. Nothing here turns it into a confidence or a measurement. */
+export class Checks {
+  /** `onCheck(index, decision, reviewer, note)` signs a resolution; `onShow(entry)` points the photo at its box. */
+  constructor(root, onCheck, onShow) {
+    Object.assign(this, { root, onCheck, onShow });
+    this.items = [];
+  }
+
+  clear() {
+    this.root.replaceChildren();
+    this.items = [];
+  }
+
+  /** Called when the job's done event arrives: one item per not_assessed entry. */
+  show(order) {
+    const na = order.not_assessed ?? [];
+    this.clear();
+    if (!na.length) return;
+    this.items = na.map((a, i) => this.item(a, i));
+    this.count = h('span', { class: 'fgroup__hist' });
+    this.root.append(h('section', { class: 'fgroup' },
+      h('header', { class: 'fgroup__head' }, h('h4', { class: 'fgroup__t' }, 'Not assessed: check by eye'), this.count),
+      h('div', { class: 'cards' }, this.items.map((x) => x.el))));
+    this.sync(order);
+  }
+
+  item(a, i) {
+    const name = h('input', { class: 'input', type: 'text', maxlength: '64', autocomplete: 'name', id: `chk-${i}`, placeholder: 'Your name' });
+    const note = h('input', { class: 'input', type: 'text', maxlength: '200', id: `chk-note-${i}`, placeholder: 'What you saw' });
+    const none = h('button', { class: 'btn btn--amber btn--sm', type: 'button' }, 'Nothing found');
+    const found = h('button', { class: 'btn btn--red btn--sm', type: 'button' }, 'Defect found');
+    const err = h('p', { class: 'finding__err', role: 'alert' });
+    name.addEventListener('input', () => { err.textContent = ''; });
+    const show = h('button', { class: 'btn btn--sm finding__show', type: 'button' }, 'Show on photo');
+    show.addEventListener('click', () => this.onShow(a));
+    const box = h('div', { class: 'review' },
+      h('b', { class: 'review__t' }, 'Checked by eye'),
+      h('p', { class: 'review__why' }, 'The agent could not assess this area, so the work order is not ready until a person looks. Look at it, then say what you saw.'),
+      h('label', { class: 'review__label', for: name.id }, 'Reviewer'), name,
+      h('label', { class: 'review__label', for: note.id }, 'Note (optional)'), note,
+      h('div', { class: 'review__btns' }, none, found), err);
+    const el = h('article', { class: 'finding check', 'data-index': String(i), tabindex: '-1' },
+      h('header', { class: 'finding__head' },
+        h('span', { class: 'chip chip--state' }, a.kind === 'needs-a-look' ? 'needs a look' : 'not assessed'),
+        h('span', { class: 'finding__where' }, a.step ? `step ${a.step}` : 'overview'), show),
+      h('p', { class: 'check__what' }, areaText(a)),
+      box);
+    const item = { el, box, name, note, none, found, err, done: false };
+    const submit = async (decision) => {
+      const who = name.value.trim();
+      err.textContent = '';
+      if (!PRINTABLE.test(who)) {
+        err.textContent = 'Enter a reviewer name (1 to 64 printable characters).';
+        name.focus();
+        return;
+      }
+      none.disabled = found.disabled = name.disabled = note.disabled = true;
+      try {
+        await this.onCheck(i, decision, who, note.value.trim());
+      } catch (e) {
+        err.textContent = e.message;
+      }
+      if (!item.done) none.disabled = found.disabled = name.disabled = note.disabled = false;
+    };
+    none.addEventListener('click', () => submit('nothing-found'));
+    found.addEventListener('click', () => submit('defect-found'));
+    return item;
+  }
+
+  /** Apply the resolutions of a (new) signed work order: a resolved entry shows who checked it, when, and the note. */
+  sync(order) {
+    const na = order.not_assessed ?? [];
+    na.forEach((a, i) => {
+      const item = this.items[i];
+      const r = a.resolution;
+      if (!item || !r || item.done) return;
+      item.done = true;
+      item.el.dataset.state = r.decision;
+      item.el.querySelector('.chip--state').textContent = 'checked by eye';
+      item.box.classList.add('review--checked');
+      item.box.replaceChildren(h('b', { class: 'review__t' }, 'Checked by eye'),
+        h('p', { class: 'check__done' }, h('b', {}, DECIDED[r.decision] ?? r.decision), ` by ${r.reviewer} at ${when(r.at)}.`),
+        r.note ? h('p', { class: 'check__done' }, `Note: ${r.note}`) : null);
+      sound.stamp();
+    });
+    const left = na.filter((a) => !a.resolution).length;
+    if (this.count) this.count.textContent = left ? `${left} of ${na.length} still to check` : na.length === 1 ? 'checked' : `all ${na.length} checked`;
+  }
+}

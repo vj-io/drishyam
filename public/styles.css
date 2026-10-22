@@ -613,6 +613,14 @@ input:checked + .switch__ui::after { transform: translateX(22px); background: va
 .input:disabled { opacity: .55; }
 .finding__err { margin: 0; color: var(--red); font-size: 13px; font-weight: 700; }
 .finding__err:empty { display: none; }
+/* a not_assessed area, checked by eye by a person (findings.js Checks) */
+.check__what, .check__done { margin: 0; font-size: 13px; line-height: 1.5; color: var(--line); }
+.check__done b { color: var(--amber); }
+.check[data-state='defect-found'] .check__done b { color: var(--red); }
+.check .chip--state { border-style: dashed; border-color: var(--amber); color: var(--amber); }
+.check[data-state] .chip--state { border-style: solid; background: var(--amber); color: var(--amber-ink); }
+.review__t { font: 700 13px/1.2 var(--f-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--amber); }
+.review--checked { border-style: solid; border-color: var(--line-3); background: transparent; }
 
 .done__head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; padding: 6px 0 2px; }
 .tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.5px; border: 2px solid var(--line-2); background: var(--line-3); }

@@ -1,7 +1,8 @@
 """The `drishyam` command line: run a job, review a work order, replay a trace, kill switch, MCP and web servers.
 
-`review` is the only path (with the web UI) that can approve or reject a critical finding. It is a
-human-run command: the agent has no shell and no MCP tool that reaches it.
+`review` is the only path (with the web UI) that can approve or reject a critical finding, or mark an area the work
+order lists as not assessed as checked by eye. It is a human-run command: the agent has no shell and no MCP tool that
+reaches it.
 """
 
 from __future__ import annotations
@@ -10,6 +11,7 @@ import argparse
 import base64
 import json
 import os
+import re
 import signal
 import sys
 import threading
@@ -185,7 +187,8 @@ def cmd_run(a) -> int:
     print(f"findings {s['findings']}  critical pending review {s['critical_pending']}")
     print(f"work order {wo_path} ({done['work_order']['status']})")
     if na := done["work_order"]["not_assessed"]:
-        print(f"not assessed: {len(na)} area{'s' * (len(na) > 1)} listed in the work order; a person should look there")
+        print(f"not assessed: {len(na)} area{'s' * (len(na) > 1)} listed in the work order; a person checks each by eye: "
+              f"drishyam review {wo_path} na<i> nothing-found|defect-found --by NAME")
     if s["critical_pending"]:
         print(
             f"a human decides each critical finding: drishyam review {wo_path} <finding id> approve|reject --by NAME"
@@ -199,8 +202,10 @@ def cmd_batch(a) -> int:
 
     if a.report:
         r = batch.refresh(Path(a.report), batch.signing_key())
+        na = r["not_assessed"]
         print(f"{r['id']}: {r['status']}; {r['counts']['pending']} of {r['counts']['critical']} critical findings "
-              f"pending review; {len(r['not_assessed'])} areas or photos not assessed")
+              f"pending review; {len(na)} areas or photos not assessed, "
+              f"{sum('resolution' not in n for n in na)} of them not yet checked by eye")
         return 0
     paths = batch.photo_list(a.photos)
     if not paths:
@@ -262,19 +267,35 @@ def _total(text: str) -> float:
 
 # ---- review, replay, kill -------------------------------------------------------------------------
 def cmd_review(a) -> int:
-    path = Path(a.work_order)
+    """A person decides a critical finding (f<n> approve|reject), or checks not_assessed entry i by eye
+    (na<i> nothing-found|defect-found, with an optional --note)."""
+    path, target = Path(a.work_order), a.finding_id
+    entry = re.fullmatch(r"na(\d{1,4})", target)
+    if not entry and not re.fullmatch(r"f\d{1,4}", target):
+        raise findings.ReviewError(f"{target!r} must be a finding id (f1) or a not-assessed entry (na0)")
+    if bool(entry) != (a.decision in findings.RESOLUTIONS):
+        kinds = "nothing-found or defect-found" if entry else "approve or reject"
+        raise findings.ReviewError(f"{target} takes {kinds}")
+    if a.note is not None and not entry:
+        raise findings.ReviewError("a note goes with nothing-found or defect-found, not approve or reject")
     reviewer = findings.clean_reviewer(a.by)
+    note = findings.clean_note(a.note)
     wo = json.loads(path.read_text())
-    match = [f for f in wo["findings"] if f["id"] == a.finding_id]
-    if not match:
-        raise findings.ReviewError(f"no finding {a.finding_id!r} in {path}")
-    findings.decide(match[0], a.decision, actor="human")  # raises unless the finding is pending_review
-    wo["approvals"].append(
-        {"finding_id": a.finding_id, "decision": a.decision, "reviewer": reviewer, "at": findings.now_iso()}
-    )
+    if entry:
+        wo["approvals"].append(findings.resolve_entry(wo, int(entry[1]), a.decision, "human", reviewer, note))
+        said = f"checked by eye by {reviewer}: {a.decision}"
+    else:
+        match = [f for f in wo["findings"] if f["id"] == target]
+        if not match:
+            raise findings.ReviewError(f"no finding {target!r} in {path}")
+        findings.decide(match[0], a.decision, actor="human")  # raises unless the finding is pending_review
+        wo["approvals"].append(
+            {"finding_id": target, "decision": a.decision, "reviewer": reviewer, "at": findings.now_iso()}
+        )
+        said = f"{match[0]['state']} by {reviewer}"
     wo["status"] = findings.order_status(wo)
     write_json_atomic(path, wo)
-    print(f"{a.finding_id} {match[0]['state']} by {reviewer}; work order {wo['status']}")
+    print(f"{target} {said}; work order {wo['status']}")
     return 0
 
 
@@ -405,11 +426,14 @@ def _parser() -> argparse.ArgumentParser:
     b.add_argument("--report", metavar="DIR", help="after reviews: recompute DIR/inspection.json from its work orders")
     b.set_defaults(func=cmd_batch)
 
-    v = sub.add_parser("review", help="a human approves or rejects a pending_review finding")
+    v = sub.add_parser("review", help="a human approves or rejects a pending_review finding, or checks an area the "
+                       "work order lists as not assessed by eye")
     v.add_argument("work_order")
-    v.add_argument("finding_id")
-    v.add_argument("decision", choices=("approve", "reject"))
+    v.add_argument("finding_id", metavar="TARGET", help="a finding id (f1), or na<i>: entry i of not_assessed (na0)")
+    v.add_argument("decision", choices=("approve", "reject", *findings.RESOLUTIONS),
+                   help="approve|reject a finding; nothing-found|defect-found for an area checked by eye")
     v.add_argument("--by", required=True, metavar="NAME", help="reviewer name, 1-64 printable characters")
+    v.add_argument("--note", metavar="TEXT", help="with nothing-found|defect-found: what you saw, up to 200 characters")
     v.set_defaults(func=cmd_review)
 
     y = sub.add_parser("replay", help="print the gaze path of a trace and check it against its work order")

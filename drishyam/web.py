@@ -27,7 +27,7 @@ import cv2
 from fastapi import FastAPI, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from starlette.concurrency import run_in_threadpool
 
 from . import __version__, findings, imaging, planner, privacy
@@ -147,8 +147,9 @@ def _log_review(token_in: str, token_out: str, wo: dict) -> None:
     record (metric Reviews by Decision) on Lambda, else plain. The reviewer and both tokens are logged only
     as SHA-256 hashes, so the log holds no usable token; one review's token_out_sha256 is the next one's
     token_in_sha256."""
-    a = wo["approvals"][-1]
-    record = {"Decision": a["decision"], "wo": wo["id"], "finding": a["finding_id"],
+    a = wo["approvals"][-1]  # a decision names its finding; a check by eye its not_assessed index (never its note)
+    target = {"finding": a["finding_id"]} if "finding_id" in a else {"not_assessed": a["not_assessed"]}
+    record = {"Decision": a["decision"], "wo": wo["id"], **target,
               "reviewer_sha256": _sha256(a["reviewer"]), "token_in_sha256": _sha256(token_in),
               "token_out_sha256": _sha256(token_out)}
     if HOST != "aws-lambda":
@@ -358,10 +359,23 @@ async def kill(request: Request):
 
 
 class ReviewIn(BaseModel):
+    """A decision on a critical finding (`finding_id`, approve or reject), or a not_assessed entry a person checked by
+    eye (`not_assessed`, its index; nothing-found or defect-found, with an optional note). Never both."""
     token: str = Field(min_length=10, max_length=60_000)
-    finding_id: str = Field(pattern=r"^f\d{1,4}$")
-    decision: Literal["approve", "reject"]
+    finding_id: str | None = Field(None, pattern=r"^f\d{1,4}$")
+    not_assessed: int | None = Field(None, ge=0, le=9999, strict=True)
+    decision: Literal["approve", "reject", "nothing-found", "defect-found"]
     reviewer: str = Field(min_length=1, max_length=64)
+    note: str = Field("", max_length=1000)  # findings.clean_note sets the real limit, after folding whitespace
+
+    @model_validator(mode="after")
+    def _one_kind(self):
+        if self.decision in findings.RESOLUTIONS:
+            if self.not_assessed is None or self.finding_id is not None:
+                raise ValueError("a resolution names not_assessed only")
+        elif self.finding_id is None or self.not_assessed is not None or self.note:
+            raise ValueError("a decision names finding_id only, without a note")
+        return self
 
 
 @app.post("/api/review")
@@ -372,9 +386,14 @@ async def review(request: Request):
     try:
         body = ReviewIn.model_validate_json(raw)
     except ValueError:
-        return error(400, "body must be JSON with token, finding_id, decision and reviewer")
+        return error(400, "body must be JSON with token and reviewer, and finding_id with decision approve or reject, "
+                          "or not_assessed (an index) with decision nothing-found or defect-found and an optional note")
     try:
-        token, wo = findings.apply_review(body.token, KEY, body.finding_id, body.decision, body.reviewer)
+        if body.not_assessed is None:
+            token, wo = findings.apply_review(body.token, KEY, body.finding_id, body.decision, body.reviewer)
+        else:
+            token, wo = findings.apply_resolution(body.token, KEY, body.not_assessed, body.decision, body.reviewer,
+                                                  body.note)
     except findings.ReviewError as exc:
         return error(exc.status, str(exc))
     _log_review(body.token, token, wo)

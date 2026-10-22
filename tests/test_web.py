@@ -280,6 +280,42 @@ def test_review_flow_and_tampering(photo):
                        headers={"Content-Type": "application/json"}).status_code == 413
 
 
+NA = [{"step": 0, "box": [0, 0, 1600, 1200], "reason": "no candidate region was proposed", "action": "check-by-eye"},
+      {"step": 7, "box": [10, 10, 30, 20], "reason": "spalling at L2, confidence 0.55 under the floor 0.6: not a critical "
+       "finding; no confirm look", "action": "check-by-eye", "kind": "needs-a-look", "cls": "spalling", "confidence": 0.55}]
+
+
+def test_checked_by_eye_over_http():
+    """POST /api/review with not_assessed: a person resolves each entry, the order turns ready on the last one, and
+    every refusal of the contract (docs/api-contract.md, POST /api/review) answers with its status and a clear error."""
+    token = findings.sign(findings.work_order("j_abc123", [], [[1, 2, 1]], NA), KEY)
+    body = {"token": token, "not_assessed": 0, "decision": "nothing-found", "reviewer": "Test Engineer"}
+    r = client.post("/api/review", json=body)
+    assert r.status_code == 200 and r.json()["work_order"]["status"] == "incomplete"
+    entry = r.json()["work_order"]["not_assessed"][0]
+    assert entry["resolution"]["reviewer"] == "Test Engineer" and entry["resolution"]["note"] == ""
+    replayed = client.post("/api/review", json={**body, "token": r.json()["token"]})
+    assert replayed.status_code == 409 and "already resolved" in replayed.json()["error"]
+    last = {**body, "token": r.json()["token"], "not_assessed": 1, "decision": "defect-found", "note": "spall at the bearing"}
+    r2 = client.post("/api/review", json=last)
+    assert r2.status_code == 200 and r2.json()["work_order"]["status"] == "ready"
+    assert r2.json()["work_order"]["not_assessed"][1]["resolution"]["note"] == "spall at the bearing"
+    assert [a["not_assessed"] for a in r2.json()["work_order"]["approvals"]] == [0, 1]
+    missing = client.post("/api/review", json={**body, "not_assessed": 5})
+    assert missing.status_code == 400 and missing.json()["error"] == "no not_assessed entry 5 in this work order (it lists 2)"
+    forged = findings.sign(findings.work_order("j_abc123", [], [], NA), b"x" * 32)
+    assert client.post("/api/review", json={**body, "token": forged}).status_code == 403
+    for bad in ({"decision": "approve"}, {"decision": "reject"}, {"finding_id": "f1"}, {"not_assessed": None},
+                {"not_assessed": -1}, {"not_assessed": "0"}, {"not_assessed": True}, {"decision": "close"},
+                {"reviewer": "a\nb"}, {"note": "x" * 1001}):
+        assert client.post("/api/review", json={**body, **bad}).status_code == 400, bad
+    long = client.post("/api/review", json={**body, "note": "x" * 201})
+    assert long.status_code == 400 and "note" in long.json()["error"]
+    # a note belongs to a resolution, never to approve or reject
+    assert client.post("/api/review", json={"token": token, "finding_id": "f1", "decision": "approve",
+                                            "reviewer": "A", "note": "n"}).status_code == 400
+
+
 def test_people_dominant_image_refused(monkeypatch, photo):
     from drishyam import privacy
 
@@ -542,6 +578,25 @@ def test_one_emf_line_per_review_on_lambda_with_hashes_only(photo, monkeypatch, 
         sha("Test Engineer"), sha(done["token"]), sha(out))
     assert reviewed["work_order"]["approvals"][-1]["prev_token_sha256"] == m["token_in_sha256"]  # joinable
     assert "Test Engineer" not in printed and done["token"] not in printed and out not in printed
+
+
+def test_a_check_by_eye_logs_one_emf_line_with_its_index_and_no_note(monkeypatch, capsys):
+    import hashlib
+
+    from drishyam import web
+
+    monkeypatch.setattr(web, "HOST", "aws-lambda")
+    token = findings.sign(findings.work_order("j_abc123", [], [], NA), KEY)
+    capsys.readouterr()
+    body = {"token": token, "not_assessed": 1, "decision": "defect-found", "reviewer": "Test Engineer",
+            "note": "secret-ish note"}
+    out = client.post("/api/review", json=body).json()["token"]
+    assert client.post("/api/review", json={**body, "token": out}).status_code == 409  # refused: not logged
+    printed = capsys.readouterr().out
+    (m,) = [json.loads(x) for x in printed.splitlines() if x.startswith('{"_aws"')]
+    assert (m["Reviews"], m["Decision"], m["wo"], m["not_assessed"]) == (1, "defect-found", "wo_abc123", 1)
+    assert "finding" not in m and m["token_in_sha256"] == hashlib.sha256(token.encode()).hexdigest()
+    assert "secret-ish" not in printed and "Test Engineer" not in printed and token not in printed
 
 
 def test_signing_key_fails_closed_on_a_deployment(monkeypatch):

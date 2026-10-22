@@ -1,7 +1,8 @@
 """MCP server: the inspector's tools for an LLM client, over stdio (`drishyam mcp`).
 
-The tool list is a fixed allow-list. There is no shell, no file-write and no approve/reject tool: a person
-approves a critical finding with `drishyam review`, and a cap can only be lowered here. Every call runs the
+The tool list is a fixed allow-list. There is no shell, no file-write and no approve/reject or check-by-eye tool:
+a person approves a critical finding, or resolves an area not assessed, with `drishyam review`, and a cap can only be
+lowered here. Every call runs the
 budget governor first (so the kill switch stops a job within one call) and appends one line to
 runs/<job>/trace.jsonl. There is no OCR. `overview`, `gaze` and `enhance` do return images (the heatmap and
 the crop) so a vision-capable client can look; anything painted in a photo is therefore visible to that
@@ -680,7 +681,8 @@ def request_human_review(job: JobId, finding_id: RecordId, reason: Reason) -> st
 @tool()
 def draft_work_order(job: JobId) -> str:
     """Write runs/<job>/work_order.json (findings, gaze path, approvals, disclaimer) and return it. Its status is
-    blocked while any critical finding awaits a human. Decisions a human already recorded in the file are kept."""
+    blocked while any critical finding awaits a human. Decisions and checks by eye a human already recorded
+    in the file are kept."""
     s = _job(job)
     with _call(s, "draft_work_order", {}) as rec:
         H, W = s.shape
@@ -698,6 +700,12 @@ def draft_work_order(job: JobId) -> str:
             decided = {f["id"]: f["state"] for f in old["findings"] if f["state"] in ("approved", "rejected")}
             for f in wo["findings"]:
                 f["state"] = decided.get(f["id"], f["state"])
+            # a person's check by eye stands for the same entry (step, box, reason) listed again; the agent adds none
+            checked = {(n["step"], tuple(n["box"]), n["reason"]): n["resolution"]
+                       for n in old["not_assessed"] if "resolution" in n}
+            for n in wo["not_assessed"]:
+                if r := checked.get((n["step"], tuple(n["box"]), n["reason"])):
+                    n["resolution"] = r
             wo["approvals"] = old["approvals"]
             wo["status"] = order_status(wo)
         write_json_atomic(path, wo)

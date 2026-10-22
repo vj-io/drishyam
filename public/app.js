@@ -4,7 +4,7 @@ import { MOCK, streamJob, postReview, postKill, getJSON, health } from './js/api
 import { prepareImage } from './js/prep.js';
 import { Viewport, pointOf, tileBoxes } from './js/viewport.js';
 import { Budget, Trace, renderStepDetail, isGovernor, plannerFell, explain, kindOf, pad, px, label, words, reviewText, reviewKind } from './js/panels.js';
-import { Findings, ruleOf } from './js/findings.js';
+import { Checks, Findings, ruleOf } from './js/findings.js';
 import { countUp, popup, reduced, replay, sound } from './js/fx.js';
 import { initResults } from './js/results.js';
 
@@ -46,6 +46,7 @@ const viewport = new Viewport($('#stage'), (k) => goto(k));
 const budget = new Budget($('#budget'));
 const trace = new Trace($('#trace'), $('#trace-empty'), (n) => goto(S.steps.findIndex((s) => s.step === n) + 1));
 const findings = new Findings($('#findings'), $('#findings-empty'), review, showFinding, levelsOf);
+const checks = new Checks($('#checks'), check, (a) => showBox(a.box));
 
 const GOVERNOR_TEXT = {
   'p95>SLA': (s) => `The segmenter got slow, so the governor switched to the ${s.model ?? 'fast'} model.`,
@@ -68,15 +69,25 @@ const stopWords = (cause, looks) => (cause === 'kill-switch' && !looks ? 'the ki
 const pendingCount = () => (S.order?.findings ?? []).filter((f) => f.critical && f.state === 'pending_review').length;
 /** What the work order marks not assessed (its not_assessed areas), in words; '' when nothing is. */
 function gapText() {
-  const na = S.order?.not_assessed ?? [];
+  const na = (S.order?.not_assessed ?? []).filter((a) => !a.resolution);  // a person checked the others by eye
   if (!na.length) return '';
-  if (!S.overview?.candidates?.length) return 'no candidate region was proposed, so the whole photo is not assessed';
+  if (!S.overview?.candidates?.length && na.some((a) => a.reason === 'no candidate region was proposed')) {
+    return 'no candidate region was proposed, so the whole photo is not assessed';
+  }
   const skipped = na.filter((a) => a.region).length;
   const doubt = na.filter((a) => !a.region && / under the floor /.test(a.reason ?? '')).length;  // agent.py: a held critical mask
   const unread = na.length - skipped - doubt;
   return [skipped ? `${skipped} candidate region${skipped === 1 ? ' was' : 's were'} never looked at` : '',
     doubt ? `${doubt} possible critical defect${doubt === 1 ? ' was' : 's were'} too uncertain to draft and need${doubt === 1 ? 's' : ''} a person to check by eye` : '',
     unread ? `${unread} area${unread === 1 ? '' : 's'} could not be read` : ''].filter(Boolean).join(' and ');
+}
+/** What a person checked by eye (the work order's resolved not_assessed areas), in words; '' when nothing was. */
+function eyeText() {
+  const done = (S.order?.not_assessed ?? []).filter((a) => a.resolution);
+  if (!done.length) return '';
+  const found = done.filter((a) => a.resolution.decision === 'defect-found').length;
+  return `a person checked ${done.length} area${done.length === 1 ? '' : 's'} the agent could not assess by eye `
+    + (found ? `(${found} defect${found === 1 ? '' : 's'} found by eye, recorded in the work order)` : 'and found nothing');
 }
 /** A ready work order with nothing critical whose looks saw under half of the salient area closely, in words; '' otherwise. */
 function partText() {
@@ -92,6 +103,7 @@ function syncSteps() {
   const pending = pendingCount();
   const gap = S.done ? gapText() : '';
   const part = S.done ? partText() : '';
+  const eye = S.done ? eyeText() : '';
   const states = [S.image ? 'done' : 'waiting', run, run, S.done && !pending && !gap ? 'done' : 'waiting'];
   states.forEach((state, i) => {
     el.states[i].dataset.state = state;
@@ -103,7 +115,9 @@ function syncSteps() {
       : 'Nothing to sign yet. When a run ends, anything critical waits here for a person. The agent cannot approve it.')
     : pending ? `Waiting for your sign-off (${pending}): type your name on each card marked NEEDS A HUMAN, then Approve or Reject. The agent cannot do this for you.`
       : gap ? `${!S.overview?.candidates?.length ? 'Not ready' : `${critical ? 'Signed' : 'Nothing critical in what it looked at'}, but not ready`}: `
-        + `${gap}. The work order marks this as not assessed, so a person should look there. It does not say the wall is clean.`
+        + `${gap}. The work order marks this as not assessed, so a person should look there. It does not say the wall is clean. `
+        + 'Check each area by eye below: type your name, then Nothing found or Defect found.'
+      : eye ? `${critical ? 'Signed and checked' : 'Checked'} by eye: ready to send. ${eye[0].toUpperCase()}${eye.slice(1)}. Download the signed work order below.`
       : critical ? 'Signed: ready to send. Download the signed work order below.'
         : part ? `Ready: ${part}. It does not say the wall is clean.`
           : 'Nothing critical was found, so nothing needs your sign-off. The work order is ready.';
@@ -113,8 +127,9 @@ function syncSteps() {
 function doneKey() {
   const d = S.done;
   if (d?.status === 'halted') return d.cause === 'cap-hit' ? 'budget' : 'halted';
+  if (S.order?.status === 'incomplete') return 'incomplete';  // done, but part of the photo is not assessed yet
   if (d?.status === 'awaiting_review' && S.order?.status !== 'blocked') return 'signed';
-  if (S.order?.status === 'incomplete') return 'incomplete';  // done, but part of the photo is not assessed
+  if (S.order?.status === 'ready' && S.order.approvals?.length) return 'signed';  // checked by eye: a person signed
   return d?.status ?? 'completed';
 }
 const PILL = {
@@ -257,6 +272,7 @@ function clearJob() {
   S.steps = viewport.steps;
   trace.clear();
   findings.clear();
+  checks.clear();
   el.slider.max = 0;
   el.slider.disabled = el.play.disabled = true;
   el.tiles.checked = false;
@@ -566,9 +582,11 @@ function updateDone() {
   const critical = S.order.findings.some((f) => f.critical);
   const gap = gapText();
   const part = partText();
+  const eye = eyeText();
   S.ui.orderState.textContent = pending
     ? `Waiting for your sign-off (${pending}): work order ${S.order.id} is ${S.order.status} until a person approves or rejects each critical finding.`
     : gap ? `Work order ${S.order.id} is ${S.order.status}: ${gap}. A person should look there.`
+    : eye ? `Work order ${S.order.id} is ${S.order.status}: ${eye}.`
     : critical ? `Signed: ready to send. Work order ${S.order.id} is ${S.order.status}.`
       : part ? `Work order ${S.order.id} is ${S.order.status}: ${part}.`
         : `Work order ${S.order.id} is ${S.order.status}: nothing critical needed a sign-off.`;
@@ -648,6 +666,7 @@ function finish(ev) {
   `It stopped because ${stopWords(ev.cause, sm.steps)}${S.steps.length ? `: step ${S.steps.at(-1).step} says why` : ''}.`);
   findings.setReady();
   findings.refresh();
+  checks.show(S.order);
   el.tiles.disabled = false;
   buildDone();
   recap();
@@ -660,10 +679,19 @@ function finish(ev) {
 }
 
 async function review(id, decision, reviewer) {
-  const res = await postReview({ token: S.token, finding_id: id, decision, reviewer });
+  const res = await postReview({ token: S.token, finding_id: id, decision, reviewer }, recorded());
   S.token = res.token;
   S.order = res.work_order;
   findings.sync(S.order);
+  updateDone();
+}
+
+/** A person checked not_assessed entry `index` by eye: nothing-found or defect-found, with an optional note. */
+async function check(index, decision, reviewer, note) {
+  const res = await postReview({ token: S.token, not_assessed: index, decision, reviewer, ...(note ? { note } : {}) }, recorded());
+  S.token = res.token;
+  S.order = res.work_order;
+  checks.sync(S.order);
   updateDone();
 }
 
