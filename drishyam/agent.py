@@ -202,9 +202,10 @@ class JobConfig:
     # batch-yield: Forced looks (survey, follow-ups, confirm, fallback, replay) are never cut. 0: off, the agent as before.
     next_ev: float = 0.0  # batch-yield
     # blur-gate: how the quality gate judges blur (imaging.quality): "laplacian", a Laplacian variance under
-    # blur-gate: SHARPNESS_MIN, as published; "reblur", the re-blur ratio (imaging.reblur, Crete-Roffet et al. 2007)
-    # blur-gate: above REBLUR_MAX, which does not move with the view's contrast or pyramid level. "laplacian" unless the
-    # blur-gate: rule stated before its dev run passes (results/dev/blur_gate.json).
+    # blur-gate: SHARPNESS_MIN, as published; "both", that and a re-blur ratio (imaging.reblur, Crete-Roffet et al.
+    # blur-gate: 2007) above REBLUR_MAX, which does not move with the view's contrast or pyramid level, so it only takes
+    # blur-gate: back refusals of faint, sharp views. "laplacian" unless the rule stated before its dev run passes
+    # blur-gate: (results/dev/blur_gate.json).
     blur_gate: str = "laplacian"  # blur-gate
 
 

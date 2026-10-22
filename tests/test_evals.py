@@ -889,8 +889,15 @@ def test_blur_gate_eval_scores_every_look_as_its_gate_read_it(tmp_path, monkeypa
     assert res["pooled"]["views"] == 3 * len(views)
     assert all(v["reason"]["laplacian"][1] == "blur" and v["reblur"][1] > v["reblur"][0] for v in views)
     assert s["gate"]["refused_blurred"]["laplacian"] == len(views) and len(s["gate"]["blurred_diff_ci"]) == 2
-    assert {"vs_ref_ci", "boxes_diff_vs_ref_ci", "images_with_any_vs_ref_ci"} <= set(s["agent"]["reblur"])
+    assert s["gate"]["as_is_diff"] <= 0 and s["gate"]["blurred_diff"] <= 0  # both-gates only takes refusals back
+    assert {"vs_ref_ci", "boxes_diff_vs_ref_ci", "images_with_any_vs_ref_ci"} <= set(s["agent"]["both"])
     assert "vs_ref_ci" not in s["agent"]["laplacian"]
+    # the calibration: the largest REBLUR_MAX (0.005 grid) at which the both-gates gate refuses as many blurred views
+    view = lambda lap, rb: {"level": 1, "reblur": rb, "reason": {"laplacian": lap, "both": [None, None]}}
+    cal = bg.threshold([{"views": [view([None, "blur"], [0.3, 0.5]), view(["blur", "blur"], [0.3, 0.45]),
+                                   view([None, None], [0.25, 0.6])]}])
+    assert (cal["reblur_max"], cal["refused_as_is"], cal["refused_blurred"]) == (
+        0.445, {"laplacian": 1, "both": 0}, {"laplacian": 2, "both": 2})
     assert set(bg.clauses(res["splits"])) == {"recall_holds_synth_dev", "recall_holds_real", "clean_boxes_do_not_rise",
                                               "clean_share_with_a_box_does_not_rise"}
     verdict = lambda a, b: bg.verdict({"as_is_diff_ci": a, "blurred_diff_ci": b})
@@ -899,4 +906,5 @@ def test_blur_gate_eval_scores_every_look_as_its_gate_read_it(tmp_path, monkeypa
     assert verdict([-0.2, -0.1], [-0.2, -0.1]) == "Harm"  # fewer refused as they are, but fewer blurred ones too
     cv2.imwrite(str(tmp_path / "disc.png"), soft_disc(3000, 2250))
     look = bg.fallback_look(tmp_path / "disc.png", harness.cost_rows("local-macos-x86", "classical-v1"))
-    assert set(look) == {"laplacian", "reblur"} and all(x["level"] == 2 and x["looks"] >= 1 for x in look.values())
+    assert set(look) == {"laplacian", "both"} and all(x["level"] == 2 and x["looks"] for x in look.values())
+    assert all(sum(x["classes"].values()) == x["boxes"] for x in look.values())

@@ -1,20 +1,24 @@
-"""Dev only: the re-blur gate (JobConfig.blur_gate "reblur": imaging.reblur, Crete-Roffet et al. 2007) against the
+"""Dev only: the both-gates blur gate (JobConfig.blur_gate "both": blur only if the Laplacian variance is under
+SHARPNESS_MIN and the re-blur ratio, imaging.reblur after Crete-Roffet et al. 2007, is above REBLUR_MAX) against the
 Laplacian gate, for v1 (v1-policy2 at its profile) at the 30 % pixel cap, on the fixed costs v1's dev runs were charged.
 
     DRISHYAM_ONNX=models/drishyam_dacl10k.onnx python -m evals.blur_gate calibrate [--workers 6]
     DRISHYAM_ONNX=models/drishyam_dacl10k.onnx python -m evals.blur_gate dev [--workers 6]
+    DRISHYAM_ONNX=models/drishyam_dacl10k.onnx python -m evals.blur_gate real01
 
-Each photo's job runs with the Laplacian gate (in `dev` with the re-blur gate too). Every look of the Laplacian job is
-rendered again as its gate read it (the sharpness its step recorded must match) and scored by both gates as it is and
+Each photo's job runs with the Laplacian gate (in `dev` with the both-gates gate too). Every look of the Laplacian job
+is rendered again as its gate read it (the sharpness its step recorded must match) and scored by both gates as it is and
 blurred by a Gaussian of SIGMA view px, the rule's 'too blurred to trust'.
 `calibrate` does that on a pool outside every dev and held-out set (`pool_records`) and prints imaging.REBLUR_MAX: the
-largest value, to STEP, at which the re-blur gate refuses at least as many of the pool's blurred views as the Laplacian
-gate does. It writes the views to runs/blur_gate/calibration.json; results/dev/blur_gate.json quotes its numbers.
+largest value, to STEP, at which the both-gates gate refuses at least as many of the pool's blurred views as the
+Laplacian gate does. It writes the views to runs/blur_gate/calibration.json; results/dev/blur_gate.json quotes them.
 `dev` runs the rule stated in results/dev/blur_gate.json, committed before it ran, on the dev splits, writes its numbers
-into that file beside the rule, and refuses to run once they are there. No image is written: ids and numbers only.
+into that file beside the rule, and refuses to run once they are there. `real01` then adds the report on real_01, which
+no clause reads, once the verdict is committed. No image is written: ids and numbers only.
 """
 
 import argparse
+import collections
 import gzip
 import json
 from datetime import datetime
@@ -33,7 +37,7 @@ RULE_FILE = harness.REPO / "results" / "dev" / "blur_gate.json"
 OUT = harness.REPO / "runs" / "blur_gate"
 ENGINE, MICRO_ARM = "onnx:drishyam_dacl10k.onnx", "local-macos-x86-dacl10k-retime"
 CAP, SIGMA, STEP = 0.3, 2.0, 0.005
-GATES = imaging.BLUR_GATES  # ("laplacian", "reblur"): the gate as published first, the reference
+GATES = imaging.BLUR_GATES  # ("laplacian", "both"): the gate as published first, the reference
 # The pool: synthetic photos of seeds no other set uses (a clean set's demo photo bridge_08, its last, left out) and
 # CODEBRIM photos in neither the dev list nor the held-out list, drawn with POOL_SEED.
 POOL_DIR = harness.REPO / "data" / "blur_pool"
@@ -57,7 +61,7 @@ def views(img, trace, blur_regions=()) -> list[dict]:
         q = {g: [imaging.quality(c, g) for c in (crop, cv2.GaussianBlur(crop, (0, 0), SIGMA))] for g in GATES}
         assert q["laplacian"][0]["sharpness"] == t["sharpness"], (t["step"], q["laplacian"][0], t["sharpness"])
         out.append({"step": t["step"], "level": t["level"], "size": size, "cause": t["cause"],
-                    "sharpness": [x["sharpness"] for x in q["laplacian"]], "reblur": [x["reblur"] for x in q["reblur"]],
+                    "sharpness": [x["sharpness"] for x in q["laplacian"]], "reblur": [x["reblur"] for x in q["both"]],
                     "reason": {g: [x["reason"] for x in q[g]] for g in GATES},
                     "blur_region": any(imaging.box_iou(t["window"], b) > 0 for b in blur_regions)})
     return out
@@ -81,8 +85,8 @@ def counts(photos: list[dict]) -> np.ndarray:
 
 
 def gate_row(c: np.ndarray) -> dict:
-    """The gates' refusals over these photos' views, and the re-blur gate's share of views refused minus the Laplacian
-    gate's, as they are and blurred, each with its paired 95 % bootstrap CI over photos (harness.boot_ci)."""
+    """The gates' refusals over these photos' views, and the both-gates gate's share of views refused minus the
+    Laplacian gate's, as they are and blurred, each with its paired 95 % bootstrap CI over photos (harness.boot_ci)."""
     def diff(new, old):
         return lambda i: (c[i, new].sum() - c[i, old].sum()) / c[i, 0].sum() if c[i, 0].sum() else np.nan
 
@@ -95,8 +99,9 @@ def gate_row(c: np.ndarray) -> dict:
 
 
 def verdict(g: dict) -> str:
-    """Gate accuracy by the rule: Harm if the re-blur gate refuses measurably more views as they are, or measurably
-    fewer blurred ones; else Gain if measurably fewer as they are; else no measurable difference."""
+    """Gate accuracy by the rule: Harm if the new gate refuses measurably more views as they are, or measurably fewer
+    blurred ones; else Gain if measurably fewer as they are; else no measurable difference. (The both-gates gate can
+    refuse no more than the Laplacian gate, so for it Harm can only come from the blurred copies.)"""
     (lo, hi), (blo, bhi) = g["as_is_diff_ci"], g["blurred_diff_ci"]
     if None in (lo, hi, blo, bhi):
         return "not computable"
@@ -106,9 +111,9 @@ def verdict(g: dict) -> str:
 
 
 def clauses(splits: dict) -> dict:
-    """The rule's agent-level clauses, re-blur against Laplacian on the same photos (evals.dev_sweep.row's paired CIs)."""
-    up = lambda s: (splits[s]["agent"]["reblur"].get("vs_ref_ci") or [None, None])[1]
-    clean = splits["clean"]["agent"]["reblur"]
+    """The rule's agent-level clauses, both-gates against Laplacian on the same photos (evals.dev_sweep.row's CIs)."""
+    up = lambda s: (splits[s]["agent"]["both"].get("vs_ref_ci") or [None, None])[1]
+    clean = splits["clean"]["agent"]["both"]
     return {"recall_holds_synth_dev": up("synth_dev") is not None and up("synth_dev") >= 1,
             "recall_holds_real": up("real") is not None and up("real") >= 1,
             "clean_boxes_do_not_rise": clean["boxes_diff_vs_ref_ci"][0] <= 0,
@@ -126,8 +131,8 @@ def described(photos: list[dict]) -> dict:
             "reblur_quartiles": [[round(float(q), 4) for q in np.percentile([x["reblur"][k] for x in v], [25, 50, 75])]
                                  for k in (0, 1)] if v else None,
             "photos_where_the_jobs_differ": sum(p["configs"][f"laplacian@{CAP}"]["trace"]
-                                                != p["configs"][f"reblur@{CAP}"]["trace"] for p in photos
-                                                if f"reblur@{CAP}" in p["configs"])}
+                                                != p["configs"][f"both@{CAP}"]["trace"] for p in photos
+                                                if f"both@{CAP}" in p["configs"])}
 
 
 def split_records(d, n, seed, listing) -> list[dict]:
@@ -165,7 +170,8 @@ def run_dev(splits: dict, workers: int, expect: dict | None = None, log=print) -
 
 def fallback_look(path, rows) -> dict:
     """Reported, not in the rule: a photo with no candidate (real_01) as `drishyam run` loads it, under each gate: its
-    whole-photo fallback-l2 look's gate result, and the looks refused as blur and boxes drafted."""
+    whole-photo fallback-l2 look's gate result, the job's looks and those refused as blur, and the boxes it drafted
+    (per-component, by class) and the critical ones among them."""
     img, _ = batch.load(path)
     costs, out = harness.op_costs(rows, img.shape[1], img.shape[0]), {}
     for g in GATES:
@@ -173,8 +179,11 @@ def fallback_look(path, rows) -> dict:
         (t,) = [t for t in r["trace"] if t["cause"] == "fallback-l2"]
         (v,) = [v for v in views(img, r["trace"]) if v["cause"] == "fallback-l2"]
         out[g] = {"level": t["level"], "size": v["size"], "sharpness": t["sharpness"], "reblur": v["reblur"][0],
-                  "ok": t["q_ok"], "reason": t["q_reason"], "looks": sum(x["action"] != "halt" for x in r["trace"]),
-                  "looks_refused_blur": sum(x["q_reason"] == "blur" for x in r["trace"]), "boxes": len(r["preds"])}
+                  "ok": t["q_ok"], "reason": t["q_reason"],
+                  "looks": [[x["level"], x["cause"], x["q_reason"]] for x in r["trace"] if x["action"] != "halt"],
+                  "looks_refused_blur": sum(x["q_reason"] == "blur" for x in r["trace"]), "boxes": len(r["preds"]),
+                  "classes": dict(collections.Counter(p["cls"] for p in r["preds"])), "signoffs": r["signoffs"],
+                  "needs_look": r["needs_look"], "status": r["status"], "halt": r["halt_cause"]}
     return out
 
 
@@ -194,16 +203,18 @@ def pool_records() -> list[dict]:
 
 
 def threshold(photos: list[dict]) -> dict:
-    """REBLUR_MAX by the calibration procedure, and both gates' refusals of the pool's views at it."""
+    """REBLUR_MAX by the calibration procedure, and both gates' refusals of the pool's views at it. The both-gates gate
+    refuses a view at t if it is glare or dark, or if the Laplacian gate calls it blur and its re-blur ratio is above t."""
     v = [x for p in photos for x in p["views"]]
-    other = [[x["reason"]["reblur"][k] in ("glare", "dark") for x in v] for k in (0, 1)]  # refused before blur
+    other = [[x["reason"]["both"][k] in ("glare", "dark") for x in v] for k in (0, 1)]  # refused before blur
+    lap = [[x["reason"]["laplacian"][k] == "blur" for x in v] for k in (0, 1)]
     rb = np.array([x["reblur"] for x in v]).reshape(-1, 2)
-    new = lambda k, t: int(sum(o or r > t for o, r in zip(other[k], rb[:, k], strict=True)))
+    new = lambda k, t: int(sum(o or (b and r > t) for o, b, r in zip(other[k], lap[k], rb[:, k], strict=True)))
     old = [sum(x["reason"]["laplacian"][k] is not None for x in v) for k in (0, 1)]
     t = max(round(i * STEP, 3) for i in range(round(1 / STEP) + 1) if new(1, round(i * STEP, 3)) >= old[1])
     return {"views": len(v), "reblur_max": t,
-            "refused_as_is": {"laplacian": old[0], "reblur": new(0, t)},
-            "refused_blurred": {"laplacian": old[1], "reblur": new(1, t)},
+            "refused_as_is": {"laplacian": old[0], "both": new(0, t)},
+            "refused_blurred": {"laplacian": old[1], "both": new(1, t)},
             "reblur_quartiles": [[round(float(q), 4) for q in np.percentile(rb[:, k], [25, 50, 75])] for k in (0, 1)],
             "views_by_level": {f"L{lv}": sum(x["level"] == lv for x in v) for lv in sorted({x["level"] for x in v})}}
 
@@ -226,7 +237,7 @@ def calibrate(workers: int) -> dict:
 
 def main(argv=None) -> None:
     ap = argparse.ArgumentParser(prog="python -m evals.blur_gate")
-    ap.add_argument("command", choices=("calibrate", "dev"))
+    ap.add_argument("command", choices=("calibrate", "dev", "real01"))
     ap.add_argument("--workers", type=int, default=6)
     a = ap.parse_args(argv)
     if default_segmenter().name != ENGINE:
@@ -235,13 +246,23 @@ def main(argv=None) -> None:
         calibrate(a.workers)
         return
     doc, rel = json.loads(RULE_FILE.read_text()), str(RULE_FILE.relative_to(harness.REPO))
-    if "verdict" in doc or git("status", "--porcelain", "--", rel):
-        raise SystemExit(f"{rel} already holds outputs or is not committed as it stands: the rule is run once")
+    if git("status", "--porcelain", "--", rel):
+        raise SystemExit(f"{rel} is not committed as it stands")
+    if a.command == "real01":  # reported, never read by the rule: only once its verdict is committed
+        if "verdict" not in doc or "real_01_fallback_look" in doc:
+            raise SystemExit(f"{rel}: real_01 is reported once, after the dev run's verdict")
+        doc["real_01_fallback_look"] = fallback_look(REAL_01, harness.cost_rows(MICRO_ARM, default_segmenter().name))
+        RULE_FILE.write_text(json.dumps(doc, indent=1, default=float) + "\n")
+        print(json.dumps(doc["real_01_fallback_look"], indent=1))
+        return
+    if "verdict" in doc:
+        raise SystemExit(f"{rel} already holds outputs: the rule is run once")
     commit, committed = git("log", "-1", "--format=%H %cI", "--", rel).split()
     started = datetime.now().astimezone().isoformat(timespec="seconds")
     assert datetime.fromisoformat(committed) < datetime.fromisoformat(started), (committed, started)
-    if imaging.REBLUR_MAX != doc["calibration"]["reblur_max"]:
-        raise SystemExit(f"imaging.REBLUR_MAX {imaging.REBLUR_MAX} is not the rule's {doc['calibration']['reblur_max']}")
+    if doc.get("arms") != list(GATES) or imaging.REBLUR_MAX != doc["calibration"]["reblur_max"]:
+        raise SystemExit(f"the rule's arms {doc.get('arms')} and REBLUR_MAX {doc['calibration']['reblur_max']} are not "
+                         f"the code's {list(GATES)} and {imaging.REBLUR_MAX}")
     pub = json.loads((harness.REPO / "results" / "dev" / "model_choice_dev.json").read_text())["datasets"]
     expect = {s: {"dataset_gt_sha256": d["gt_sha256"], "dataset_images_sha256": d["images_sha256"]}
               for s, d in pub.items()}
@@ -249,7 +270,6 @@ def main(argv=None) -> None:
     res = run_dev(SPLITS, a.workers, expect, lambda m: print(m, flush=True))
     word, cl = verdict(res["pooled"]), clauses(res["splits"])
     adopted = word == "Gain" and all(cl.values())
-    real = fallback_look(REAL_01, harness.cost_rows(MICRO_ARM, default_segmenter().name))  # after the verdict: not in it
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "dev_views.json.gz").write_bytes(gzip.compress(json.dumps(res["views"]).encode()))
     doc.update({"run": {"rule_commit": commit, "rule_committed": committed, "run_started": started, "code": code,
@@ -257,10 +277,9 @@ def main(argv=None) -> None:
                         "finished": datetime.now().astimezone().isoformat(timespec="seconds"),
                         "views_file": str((OUT / "dev_views.json.gz").relative_to(harness.REPO))},
                 "gate_pooled": res["pooled"], "splits": res["splits"], "clauses": cl,
-                "verdict": word, "adopted": adopted, "real_01_fallback_look": real})
+                "verdict": word, "adopted": adopted})
     RULE_FILE.write_text(json.dumps(doc, indent=1, default=float) + "\n")
-    print(json.dumps({k: doc[k] for k in ("gate_pooled", "clauses", "verdict", "adopted", "real_01_fallback_look")},
-                     indent=1, default=float))
+    print(json.dumps({k: doc[k] for k in ("gate_pooled", "clauses", "verdict", "adopted")}, indent=1, default=float))
 
 
 if __name__ == "__main__":

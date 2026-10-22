@@ -983,7 +983,8 @@ def test_the_classical_profile_is_the_agent_every_classical_number_ran_with(scen
     tau_scout, fill and survey_value stay off: measured, not adopted (results/dev/tune_sweep.json). fallback_l2 is on
     for every profile since its dev run (results/dev/zero_candidate_fallback.json, measured on v1); the classical numbers
     ran before it, with it off, and it changes only a photo with no candidate. v1-policy2's knobs are off for it,
-    batch-yield's next_ev is 0 (off) for every profile, and so is the re-blur gate (results/dev/blur_gate.json)."""
+    batch-yield's next_ev is 0 (off) for every profile, and the blur gate is the Laplacian one
+    (results/dev/blur_gate.json)."""
     from dataclasses import asdict
 
     from drishyam.agent import PROFILES
@@ -1898,7 +1899,7 @@ def test_the_next_photos_first_look_is_worth_its_triage_prior_max_under_v1_grid(
     assert looks_of(events)[0]["cause"] == "best-score" and looks_of(events)[0]["value"] == tri["prior_max"]
 
 
-# ---- blur gate (JobConfig.blur_gate): the quality gate's Laplacian variance, or the re-blur ratio (imaging.reblur) --
+# ---- blur gate (JobConfig.blur_gate): the Laplacian variance alone, or with the re-blur ratio (imaging.reblur) -----
 def without_blur_gate(monkeypatch):
     """drishyam.agent without its lines marked `# blur-gate`: the agent before the knob."""
     import re
@@ -1945,26 +1946,26 @@ def faint_wall(w, h):
     return np.clip(g.mean() + (g - g.mean()) * 0.2, 0, 255).astype(np.uint8)
 
 
-def test_the_reblur_gate_keeps_a_sharp_faint_wall_and_still_refuses_a_blurred_one():
+def test_the_both_gates_gate_keeps_a_sharp_faint_wall_and_still_refuses_a_blurred_one():
     """real_01's case without real_01: every look at a sharp, faint wall (it has no candidate: one whole-photo L2 look)
-    is refused as blur by the Laplacian gate (a not-assessed entry, re-shoot) and passed by the re-blur gate, whose
-    ratio each step then records. A wall at full contrast blurred by sigma 8 L0 px (1 view px at L3, 4 at L1) is
-    refused at every look by both."""
+    is refused as blur by the Laplacian gate (a not-assessed entry, re-shoot) and passed by the both-gates gate, its
+    re-blur ratio saying sharp; that gate's steps record the ratio. A wall at full contrast blurred by sigma 8 L0 px
+    (1 view px at L3, 4 at L1) is refused at every look by both gates."""
     from evals import harness
 
     from .conftest import concrete
 
     sharp = faint_wall(4000, 3000)
     for img, passes in ((sharp, True), (cv2.GaussianBlur(concrete(3000, 4000, 4), (0, 0), 8.0), False)):
-        for gate in ("laplacian", "reblur"):
+        for gate in ("laplacian", "both"):
             ev = list(fixed_job(img, blur_gate=gate).run())
             looks, refused = looks_of(ev), [e for e in ev[-1]["work_order"]["not_assessed"] if e["reason"] == "blur"]
-            assert looks and all(("reblur" in s["observation"]) == (gate == "reblur") for s in looks)
-            if passes and gate == "reblur":
+            assert looks and all(("reblur" in s["observation"]) == (gate == "both") for s in looks)
+            if passes and gate == "both":
                 assert all(s["quality"]["ok"] for s in looks) and not refused
             else:
                 assert not any(s["quality"]["ok"] for s in looks) and len(refused) == len(looks)
                 assert all(e["action"] == "re-shoot" for e in refused)
-    r = harness.run_drishyam(sharp, 0.3, FALLBACK_COSTS, blur_gate="reblur")
-    assert r["switches"]["blur_gate"] == "reblur" and all(t["q_ok"] for t in r["trace"])
+    r = harness.run_drishyam(sharp, 0.3, FALLBACK_COSTS, blur_gate="both")
+    assert r["switches"]["blur_gate"] == "both" and all(t["q_ok"] for t in r["trace"])
     assert harness.run_drishyam(sharp, 0.3, FALLBACK_COSTS)["switches"]["blur_gate"] == "laplacian"

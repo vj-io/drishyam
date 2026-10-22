@@ -146,7 +146,7 @@ def test_l0_box_is_never_degenerate_under_yaw_and_pitch():
             assert bx + bw <= 2048 and by + bh <= 1536
 
 
-# ---- the blur gate (JobConfig.blur_gate): the Laplacian variance, or the re-blur ratio (imaging.reblur) ----------
+# ---- the blur gate (JobConfig.blur_gate): the Laplacian variance, or it and the re-blur ratio (imaging.reblur) ----
 def dead_leaves(n: int, seed: int = 0) -> np.ndarray:
     """Grey discs of power-law sizes drawn over each other: the dead-leaves model, whose statistics do not change with
     scale (Lee, Mumford and Huang 2001), so its pyramid levels are the same scene at half and quarter scale."""
@@ -175,16 +175,22 @@ def cracked_concrete():
     return add_crack(concrete(2048, 2048, 3), (200, 900))
 
 
-@pytest.mark.parametrize("make", [cracked_concrete, lambda: dead_leaves(2048)])
-def test_the_reblur_ratio_does_not_move_with_contrast(make):
+def faint(view, k=0.25):
+    """The view at k of its contrast, about its mean."""
+    return np.clip(view.mean() + (view.astype(np.float32) - view.mean()) * k, 0, 255).astype(np.uint8)
+
+
+@pytest.mark.parametrize("make, faint_reason", [(cracked_concrete, None), (lambda: dead_leaves(2048), "blur")])
+def test_the_reblur_ratio_does_not_move_with_contrast(make, faint_reason):
     """A quarter of the contrast (about the mean): the Laplacian variance falls 16-fold, so the Laplacian gate refuses
-    the faint copy of a view it passes; the re-blur ratio is a ratio of gradient sums and stays within 8-bit rounding,
-    so the re-blur gate decides the faint copy as it decides the view."""
+    the faint copy of a view it passes; the re-blur ratio is a ratio of gradient sums and stays within 8-bit rounding.
+    So the both-gates gate passes the faint concrete, whose ratio says sharp, and still refuses the faint dead-leaves
+    copy: its discs, flat between anti-aliased edges, read 0.41, above REBLUR_MAX."""
     view = central_views(make(), (1,))[0]
-    low = np.clip(view.mean() + (view.astype(np.float32) - view.mean()) * 0.25, 0, 255).astype(np.uint8)
+    low = faint(view)
     assert abs(imaging.reblur(gray(low)) - imaging.reblur(gray(view))) < 0.02
     assert imaging.quality(view)["ok"] and imaging.quality(low)["reason"] == "blur"
-    assert imaging.quality(low, "reblur")["reason"] == imaging.quality(view, "reblur")["reason"]
+    assert imaging.quality(view, "both")["ok"] and imaging.quality(low, "both")["reason"] == faint_reason
 
 
 def test_the_reblur_ratio_does_not_move_with_the_pyramid_level():
@@ -200,40 +206,57 @@ def test_the_reblur_ratio_does_not_move_with_the_pyramid_level():
 @pytest.mark.parametrize("make", [cracked_concrete, lambda: dead_leaves(2048)])
 def test_the_reblur_ratio_rises_with_blur_and_the_gate_refuses_a_sigma_2_view(make):
     """Monotone in the Gaussian sigma (view px), and a sigma-2 copy, the rule's 'too blurred to trust'
-    (results/dev/blur_gate.json), is refused. (The cracked concrete as it is passes; the dead-leaves discs, flat
-    between anti-aliased edges, read 0.41 and do not.)"""
+    (results/dev/blur_gate.json), is refused by the both-gates gate: both its Laplacian variance and its ratio say
+    blur."""
     view = central_views(make(), (1,))[0]
     rb = [imaging.reblur(gray(cv2.GaussianBlur(view, (0, 0), s) if s else view)) for s in (0, 0.5, 1, 1.5, 2, 3, 4)]
     assert all(a < b for a, b in itertools.pairwise(rb)), rb
-    assert imaging.quality(cv2.GaussianBlur(view, (0, 0), 2.0), "reblur")["reason"] == "blur"
+    assert imaging.quality(cv2.GaussianBlur(view, (0, 0), 2.0), "both")["reason"] == "blur"
+
+
+def test_the_both_gates_gate_only_takes_back_blur_refusals_the_laplacian_gate_makes():
+    """Sharp, faint, sigma-2 blurred and half blown-out views of three scenes at L0-L2: the both-gates gate refuses a
+    view only for the reason the Laplacian gate refuses it, and differs from it only by passing a view the Laplacian
+    gate calls blur whose re-blur ratio is at most REBLUR_MAX (here the faint concrete ones)."""
+    taken_back = 0
+    for img in (cracked_concrete(), dead_leaves(2048), concrete(2048, 2048, 4)):
+        for view in central_views(img):
+            glare = view.copy()
+            glare[:256] = 255
+            for v in (view, faint(view), cv2.GaussianBlur(view, (0, 0), 2.0), glare):
+                old, new = imaging.quality(v), imaging.quality(v, "both")
+                assert new["reason"] == old["reason"] or (
+                    old["reason"] == "blur" and new["ok"] and new["reblur"] <= imaging.REBLUR_MAX)
+                taken_back += old["reason"] == "blur" and new["ok"]
+    assert taken_back >= 4
 
 
 def test_known_limit_a_faint_surface_blurred_past_its_grain_reads_sharp():
     """Known limit (results/dev/blur_gate.json): concrete grain at a fifth of its contrast, blurred by sigma 8 L0 px
     and seen at L1 (4 view px of blur). The grain is gone; what is left is 8-bit steps, which a measure that ignores
-    contrast reads as sharp, so the re-blur gate passes the view. The Laplacian gate refuses it."""
-    g = concrete(2048, 2048, 4).astype(np.float32)
-    faint = np.clip(g.mean() + (g - g.mean()) * 0.2, 0, 255).astype(np.uint8)
-    view = central_views(cv2.GaussianBlur(faint, (0, 0), 8.0), (1,))[0]
-    assert imaging.quality(view, "reblur")["ok"] and imaging.quality(view)["reason"] == "blur"
+    contrast reads as sharp, so the both-gates gate takes back the Laplacian gate's refusal and passes the view."""
+    view = central_views(cv2.GaussianBlur(faint(concrete(2048, 2048, 4), 0.2), (0, 0), 8.0), (1,))[0]
+    assert imaging.quality(view)["reason"] == "blur" and imaging.quality(view, "both")["ok"]
 
 
 def test_a_view_with_no_gradient_is_blur_under_both_gates_without_a_warning():
-    """Nothing to judge focus by: the ratio's denominator is 0, so the measure is 1 (refused, as the Laplacian gate
-    refuses it); no division warning, also on a view too small to keep any pixel inside the measure's border."""
+    """Nothing to judge focus by: the ratio's denominator is 0, so the measure is 1, and the Laplacian variance is 0:
+    refused by both gates; no division warning, also on a view too small to keep any pixel inside the ratio's border."""
     import warnings
 
     with warnings.catch_warnings():
         warnings.simplefilter("error")
         for flat in (np.full((512, 512, 3), 128, np.uint8), np.full((3, 3, 3), 128, np.uint8)):
             assert imaging.reblur(gray(flat)) == 1.0
-            q = imaging.quality(flat, "reblur")
+            q = imaging.quality(flat, "both")
             assert (q["reason"], q["reblur"]) == ("blur", 1.0) and imaging.quality(flat)["reason"] == "blur"
 
 
 def test_the_blur_gate_must_be_one_it_knows():
-    with pytest.raises(ValueError, match="blur gate"):
-        imaging.quality(np.zeros((64, 64, 3), np.uint8), "sharpness")
+    """"reblur" (the re-blur ratio alone: the first rule, replaced before any dev read) is no longer a gate."""
+    for name in ("sharpness", "reblur"):
+        with pytest.raises(ValueError, match="blur gate"):
+            imaging.quality(np.zeros((64, 64, 3), np.uint8), name)
 
 
 def without_blur_gate(monkeypatch):

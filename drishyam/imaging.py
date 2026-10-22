@@ -21,12 +21,13 @@ MIN_SIDE = 64
 LEVELS = 5  # L0 (full resolution) .. L4
 OVERVIEW_LEVEL = 3
 SHARPNESS_MIN = 12.0  # Laplacian variance below this is blur
-# The re-blur gate (JobConfig.blur_gate "reblur", off by default): a view whose re-blur ratio (`reblur`) is above
-# REBLUR_MAX is blur. REBLUR_MAX was set on a calibration pool outside every dev and held-out set, against a sigma-2
-# Gaussian blur of each view the agent took there (results/dev/blur_gate.json: the pool and the procedure).
+# The both-gates blur gate (JobConfig.blur_gate "both", off by default): a view is blur only if its Laplacian
+# variance is under SHARPNESS_MIN and its re-blur ratio (`reblur`) is above REBLUR_MAX. REBLUR_MAX was set on a
+# calibration pool outside every dev and held-out set, against a sigma-2 Gaussian blur of each view the agent took
+# there (results/dev/blur_gate.json: the pool and the procedure).
 REBLUR_SIZE = 11  # the re-blur's box, view px: skimage.measure.blur_effect's h_size
-REBLUR_MAX = 0.38
-BLUR_GATES = ("laplacian", "reblur")
+REBLUR_MAX = 0.37
+BLUR_GATES = ("laplacian", "both")
 GLARE_MAX = 0.20  # fraction of blown-out pixels
 DARK_MAX = 0.50
 # Saliency's absolute null: each map is divided by max(its 99.5th percentile, floor), so the texture of a sound
@@ -311,14 +312,14 @@ def quality(crop: np.ndarray,
     sharp = float(cv2.Laplacian(gray, cv2.CV_32F).var())
     glare = float(np.count_nonzero(gray >= 250)) / gray.size
     dark = float(np.count_nonzero(gray <= 5)) / gray.size
-    rb = reblur(gray) if gate == "reblur" else None  # blur-gate
+    rb = reblur(gray) if gate == "both" else None  # blur-gate
     reason = None
     if glare > GLARE_MAX:
         reason = "glare"
     elif dark > DARK_MAX:
         reason = "dark"
-    elif rb is not None:  # blur-gate: the re-blur ratio judges blur instead of the Laplacian variance
-        reason = "blur" if rb > REBLUR_MAX else None  # blur-gate
+    elif rb is not None:  # blur-gate: blur only if the re-blur ratio agrees with the Laplacian variance
+        reason = "blur" if sharp < SHARPNESS_MIN and rb > REBLUR_MAX else None  # blur-gate
     elif sharp < SHARPNESS_MIN:
         reason = "blur"
     return {"ok": reason is None, "reason": reason, "sharpness": round(sharp, 1),
