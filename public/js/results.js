@@ -2,14 +2,16 @@
 import { $, h, svg, num } from './dom.js';
 import { getJSON } from './api.js';
 import { countUp } from './fx.js';
+import { size } from './panels.js';
 
 const SERIES = [
   ['downscale', 'downscale once', 'downscale', 'rect'],
   ['tiling', 'tiling (L2, L1, L0 grids)', 'tiling', 'diamond'],
   ['drishyam', 'Drishyam', 'drishyam', 'circle'],
 ];
-// v1's Drishyam curve on the same images (evals.model_eval --publish): the segmenter the live demo runs since 2026-10-21.
-const MODEL = ['model', 'Drishyam, v1 (the live engine)', 'model', 'circle'];
+// v1's Drishyam curve on the same images (evals.model_eval --publish): the segmenter the live demo runs since 2026-10-21,
+// with its first look policy (v1-policy2, live since 2026-10-22, is #policy2-note under FIG. 4.2).
+const MODEL = ['model', 'Drishyam, v1 (first look policy)', 'model', 'circle'];
 // evals.harness.BUDGETS: the pixel caps of a summary's policies.drishyam points, in order
 const CAPS = [0.05, 0.1, 0.2, 0.3, 0.5, 1.0];
 
@@ -184,10 +186,11 @@ function versusDownscale(hs) {
   return ci[0] > 1 ? '; it beats one downscale' : ci[1] < 1 ? '; one downscale does better' : '; one downscale does as well';
 }
 
-/** Hero chips, each a measured fact with its caveat, every pixel figure a share of the image's own pixels.
- * #stat-real, the first chip, holds v1 on CODEBRIM (`v1.real`, its summary) when published, else `real` (the classical
- * runs); the other three are the classical engine's. */
+/** Hero chips, each a measured fact with its caveat in 25 words or fewer, every pixel figure a share of the image's own
+ * pixels. #stat-real, the first chip, holds v1 on CODEBRIM (`v1.real`, its summary) when published, else `real` (the
+ * classical runs); the other three are the classical engine's. Returns the long versions, for FIG. 4.1's notes. */
 function heroChips(sum, real, v1) {
+  const long = [];
   // Exhaustive tiling (the most pixels) is the PRD's reference point for the headline ratio.
   const tiling = points(sum.policies?.tiling).pop();
   const hs = sum.headline_stats ?? {};
@@ -209,9 +212,13 @@ function heroChips(sum, real, v1) {
     const target = hs.target?.recall_ratio;
     const ds = interval(hs.recall_ratio_vs_downscale_ci);
     const vsDown = !ds ? '' : ds[0] > 1 ? ' It beats one downscaled pass' : ds[1] < 1 ? ' One downscaled pass does better' : ' One downscaled pass does about as well';
-    fill('stat-recall', `Classical engine, synthetic test set${num(sum.n_images) ? ` (${sum.n_images} photos)` : ''}`, Math.round(100 * ratio), { suffix: ' %' },
-      `of what checking every tile finds, reading ${pct(drishyam.pixels_frac)} of the image's pixels${num(hs.budget) ? ` under the ${pct(hs.budget)} pixel cap` : ''} (tiling reads ${pct(tiling.pixels_frac)}${tiling.pixels_frac > 1 ? ': its tiles overlap' : ''}).`
-      + `${num(target) ? ` Target was ${pct(target)}: ${ratio >= target ? 'met' : 'missed'}.` : ''}`
+    const key = `Classical engine, synthetic test set${num(sum.n_images) ? ` (${sum.n_images} photos)` : ''}`;
+    const met = num(target) ? `${pct(target)}: ${ratio >= target ? 'met' : 'missed'}.` : '';
+    fill('stat-recall', key, Math.round(100 * ratio), { suffix: ' %' },
+      `of what checking every tile finds, at ${pct(drishyam.pixels_frac)} of the pixels (tiling ${pct(tiling.pixels_frac)}).`
+      + `${met ? ` Target ${met}` : ''}${vsDown ? `${vsDown.replace('downscaled pass', 'downscale')}.` : ''}`);
+    long.push(`${key}: Drishyam finds ${Math.round(100 * ratio)} % of what checking every tile finds, reading ${pct(drishyam.pixels_frac)} of the image's pixels${num(hs.budget) ? ` under the ${pct(hs.budget)} pixel cap` : ''} (tiling reads ${pct(tiling.pixels_frac)}${tiling.pixels_frac > 1 ? ': its tiles overlap' : ''}).`
+      + `${met ? ` Target was ${met}` : ''}`
       + `${vsDown ? `${vsDown} (${dec(hs.recall_ratio_vs_downscale)}×, 95 % CI ${dec(ds[0])}–${dec(ds[1])}).` : ''}`);
   }
   // v1's chip, first and two lines long: its interval, chance and the classical engine's recall (its costs and misses
@@ -254,7 +261,8 @@ function heroChips(sum, real, v1) {
     const rest = [halts['cap-hit'] && `${halts['cap-hit']} hit a time, $ or step cap`, ...other(halts)].filter(Boolean);
     const at = capped && [`a cap ended ${capped['cap-hit'] ?? 0} of ${total(capped)} first`, `the stop rule ${capped['stop-rule'] ?? 0}`, ...other(capped)];
     fill('stat-cost', `Classical engine, no pixel cap (100 %): ${stops * 2 >= total(halts) ? 'stops on its own' : 'the stop rule'}`, stops, { suffix: ` of ${total(halts)} jobs` },
-      `the stop rule ended them when the next look was worth less than it cost, at ${pct(uncapped.pixels_frac)} of the image's pixels on average`
+      `ended by the stop rule, when the next look was worth less than it cost: ${pct(uncapped.pixels_frac)} of the pixels on average (FIG. 4.1).`);
+    long.push(`Classical engine, no pixel cap (100 %): the stop rule ended ${stops} of ${total(halts)} jobs when the next look was worth less than it cost, at ${pct(uncapped.pixels_frac)} of the image's pixels on average`
       + `${rest.length ? `; the other ${rest.join(', ')}` : ''}.`
       + `${at ? ` At the ${pct(hs.budget)} pixel cap of the headline: ${at.slice(0, -1).join(', ')}, and ${at.at(-1)}.` : ''}`);
   }
@@ -265,6 +273,7 @@ function heroChips(sum, real, v1) {
     fill('stat-ops', 'Classical engine, failure drills', ok, { suffix: ` / ${fired} recovered` },
       'planner timeouts, malformed replies and slow-segmenter faults, injected on purpose');
   }
+  return long.map((t) => h('p', { class: 'note' }, t));
 }
 
 /** The machine was busy: its 1-minute load average was at or above its logical CPU count. */
@@ -283,7 +292,8 @@ function place(prov) {
   return `local x86 laptop${cpu ? ` (${cpu})` : ''}${busy(prov) ? ', under load' : ''}${arm}`;
 }
 
-/** `model` (optional): {sum, text}, v1's summary on the same images, drawn dashed, and what its note says.
+/** `model` (optional): {sum, text, policy2}, v1's summary on the same images, drawn dashed, what its note says, and where
+ * v1-policy2's own read is (the live look policy: #policy2-note under FIG. 4.2).
  * `extra` (optional) adds lines to the folded provenance block. */
 function renderBench(sum, id, file, note, model, iou = false, extra = null) {
   const root = $(`#${id}`);
@@ -294,14 +304,15 @@ function renderBench(sum, id, file, note, model, iou = false, extra = null) {
   const withModel = points(model?.sum?.policies?.drishyam).length > 0;
   const series = withModel ? [...SERIES, MODEL] : SERIES;
   const policies = withModel ? { ...sum.policies, model: model.sum.policies.drishyam } : sum.policies;
-  const plot = h('div', {}, chart(policies, series, iou), legend(series), marks(policies, series, iou), dataTable(policies, series),
-    withModel ? h('p', { class: 'note' }, `Dashed red: Drishyam with v1, the dacl10k-trained segmenter the live demo runs since 2026-10-21, on the same images, with its first look policy (v1-policy2, live since 2026-10-22, is under FIG. 4.2); the other lines use the classical engine.${model.text ? ` v1 held out: ${model.text}` : ''}`) : null);
+  const plot = h('div', {}, chart(policies, series, iou), legend(series), dataTable(policies, series));
   NARROW.addEventListener('change', () => plot.firstElementChild.replaceWith(chart(policies, series, iou)));
   root.replaceChildren(h('div', { class: 'stack' },
     h('p', { class: 'dataset' }, h('span', { class: 'dataset__k' }, 'dataset'), h('b', {}, String(sum.dataset ?? 'unlabelled'))),
     h('div', { class: 'bench' },
       plot,
-      h('div', { class: 'stack' },
+      h('div', { class: 'stack' },  // beside the chart: what its lines and marks mean, then the notes
+        withModel ? h('p', { class: 'note' }, `Dashed red: Drishyam with v1, the dacl10k-trained segmenter the live demo runs since 2026-10-21, on the same images, with its first look policy; the live policy since 2026-10-22, v1-policy2, is summarised ${model.policy2}. The other lines use the classical engine.${model.text ? ` v1 held out: ${model.text}` : ''}`) : null,
+        marks(policies, series, iou),
         note?.(sum) ?? null,
         micro || prov.length ? h('details', { class: 'data' },
           h('summary', {}, `${micro ? 'Micro-benchmarks and provenance' : 'Provenance'}${where ? `: ${where}` : ''}`),
@@ -367,8 +378,14 @@ function failureImage(path) {
   return img;
 }
 
+/** The failure data's raw ids in the site's words: drishyam@0.3, tiling@L0 (the level words of the step detail), exposed_rebar. */
+const inWords = (t) => String(t ?? '')
+  .replace(/\bdrishyam@(\d*\.?\d+)/g, (_, c) => `Drishyam at a ${pct(Number(c))} pixel cap`)
+  .replace(/\btiling@L(\d)\b/g, (_, L) => `tiling at ${size(Number(L))}`)
+  .replace(/\b(?:exposed_rebar|not_assessed)\b/g, (m) => m.replaceAll('_', ' '));
+
 const rules = (cases) => [...new Set(cases.map((f) => String(f.rule_that_would_catch_it ?? '')))]
-  .map((rule) => h('p', { class: 'fail__rule' }, h('b', {}, 'Rule that would catch it'), rule));
+  .map((rule) => h('p', { class: 'fail__rule' }, h('b', {}, 'Rule that would catch it'), inWords(rule)));
 
 /** One plate per failure category; each case on it is a sub-figure (a), (b), ... under one shared rule. Real-photo
  * failures (CODEBRIM, text only: its licence bars sharing the photos) follow as one more plate. */
@@ -390,7 +407,7 @@ function renderFailures(list, realList) {
         const img = failureImage(f.image);
         return h('figure', { class: 'fail__case' },
           img ? h('div', { class: 'fail__frame' }, img) : null,
-          h('figcaption', {}, h('b', { class: 'fail__sub' }, `(${String.fromCharCode(97 + j)})`), ' ', String(f.what_happened ?? '')));
+          h('figcaption', {}, h('b', { class: 'fail__sub' }, `(${String.fromCharCode(97 + j)})`), ' ', inWords(f.what_happened)));
       })),
       rules(cases)))),
     real.length ? realFailures(real, n) : null));
@@ -409,9 +426,9 @@ function realFailures(real, n) {
     h('div', { class: 'stack' },
       h('p', { class: 'note' }, `${real.length} cases from the CODEBRIM evaluation, written out because its licence does not allow sharing the photos.`),
       table('Real-photo failures', ['photo', 'class', 'what happened'],
-        real.map((f) => [String(f.id ?? ''), String(f.class ?? '–'), String(f.what_happened)])),
+        real.map((f) => [String(f.id ?? ''), inWords(f.class ?? '–'), inWords(f.what_happened)])),
       table('Rules that would catch them', ['failure', 'rule that would catch it'],
-        byRule.map(([category, cases]) => [category, String(cases[0].rule_that_would_catch_it ?? '')]))));
+        byRule.map(([category, cases]) => [category, inWords(cases[0].rule_that_would_catch_it)]))));
 }
 
 export async function initResults() {
@@ -422,8 +439,10 @@ export async function initResults() {
       'results/codebrim/failures_text.json', 'results/large/summary.json', 'results/live/summary.json',
       'results/synth_dacl10k/summary.json', 'results/codebrim_dacl10k/summary.json'].map(getJSON));
   const v1 = { synth: v1synth, real: v1real };
-  if (renderBench(sum, 'bench', 'results/summary.json', () => synthNotes(large, live), { sum: v1synth, text: v1Facts(v1synth, sum, v1synth, sum) },
-    false, liveLoad(live))) heroChips(sum, real, v1);
-  renderBench(real, 'bench-real', 'results/codebrim/summary.json', realNote, { sum: v1real, text: v1Facts(v1real, real, v1synth, sum) }, true);
+  const long = sum?.policies ? heroChips(sum, real, v1) : [];  // the hero cards' long versions are FIG. 4.1's first notes
+  renderBench(sum, 'bench', 'results/summary.json', () => [...long, ...synthNotes(large, live)],
+    { sum: v1synth, text: v1Facts(v1synth, sum, v1synth, sum), policy2: 'under FIG. 4.2' }, false, liveLoad(live));
+  renderBench(real, 'bench-real', 'results/codebrim/summary.json', realNote,
+    { sum: v1real, text: v1Facts(v1real, real, v1synth, sum), policy2: 'in the note below' }, true);
   renderFailures(fails, realFails);
 }

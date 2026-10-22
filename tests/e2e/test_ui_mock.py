@@ -400,7 +400,7 @@ def hscroll_offenders(page):
     return page.evaluate("""() => ({
       sw: document.documentElement.scrollWidth, iw: window.innerWidth,
       off: [...document.querySelectorAll('body *')].filter(e => {
-        if (e.closest('.table-wrap, .toasts, .gallery')) return false;  // scroll on their own, never widen the page
+        if (e.closest('.table-wrap, .toasts, .gallery, .loop__pan')) return false;  // scroll on their own, never widen the page
         const r = e.getBoundingClientRect();
         return r.width > 0 && r.right > window.innerWidth + 1;
       }).map(e => e.tagName.toLowerCase() + '.' + String(e.className).split(' ')[0]).slice(0, 8)})""")
@@ -500,6 +500,10 @@ def test_desktop_mock(browser, base):
     expect(p.locator(".nav__links a")).to_have_text(["Demo", "How it works", "Results", "Docs"])
     expect(p.locator(".nav__menu")).to_be_hidden()                # the phone menu only
     expect(p.locator("#look")).to_be_enabled(timeout=T)          # mock.jpg is preloaded
+    expect(p.locator("#job-text")).to_contain_text(f"recorded on the classical engine on {STEPS[0]['t'][:10]} with all three failure drills")
+    planner = {e["status"] for e in EVENTS if e["type"] == "planner"}   # a timeout falls back, a shell command is rejected
+    assert "p95_spike" in {st.get("injected") for st in STEPS} and {"fallback", "rejected"} <= planner, "the label says the fixture ran all three drills"
+    expect(p.locator("#api-status")).to_have_text("Recorded run: no API is called.")
     expect(p.locator("#state-1")).to_have_text("Done")
     expect(p.locator("#say-1")).to_contain_text("Ready:")
     expect(p.locator(".thumb")).to_have_count(1)                  # routed sample manifest
@@ -511,16 +515,23 @@ def test_desktop_mock(browser, base):
     head = max((pt for pt in SUMMARY["policies"]["drishyam"] if pt["pixels_frac"] <= hs["budget"]), key=lambda pt: pt["pixels_frac"])
     expect(p.locator("#stat-recall .stat__v")).to_have_text(f"{round(100 * hs['recall_ratio_vs_tiling'])} %", timeout=T)
     expect(p.locator("#stat-recall .stat__k")).to_have_text(f"Classical engine, synthetic test set ({SUMMARY['n_images']} photos)")
-    expect(p.locator("#stat-recall .stat__s")).to_contain_text(
-        f"reading {round(100 * head['pixels_frac'])} % of the image's pixels under the 30 % pixel cap (tiling reads 100 %).")
-    expect(p.locator("#stat-recall .stat__s")).to_contain_text("Target was 90 %: met. It beats one downscaled pass (1.60×, 95 % CI 1.40–1.80).")
+    expect(p.locator("#stat-recall .stat__s")).to_have_text(
+        f"of what checking every tile finds, at {round(100 * head['pixels_frac'])} % of the pixels (tiling 100 %). Target 90 %: met. It beats one downscale.")
     # the stop-rule count is at the 100 % pixel cap, next to the 30 % headline: each number names its cap
     halts = SUMMARY["agent_metrics"]["by_budget"]
     expect(p.locator("#stat-cost .stat__k")).to_have_text("Classical engine, no pixel cap (100 %): stops on its own")
     expect(p.locator("#stat-cost .stat__v")).to_have_text(f"{halts['1.0']['halt_causes']['stop-rule']} of 200 jobs")
-    expect(p.locator("#stat-cost .stat__s")).to_contain_text("the stop rule ended them when the next look was worth less than it cost")
-    expect(p.locator("#stat-cost .stat__s")).to_contain_text("; the other 17 had looked at every candidate.")   # 183 + 17 = 200
-    expect(p.locator("#stat-cost .stat__s")).to_contain_text(
+    expect(p.locator("#stat-cost .stat__s")).to_have_text(
+        "ended by the stop rule, when the next look was worth less than it cost: 50 % of the pixels on average (FIG. 4.1).")
+    words = p.evaluate("[...document.querySelectorAll('.stats .stat__s')].map((e) => e.textContent.trim().split(/\\s+/).length)")
+    assert max(words) <= 25, f"a hero card's line runs to {max(words)} words"
+    # the long versions, every number kept, are FIG. 4.1's notes
+    expect(p.locator("#bench")).to_contain_text(
+        f"reading {round(100 * head['pixels_frac'])} % of the image's pixels under the 30 % pixel cap (tiling reads 100 %).")
+    expect(p.locator("#bench")).to_contain_text("Target was 90 %: met. It beats one downscaled pass (1.60×, 95 % CI 1.40–1.80).")
+    expect(p.locator("#bench")).to_contain_text("the stop rule ended 183 of 200 jobs when the next look was worth less than it cost")
+    expect(p.locator("#bench")).to_contain_text("; the other 17 had looked at every candidate.")   # 183 + 17 = 200
+    expect(p.locator("#bench")).to_contain_text(
         "At the 30 % pixel cap of the headline: a cap ended 125 of 200 first, the stop rule 71, and 4 had looked at every candidate.")
     expect(p.locator("#stat-ops .stat__v")).to_have_text("49 / 50 recovered")
     # the real-photo card is the live engine's and comes first, short: its interval and chance (REAL has no point at
@@ -541,8 +552,11 @@ def test_desktop_mock(browser, base):
         expect(p.locator("#bench-real")).to_contain_text(said.replace("Recall", "v1 held out: recall"))
     expect(p.locator("#bench svg.chart")).to_be_visible()
     expect(p.locator("#bench .legend li")).to_have_count(4)                       # three policies and v1's dashed line
-    expect(p.locator("#bench .legend")).to_contain_text("Drishyam, v1 (the live engine)")
+    expect(p.locator("#bench .legend")).to_contain_text("Drishyam, v1 (first look policy)")
     expect(p.locator("#bench-real")).to_contain_text("Dashed red: Drishyam with v1, the dacl10k-trained segmenter the live demo runs since 2026-10-21")
+    expect(p.locator("#bench")).to_contain_text("with its first look policy; the live policy since 2026-10-22, v1-policy2, is summarised under FIG. 4.2.")
+    expect(p.locator("#bench-real")).to_contain_text("v1-policy2, is summarised in the note below.")   # FIG. 4.2 never points at itself
+    expect(p.locator("#bench-real")).not_to_contain_text("under FIG. 4.2")
     expect(p.locator("#bench-real")).to_contain_text("v1 held out: recall 0.49 (95 % CI 0.44–0.54) at the 30 % pixel cap.")
     n_iou = sum(len(v) for v in REAL["policies"].values()) + len(V1_POINTS)
     expect(p.locator("#bench-real .chart__plot path[d*='l10 10']")).to_have_count(n_iou)  # IoU-only crosses on FIG. 4.2 only
@@ -585,6 +599,8 @@ def test_desktop_mock(browser, base):
     p.click("#kill")
     expect(p.locator("#job-pill")).to_have_text("killed")
     expect(p.locator("#job-text")).to_contain_text("Killed at step")
+    expect(p.locator("#state-2")).to_have_text("Killed")
+    expect(p.locator("#narrator")).to_contain_text("Killed at step")
     expect(p.locator("#kill")).to_be_hidden()
     expect(p.locator("#resume")).to_be_visible()
     n = p.locator(".trace__line").count()
@@ -643,6 +659,8 @@ def test_desktop_mock(browser, base):
     expect(p.locator("#state-4")).to_have_text("Waiting")
     expect(p.locator("#say-4")).to_contain_text(f"Waiting for your sign-off ({pending})")
     expect(p.locator("#recap")).to_contain_text("What you just saw")
+    expect(p.locator("#recap").get_by_role("button", name="Now break it")).to_have_count(0)
+    expect(p.locator("#recap")).to_contain_text("replays the same saved job")
     # decisions are step records, looks the ones that moved the camera: the recap's count of looks is the tile's
     looks = N_STEPS - len(HALTS)
     expect(p.locator("#recap")).to_contain_text(
@@ -1056,6 +1074,12 @@ def test_the_latest_photo_picked_wins(browser, base):
     expect(p.locator("#gallery .thumb[data-file='bridge_01.jpg']")).to_have_attribute("aria-pressed", "true")
     expect(p.locator("#prep")).not_to_contain_text("mock.jpg")
     expect(p.locator("#look")).to_be_enabled(timeout=T)
+    p.click("#look")                                              # the saved job is never drawn over another photo
+    expect(p.locator("#job-text")).to_have_text("The recorded run replays one saved job; open the live demo to run your photo.")
+    expect(p.locator("#job-text a")).to_have_attribute("href", "/#demo")
+    p.wait_for_timeout(800)
+    expect(p.locator(".trace__line")).to_have_count(0)
+    expect(p.locator("#job-pill")).to_have_text("ready")
     s.check_clean()
     s.context.close()
     print("ok  the latest photo picked wins over a preselect still loading")

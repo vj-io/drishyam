@@ -15,6 +15,10 @@ const GUIDE_REAL = 'real_02.jpg';  // our own wall photo the v1 engine took a lo
 const GUIDE_PACE_MS = 1000;  // asks the server to wait this long between looks (pace_ms); its timings exclude the wait
 const KILL_WAIT_S = 8;  // a KILL pressed before the server's first record waits this long for it, then cancels the upload
 const NOTE = 'Press Run and the agent’s reasoning appears here, one decision at a time, in plain words.';
+// ?mock=1 replays public/fixtures/job.ndjson (its step times, its accurate/fast models and its injected drills say so);
+// the e2e test pins this date to the fixture's, so a re-recorded fixture must update it.
+const RECORDED = 'a saved job, recorded on the classical engine on 2026-10-17 with all three failure drills switched on';
+const FIXTURE = 'fixtures/mock.jpg';  // the photo that saved job ran on: the only one ?mock=1 may replay it over
 
 const el = {
   pill: $('#job-pill'), text: $('#job-text'), count: $('#job-steps'), kill: $('#kill'), resume: $('#resume'), sound: $('#sound'),
@@ -84,14 +88,14 @@ function partText() {
 }
 
 function syncSteps() {
-  const run = S.mode === 'running' ? 'running' : S.done ? 'done' : 'waiting';
+  const run = ['running', 'killed', 'stopped'].includes(S.mode) ? S.mode : S.done ? 'done' : 'waiting';
   const pending = pendingCount();
   const gap = S.done ? gapText() : '';
   const part = S.done ? partText() : '';
   const states = [S.image ? 'done' : 'waiting', run, run, S.done && !pending && !gap ? 'done' : 'waiting'];
   states.forEach((state, i) => {
     el.states[i].dataset.state = state;
-    el.states[i].textContent = { waiting: 'Waiting', running: 'Running', done: 'Done' }[state];
+    el.states[i].textContent = { waiting: 'Waiting', running: 'Running', done: 'Done', killed: 'Killed', stopped: 'Stopped' }[state];
   });
   const critical = (S.order?.findings ?? []).some((f) => f.critical);
   el.say4.textContent = !S.done
@@ -127,7 +131,7 @@ function setMode(mode, text) {
   el.pill.className = `pill pill--${key}`;
   el.pill.textContent = PILL[key] ?? key;
   el.text.textContent = text ?? ({
-    idle: MOCK ? 'Recorded run: a saved job replays from fixtures, no server. Press Run.'
+    idle: MOCK ? `Recorded run: ${RECORDED}; the live engine today is v1 with v1-policy2. Press Run.`
       : S.image ? 'Photo ready. Press Run, or Watch it inspect a bridge for a guided run.' : 'Pick a photo, then press Run.',
     running: 'Sending the photo to the agent…',
   }[mode] ?? '');
@@ -140,7 +144,7 @@ function setMode(mode, text) {
   el.look.disabled = el.runBar.disabled = el.tryKill.disabled = running || !S.image;
   el.guided.disabled = el.guidedReal.disabled = running;
   if (!running) el.count.textContent = '';
-  if (['error', 'killed'].includes(mode) && !S.events.length) narrate(el.text.textContent);  // nothing arrived: the NOTE still says "Sending"
+  if (['killed', 'stopped'].includes(mode) || (mode === 'error' && !S.events.length)) narrate(el.text.textContent);  // the NOTE says how the run ended
   if (onBar && !running) (el.resume.hidden ? el.look : el.resume).focus({ preventScroll: true });
   showCam(viewport.cursor);  // its caption says whether a job is on its way
   syncSteps();
@@ -219,7 +223,7 @@ function goto(k, animate = false) {
   const level = S.steps.slice(0, k).reverse().find((s) => num(s.decision?.args?.level))?.decision.args.level;  // a halt keeps the last look's scale
   el.tbScale.textContent = num(level) ? `L${level} · 1:${2 ** level}` : 'overview';
   const planner = step && S.planners.get(step.step);
-  renderStepDetail(el.detail, step, planner);
+  renderStepDetail(el.detail, step, planner, Boolean(S.job));
   budget.show(step
     ? { pixels: step.pixels_frac ?? 0, usd: step.usd_used ?? 0, seconds: step.seconds_used ?? 0 }
     : { pixels: S.overview?.pixels_frac ?? 0, usd: 0, seconds: 0 });
@@ -317,7 +321,7 @@ function handle(ev) {
       if (!S.arrived) {
         el.text.textContent = S.opts.killHint ? `${recorded() ? 'Recorded run' : 'Live'}: each look is shown the moment it arrives. Press KILL in this bar while it is looking.`
           : S.opts.trace ? `Recorded run of the v1 engine on our own photo, replayed from its saved trace (no server), at reading speed${ev.cost_model?.kind === 'fixed' ? '; its seconds and $ are modelled, not measured' : ''}.`
-          : MOCK ? 'Recorded run: replaying a saved job from fixtures (no server), at reading speed.'
+          : MOCK ? `Recorded run: replaying ${RECORDED} (no server), at reading speed.`
             : paceMs() > 0 ? `Paced for viewing: the agent waits ${paceMs() / 1000} s between looks; timings exclude the wait.`
               : 'Running live on the server; each decision is shown at reading speed.';
       }
@@ -617,8 +621,9 @@ function recap() {
     h('div', { class: 'recap__next' },
       pendingCount() ? h('p', {}, sign, ' takes you to the first card that needs a person: type your name, then Approve or Reject.') : null,
       otherBtn ? h('p', {}, otherBtn, ' replays the v1 engine’s recorded run on it, also with no ground truth.') : null,
-      h('p', {}, breakIt, ' reruns it with a planner that sends a shell command and a segmenter slowed on purpose.'),
-      h('p', {}, tryKill, ' starts a run shown live, whose planner stalls 2 s at step 3, so you can halt it with KILL in the bar above.')));
+      MOCK ? null : h('p', {}, breakIt, ' reruns it with a planner that sends a shell command and a segmenter slowed on purpose.'),
+      h('p', {}, tryKill, MOCK ? ' replays the same saved job, each look shown as it arrives, so you can halt it with KILL in the bar above.'
+        : ' starts a run shown live, whose planner stalls 2 s at step 3, so you can halt it with KILL in the bar above.')));
   el.recap.hidden = false;
 }
 
@@ -678,6 +683,11 @@ function params(opts) {
 /** opts: { replay, pace (ms the server waits between looks), chaos, guided, killHint }. */
 async function run(opts = {}) {
   if (!S.image || S.mode === 'running') return;
+  if (MOCK && !opts.trace && S.sample !== FIXTURE) {  // the saved job is never drawn over another photo
+    el.text.replaceChildren('The recorded run replays one saved job; ', h('a', { href: `${location.pathname}#demo` }, 'open the live demo'), ' to run your photo.');
+    narrate(el.text.textContent);
+    return;
+  }
   S.opts = opts;
   S.ctl = new AbortController();
   clearTimeout(S.killTimer);
@@ -728,7 +738,6 @@ function stop(why, unconfirmed = false) {
   if (unconfirmed) {
     setMode('stopped', `The page stopped showing the job at step ${n}${why}; the server may still be running it, up to its time cap. `
       + `What arrived is kept: Resume re-sends the photo and replays your ${n} moves.`);
-    narrate(el.text.textContent);
     return;
   }
   setMode('killed', `Killed at step ${n}${why} — state preserved. Resume re-sends the photo and replays your ${n} moves.`);
@@ -815,7 +824,8 @@ async function useImage(blob, label, file = null, pick = ++picks) {
     clearJob();
     viewport.setImage(S.image.url);
     el.prep.textContent = [label, `${p.width}×${p.height}`, `${(p.blob.size / 1e6).toFixed(1)} MB`, p.note].filter(Boolean).join(' · ');
-    el.say1.textContent = `Ready: ${label} (${p.width} × ${p.height} px). Pick another sample, or use your own photo.`;
+    const note = $$('.thumb', el.gallery).find((b) => b.dataset.file === file)?.sample.note;  // in full: the card clamps it
+    el.say1.textContent = `Ready: ${label} (${p.width} × ${p.height} px).${note ? ` ${note}` : ''} Pick another sample, or use your own photo.`;
     for (const b of $$('.thumb', el.gallery)) b.setAttribute('aria-pressed', String(b.dataset.file === file));
     setMode('idle');
   } catch {
@@ -956,14 +966,14 @@ setMode('idle');
 S.ready = loadSamples().then((first) => {
   if (!MOCK) return first && choose(first);
   const pick = ++picks;  // asked for now: a tap while it loads wins
-  return fetch('fixtures/mock.jpg').then((r) => r.blob())
-    .then((b) => (pick === picks ? useImage(b, 'mock.jpg (recorded job)', null, pick) : null));
+  return fetch(FIXTURE).then((r) => r.blob())
+    .then((b) => (pick === picks ? useImage(b, 'mock.jpg (recorded job)', FIXTURE, pick) : null));
 });
 initResults();
 health().then((hl) => {
   const arch = hl?.arch ?? hl?.machine;
   const where = [hl?.host && `host ${hl.host}`, arch, hl?.commit && `commit ${String(hl.commit).slice(0, 7)}`].filter(Boolean);
-  $('#api-status').textContent = hl?.ok
+  $('#api-status').textContent = MOCK ? 'Recorded run: no API is called.' : hl?.ok
     ? ['API online', `OpenCV ${hl.opencv}`, hl.build, `segmenter ${hl.segmenter}`, ...where].join(' · ')
     : 'The API is not reachable from this page. Watch a recorded run instead: it replays a saved job.';
   if (hl?.ok && hl.host) $('#live-where').textContent = `Live demo: OpenCV ${hl.opencv}, ${hl.build}, on ${hl.host}${arch ? ` (${arch})` : ''}.`;

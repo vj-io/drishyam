@@ -18,7 +18,7 @@ export async function getJSON(url) {
 }
 
 export const health = () => (MOCK
-  ? Promise.resolve({ ok: true, opencv: '5.0.0', build: 'mock fixture, no server', segmenter: 'fixture' })
+  ? Promise.resolve({ ok: true })  // the page says it is a recorded run; no API is called
   : getJSON('/api/health'));
 
 const b64url = (s) => btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
