@@ -151,7 +151,9 @@ findings 0  critical pending review 0
 not assessed: 1 area listed in the work order; a person should look there
 ```
 
-The rule agent takes no look. Its work order is `incomplete` and lists the whole photo as not assessed ("no candidate
+The rule agent took no look: this run predates the zero-candidate fallback (on by default since 2026-10-21 evening,
+live since 2026-10-22), with which it takes one whole-photo look at L2 that the blur gate refuses ([report, section
+9](../report.md#9-failures)). Its work order is `incomplete` and lists the whole photo as not assessed ("no candidate
 region was proposed", action `check-by-eye`). Claude took 3 looks (13.2 % of the pixels) where it saw a line in the
 heatmap, and logged one crack. Its work order says `ready` with nothing listed as not assessed, although about a third
 of the photo (32 %, outside the windows of g1 and g3) was seen only in the overview: the MCP `draft_work_order` lists

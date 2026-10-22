@@ -686,11 +686,12 @@ own `findContours` docstring and runs only for `RETR_LIST` without a hierarchy.
   `OnnxSegmenter(engine="classic")`. Its traces matched here, but it was not faster here: off. On GitHub's Arm
   runner it passes both the identity and the speed test, at every thread count (below).
 - `CV_Bool` (new): `CV_BOOL_MASKS`, the NumPy bool footprint as a `copyTo` mask in `segment.restrict`: identical,
-  x0.83 to x0.94 of the NumPy time, but one interval reaches 1.02: off. It passes on both GitHub runners (below).
+  x0.83 to x0.94 of the NumPy time, but one interval reaches 1.02, so it fails the rule on this Mac. It passes on both
+  GitHub runners, and it is on since 2026-10-22 by the Arm result, the owner's choice (below).
 - 5.0's warp (new, bilinear without lookup tables): in use with the wheel; 4.14 took 1.6 and 2.4 times as long on
   the gaze (the builds table).
 - `reduceArgMax` (OpenCV 4.6, not new): `CV_ARGMAX` in `segment.finish`: identical, x0.52 to x0.74 of NumPy's time:
-  on, the one flag adopted. On a whole look the change is within this machine's noise (the last two timing rows,
+  on, one of the two flags adopted (the other is `CV_BOOL_MASKS`). On a whole look the change is within this machine's noise (the last two timing rows,
   all three flags at once): `finish` is about a fifth of a classical look's time here.
 - `compare` (not new): `CV_COMPARE` in `_clean`: identical, no measurable gain: off.
 - The x86 wheel's IPP HAL (not new): with it off only `saliency`'s output changed, and no stage was measurably

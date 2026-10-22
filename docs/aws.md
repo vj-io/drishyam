@@ -13,8 +13,8 @@ from `aws-lambda` on `aarch64` with OpenCV 5.0.0 (`stock (not COOL)`), segmenter
 commit dda3080, a job on `bridge_03.jpg` streamed to `done` (`awaiting_review`, 6 steps), KILL halted a second job
 after 3 steps, an unsigned `POST` through CloudFront got 403, the raw Function URL got 403, and the WAF answered 429
 at the 18th empty-bodied job start. The startup log has `DRISHYAM_CV_THREADS=2: cv2.getNumThreads() = 2`. The step
-p95 was 1138.9 ms over 6 steps: with v1 a step costs 0.52 to 1.14 s at p95 over the eleven smoke runs since the v1
-deploy, against 67.7 to 88.0 ms for the classical engine. At that deploy the governor's 500 ms target sent most
+p95 was 1138.9 ms over 6 steps: with v1 a step costs 0.52 to 1.14 s at p95 over the eleven v1 smoke runs to
+f12f50f (`video/live/aws-smoke.log`; each later run below falls in that range), against 67.7 to 88.0 ms for the classical engine. At that deploy the governor's 500 ms target sent most
 later looks to the fast FP16 net; the v1 limit is now 1500 ms (below). The summary line, copied here because `runs/aws-smoke.log` is git-ignored (UTC; earlier lines are
 in `video/live/aws-smoke.log`):
 
@@ -146,6 +146,10 @@ Lambda concurrency quota is below 105 (the owner's account has 10), it stops and
 the shorter is to run it as `RESERVED=none scripts/aws.sh deploy` (see [Operate](#operate)). Left
 running, the stack costs about what the [Cost estimate](#cost-estimate) says, mostly the WAF; `destroy`
 removes it, except the `CDKToolkit` bootstrap stack and one small log group (see [Operate](#operate)).
+As written, `deploy` ships the classical engine (no weights). The live site's configuration is v1: download its
+weights first ([README, Run it](../README.md#run-it)), then deploy with
+`ONNX=models/drishyam_dacl10k.onnx ONNX_FP16=models/drishyam_dacl10k.fp16.onnx scripts/aws.sh deploy` (with
+`RESERVED=none` on a small quota, as above).
 
 ## Architecture
 
