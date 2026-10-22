@@ -13,21 +13,70 @@
   "JobConfig.blur_gate (default \"laplacian\") is passed by drishyam.agent to imaging.quality on every look (only when it is not \"laplacian\": with the knob off the call is quality(crop), as before); it is a JobConfig field, not a profile value, so it applies to every profile alike. A refused look is handled as before (its findings dropped, a not-assessed entry with action re-shoot). Nothing else reads the knob: the MCP gaze tool and the router's overview keep the Laplacian gate. evals.harness.run_drishyam passes it like any JobConfig switch and records it in each job's `switches`.",
   "Knob off is the code as it was: every line the knob adds to drishyam/agent.py and to imaging.quality ends in `# blur-gate`. tests/test_agent.py strips those lines and checks the agent's whole event stream on every bundled sample (classical engine) and three synthetic photos under v1's profile; tests/test_imaging.py does the same for quality() on 200 views of the bundled samples (L0-L3, five points each), and checks on sharp, faint, blurred and blown-out synthetic views that the both-gates gate refuses a view only for the Laplacian gate's reason. drishyam run's traces and work orders on the 10 bundled samples, and drishyam batch on them, with the classical engine and with v1 (DRISHYAM_ONNX), were captured before the change (a8aa8e0) and after it: byte-identical."
  ],
- "arms": ["laplacian", "both"],
+ "arms": [
+  "laplacian",
+  "both"
+ ],
  "calibration": {
   "too_blurred_to_trust": "A Gaussian blur of sigma 2.0 view px applied to the view crop (cv2.GaussianBlur(crop, (0, 0), 2.0)). A 1-px hairline keeps about a fifth of its contrast at that blur (peak 1 / (sqrt(2 pi) x 2) = 0.20), so a view blurred that much cannot be trusted to show the hairline cracks the agent zooms for.",
   "pool": "Outside every dev and held-out set, the same pool as the replaced rule's. 40 synthetic photos with damage (evals.synth.build_dataset, seed 5150, 2048 x 1536) and 20 without (clean, seed 5151; the demo photo bridge_08 that the clean builder appends is left out); the seeds used elsewhere in evals/ and results/ are 0-4, 7, 8, 11, 2536-2543, 4242-4244 and 9000, and a set's per-photo seeds are seed x 100000 + i, so no photo is shared. And 100 CODEBRIM photos in neither evals/codebrim_dev100.txt nor evals/codebrim_eval200.txt, drawn with seed 5150 (evals.codebrim.select_dev from the other 752 annotated photos). CODEBRIM has no bridge ids, so pool photos may show the same bridges as dev and held-out photos; they were read for the threshold only, and no label of theirs was used.",
-  "pool_sha256": {"dataset_gt_sha256": "a53de484b3849ed3dbc145445c119a1e4e68c885c93858c73468edcad1b19e42", "dataset_images_sha256": "071e6f5caf771a7432f6837ccad54275693e602243a9d22e3b966d0622d158b9"},
+  "pool_sha256": {
+   "dataset_gt_sha256": "a53de484b3849ed3dbc145445c119a1e4e68c885c93858c73468edcad1b19e42",
+   "dataset_images_sha256": "071e6f5caf771a7432f6837ccad54275693e602243a9d22e3b966d0622d158b9"
+  },
   "procedure": "The replaced rule's procedure, applied to the both-gates gate (the owner's instruction of 2026-10-23). v1 runs on every pool photo as in the rule below with the Laplacian gate (evals.blur_gate.photo_task); every look is rendered again as its gate read it (evals.blur_gate.views: its recorded Laplacian variance must match) and scored as it is and blurred by sigma 2.0. REBLUR_MAX is the largest value on a 0.005 grid at which the both-gates gate refuses at least as many of the blurred pool views as the Laplacian gate does. Command: DRISHYAM_ONNX=models/drishyam_dacl10k.onnx python -m evals.blur_gate calibrate --workers 6 (views in runs/blur_gate/calibration.json, not committed; the 788 views are the first calibration's, view for view).",
   "reblur_max": 0.37,
   "views": 788,
-  "views_by_level": {"L1": 199, "L2": 492, "L3": 97},
-  "refused_blurred": {"laplacian": 787, "both": 787},
-  "refused_as_is": {"laplacian": 47, "both": 22},
-  "reblur_quartiles": {"as_is": [0.2676, 0.2928, 0.3335], "blurred": [0.5112, 0.5456, 0.5824]},
+  "views_by_level": {
+   "L1": 199,
+   "L2": 492,
+   "L3": 97
+  },
+  "refused_blurred": {
+   "laplacian": 787,
+   "both": 787
+  },
+  "refused_as_is": {
+   "laplacian": 47,
+   "both": 22
+  },
+  "reblur_quartiles": {
+   "as_is": [
+    0.2676,
+    0.2928,
+    0.3335
+   ],
+   "blurred": [
+    0.5112,
+    0.5456,
+    0.5824
+   ]
+  },
   "by_source": {
-   "synthetic": {"photos": 60, "views": 173, "refused_as_is": {"laplacian": 0, "both": 0}, "refused_blurred": {"laplacian": 173, "both": 173}},
-   "codebrim": {"photos": 100, "views": 615, "refused_as_is": {"laplacian": 47, "both": 22}, "refused_blurred": {"laplacian": 614, "both": 614}}
+   "synthetic": {
+    "photos": 60,
+    "views": 173,
+    "refused_as_is": {
+     "laplacian": 0,
+     "both": 0
+    },
+    "refused_blurred": {
+     "laplacian": 173,
+     "both": 173
+    }
+   },
+   "codebrim": {
+    "photos": 100,
+    "views": 615,
+    "refused_as_is": {
+     "laplacian": 47,
+     "both": 22
+    },
+    "refused_blurred": {
+     "laplacian": 614,
+     "both": 614
+    }
+   }
   },
   "what_the_pool_shows": "The Laplacian gate refuses 787 of the 788 blurred pool views (it passes one L1 view whose blurred variance is 20.0, which the both-gates gate passes too). Among the 787, the lowest re-blur ratio is 0.3711 (an L2 view of a CODEBRIM photo), so the both-gates gate matches them all at any REBLUR_MAX under it: 0.37 on the grid. At 0.37, of the 45 views the Laplacian gate refuses as blur as they are (16 photos, all CODEBRIM), it takes back 25 (11 photos; Laplacian variance 4.9-11.8, ratio 0.23-0.34) and keeps 20 (6 photos); both gates refuse the same 2 glare views. Whether the views taken back are sharp is not known: CODEBRIM holds some out-of-focus photos. The dev run alone decides."
  },
@@ -53,10 +102,3590 @@
   "dev_read": "none: evals.blur_gate dev never ran under the replaced rule; no dev or held-out photo was read by the replaced rule's code or this one before this file was committed"
  },
  "splits": {
-  "synth_dev": "data/synth_dev, 60 photos, seed 4242 (2048 x 1536)",
-  "clean": "data/synth_clean_dev, 30 photos with no damage, seed 4243",
-  "real": "CODEBRIM dev100: evals/codebrim_dev100.txt in data/codebrim (none in eval200)",
-  "check": "each split's dataset sha256 (ground truth and images) must equal results/dev/model_choice_dev.json's datasets; the run refuses otherwise"
+  "synth_dev": {
+   "n": 60,
+   "dataset_gt_sha256": "ab3ea45abb852fa21e2696721060a4952819196b2959085d6f27866726b74bd3",
+   "dataset_images_sha256": "736126cce1714f7fa3823b04d001f0a5f9d913179f959ed34c675f3cd2332777",
+   "gate": {
+    "photos": 60,
+    "views": 176,
+    "refused_as_is": {
+     "laplacian": 0,
+     "both": 0
+    },
+    "refused_blurred": {
+     "laplacian": 176,
+     "both": 176
+    },
+    "as_is_diff": 0.0,
+    "as_is_diff_ci": [
+     0.0,
+     0.0
+    ],
+    "blurred_diff": 0.0,
+    "blurred_diff_ci": [
+     0.0,
+     0.0
+    ]
+   },
+   "agent": {
+    "laplacian": {
+     "recall": 0.615,
+     "recall_ci": [
+      0.5455,
+      0.6834
+     ],
+     "recall_iou_only": 0.6,
+     "chance_recall": 0.095,
+     "chance_recall_iou_only": 0.045,
+     "precision": 0.3333,
+     "fp_per_image": 4.1,
+     "boxes_per_image": 6.15,
+     "pixels_frac": 0.26,
+     "net_pixels_frac": 0.2444,
+     "images_with_any": 0.95,
+     "critical_per_image": 0.8167,
+     "findings_per_image": 2.2333,
+     "per_class": {
+      "crack": 0.5738,
+      "spalling": 1.0,
+      "efflorescence": 0.0,
+      "exposed_rebar": 0.0,
+      "corrosion": 1.0
+     },
+     "ms_per_job": 1749.2526,
+     "recall_per_s": 0.3516,
+     "halt": {
+      "cap-hit": 56,
+      "stop-rule": 4
+     },
+     "looks_mean": 2.9333,
+     "looks_by_level": {
+      "L1": 116,
+      "L2": 60
+     },
+     "looks_by_action": {
+      "gaze": 118,
+      "escalate": 10,
+      "verify": 48
+     },
+     "segmenter": "onnx:drishyam_dacl10k.onnx",
+     "confirm": null,
+     "profile": "onnx:drishyam_dacl10k.onnx",
+     "crit_recall": 0.7571,
+     "crit_recall_ci": [
+      0.6957,
+      0.8302
+     ],
+     "per_class_gt": {
+      "crack": 61,
+      "spalling": 53,
+      "efflorescence": 34,
+      "exposed_rebar": 17,
+      "corrosion": 35
+     },
+     "recall_all": 0.615,
+     "recall_all_ci": [
+      0.5455,
+      0.6834
+     ],
+     "crit_recall_all": 0.7571,
+     "crit_recall_all_ci": [
+      0.6957,
+      0.8302
+     ],
+     "crit_per_image": 0.8167,
+     "signoffs_per_image": 0.3833,
+     "reviews_per_image": 0.4833,
+     "look_per_image": 0.0,
+     "needs_look_per_image": 0.0,
+     "all_per_image": 6.15,
+     "crit_merged_per_image": 0.45,
+     "images_with_any_all": 0.95,
+     "per_image": [
+      [
+       2,
+       2,
+       1,
+       1,
+       3
+      ],
+      [
+       2,
+       2,
+       0,
+       0,
+       4
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       2
+      ],
+      [
+       2,
+       2,
+       0,
+       0,
+       3
+      ],
+      [
+       1,
+       1,
+       1,
+       1,
+       1
+      ],
+      [
+       3,
+       3,
+       1,
+       0,
+       5
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       1
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       2
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       2
+      ],
+      [
+       2,
+       2,
+       0,
+       0,
+       4
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       1
+      ],
+      [
+       2,
+       2,
+       0,
+       0,
+       2
+      ],
+      [
+       4,
+       4,
+       0,
+       0,
+       5
+      ],
+      [
+       3,
+       3,
+       1,
+       0,
+       6
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       1
+      ],
+      [
+       3,
+       3,
+       0,
+       0,
+       4
+      ],
+      [
+       3,
+       3,
+       0,
+       0,
+       4
+      ],
+      [
+       4,
+       4,
+       1,
+       0,
+       6
+      ],
+      [
+       4,
+       4,
+       0,
+       0,
+       5
+      ],
+      [
+       2,
+       2,
+       1,
+       0,
+       5
+      ],
+      [
+       3,
+       3,
+       0,
+       0,
+       3
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       3
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       6
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       2
+      ],
+      [
+       3,
+       3,
+       1,
+       1,
+       5
+      ],
+      [
+       2,
+       2,
+       0,
+       0,
+       3
+      ],
+      [
+       3,
+       2,
+       1,
+       1,
+       7
+      ],
+      [
+       2,
+       2,
+       0,
+       0,
+       6
+      ],
+      [
+       2,
+       2,
+       0,
+       0,
+       3
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       1
+      ],
+      [
+       3,
+       3,
+       1,
+       1,
+       6
+      ],
+      [
+       5,
+       5,
+       1,
+       1,
+       5
+      ],
+      [
+       4,
+       3,
+       2,
+       0,
+       5
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       1
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       3
+      ],
+      [
+       3,
+       3,
+       0,
+       0,
+       5
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       1
+      ],
+      [
+       3,
+       3,
+       0,
+       0,
+       4
+      ],
+      [
+       3,
+       3,
+       0,
+       0,
+       4
+      ],
+      [
+       2,
+       2,
+       1,
+       0,
+       3
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       2
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       6
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       1
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       2
+      ],
+      [
+       2,
+       2,
+       1,
+       1,
+       3
+      ],
+      [
+       5,
+       5,
+       2,
+       1,
+       5
+      ],
+      [
+       3,
+       3,
+       1,
+       0,
+       4
+      ],
+      [
+       2,
+       2,
+       0,
+       0,
+       2
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       2
+      ],
+      [
+       3,
+       3,
+       2,
+       1,
+       4
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       1
+      ],
+      [
+       4,
+       4,
+       0,
+       0,
+       7
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       1
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       1
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       2
+      ],
+      [
+       4,
+       3,
+       0,
+       0,
+       4
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       1
+      ],
+      [
+       2,
+       2,
+       0,
+       0,
+       3
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       2
+      ],
+      [
+       3,
+       3,
+       0,
+       0,
+       5
+      ]
+     ]
+    },
+    "both": {
+     "recall": 0.615,
+     "recall_ci": [
+      0.5455,
+      0.6834
+     ],
+     "recall_iou_only": 0.6,
+     "chance_recall": 0.085,
+     "chance_recall_iou_only": 0.055,
+     "precision": 0.3333,
+     "fp_per_image": 4.1,
+     "boxes_per_image": 6.15,
+     "pixels_frac": 0.26,
+     "net_pixels_frac": 0.2444,
+     "images_with_any": 0.95,
+     "critical_per_image": 0.8167,
+     "findings_per_image": 2.2333,
+     "per_class": {
+      "crack": 0.5738,
+      "spalling": 1.0,
+      "efflorescence": 0.0,
+      "exposed_rebar": 0.0,
+      "corrosion": 1.0
+     },
+     "ms_per_job": 1749.2526,
+     "recall_per_s": 0.3516,
+     "vs_ref": 1.0,
+     "vs_ref_ci": [
+      1.0,
+      1.0
+     ],
+     "vs_ref_iou_only_ci": [
+      1.0,
+      1.0
+     ],
+     "pixels_vs_ref": 1.0,
+     "ref": "laplacian@0.3",
+     "boxes_vs_ref_ci": [
+      1.0,
+      1.0
+     ],
+     "boxes_diff_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "ms_vs_ref": 1.0,
+     "ms_vs_ref_ci": [
+      1.0,
+      1.0
+     ],
+     "recall_per_s_vs_ref": 1.0,
+     "recall_per_s_vs_ref_ci": [
+      1.0,
+      1.0
+     ],
+     "chance_vs_ref_ci": [
+      0.4737,
+      1.6
+     ],
+     "halt": {
+      "cap-hit": 56,
+      "stop-rule": 4
+     },
+     "looks_mean": 2.9333,
+     "looks_by_level": {
+      "L1": 116,
+      "L2": 60
+     },
+     "looks_by_action": {
+      "gaze": 118,
+      "escalate": 10,
+      "verify": 48
+     },
+     "segmenter": "onnx:drishyam_dacl10k.onnx",
+     "confirm": null,
+     "profile": "onnx:drishyam_dacl10k.onnx",
+     "crit_recall": 0.7571,
+     "crit_recall_ci": [
+      0.6957,
+      0.8302
+     ],
+     "per_class_gt": {
+      "crack": 61,
+      "spalling": 53,
+      "efflorescence": 34,
+      "exposed_rebar": 17,
+      "corrosion": 35
+     },
+     "crit_recall_vs_ref": 1.0,
+     "crit_recall_vs_ref_ci": [
+      1.0,
+      1.0
+     ],
+     "recall_all": 0.615,
+     "recall_all_ci": [
+      0.5455,
+      0.6834
+     ],
+     "crit_recall_all": 0.7571,
+     "crit_recall_all_ci": [
+      0.6957,
+      0.8302
+     ],
+     "crit_per_image": 0.8167,
+     "signoffs_per_image": 0.3833,
+     "reviews_per_image": 0.4833,
+     "look_per_image": 0.0,
+     "needs_look_per_image": 0.0,
+     "all_per_image": 6.15,
+     "crit_merged_per_image": 0.45,
+     "images_with_any_all": 0.95,
+     "recall_all_vs_ref": 1.0,
+     "recall_all_vs_ref_ci": [
+      1.0,
+      1.0
+     ],
+     "crit_recall_all_vs_ref": 1.0,
+     "crit_recall_all_vs_ref_ci": [
+      1.0,
+      1.0
+     ],
+     "crit_diff_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "signoffs_diff_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "reviews_diff_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "look_diff_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "needs_look_diff_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "all_diff_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "crit_merged_diff_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "images_with_any_all_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "per_image": [
+      [
+       2,
+       2,
+       0,
+       0,
+       3
+      ],
+      [
+       2,
+       2,
+       0,
+       0,
+       4
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       2
+      ],
+      [
+       2,
+       2,
+       0,
+       0,
+       3
+      ],
+      [
+       1,
+       1,
+       1,
+       1,
+       1
+      ],
+      [
+       3,
+       3,
+       1,
+       0,
+       5
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       1
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       2
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       2
+      ],
+      [
+       2,
+       2,
+       1,
+       0,
+       4
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       1
+      ],
+      [
+       2,
+       2,
+       1,
+       1,
+       2
+      ],
+      [
+       4,
+       4,
+       1,
+       1,
+       5
+      ],
+      [
+       3,
+       3,
+       0,
+       0,
+       6
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       1
+      ],
+      [
+       3,
+       3,
+       1,
+       1,
+       4
+      ],
+      [
+       3,
+       3,
+       0,
+       0,
+       4
+      ],
+      [
+       4,
+       4,
+       1,
+       0,
+       6
+      ],
+      [
+       4,
+       4,
+       1,
+       1,
+       5
+      ],
+      [
+       2,
+       2,
+       1,
+       1,
+       5
+      ],
+      [
+       3,
+       3,
+       0,
+       0,
+       3
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       3
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       6
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       2
+      ],
+      [
+       3,
+       3,
+       0,
+       0,
+       5
+      ],
+      [
+       2,
+       2,
+       0,
+       0,
+       3
+      ],
+      [
+       3,
+       2,
+       1,
+       0,
+       7
+      ],
+      [
+       2,
+       2,
+       0,
+       0,
+       6
+      ],
+      [
+       2,
+       2,
+       0,
+       0,
+       3
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       1
+      ],
+      [
+       3,
+       3,
+       0,
+       0,
+       6
+      ],
+      [
+       5,
+       5,
+       3,
+       2,
+       5
+      ],
+      [
+       4,
+       3,
+       0,
+       0,
+       5
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       1
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       3
+      ],
+      [
+       3,
+       3,
+       0,
+       0,
+       5
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       1
+      ],
+      [
+       3,
+       3,
+       0,
+       0,
+       4
+      ],
+      [
+       3,
+       3,
+       0,
+       0,
+       4
+      ],
+      [
+       2,
+       2,
+       0,
+       0,
+       3
+      ],
+      [
+       1,
+       1,
+       1,
+       1,
+       2
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       6
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       1
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       2
+      ],
+      [
+       2,
+       2,
+       0,
+       0,
+       3
+      ],
+      [
+       5,
+       5,
+       0,
+       0,
+       5
+      ],
+      [
+       3,
+       3,
+       1,
+       1,
+       4
+      ],
+      [
+       2,
+       2,
+       0,
+       0,
+       2
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       2
+      ],
+      [
+       3,
+       3,
+       1,
+       1,
+       4
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       1
+      ],
+      [
+       4,
+       4,
+       0,
+       0,
+       7
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       1
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       1
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       2
+      ],
+      [
+       4,
+       3,
+       1,
+       0,
+       4
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       1
+      ],
+      [
+       2,
+       2,
+       0,
+       0,
+       3
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       2
+      ],
+      [
+       3,
+       3,
+       0,
+       0,
+       5
+      ]
+     ]
+    }
+   },
+   "described": {
+    "refused_by_level": {
+     "L1": {
+      "laplacian": [
+       0,
+       116
+      ],
+      "both": [
+       0,
+       116
+      ],
+      "views": 116
+     },
+     "L2": {
+      "laplacian": [
+       0,
+       60
+      ],
+      "both": [
+       0,
+       60
+      ],
+      "views": 60
+     }
+    },
+    "over_blur_regions": {
+     "laplacian": [
+      0,
+      5
+     ],
+     "both": [
+      0,
+      5
+     ],
+     "views": 5
+    },
+    "reblur_quartiles": [
+     [
+      0.2484,
+      0.2647,
+      0.2771
+     ],
+     [
+      0.5163,
+      0.5357,
+      0.5491
+     ]
+    ],
+    "photos_where_the_jobs_differ": 0
+   }
+  },
+  "clean": {
+   "n": 30,
+   "dataset_gt_sha256": "6007a8bf12e5641f297a1630e2f4dc3f2f335ca1806f8dea3b4daad693df2ecc",
+   "dataset_images_sha256": "eaac718e380bfc6eef0571a2c91f21a4019c82f4232866d45624be1f4fa3c373",
+   "gate": {
+    "photos": 30,
+    "views": 78,
+    "refused_as_is": {
+     "laplacian": 0,
+     "both": 0
+    },
+    "refused_blurred": {
+     "laplacian": 78,
+     "both": 78
+    },
+    "as_is_diff": 0.0,
+    "as_is_diff_ci": [
+     0.0,
+     0.0
+    ],
+    "blurred_diff": 0.0,
+    "blurred_diff_ci": [
+     0.0,
+     0.0
+    ]
+   },
+   "agent": {
+    "laplacian": {
+     "recall": null,
+     "recall_ci": [
+      null,
+      null
+     ],
+     "recall_iou_only": null,
+     "chance_recall": null,
+     "chance_recall_iou_only": null,
+     "precision": null,
+     "fp_per_image": 0.0,
+     "boxes_per_image": 0.0,
+     "pixels_frac": 0.2323,
+     "net_pixels_frac": 0.2167,
+     "images_with_any": 0.0,
+     "critical_per_image": 0.0,
+     "findings_per_image": 0.0,
+     "per_class": {
+      "crack": null,
+      "spalling": null,
+      "efflorescence": null,
+      "exposed_rebar": null,
+      "corrosion": null
+     },
+     "ms_per_job": 1552.0356,
+     "recall_per_s": null,
+     "halt": {
+      "exhausted": 4,
+      "cap-hit": 20,
+      "stop-rule": 6
+     },
+     "looks_mean": 2.6,
+     "looks_by_level": {
+      "L1": 50,
+      "L2": 28
+     },
+     "looks_by_action": {
+      "gaze": 78
+     },
+     "segmenter": "onnx:drishyam_dacl10k.onnx",
+     "confirm": null,
+     "profile": "onnx:drishyam_dacl10k.onnx",
+     "crit_recall": null,
+     "crit_recall_ci": [
+      null,
+      null
+     ],
+     "per_class_gt": {
+      "crack": 0,
+      "spalling": 0,
+      "efflorescence": 0,
+      "exposed_rebar": 0,
+      "corrosion": 0
+     },
+     "recall_all": null,
+     "recall_all_ci": [
+      null,
+      null
+     ],
+     "crit_recall_all": null,
+     "crit_recall_all_ci": [
+      null,
+      null
+     ],
+     "crit_per_image": 0.0,
+     "signoffs_per_image": 0.0,
+     "reviews_per_image": 0.0,
+     "look_per_image": 0.0,
+     "needs_look_per_image": 0.0,
+     "all_per_image": 0.0,
+     "crit_merged_per_image": 0.0,
+     "images_with_any_all": 0.0,
+     "per_image": [
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ]
+     ]
+    },
+    "both": {
+     "recall": null,
+     "recall_ci": [
+      null,
+      null
+     ],
+     "recall_iou_only": null,
+     "chance_recall": null,
+     "chance_recall_iou_only": null,
+     "precision": null,
+     "fp_per_image": 0.0,
+     "boxes_per_image": 0.0,
+     "pixels_frac": 0.2323,
+     "net_pixels_frac": 0.2167,
+     "images_with_any": 0.0,
+     "critical_per_image": 0.0,
+     "findings_per_image": 0.0,
+     "per_class": {
+      "crack": null,
+      "spalling": null,
+      "efflorescence": null,
+      "exposed_rebar": null,
+      "corrosion": null
+     },
+     "ms_per_job": 1552.0356,
+     "recall_per_s": null,
+     "ref": "laplacian@0.3",
+     "boxes_vs_ref_ci": [
+      null,
+      null
+     ],
+     "boxes_diff_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "ms_vs_ref": 1.0,
+     "ms_vs_ref_ci": [
+      1.0,
+      1.0
+     ],
+     "halt": {
+      "exhausted": 4,
+      "cap-hit": 20,
+      "stop-rule": 6
+     },
+     "looks_mean": 2.6,
+     "looks_by_level": {
+      "L1": 50,
+      "L2": 28
+     },
+     "looks_by_action": {
+      "gaze": 78
+     },
+     "segmenter": "onnx:drishyam_dacl10k.onnx",
+     "confirm": null,
+     "profile": "onnx:drishyam_dacl10k.onnx",
+     "crit_recall": null,
+     "crit_recall_ci": [
+      null,
+      null
+     ],
+     "per_class_gt": {
+      "crack": 0,
+      "spalling": 0,
+      "efflorescence": 0,
+      "exposed_rebar": 0,
+      "corrosion": 0
+     },
+     "recall_all": null,
+     "recall_all_ci": [
+      null,
+      null
+     ],
+     "crit_recall_all": null,
+     "crit_recall_all_ci": [
+      null,
+      null
+     ],
+     "crit_per_image": 0.0,
+     "signoffs_per_image": 0.0,
+     "reviews_per_image": 0.0,
+     "look_per_image": 0.0,
+     "needs_look_per_image": 0.0,
+     "all_per_image": 0.0,
+     "crit_merged_per_image": 0.0,
+     "images_with_any_all": 0.0,
+     "crit_diff_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "signoffs_diff_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "reviews_diff_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "look_diff_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "needs_look_diff_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "all_diff_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "crit_merged_diff_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "images_with_any_all_vs_ref_ci": [
+      0.0,
+      0.0
+     ],
+     "per_image": [
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ]
+     ]
+    }
+   },
+   "described": {
+    "refused_by_level": {
+     "L1": {
+      "laplacian": [
+       0,
+       50
+      ],
+      "both": [
+       0,
+       50
+      ],
+      "views": 50
+     },
+     "L2": {
+      "laplacian": [
+       0,
+       28
+      ],
+      "both": [
+       0,
+       28
+      ],
+      "views": 28
+     }
+    },
+    "over_blur_regions": {
+     "laplacian": [
+      0,
+      0
+     ],
+     "both": [
+      0,
+      0
+     ],
+     "views": 0
+    },
+    "reblur_quartiles": [
+     [
+      0.2438,
+      0.261,
+      0.2759
+     ],
+     [
+      0.5143,
+      0.5404,
+      0.5587
+     ]
+    ],
+    "photos_where_the_jobs_differ": 0
+   }
+  },
+  "real": {
+   "n": 100,
+   "dataset_gt_sha256": "b5b6a2b442f558285ec31a7a97747cb5c918a0db4a189b2ddfca9fab710c4cd3",
+   "dataset_images_sha256": "445cf8082075eaeccdff012920c475801e3b3200831cfe76c37a972b1fa9a477",
+   "gate": {
+    "photos": 100,
+    "views": 597,
+    "refused_as_is": {
+     "laplacian": 49,
+     "both": 6
+    },
+    "refused_blurred": {
+     "laplacian": 592,
+     "both": 584
+    },
+    "as_is_diff": -0.072,
+    "as_is_diff_ci": [
+     -0.1148,
+     -0.0327
+    ],
+    "blurred_diff": -0.0134,
+    "blurred_diff_ci": [
+     -0.0253,
+     -0.0033
+    ]
+   },
+   "agent": {
+    "laplacian": {
+     "recall": 0.4886,
+     "recall_ci": [
+      0.4188,
+      0.5493
+     ],
+     "recall_iou_only": 0.2688,
+     "chance_recall": 0.2282,
+     "chance_recall_iou_only": 0.0597,
+     "precision": 0.0851,
+     "fp_per_image": 36.14,
+     "boxes_per_image": 39.5,
+     "pixels_frac": 0.1452,
+     "net_pixels_frac": 0.1296,
+     "images_with_any": 0.93,
+     "critical_per_image": 6.38,
+     "findings_per_image": 5.85,
+     "per_class": {
+      "crack": 0.412,
+      "spalling": 0.7849,
+      "efflorescence": 0.4512,
+      "exposed_rebar": 0.1727,
+      "corrosion": 0.6047
+     },
+     "ms_per_job": 3470.3298,
+     "recall_per_s": 0.1408,
+     "halt": {
+      "stop-rule": 69,
+      "cap-hit": 17,
+      "exhausted": 14
+     },
+     "looks_mean": 5.97,
+     "looks_by_level": {
+      "L1": 49,
+      "L2": 453,
+      "L3": 95
+     },
+     "looks_by_action": {
+      "gaze": 485,
+      "escalate": 39,
+      "verify": 73
+     },
+     "segmenter": "onnx:drishyam_dacl10k.onnx",
+     "confirm": null,
+     "profile": "onnx:drishyam_dacl10k.onnx",
+     "crit_recall": 0.5231,
+     "crit_recall_ci": [
+      0.4522,
+      0.5816
+     ],
+     "per_class_gt": {
+      "crack": 301,
+      "spalling": 186,
+      "efflorescence": 82,
+      "exposed_rebar": 139,
+      "corrosion": 129
+     },
+     "recall_all": 0.4898,
+     "recall_all_ci": [
+      0.4188,
+      0.5496
+     ],
+     "crit_recall_all": 0.5262,
+     "crit_recall_all_ci": [
+      0.455,
+      0.5828
+     ],
+     "crit_per_image": 6.38,
+     "signoffs_per_image": 1.34,
+     "reviews_per_image": 1.75,
+     "look_per_image": 0.49,
+     "needs_look_per_image": 0.14,
+     "all_per_image": 39.99,
+     "crit_merged_per_image": 3.18,
+     "images_with_any_all": 0.93,
+     "per_image": [
+      [
+       0,
+       0,
+       0,
+       0,
+       1
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       2
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       2
+      ],
+      [
+       2,
+       1,
+       0,
+       0,
+       2
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       2
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       2
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       2
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       5
+      ],
+      [
+       5,
+       4,
+       3,
+       0,
+       12
+      ],
+      [
+       2,
+       1,
+       1,
+       0,
+       9
+      ],
+      [
+       3,
+       1,
+       0,
+       0,
+       5
+      ],
+      [
+       2,
+       2,
+       1,
+       1,
+       2
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       4
+      ],
+      [
+       3,
+       2,
+       2,
+       2,
+       3
+      ],
+      [
+       4,
+       3,
+       3,
+       1,
+       5
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       3
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       2
+      ],
+      [
+       1,
+       1,
+       1,
+       1,
+       1
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       1
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       1
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       1
+      ],
+      [
+       1,
+       0,
+       0,
+       0,
+       2
+      ],
+      [
+       3,
+       2,
+       0,
+       0,
+       12
+      ],
+      [
+       6,
+       2,
+       5,
+       1,
+       14
+      ],
+      [
+       3,
+       1,
+       0,
+       0,
+       3
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       2
+      ],
+      [
+       3,
+       2,
+       0,
+       0,
+       3
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       1
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       4
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       12
+      ],
+      [
+       3,
+       3,
+       0,
+       0,
+       9
+      ],
+      [
+       2,
+       2,
+       2,
+       2,
+       3
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       7
+      ],
+      [
+       0,
+       0,
+       2,
+       0,
+       3
+      ],
+      [
+       2,
+       1,
+       0,
+       0,
+       24
+      ],
+      [
+       7,
+       5,
+       1,
+       0,
+       24
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       1
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       1
+      ],
+      [
+       4,
+       3,
+       1,
+       1,
+       6
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       2
+      ],
+      [
+       9,
+       4,
+       5,
+       0,
+       47
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       3
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       1
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       4
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       1
+      ],
+      [
+       6,
+       4,
+       4,
+       3,
+       11
+      ],
+      [
+       5,
+       2,
+       0,
+       0,
+       6
+      ],
+      [
+       5,
+       3,
+       1,
+       0,
+       6
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       3
+      ],
+      [
+       9,
+       3,
+       4,
+       1,
+       12
+      ],
+      [
+       2,
+       0,
+       1,
+       0,
+       9
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       4
+      ],
+      [
+       10,
+       2,
+       10,
+       1,
+       10
+      ],
+      [
+       7,
+       5,
+       1,
+       1,
+       15
+      ],
+      [
+       7,
+       3,
+       5,
+       1,
+       11
+      ],
+      [
+       21,
+       10,
+       12,
+       1,
+       31
+      ],
+      [
+       19,
+       7,
+       13,
+       5,
+       34
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       1
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       6
+      ],
+      [
+       2,
+       2,
+       1,
+       1,
+       3
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       2
+      ],
+      [
+       3,
+       3,
+       1,
+       1,
+       4
+      ],
+      [
+       2,
+       1,
+       1,
+       0,
+       8
+      ],
+      [
+       1,
+       1,
+       1,
+       1,
+       1
+      ],
+      [
+       17,
+       9,
+       9,
+       1,
+       30
+      ],
+      [
+       3,
+       2,
+       0,
+       0,
+       7
+      ],
+      [
+       9,
+       5,
+       1,
+       0,
+       14
+      ],
+      [
+       20,
+       7,
+       10,
+       1,
+       30
+      ],
+      [
+       3,
+       1,
+       0,
+       0,
+       5
+      ],
+      [
+       10,
+       10,
+       6,
+       3,
+       17
+      ],
+      [
+       4,
+       3,
+       2,
+       2,
+       9
+      ],
+      [
+       2,
+       0,
+       2,
+       0,
+       3
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       1
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       4
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       5
+      ],
+      [
+       17,
+       8,
+       6,
+       0,
+       31
+      ],
+      [
+       10,
+       7,
+       6,
+       1,
+       17
+      ],
+      [
+       4,
+       4,
+       0,
+       0,
+       8
+      ],
+      [
+       3,
+       2,
+       2,
+       1,
+       4
+      ],
+      [
+       7,
+       2,
+       3,
+       1,
+       15
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       3
+      ],
+      [
+       5,
+       4,
+       3,
+       0,
+       5
+      ],
+      [
+       10,
+       6,
+       6,
+       3,
+       16
+      ],
+      [
+       14,
+       10,
+       6,
+       1,
+       21
+      ],
+      [
+       4,
+       2,
+       0,
+       0,
+       8
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       9
+      ],
+      [
+       9,
+       5,
+       4,
+       3,
+       14
+      ],
+      [
+       15,
+       6,
+       12,
+       2,
+       21
+      ],
+      [
+       5,
+       1,
+       0,
+       0,
+       7
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       6
+      ],
+      [
+       4,
+       3,
+       4,
+       1,
+       4
+      ],
+      [
+       14,
+       8,
+       9,
+       1,
+       23
+      ],
+      [
+       14,
+       9,
+       7,
+       3,
+       20
+      ],
+      [
+       0,
+       0,
+       1,
+       0,
+       5
+      ],
+      [
+       7,
+       4,
+       2,
+       0,
+       7
+      ],
+      [
+       20,
+       8,
+       7,
+       1,
+       24
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       7
+      ],
+      [
+       4,
+       2,
+       1,
+       0,
+       4
+      ]
+     ]
+    },
+    "both": {
+     "recall": 0.509,
+     "recall_ci": [
+      0.4402,
+      0.5648
+     ],
+     "recall_iou_only": 0.2808,
+     "chance_recall": 0.2473,
+     "chance_recall_iou_only": 0.0621,
+     "precision": 0.0868,
+     "fp_per_image": 36.83,
+     "boxes_per_image": 40.33,
+     "pixels_frac": 0.1443,
+     "net_pixels_frac": 0.1286,
+     "images_with_any": 0.97,
+     "critical_per_image": 6.42,
+     "findings_per_image": 6.06,
+     "per_class": {
+      "crack": 0.4485,
+      "spalling": 0.7903,
+      "efflorescence": 0.4634,
+      "exposed_rebar": 0.1799,
+      "corrosion": 0.6279
+     },
+     "ms_per_job": 3436.2433,
+     "recall_per_s": 0.1481,
+     "vs_ref": 1.0416,
+     "vs_ref_ci": [
+      1.0051,
+      1.0917
+     ],
+     "vs_ref_iou_only_ci": [
+      1.0045,
+      1.0981
+     ],
+     "pixels_vs_ref": 0.9936,
+     "ref": "laplacian@0.3",
+     "boxes_vs_ref_ci": [
+      1.0057,
+      1.0411
+     ],
+     "boxes_diff_vs_ref_ci": [
+      0.2498,
+      1.5203
+     ],
+     "images_with_any_vs_ref_ci": [
+      0.01,
+      0.08
+     ],
+     "ms_vs_ref": 0.9902,
+     "ms_vs_ref_ci": [
+      0.9781,
+      1.0016
+     ],
+     "recall_per_s_vs_ref": 1.0519,
+     "recall_per_s_vs_ref_ci": [
+      1.012,
+      1.1037
+     ],
+     "chance_vs_ref_ci": [
+      0.956,
+      1.2446
+     ],
+     "halt": {
+      "stop-rule": 75,
+      "cap-hit": 17,
+      "exhausted": 8
+     },
+     "looks_mean": 5.91,
+     "looks_by_level": {
+      "L1": 49,
+      "L2": 447,
+      "L3": 95
+     },
+     "looks_by_action": {
+      "gaze": 472,
+      "escalate": 42,
+      "verify": 77
+     },
+     "segmenter": "onnx:drishyam_dacl10k.onnx",
+     "confirm": null,
+     "profile": "onnx:drishyam_dacl10k.onnx",
+     "crit_recall": 0.5292,
+     "crit_recall_ci": [
+      0.4608,
+      0.5858
+     ],
+     "per_class_gt": {
+      "crack": 301,
+      "spalling": 186,
+      "efflorescence": 82,
+      "exposed_rebar": 139,
+      "corrosion": 129
+     },
+     "crit_recall_vs_ref": 1.0118,
+     "crit_recall_vs_ref_ci": [
+      1.0,
+      1.0455
+     ],
+     "recall_all": 0.5102,
+     "recall_all_ci": [
+      0.4406,
+      0.5657
+     ],
+     "crit_recall_all": 0.5323,
+     "crit_recall_all_ci": [
+      0.4626,
+      0.5878
+     ],
+     "crit_per_image": 6.42,
+     "signoffs_per_image": 1.36,
+     "reviews_per_image": 1.84,
+     "look_per_image": 0.5,
+     "needs_look_per_image": 0.15,
+     "all_per_image": 40.83,
+     "crit_merged_per_image": 3.2,
+     "images_with_any_all": 0.97,
+     "recall_all_vs_ref": 1.0415,
+     "recall_all_vs_ref_ci": [
+      1.005,
+      1.0913
+     ],
+     "crit_recall_all_vs_ref": 1.0117,
+     "crit_recall_all_vs_ref_ci": [
+      1.0,
+      1.0448
+     ],
+     "crit_diff_vs_ref_ci": [
+      0.0,
+      0.11
+     ],
+     "signoffs_diff_vs_ref_ci": [
+      0.0,
+      0.06
+     ],
+     "reviews_diff_vs_ref_ci": [
+      0.03,
+      0.17
+     ],
+     "look_diff_vs_ref_ci": [
+      0.0,
+      0.03
+     ],
+     "needs_look_diff_vs_ref_ci": [
+      0.0,
+      0.03
+     ],
+     "all_diff_vs_ref_ci": [
+      0.25,
+      1.53
+     ],
+     "crit_merged_diff_vs_ref_ci": [
+      0.0,
+      0.06
+     ],
+     "images_with_any_all_vs_ref_ci": [
+      0.01,
+      0.08
+     ],
+     "per_image": [
+      [
+       0,
+       0,
+       0,
+       0,
+       1
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       2
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       2
+      ],
+      [
+       2,
+       1,
+       0,
+       0,
+       2
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       2
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       2
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       2
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       5
+      ],
+      [
+       5,
+       4,
+       5,
+       1,
+       12
+      ],
+      [
+       2,
+       1,
+       1,
+       0,
+       9
+      ],
+      [
+       3,
+       1,
+       0,
+       0,
+       5
+      ],
+      [
+       2,
+       2,
+       0,
+       0,
+       2
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       4
+      ],
+      [
+       1,
+       1,
+       3,
+       1,
+       3
+      ],
+      [
+       4,
+       3,
+       3,
+       1,
+       5
+      ],
+      [
+       3,
+       2,
+       0,
+       0,
+       3
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       2
+      ],
+      [
+       1,
+       1,
+       1,
+       0,
+       1
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       1
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       1
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       1
+      ],
+      [
+       1,
+       0,
+       0,
+       0,
+       2
+      ],
+      [
+       3,
+       2,
+       0,
+       0,
+       12
+      ],
+      [
+       6,
+       2,
+       5,
+       1,
+       14
+      ],
+      [
+       3,
+       1,
+       1,
+       0,
+       3
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       2
+      ],
+      [
+       3,
+       2,
+       1,
+       0,
+       3
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       1
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       4
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       12
+      ],
+      [
+       3,
+       3,
+       1,
+       0,
+       9
+      ],
+      [
+       2,
+       2,
+       2,
+       2,
+       3
+      ],
+      [
+       1,
+       1,
+       1,
+       0,
+       7
+      ],
+      [
+       0,
+       0,
+       1,
+       0,
+       3
+      ],
+      [
+       2,
+       1,
+       0,
+       0,
+       24
+      ],
+      [
+       7,
+       5,
+       2,
+       0,
+       24
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       1
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       1
+      ],
+      [
+       4,
+       3,
+       0,
+       0,
+       6
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       2
+      ],
+      [
+       9,
+       4,
+       3,
+       0,
+       47
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       3
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       1
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       4
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       1
+      ],
+      [
+       6,
+       4,
+       3,
+       3,
+       11
+      ],
+      [
+       5,
+       2,
+       0,
+       0,
+       6
+      ],
+      [
+       5,
+       3,
+       2,
+       0,
+       6
+      ],
+      [
+       1,
+       1,
+       1,
+       0,
+       3
+      ],
+      [
+       9,
+       3,
+       3,
+       1,
+       12
+      ],
+      [
+       2,
+       0,
+       1,
+       0,
+       9
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       4
+      ],
+      [
+       10,
+       2,
+       10,
+       0,
+       10
+      ],
+      [
+       7,
+       5,
+       1,
+       0,
+       15
+      ],
+      [
+       7,
+       3,
+       5,
+       0,
+       11
+      ],
+      [
+       21,
+       10,
+       11,
+       4,
+       31
+      ],
+      [
+       19,
+       7,
+       13,
+       6,
+       34
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       1
+      ],
+      [
+       1,
+       1,
+       0,
+       0,
+       6
+      ],
+      [
+       2,
+       2,
+       1,
+       1,
+       3
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       2
+      ],
+      [
+       3,
+       3,
+       0,
+       0,
+       4
+      ],
+      [
+       4,
+       1,
+       2,
+       1,
+       8
+      ],
+      [
+       1,
+       1,
+       1,
+       1,
+       1
+      ],
+      [
+       17,
+       9,
+       7,
+       1,
+       30
+      ],
+      [
+       3,
+       2,
+       1,
+       0,
+       7
+      ],
+      [
+       9,
+       5,
+       0,
+       0,
+       14
+      ],
+      [
+       20,
+       7,
+       16,
+       1,
+       30
+      ],
+      [
+       3,
+       1,
+       0,
+       0,
+       5
+      ],
+      [
+       10,
+       10,
+       8,
+       5,
+       17
+      ],
+      [
+       4,
+       3,
+       4,
+       2,
+       9
+      ],
+      [
+       2,
+       0,
+       1,
+       0,
+       3
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       1
+      ],
+      [
+       1,
+       1,
+       1,
+       1,
+       4
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       5
+      ],
+      [
+       17,
+       8,
+       11,
+       2,
+       31
+      ],
+      [
+       10,
+       7,
+       7,
+       2,
+       17
+      ],
+      [
+       4,
+       4,
+       0,
+       0,
+       8
+      ],
+      [
+       3,
+       2,
+       1,
+       1,
+       4
+      ],
+      [
+       8,
+       2,
+       7,
+       2,
+       15
+      ],
+      [
+       3,
+       3,
+       0,
+       0,
+       3
+      ],
+      [
+       5,
+       4,
+       4,
+       1,
+       5
+      ],
+      [
+       10,
+       6,
+       7,
+       2,
+       16
+      ],
+      [
+       14,
+       10,
+       8,
+       3,
+       21
+      ],
+      [
+       4,
+       2,
+       0,
+       0,
+       8
+      ],
+      [
+       6,
+       3,
+       2,
+       0,
+       9
+      ],
+      [
+       9,
+       5,
+       3,
+       0,
+       14
+      ],
+      [
+       15,
+       6,
+       10,
+       1,
+       21
+      ],
+      [
+       5,
+       1,
+       0,
+       0,
+       7
+      ],
+      [
+       2,
+       1,
+       0,
+       0,
+       6
+      ],
+      [
+       4,
+       3,
+       3,
+       0,
+       4
+      ],
+      [
+       14,
+       8,
+       2,
+       1,
+       23
+      ],
+      [
+       14,
+       9,
+       7,
+       1,
+       20
+      ],
+      [
+       2,
+       2,
+       2,
+       0,
+       5
+      ],
+      [
+       7,
+       4,
+       1,
+       0,
+       7
+      ],
+      [
+       20,
+       8,
+       6,
+       1,
+       24
+      ],
+      [
+       1,
+       1,
+       1,
+       0,
+       7
+      ],
+      [
+       4,
+       2,
+       3,
+       2,
+       4
+      ]
+     ]
+    }
+   },
+   "described": {
+    "refused_by_level": {
+     "L1": {
+      "laplacian": [
+       1,
+       49
+      ],
+      "both": [
+       0,
+       48
+      ],
+      "views": 49
+     },
+     "L2": {
+      "laplacian": [
+       42,
+       449
+      ],
+      "both": [
+       5,
+       442
+      ],
+      "views": 453
+     },
+     "L3": {
+      "laplacian": [
+       6,
+       94
+      ],
+      "both": [
+       1,
+       94
+      ],
+      "views": 95
+     }
+    },
+    "over_blur_regions": {
+     "laplacian": [
+      0,
+      0
+     ],
+     "both": [
+      0,
+      0
+     ],
+     "views": 0
+    },
+    "reblur_quartiles": [
+     [
+      0.272,
+      0.3007,
+      0.3339
+     ],
+     [
+      0.5082,
+      0.5396,
+      0.5768
+     ]
+    ],
+    "photos_where_the_jobs_differ": 14
+   }
+  }
  },
  "code": "e2c6aafe9310a0ebbb9338b76c79cfb7b01bd6a8: the both-gates gate, its tests and evals/blur_gate.py, committed before this file; the run records the commit it runs at",
  "commands": [
@@ -64,5 +3693,48 @@
   "Then the verdict is read from this file by the rule above, unchanged, and committed.",
   "Then DRISHYAM_ONNX=models/drishyam_dacl10k.onnx .venv/bin/python -m evals.blur_gate real01 adds real_01_fallback_look (it refuses before the verdict is in this file, or twice)."
  ],
- "if_adopted": "JobConfig.blur_gate's default becomes \"both\" for every profile, in its own commit, and the unit suite runs again; every number published before it ran with the Laplacian gate, and is said to wherever it is reported beside the new gate's. Scoring v1 with it on a held-out set is a separate step for the owner to approve; nothing runs on held-out data in this test, and nothing is written to public/."
+ "if_adopted": "JobConfig.blur_gate's default becomes \"both\" for every profile, in its own commit, and the unit suite runs again; every number published before it ran with the Laplacian gate, and is said to wherever it is reported beside the new gate's. Scoring v1 with it on a held-out set is a separate step for the owner to approve; nothing runs on held-out data in this test, and nothing is written to public/.",
+ "run": {
+  "rule_commit": "45c3ef7024bd4715113514dda23eca79aaed31df",
+  "rule_committed": "2026-10-23T00:42:27+05:30",
+  "run_started": "2026-10-23T00:42:35+05:30",
+  "code": {
+   "commit": "45c3ef7024bd4715113514dda23eca79aaed31df",
+   "tracked_changes": ""
+  },
+  "segmenter": "onnx:drishyam_dacl10k.onnx drishyam_dacl10k.onnx@c49416c10087",
+  "micro_arm": "local-macos-x86-dacl10k-retime",
+  "finished": "2026-10-23T00:48:19+05:30",
+  "views_file": "runs/blur_gate/dev_views.json.gz"
+ },
+ "gate_pooled": {
+  "photos": 190,
+  "views": 851,
+  "refused_as_is": {
+   "laplacian": 49,
+   "both": 6
+  },
+  "refused_blurred": {
+   "laplacian": 846,
+   "both": 838
+  },
+  "as_is_diff": -0.0505,
+  "as_is_diff_ci": [
+   -0.0836,
+   -0.0235
+  ],
+  "blurred_diff": -0.0094,
+  "blurred_diff_ci": [
+   -0.0176,
+   -0.0023
+  ]
+ },
+ "clauses": {
+  "recall_holds_synth_dev": true,
+  "recall_holds_real": true,
+  "clean_boxes_do_not_rise": true,
+  "clean_share_with_a_box_does_not_rise": true
+ },
+ "verdict": "Harm",
+ "adopted": false
 }
