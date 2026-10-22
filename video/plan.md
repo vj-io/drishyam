@@ -13,7 +13,7 @@ stamping in at each chapter.
 | `public/video/drishyam.mp4` | the video (H.264 + AAC, poster baked in as frame 0) | no: `public/video/*.mp4` is ignored; it ships to the site bucket at deploy time and as a release asset |
 | `public/video/drishyam.vtt` | captions, the same cues as the burned-in ones (written by the same build as the MP4) | yes |
 | `public/video/poster.jpg` | the agent's confirm look on the rebar in the live run (line `l5`, step 3: the camera panel with its crop and its reason, "confirm look: none of exposed_rebar confirmed"), settled | yes |
-| `brag-output/drishyam-short.mp4` | 15-20 s 9:16 cut: the cold open's run, the sign-off (the typing at real time, then a jump cut to Approve), ending on the settled APPROVED stamp of the spalling and the URL; labelled "recorded 2026-10-22 · live site · v1 · v1-policy2" and "the rebar went to a person to check by eye"; its three lines are o1, "Only a person can approve a critical finding." and "Try it live: the trained v1."; v1's held-out result in the lower third | no (brag-output/ is ignored) |
+| `brag-output/drishyam-short.mp4` | 15-20 s 9:16 cut: the cold open's run, the sign-off (the typing at real time, then a jump cut to Approve), ending on the settled APPROVED stamp of the spalling and the URL; labelled "recorded 2026-10-22 · live site · v1 · v1-policy2" and "the rebar went to a person to check by eye"; its three lines are o1, "Only a person can approve a critical finding." and "Try it live: the trained v1."; v1's held-out result in the lower third, with what v1-policy2 changes (8.75 critical boxes per photo, 0.91×; recall 0.99×) | no (brag-output/ is ignored) |
 | `brag-output/standin/film/` | `build.py --standin`: the film with the stand-in real-photo runs, if `--make-standin` made them (nothing is pending any more): `drishyam-standin.mp4`, `drishyam-standin.vtt`, `poster-standin.jpg`, `plan-tables.md` | no |
 
 The site's player is static markup in `public/index.html`, where the removed `initVideo()` (commit 939f973) put it:
@@ -130,8 +130,12 @@ CODEBRIM photos (dataset sha256s), and the classical engine it is compared with 
 each engine charged its own cost table timed on one machine (`local-macos-x86`; the build refuses tables from two
 machines). The voice says its recall (49 %) and the paired ratio to the classical engine (2.5×, against the classical
 engine's 1 in 5) in `r6`, then its chance recall (its boxes at random places find 30 %) and its critical boxes per photo
-against the classical engine's (5.5×) in `r8`; the board makes v1 the headline and adds the CIs, the critical boxes
-per photo, the classical engine as its comparison row (every classical method about 1 in 5, its chance), the tiling
+against the classical engine's (5.5×) in `r8`, which ends with what the live look policy changes: "The live policy
+sends a tenth fewer, with recall unchanged" (v1-policy2's one held-out read beside v1's, `results/heldout_models.json`
+`"v1-policy2"` and its pairs with v1: 8.75 critical boxes per photo instead of 9.60, 0.91×, CI 0.84–0.98; recall 0.99×,
+CI 0.97–1.01; the build asserts the read used v1's baselines, passed its dev rule's clauses, compares with the board's
+v1 figure, and that its confidence floor is the one in the footage). The board makes v1 the headline and adds the CIs,
+the critical boxes per photo, the live policy's line under them, the classical engine as its comparison row (every classical method about 1 in 5, its chance), the tiling
 levels with v1 that find as much (L2 and L1) and the near-duplicate count (0; spoken if above zero). `r7` adds that it put no box on any of the 51 synthetic photos with no damage. `--check-template` builds
 the line from the real summary, measures the whole film (both real photos) against 300 s, and checks that the same
 summary charged another machine's cost table is refused.
@@ -169,8 +173,10 @@ writes `health.json` and the boxes of its key fields, the segmenter's and the wh
 
 ## Length
 
-Nothing is pending: the committed tables below are the film as rendered, 243.6 s (239.9 s before the live chapter was
-re-recorded on 2026-10-22; its new lines say more about the rebar). With the trained segmenter's line,
+The committed tables below are the layout of 247.9 s: `r8` gained what the live look policy changes. The committed
+`public/video/drishyam.vtt` and poster, and the MP4, are still the render of 243.6 s from before that line (239.9 s
+before the live chapter was re-recorded on 2026-10-22); the next full render, after the live chapter is recorded
+again, brings them back in step. With the trained segmenter's line,
 both real photos and the portraits on, the narration first measured 285 s; it came to 4:00 by cutting words and
 holds, not chapters:
 
@@ -247,18 +253,14 @@ and AWS and Arm (the arm Lambda, its latency then and now).
 - Clicking "Try KILL" clears the last job, so the page re-lays out and scrolls back to the viewer; at about 7x speed
   the "How it works" sheet passes through the window for a fraction of a second, and after KILL the page scrolls up to
   the Demo sheet's head, where Resume is. It is the real page doing it.
-- The results board (`r6`, `r8`) and the short's lower third quote v1's held-out read under its first look policy
-  (9.60 critical boxes per photo, 5.5x the classical engine's). The live site, and so the re-recorded footage, runs
-  v1-policy2, whose one held-out read sends 8.75 per photo to a person at about the same recall (README.md). This
-  pass re-recorded the live chapter only; the board was not changed.
 
 <!-- generated:start -->
 ### Requirement checklist (timestamps from this build)
 
 | Requirement | Covered by | From | To |
 | --- | --- | --- | --- |
-| At most 5 minutes, 1920x1080 | open, end | 0:00.0 | 4:03.6 |
-| Narrated (offline Kokoro voice af_heart) with burned-in captions; the same cues in public/video/drishyam.vtt | open, end | 0:00.0 | 4:03.6 |
+| At most 5 minutes, 1920x1080 | open, end | 0:00.0 | 4:07.9 |
+| Narrated (offline Kokoro voice af_heart) with burned-in captions; the same cues in public/video/drishyam.vtt | open, end | 0:00.0 | 4:07.9 |
 | The team: Vaibhav Jangid, Bhavya Dhoot. Each real photo, then the window's looks turn it into OpenCV line art (Canny, findContours, approxPolyDP); name cards without the private inputs | team | 0:09.0 | 0:23.1 |
 | Problem and user, with sources on screen | problem | 0:23.1 | 0:39.0 |
 | Disclosed before the demo plays: the footage was recorded 2026-10-22 on the live site, the trained v1 with its v1-policy2 look policy, the build the site runs now | l0 | 0:39.5 | 0:45.0 |
@@ -275,13 +277,13 @@ and AWS and Arm (the arm Lambda, its latency then and now).
 | The live site now runs the trained segmenter v1 on OpenCV 5 DNN ENGINE_NEW, and its Lambda step p95 then and now (video/live/aws-smoke.log) | a4, a5 | 2:24.5 | 2:35.8 |
 | Principal results: recall vs pixels, with one downscale, the tiling family and chance | r1, r3 | 2:36.7 | 2:48.8 |
 | Ablations (public/results/ablations.json) | r5 | 2:49.1 | 2:56.2 |
-| Real photos (CODEBRIM), the headline board: trained v1, held out (results/heldout_models.json), against the classical engine (about 1 in 5, the comparison row), its chance recall and critical boxes; no CODEBRIM image shown | r6, r8 | 2:56.4 | 3:12.1 |
-| False alarms on synthetic photos with no damage (public/results/clean/summary.json), the classical engine and v1 | r7 | 3:12.3 | 3:18.5 |
-| Two real photos of our own (painted walls, no ground truth): the looks, the findings, what it missed (video/live/real.*, video/live/variants/IMG_2330/real.*) | real | 3:18.9 | 3:35.2 |
-| Failure cases: failures.json plates and their rules; one CODEBRIM case in words only | failures | 3:35.2 | 3:46.0 |
-| Limits and responsible use | limits | 3:46.0 | 3:52.9 |
-| Reproduce: make test, make eval, scripts/aws.sh | repro | 3:52.9 | 3:57.6 |
-| End card: live URL, repository, team | end | 3:57.6 | 4:03.6 |
+| Real photos (CODEBRIM), the headline board: trained v1, held out (results/heldout_models.json), against the classical engine (about 1 in 5, the comparison row), its chance recall and critical boxes, and what the live look policy v1-policy2 changes (fewer critical boxes, recall unchanged); no CODEBRIM image shown | r6, r8 | 2:56.4 | 3:16.4 |
+| False alarms on synthetic photos with no damage (public/results/clean/summary.json), the classical engine and v1 | r7 | 3:16.6 | 3:22.8 |
+| Two real photos of our own (painted walls, no ground truth): the looks, the findings, what it missed (video/live/real.*, video/live/variants/IMG_2330/real.*) | real | 3:23.2 | 3:39.5 |
+| Failure cases: failures.json plates and their rules; one CODEBRIM case in words only | failures | 3:39.5 | 3:50.3 |
+| Limits and responsible use | limits | 3:50.3 | 3:57.3 |
+| Reproduce: make test, make eval, scripts/aws.sh | repro | 3:57.3 | 4:01.9 |
+| End card: live URL, repository, team | end | 4:01.9 | 4:07.9 |
 
 ### Chapters (from this build)
 
@@ -294,12 +296,12 @@ and AWS and Arm (the arm Lambda, its latency then and now).
 | Failure drills | 1:29.0 | 1:47.0 | b0, b1, b2, b3, b4 |
 | An LLM over MCP | 1:47.0 | 2:03.4 | m1, m2, m3, m4 |
 | Architecture | 2:03.4 | 2:36.2 | a0, a1, a3, a4, a5 |
-| Results | 2:36.2 | 3:18.9 | r1, r3, r5, r6, r8, r7 |
-| Real photos (ours) | 3:18.9 | 3:35.2 | q1, q2 |
-| Failure cases | 3:35.2 | 3:46.0 | f1, f2 |
-| Limits | 3:46.0 | 3:52.9 | x1 |
-| Reproduce | 3:52.9 | 3:57.6 | y1 |
-| End | 3:57.6 | 4:03.6 | e1 |
+| Results | 2:36.2 | 3:23.2 | r1, r3, r5, r6, r8, r7 |
+| Real photos (ours) | 3:23.2 | 3:39.5 | q1, q2 |
+| Failure cases | 3:39.5 | 3:50.3 | f1, f2 |
+| Limits | 3:50.3 | 3:57.3 | x1 |
+| Reproduce | 3:57.3 | 4:01.9 | y1 |
+| End | 4:01.9 | 4:07.9 | e1 |
 
 ### Every number and URL, with its source
 
@@ -453,6 +455,9 @@ and AWS and Arm (the arm Lambda, its latency then and now).
 | tiling with the trained segmenter, L2/L1/L0: pixels, recall | [[0.1047, 0.5027], [0.4191, 0.5139], [1.6229, 0.3555]] | `public/results/codebrim_dacl10k/summary.json` | policies.tiling |
 | tiling levels that find as much as the trained segmenter's agent, or more | ["L2", "L1"] | `public/results/codebrim_dacl10k/summary.json` | policies.tiling[].recall >= policies.drishyam[cap 0.3].recall |
 | CODEBRIM photos with a near-duplicate in dacl10k | 0 | `public/results/codebrim_dacl10k/summary.json` | leakage.near_duplicates |
+| v1-policy2 (live look policy): critical boxes per photo, CODEBRIM held out | 8.75 | `results/heldout_models.json` | ['v1-policy2'].read.codebrim.matrix['v1-policy2@0.3'].critical_per_image |
+| v1-policy2 / v1: critical boxes per photo, paired 95 % CI | [0.9115, [0.8358, 0.9817]] | `results/heldout_models.json` | pairs['codebrim@0.3: v1-policy2 / v1'].critical |
+| v1-policy2 / v1: recall, paired 95 % CI | [0.9928, [0.972, 1.0134]] | `results/heldout_models.json` | pairs['codebrim@0.3: v1-policy2 / v1'].recall |
 | team portraits: the OpenCV calls in the header | ["cv2.Canny", "cv2.findContours", "cv2.approxPolyDP"] | `$DRISHYAM_PRIVATE_DIR/team/out/portraits.py` | cv2 calls in the script (OpenCV 5); private, git-ignored |
 | team photos: photo-1, photo-2 | ["Vaibhav Jangid", "Bhavya Dhoot"] | `$DRISHYAM_PRIVATE_DIR/team/team.json` | photo-1.name, photo-2.name (both agreed to appear) |
 | real photo IMG_2332: engine | onnx:drishyam_dacl10k.onnx | `video/live/real.json` | engine |
@@ -534,13 +539,13 @@ and AWS and Arm (the arm Lambda, its latency then and now).
 | r3 | 2:46.6 | One downscaled pass does about as well. | One downscaled pass does about as well. |
 | r5 | 2:49.1 | Ablations: only dropping the survey look loses recall, and a random gaze order matches it on smaller photos. | Ablations: only dropping the survey look loses recall, and a random gaze order matches it on smaller photos. |
 | r6 | 2:56.4 | On two hundred real CODEBRIM photos, held out, the trained v1 finds forty-nine percent: two and a half times the classical engine's one in five. | On 200 real CODEBRIM photos, held out, the trained v1 finds 49 %: two and a half times the classical engine's 1 in 5. |
-| r8 | 3:06.0 | But its boxes find thirty percent at random, and a person gets five and a half times the critical boxes. | But its boxes find 30 % at random, and a person gets five and a half times the critical boxes. |
-| r7 | 3:12.3 | On fifty-one undamaged synthetic photos, the classical engine flags two in three; v1, none. | On 51 undamaged synthetic photos, the classical engine flags 2 in 3; v1, none. |
-| q1 | 3:19.4 | Our own wall, no ground truth: no region was proposed, so the trained segmenter never ran, and missed the hairline crack. | Our own wall, no ground truth: no region was proposed, so the trained segmenter never ran, and missed the hairline crack. |
-| q2 | 3:27.8 | On a second wall, one close look flagged a crack on the lower of two we traced, and never looked closely at most of the wall. | On a second wall, one close look flagged a crack on the lower of two we traced, and never looked closely at most of the wall. |
-| f1 | 3:35.7 | Failures in the open: graffiti read as spalling, a formwork line as a crack, glare, and blur. | Failures in the open: graffiti read as spalling, a formwork line as a crack, glare, and blur. |
-| f2 | 3:41.8 | Only the glare gate caught its case; three fixes are not built yet. | Only the glare gate caught its case; three fixes are not built yet. |
-| x1 | 3:46.5 | Pixels, not millimetres. AI-assisted, not an inspection. Only a person can approve. | Pixels, not millimetres. AI-assisted, not an inspection. Only a person can approve. |
-| y1 | 3:53.4 | Make test, make eval, and one script for the AWS stack. | make test, make eval, and one script for the AWS stack. |
-| e1 | 3:58.0 | Drishyam. It looks where it matters, and asks a human first. | Drishyam. It looks where it matters, and asks a human first. |
+| r8 | 3:06.0 | But its boxes find thirty percent at random, and a person gets five and a half times the critical boxes. The live policy sends a tenth fewer, with recall unchanged. | But its boxes find 30 % at random, and a person gets five and a half times the critical boxes. The live policy sends a tenth fewer, with recall unchanged. |
+| r7 | 3:16.6 | On fifty-one undamaged synthetic photos, the classical engine flags two in three; v1, none. | On 51 undamaged synthetic photos, the classical engine flags 2 in 3; v1, none. |
+| q1 | 3:23.8 | Our own wall, no ground truth: no region was proposed, so the trained segmenter never ran, and missed the hairline crack. | Our own wall, no ground truth: no region was proposed, so the trained segmenter never ran, and missed the hairline crack. |
+| q2 | 3:32.1 | On a second wall, one close look flagged a crack on the lower of two we traced, and never looked closely at most of the wall. | On a second wall, one close look flagged a crack on the lower of two we traced, and never looked closely at most of the wall. |
+| f1 | 3:40.0 | Failures in the open: graffiti read as spalling, a formwork line as a crack, glare, and blur. | Failures in the open: graffiti read as spalling, a formwork line as a crack, glare, and blur. |
+| f2 | 3:46.1 | Only the glare gate caught its case; three fixes are not built yet. | Only the glare gate caught its case; three fixes are not built yet. |
+| x1 | 3:50.8 | Pixels, not millimetres. AI-assisted, not an inspection. Only a person can approve. | Pixels, not millimetres. AI-assisted, not an inspection. Only a person can approve. |
+| y1 | 3:57.8 | Make test, make eval, and one script for the AWS stack. | make test, make eval, and one script for the AWS stack. |
+| e1 | 4:02.3 | Drishyam. It looks where it matters, and asks a human first. | Drishyam. It looks where it matters, and asks a human first. |
 <!-- generated:end -->

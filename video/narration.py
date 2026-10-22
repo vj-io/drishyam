@@ -158,7 +158,11 @@ def lines(D):
         (f"one in {words(cb['one_in'])}", f"1 in {cb['one_in']}"), ".")
     assert md["chance"] > md["classical"] and crlo > 1 and abs(cr - 5.5) < 0.1, "r8 says its boxes at random find a lot, and five and a half times the critical boxes"
     leak = [] if md["near_dups"] == 0 else [" ", W(md["near_dups"]), " of these photos have a near-duplicate in its training set."]   # the board shows the count either way
-    add("results", "r8", "But its boxes find ", P(md["chance"]), " at random, and a person gets five and a half times the critical boxes.", *leak)
+    # the live look policy (v1-policy2): about a tenth fewer critical boxes (CI under 1), recall unchanged (CI across 1); figures on the board
+    (c2, (c2lo, c2hi)), (r2, (r2lo, r2hi)) = md["policy2"]["crit_ratio"], md["policy2"]["recall_ratio"]
+    assert round(1 - c2, 1) == 0.1 and c2hi < 1 and r2lo < 1 < r2hi, md["policy2"]
+    add("results", "r8", "But its boxes find ", P(md["chance"]), " at random, and a person gets five and a half times the critical boxes.", *leak,
+        " The live policy sends a tenth fewer, with recall unchanged.")
     assert abs(cl["any"] - 2 / 3) < 0.01 and md["clean_any"] == [0.0, cl["any"]], "r7 says two in three, and none for v1"
     add("results", "r7", "On ", W(cl["n"]), " undamaged synthetic photos, the classical engine flags ", ("two in three", "2 in 3"), "; v1, none.")
 

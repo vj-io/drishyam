@@ -581,21 +581,22 @@ function buildResults() {
     ${[['no-survey', 'no survey look'], ['no-verify', 'no verify'], ['no-uncertainty', 'no uncertainty term'], ['governor-on', 'governor on']].map(([k, n]) => `<tr><td>${n}</td>${dsl.map((d) => vr(ab[d][k])).join('')}</tr>`).join('')}
     <tr><td>random gaze order (95 % CI)</td>${dsl.map((d) => `<td class="n ${ab[d].random_hi < 1 ? 'bad' : ''}">${fmt(ab[d].random_lo)}–${fmt(ab[d].random_hi)}</td>`).join('')}</tr></table>`;
   // P3: the headline board, the trained v1 on real photos, held out (r6, r8); the classical engine is its comparison row
-  const cb = D.codebrim, cl = D.clean, M = D.model, p3 = el('div', 'box amb', board); css(p3, { left: '0px', top: P3Y + 'px', width: '1530px', height: '836px' });
+  const cb = D.codebrim, cl = D.clean, M = D.model, P2 = M.policy2, p3 = el('div', 'box amb', board); css(p3, { left: '0px', top: P3Y + 'px', width: '1530px', height: '836px' });
   const tw = M.tiling_wins.length ? `tiling with ${M.name} at ${M.tiling_wins.join(' and ')} finds as much or more (${M.tiling.slice(0, M.tiling_wins.length).map(([px, r]) => `${fmt(r)} at ${fmt(px)} of the pixels`).join(', ')})` : 'no tiling level finds as much';
   p3.innerHTML = `<div class="abs lab" style="left:30px;top:24px;font-size:21px"><span class="fig">FIG. 4.3</span><span style="margin-left:16px">${M.n} real photos · CODEBRIM · held out: chosen on dev splits, scored once</span></div>
-    <div class="abs" style="left:30px;top:84px;display:flex;align-items:flex-end;gap:44px"><div class="h1 amber" data-w="finds" data-l="r6" style="font-size:250px;line-height:.8;white-space:nowrap">${pc(M.recall)}</div>
+    <div class="abs" style="left:30px;top:84px;display:flex;align-items:flex-end;gap:44px"><div class="h1 amber" data-w="finds" data-l="r6" style="font-size:220px;line-height:.8;white-space:nowrap">${pc(M.recall)}</div>
       <div style="padding-bottom:6px"><div class="h2" style="font-size:84px;white-space:nowrap">trained ${M.name}, held out</div>
       <div class="mono" style="font-size:27px;margin-top:12px;white-space:nowrap">defect recall (95 % CI ${fmt(M.ci[0])}–${fmt(M.ci[1])}) at ${pc(M.pixels_frac)} of the pixels</div></div></div>
-    <div class="abs h2" data-w="two and a half" data-l="r6" style="left:30px;top:316px;font-size:40px;white-space:nowrap">${fmt(M.ratio[0], 1)}× the classical engine <span style="color:var(--line-2)">(${fmt(M.ratio[1][0])}–${fmt(M.ratio[1][1])})</span> · ${cb.n} real CODEBRIM photos</div>
-    <div class="box amb" data-w="random" data-l="r8" style="left:30px;top:392px;width:720px;height:168px;padding:16px 22px"><div class="lab amber" style="font-size:19px">chance · its boxes placed at random</div>
+    <div class="abs h2" data-w="two and a half" data-l="r6" style="left:30px;top:284px;font-size:40px;white-space:nowrap">${fmt(M.ratio[0], 1)}× the classical engine <span style="color:var(--line-2)">(${fmt(M.ratio[1][0])}–${fmt(M.ratio[1][1])})</span> · ${cb.n} real CODEBRIM photos</div>
+    <div class="box amb" data-w="random" data-l="r8" style="left:30px;top:346px;width:720px;height:228px;padding:16px 22px"><div class="lab amber" style="font-size:19px">chance · its boxes placed at random</div>
       <div class="h2 amber" style="font-size:64px;margin:8px 0 6px">${pc(M.chance)}</div><div class="mono" style="font-size:21px">find ${fmt(M.chance)} of the defects; its own boxes ${fmt(M.recall)}</div></div>
-    <div class="box amb" data-w="a person" data-l="r8" style="left:780px;top:392px;width:720px;height:168px;padding:16px 22px"><div class="lab amber" style="font-size:19px">for a person to sign off</div>
-      <div class="h2 amber" style="font-size:64px;margin:8px 0 6px">${fmt(M.crit[0])} <span style="font-size:34px">critical boxes per photo</span></div><div class="mono" style="font-size:21px">classical engine ${fmt(M.crit[1])}: ${fmt(M.crit_ratio[0], 1)}× (${fmt(M.crit_ratio[1][0])}–${fmt(M.crit_ratio[1][1])})</div></div>
-    <div class="box" data-w="one in" data-l="r6" style="left:30px;top:584px;width:1470px;height:112px;padding:14px 22px;display:flex;align-items:center;gap:34px">
+    <div class="box amb" data-w="a person" data-l="r8" style="left:780px;top:346px;width:720px;height:228px;padding:16px 22px"><div class="lab amber" style="font-size:19px">for a person to sign off</div>
+      <div class="h2 amber" style="font-size:64px;margin:8px 0 6px">${fmt(M.crit[0])} <span style="font-size:34px">critical boxes per photo</span></div><div class="mono" style="font-size:21px">classical engine ${fmt(M.crit[1])}: ${fmt(M.crit_ratio[0], 1)}× (${fmt(M.crit_ratio[1][0])}–${fmt(M.crit_ratio[1][1])})</div>
+      <div class="mono amber" data-w="the live policy" data-l="r8" style="font-size:19px;line-height:1.35;margin-top:8px">live policy v1-policy2: ${fmt(P2.crit)} critical boxes per photo (${fmt(P2.crit_ratio[0])}×, CI ${fmt(P2.crit_ratio[1][0])}–${fmt(P2.crit_ratio[1][1])}), recall ${fmt(P2.recall_ratio[0])}× (CI ${fmt(P2.recall_ratio[1][0])}–${fmt(P2.recall_ratio[1][1])})</div></div>
+    <div class="box" data-w="one in" data-l="r6" style="left:30px;top:592px;width:1470px;height:112px;padding:14px 22px;display:flex;align-items:center;gap:34px">
       <div style="flex:none"><div class="lab" style="font-size:19px;white-space:nowrap">comparison · classical engine</div><div class="h2" style="font-size:52px;margin-top:6px;white-space:nowrap">about 1 in ${cb.one_in}</div></div>
       <div class="mono" style="font-size:22px;line-height:1.35;color:var(--line-2)">every classical method, ours included: recall ${fmt(cb.range[0])}–${fmt(cb.range[1])}; its boxes at random ${fmt(cb.chance)}</div></div>
-    <div class="abs src" style="left:30px;top:712px;width:1470px;font-size:19px;line-height:1.42;white-space:normal">${tw} · near-duplicates in its training set (dacl10k): ${M.near_dups} · governor off · each engine charged its own cost table, timed on one machine (${M.machine}) · results/heldout_models.json · public/results/codebrim_dacl10k/summary.json · public/results/codebrim/summary.json · the licence bars showing the photos</div>`;
+    <div class="abs src" style="left:30px;top:718px;width:1470px;font-size:18px;line-height:1.42;white-space:normal">${tw} · near-duplicates in its training set (dacl10k): ${M.near_dups} · governor off · each engine charged its own cost table, timed on one machine (${M.machine}) · results/heldout_models.json · public/results/codebrim_dacl10k/summary.json · public/results/codebrim/summary.json · the licence bars showing the photos</div>`;
   // the clean set (r7), to the right of the board, under the ablations
   const p4 = el('div', 'box', board, `<div class="lab">${cl.n} synthetic photos with no damage</div><div class="h1 amber" style="font-size:104px;margin:8px 0">${pc(cl.any)}</div>
       <div class="mono" style="font-size:26px">of them got a report from the classical engine (${pc(cl.cap)} cap)</div>
@@ -851,10 +852,12 @@ function buildShort() {
   css(cs, { display: 'inline-block', padding: '10px 22px', background: 'rgba(4,20,44,.94)', border: '2.5px solid var(--line-3)', borderLeft: '8px solid var(--amber)', font: '500 34px/1.3 var(--fm)', color: 'var(--line)' });
   const url = el('div', 'abs mono', stage, D.urls.live.replace('https://', '')); css(url, { left: '60px', top: '1508px', width: '960px', textAlign: 'center', font: '700 40px/1 var(--fm)', color: 'var(--amber)' });
   // the lower third: what the site runs now, held out (the film's headline board, short form)
-  const card = el('div', 'box amb', stage, `<div class="lab amber" style="font-size:21px">the site now runs ${M.name} · trained, held out</div>
+  const P2 = M.policy2;
+  const card = el('div', 'box amb', stage, `<div class="lab amber" style="font-size:21px">trained ${M.name}, held out · the site runs it with v1-policy2</div>
     <div style="display:flex;align-items:flex-end;gap:26px;margin-top:6px"><div class="h1 amber" style="font-size:120px;line-height:.85;white-space:nowrap;flex:none">${pc(M.recall)}</div>
     <div class="mono" style="font-size:25px;line-height:1.35">recall on ${M.n} real CODEBRIM photos: ${fmt(M.ratio[0], 1)}× the classical engine</div></div>
-    <div class="mono" style="font-size:23px;margin-top:10px;color:var(--line-2)">chance ${pc(M.chance)} · ${fmt(M.crit[0])} critical boxes per photo for a person</div>`);
+    <div class="mono" style="font-size:23px;margin-top:10px;color:var(--line-2)">chance ${pc(M.chance)} · ${fmt(M.crit[0])} critical boxes per photo for a person</div>
+    <div class="mono amber" style="font-size:23px;margin-top:4px">with v1-policy2: ${fmt(P2.crit)} (${fmt(P2.crit_ratio[0])}×), recall ${fmt(P2.recall_ratio[0])}×</div>`);
   css(card, { left: '60px', top: '1572px', width: '960px', height: '250px', padding: '18px 26px' });
   const big = card.querySelector('.h1'), TV = l2.t + l2.dur * l2.text.indexOf('trained') / l2.text.length;
   const caps = [[l0.t, l0.t + l0.dur, LINE.o1.cap], [l1.t, l1.t + l1.dur, l1.text], [l2.t, l2.t + l2.dur, l2.text]];   // the captions of the three lines the short speaks

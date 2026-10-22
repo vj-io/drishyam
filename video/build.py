@@ -392,6 +392,17 @@ def data(model=MODEL, reals=REALS):
                       "tiling": src("tiling with the trained segmenter, L2/L1/L0: pixels, recall", [[t["pixels_frac"], t["recall"]] for t in pts(s["policies"]["tiling"])], f, "policies.tiling"),
                       "tiling_wins": src("tiling levels that find as much as the trained segmenter's agent, or more", wins, f, "policies.tiling[].recall >= policies.drishyam[cap 0.3].recall"),
                       "near_dups": src("CODEBRIM photos with a near-duplicate in dacl10k", lk["near_duplicates"], f, "leakage.near_duplicates")}
+        # what the live look policy (v1-policy2, live since 2026-10-22) changes on these photos: its one held-out read beside
+        # v1's, the same baselines (tests/test_report_doc.py p2(), policy2_quotes()); the headline stays v1's read
+        b2 = H["v1-policy2"]; c2 = b2["read"]["codebrim"]["matrix"]; q = H["pairs"][f"codebrim@0.3: v1-policy2 / {name}"]
+        assert b2["model"] == name and b2["sets"] == ["codebrim", "synth", "clean"] and all(b2["dev_rule_on_held_out"]["clauses"].values()), b2["model"]
+        assert all(all(r["baselines_same_as_v1s_run"].values()) for r in b2["read"].values()), "v1-policy2 was read against v1's own baselines"
+        assert c2[f"{name}@0.3"]["critical_per_image"] == row["critical_per_image"], "the board's v1 figure is the one v1-policy2 is compared with"
+        assert b2["configuration"]["crit_floor"] == D["guided"]["held"][2], "the footage's confidence floor is the held-out configuration's"
+        D["model"]["policy2"] = {
+            "crit": src("v1-policy2 (live look policy): critical boxes per photo, CODEBRIM held out", c2["v1-policy2@0.3"]["critical_per_image"], hf, "['v1-policy2'].read.codebrim.matrix['v1-policy2@0.3'].critical_per_image"),
+            "crit_ratio": src("v1-policy2 / v1: critical boxes per photo, paired 95 % CI", q["critical"], hf, f"pairs['codebrim@0.3: v1-policy2 / {name}'].critical"),
+            "recall_ratio": src("v1-policy2 / v1: recall, paired 95 % CI", q["recall"], hf, f"pairs['codebrim@0.3: v1-policy2 / {name}'].recall")}
     else:
         src("trained segmenter", "results pending", f, "absent at build time")
 
@@ -735,7 +746,7 @@ REQS = [   # competition requirement -> where the film covers it (scene ids or n
     ("The live site now runs the trained segmenter v1 on OpenCV 5 DNN ENGINE_NEW, and its Lambda step p95 then and now (video/live/aws-smoke.log)", ["a4", "a5"]),
     ("Principal results: recall vs pixels, with one downscale, the tiling family and chance", ["r1", "r3"]),
     ("Ablations (public/results/ablations.json)", ["r5"]),
-    ("Real photos (CODEBRIM), the headline board: trained v1, held out (results/heldout_models.json), against the classical engine (about 1 in 5, the comparison row), its chance recall and critical boxes; no CODEBRIM image shown", ["r6", "r8"]),
+    ("Real photos (CODEBRIM), the headline board: trained v1, held out (results/heldout_models.json), against the classical engine (about 1 in 5, the comparison row), its chance recall and critical boxes, and what the live look policy v1-policy2 changes (fewer critical boxes, recall unchanged); no CODEBRIM image shown", ["r6", "r8"]),
     ("False alarms on synthetic photos with no damage (public/results/clean/summary.json), the classical engine and v1", ["r7"]),
     ("Two real photos of our own (painted walls, no ground truth): the looks, the findings, what it missed (video/live/real.*, video/live/variants/IMG_2330/real.*)", ["real"]),
     ("Failure cases: failures.json plates and their rules; one CODEBRIM case in words only", ["failures"]),
