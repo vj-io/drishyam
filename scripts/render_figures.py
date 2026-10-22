@@ -32,7 +32,7 @@ def architecture(browser) -> None:
     page_file.parent.mkdir(exist_ok=True)
     page_file.write_text(f"<!doctype html><style>{faces}html,body{{margin:0}}svg{{display:block}}</style>"
                          + (ROOT / "docs/architecture.svg").read_text())
-    pg = browser.new_page(viewport={"width": 1340, "height": 1640}, device_scale_factor=2)
+    pg = browser.new_page(viewport={"width": 1340, "height": 1720}, device_scale_factor=2)
     pg.goto(page_file.as_uri())
     pg.evaluate("document.fonts.ready")
     pg.locator("svg").first.screenshot(path=str(ROOT / "docs/architecture.png"))
