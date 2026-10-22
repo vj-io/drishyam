@@ -50,7 +50,8 @@ adf9474 from `aws-lambda` on `aarch64`, a job on `bridge_03.jpg` ended `awaiting
 the second job after 3 steps, both 403 checks held, and the WAF answered 429 at the 16th empty-bodied job start. The
 step p95 was 1091.9 ms over 6 steps, under the 1500 ms limit, so the governor kept v1 on the 512-px net. The two
 live browser runs right after it failed before their first step: the smoke's WAF loop had rate-limited this
-address, and no job request reached the function; run again 8 minutes later, the suite found the raw class names:
+address, and no job request reached the function. Run again 8 minutes later, the suite found the raw class names
+that c1830c4 fixes. The adf9474 smoke line:
 
 ```
 smoke 2026-10-22T04:49:02Z https://d1xg58guluup8c.cloudfront.net commit=adf94742a77a447d33fa633557ce9a97dfe59bf7 package=7OEG4ckT8LB95g7eWrj1Lv+D77os1Uu2zEgPl023EBg= ttfb_first=1.269052s ttfb_warm=1.226468s step_p95_ms=1091.9 result=pass
