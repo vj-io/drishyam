@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1340 1720" width="1340" height="1720" role="img" aria-labelledby="t d">
 <title id="t">Drishyam system architecture</title>
-<desc id="d">Clients (browser UI, drishyam CLI, MCP client) reach one agent core: the browser through CloudFront with OAC and WAF, a Lambda Function URL and an arm64 Lambda running the FastAPI web tier (deployed; v1, the dacl10k-trained segmenter, runs live since 2026-10-21, with the v1-policy2 look policy since 2026-10-22; live build 6e0a6cd), with the static site in a private S3 bucket behind the same distribution; the CLI and MCP server run it locally. The agent core (policy with the zero-candidate fallback and v1-policy2's confirm looks, governor, planner with allow-list validator, human gate whose decide accepts approve and reject only) drives the OpenCV 5 layer and emits an NDJSON trace and a signed work order. DynamoDB holds the kill flag, Secrets Manager the signing key, CloudWatch the metrics and alarms, X-Ray the traces, AWS Budgets the spend alerts; alarms and budget alerts reach the owner's email through SNS. The CLI's drishyam batch can route photos through Amazon Nova Lite on Bedrock (--router nova, off by default, CLI only) and has an off-by-default --batch-yield rule.</desc>
+<desc id="d">Clients (browser UI, drishyam CLI, MCP client) reach one agent core: the browser through CloudFront with OAC and WAF, a Lambda Function URL and an arm64 Lambda running the FastAPI web tier (deployed; v1, the dacl10k-trained segmenter, runs live since 2026-10-21, with the v1-policy2 look policy since 2026-10-22; live build a2b8688), with the static site in a private S3 bucket behind the same distribution; the CLI and MCP server run it locally. The agent core (policy with the zero-candidate fallback and v1-policy2's confirm looks, governor, planner with allow-list validator, human gate whose decide accepts approve and reject only) drives the OpenCV 5 layer and emits an NDJSON trace and a signed work order. DynamoDB holds the kill flag, Secrets Manager the signing key, CloudWatch the metrics and alarms, X-Ray the traces, AWS Budgets the spend alerts; alarms and budget alerts reach the owner's email through SNS. The CLI's drishyam batch can route photos through Amazon Nova Lite on Bedrock (--router nova, off by default, CLI only) and has an off-by-default --batch-yield rule.</desc>
 <style>
   .bg { fill: #072247; }
   .sheet { fill: #0F3B73; stroke: #E8F1FF; stroke-width: 3; }
@@ -57,7 +57,7 @@
 <path class="cross" d="M1305 1694H1323M1314 1685V1703"/><circle class="cross" cx="1314" cy="1694" r="4.5"/>
 <text x="60" y="74" class="sheet-title" xml:space="preserve">DRISHYAM · SYSTEM ARCHITECTURE</text>
 <text x="1280" y="56" class="fs" text-anchor="end" xml:space="preserve">FIG. A-1 · OpenCV 5 components, AWS services and agent components</text>
-<text x="1280" y="74" class="fs" text-anchor="end" xml:space="preserve">cv2 calls, modules and causes are real names in drishyam/ at v1.1.1 (6e0a6cd)</text>
+<text x="1280" y="74" class="fs" text-anchor="end" xml:space="preserve">cv2 calls, modules and causes are real names in drishyam/ at v1.1.1 (a2b8688)</text>
 <line class="tbl" x1="36" y1="92" x2="1304" y2="92"/>
 <rect class="frame" x="60" y="108" width="460" height="156"/>
 <circle class="n" cx="82" cy="128" r="11"/>
@@ -81,7 +81,7 @@
 <text class="nt" x="82" y="324" text-anchor="middle">2</text>
 <text x="100" y="324" class="fl" xml:space="preserve">ENTRY · AWS PATH</text>
 <rect class="lbg" x="248" y="313" width="522" height="16"/>
-<text x="252.24" y="324" class="fs" xml:space="preserve">v1 live since 2026-10-21 · v1-policy2 since 2026-10-22 · 6e0a6cd smoke-tested</text>
+<text x="252.24" y="324" class="fs" xml:space="preserve">v1 live since 2026-10-21 · v1-policy2 since 2026-10-22 · a2b8688 smoke-tested</text>
 <g class="node" data-box="80 344 440 104">
 <rect class="box" x="80" y="344" width="440" height="104"/>
 <text x="90" y="364" class="h" xml:space="preserve">CLOUDFRONT DISTRIBUTION</text>

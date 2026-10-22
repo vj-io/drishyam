@@ -39,7 +39,7 @@ v1-policy2, the live one ([report, section 8](docs/report.md#v1-policy2-held-out
 boxes: each connected part of a finding's mask, in every look that drew it, that is critical by class and area. That
 is the unit the scorer matches, and one finding has several.
 
-- **v1 runs live since 2026-10-21**, with the v1-policy2 look policy since 2026-10-22 (deployed commit 6e0a6cd, smoke-tested: [docs/aws.md](docs/aws.md)). It was
+- **v1 runs live since 2026-10-21**, with the v1-policy2 look policy since 2026-10-22 (deployed commit a2b8688, smoke-tested: [docs/aws.md](docs/aws.md)). It was
   chosen on the dev splits only ([results/dev/model_choice_dev.json](results/dev/model_choice_dev.json)); held out
   it is again the only model with no measurable loss against any other. These are its second scorings (one earlier,
   unpublished). Its CC BY-NC 4.0 weights are release assets of v1.1.0, not in git.

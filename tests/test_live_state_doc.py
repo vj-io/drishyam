@@ -127,7 +127,7 @@ STALE_CLAIMS = {
     "close or downgrade": "findings.decide accepts approve and reject only",
     "about 24,000": "a person signs critical findings, not boxes; the measured 2,536-photo backlog queued 684",
     "rev 1.1.0": "the figures are REV 1.1.1",
-    "deployed commit adf9474": "the deployed commit is the one docs/aws.md names first (6e0a6cd); adf9474 first deployed v1-policy2",
+    "deployed commit adf9474": "the deployed commit is the one docs/aws.md names first; adf9474 first deployed v1-policy2",
 }
 # A deploy older than the live one is named only in the history that records it (and 03af85b as the model's install
 # commit in models/README.md), never as the current build.

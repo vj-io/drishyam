@@ -29,7 +29,7 @@ v1-policy2, the live one (section 8). The last column counts boxes: each connect
 look that drew it, that is critical by class and area. That is the unit the scorer matches, and one finding has
 several.
 
-- **v1 runs live since 2026-10-21**, with the v1-policy2 look policy since 2026-10-22 (deployed commit 6e0a6cd, smoke-tested: [aws.md](aws.md)). It was chosen on the
+- **v1 runs live since 2026-10-21**, with the v1-policy2 look policy since 2026-10-22 (deployed commit a2b8688, smoke-tested: [aws.md](aws.md)). It was chosen on the
   dev splits only (`results/dev/model_choice_dev.json`); held out it is again the only model with no measurable
   loss against any other. These are its second scorings (one earlier, unpublished). Its CC BY-NC 4.0 weights are
   release assets of v1.1.0, not in git.
@@ -170,13 +170,13 @@ limits and the cost table, is [aws.md](aws.md).
   AppErrors) and X-Ray tracing. The alarms and a 20 USD monthly budget publish to one SNS topic, whose email
   subscription is confirmed: a test alarm (AppErrors set to ALARM by hand) reached the owner's email on 2026-10-21.
   The alarms have no OK action, so a recovery sends no email.
-- **Smoke test** (`scripts/aws.sh smoke` with `WAF_LOOP=1`, `scripts/smoke.sh`): `smoke 2026-10-22T15:17:18Z
-  result=pass`, against the live build, commit 6e0a6cd, the commit `/api/health` reports: a job on `bridge_03.jpg`
+- **Smoke test** (`scripts/aws.sh smoke` with `WAF_LOOP=1`, `scripts/smoke.sh`): `smoke 2026-10-22T17:17:47Z
+  result=pass`, against the live build, commit a2b8688, the commit `/api/health` reports: a job on `bridge_03.jpg`
   ended `awaiting_review` after 6 steps; KILL, sent after step 2 streamed, halted the second job after 3 steps; a
-  `POST` without the body hash and a direct Function URL call both got 403; the WAF answered 429 at the 13th
-  empty-bodied job start (WAF evaluates rates about every 10 s, so it blocks late); and the step p95 was 644.1 ms over
-  6 steps, under v1's 1500 ms limit. The live browser suite (`tests/e2e/test_ui_live.py`) passed twice against this
-  deploy. With v1 a step's p95 was 0.52 to 1.14 s over the eleven v1 smoke runs to f12f50f, and every later run
+  `POST` without the body hash and a direct Function URL call both got 403; the WAF answered 429 at the 15th
+  empty-bodied job start (WAF evaluates rates about every 10 s, so it blocks late); and the step p95 was 994.9 ms over
+  6 steps, under v1's 1500 ms limit. The live browser suite (`tests/e2e/test_ui_live.py`) passed three of the four
+  times it ran against this deploy: once its guided run took 40.8 s, over the suite's 40 s limit ([aws.md](aws.md)). With v1 a step's p95 was 0.52 to 1.14 s over the eleven v1 smoke runs to f12f50f, and every later run
   [aws.md](aws.md) quotes falls in that range, against 67.7 to 88.0 ms for the classical engine before it.
 - **Cost.** Spent so far: 0.62 USD before credits, month to date on 2026-10-21 (Cost Explorer; 0.59 of it the WAF),
   0.00 USD after them. The list-price estimate is about 10 USD a month at 1,000 jobs a month, 8 of it the WAF ([aws.md](aws.md)). The $ shown
@@ -672,7 +672,7 @@ score, overlapping critical findings of one class merged, and the zero-candidate
 were committed before any of them ran ([results/dev/policy2_sweep.json](../results/dev/policy2_sweep.json), commit
 54b5601); two passed every clause, and the one that found more critical-class boxes became v1's default in the code
 (`drishyam.agent.POLICY2`), and the live site runs it since 2026-10-22 (first deployed from commit adf9474; the live
-build is 6e0a6cd, [aws.md](aws.md)). It was then scored **once** on
+build is a2b8688, [aws.md](aws.md)). It was then scored **once** on
 the held-out sets with v1's recipe and cost table (`runs/heldout/run_policy2.sh`, at commit 44d891d; the leakage
 check first, the same counts). This is v1's third read of CODEBRIM eval200 and synth200 and its second of the clean
 set; a held-out run of v1 with the fallback alone was started and stopped, and its output was never read or used.
@@ -838,7 +838,7 @@ Failure drills, each runnable from the UI (`chaos` toggles) and covered by tests
 | --- | --- |
 | 20 planner timeouts + 20 malformed planner replies | 40 / 40 recovered by the rule planner (`test_20_timeouts_and_20_malformed_all_recover`) |
 | Forced p95 spike on the segmenter | the next step's cause is `p95>SLA` and its model is `fast` (`test_forced_p95_spike_changes_next_steps_model`) |
-| KILL during a live job | kill sent during step 3 → step 4 halted with cause `kill-switch` (`test_kill_endpoint_halts_a_running_job`, the live e2e run; on the deployed site, check 3 of `scripts/smoke.sh`, sent once step 2 has streamed: halted after 3 steps in the 6e0a6cd smoke run, section 5) |
+| KILL during a live job | kill sent during step 3 → step 4 halted with cause `kill-switch` (`test_kill_endpoint_halts_a_running_job`, the live e2e run; on the deployed site, check 3 of `scripts/smoke.sh`, sent once step 2 has streamed: halted after 3 steps in the a2b8688 smoke run, section 5) |
 | $ and pixel caps | the job halts inside one step with coverage and unvisited regions reported (`test_pixel_cap_is_never_exceeded`, `test_seconds_and_usd_caps_halt`) |
 | Agent tries to approve its own critical finding | `ForbiddenTransition` (`test_agent_cannot_decide_or_downgrade`) |
 
