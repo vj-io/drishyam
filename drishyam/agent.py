@@ -196,6 +196,11 @@ class JobConfig:
     crit_floor: float | None = None  # policy2: a mask that would make a new critical finding, under this confidence, is held
     crit_confirm: str | None = None  # policy2: a held mask's confirm look: "shift" (its level, recentred), "finer" or "off"
     merge_critical: bool | None = None  # policy2: a critical mask mostly inside a critical finding of its class joins it
+    # batch-yield: the patch-leaving rule (Charnov's marginal value theorem, 1976). `drishyam batch --batch-yield` sets
+    # batch-yield: it under budget pressure to the next queued photo's first-look value (batch.run_batch); once this
+    # batch-yield: photo has had a look, a best-score look whose ev (`_score`) is below it halts the job, cause batch-yield.
+    # batch-yield: Forced looks (survey, follow-ups, confirm, fallback, replay) are never cut. 0: off, the agent as before.
+    next_ev: float = 0.0  # batch-yield
 
 
 @dataclass
@@ -669,7 +674,7 @@ class Job:
                 if not scored:
                     halt_cause, halt_why = "exhausted", "every candidate has been looked at"
                     break
-                (best, _, a, sev, u), r = scored[0]
+                (best, ev, a, sev, u), r = scored[0]
                 # lambda: eps x the value found per ms so far, but never below eps x v0 per look (the floor), so a
                 # photo with nothing to find can still stop on the rule rather than spend its whole budget. The floor
                 # holds only once, for EVERY candidate still worth a look (unseen > 0), a look at least as fine as its
@@ -685,6 +690,10 @@ class Job:
                     term = "floor: eps x v0 / t_hat" if lam_floor >= lam_found else "eps x value/cost"
                     halt_why = f"best score {best:.2e} < lambda {lam:.2e} ({term})"
                     break
+                if cfg.next_ev > 0 and self.gaze_path and ev < cfg.next_ev:  # batch-yield
+                    halt_cause, halt_why = "batch-yield", (f"best look's value {ev:.4g} < next_ev {cfg.next_ev:.4g} "  # batch-yield
+                                                           "(the next photo's first look's value)")  # batch-yield
+                    break  # batch-yield
                 pick, cause = "argmax", "best-score"
                 if cfg.order == "random":  # ablation: any unseen candidate; the stop rule still reads the best score
                     (best, _, a, sev, u), r = rng.choice(scored)
@@ -863,6 +872,8 @@ class Job:
                 "usd_used": round(self.budget.usd_used, 6), "seconds_used": round(self.budget.seconds_used, 3),
                 "injected": injected,
             }
+            if cause == "best-score":  # batch-yield: the look's ev, the value next_ev is compared with
+                rec["value"] = ev  # batch-yield
             if confirmed:  # cascade
                 rec |= {"confirm": confirmed,  # cascade
                         "latency_ms": round(warp_ms + seg_ms + confirmed.get("latency_ms", 0.0), 1)}  # cascade
@@ -889,6 +900,7 @@ class Job:
 
         self.budget.seconds_used = clock() - t_start
         halted = halt_cause in ("cap-hit", "kill-switch")
+        halted = halted or halt_cause == "batch-yield"  # batch-yield: the photo is left unfinished, never clean
         rec = {"type": "step", "job": self.id, "step": self.step, "t": now_iso(), "region": None,
                "decision": {"action": "halt", "args": {}}, "rationale": halt_why, "cause": halt_cause,
                "planner": "rule", "model": self.settings.model, "profile": cfg.profile,

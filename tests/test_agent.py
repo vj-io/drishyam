@@ -982,7 +982,8 @@ def test_the_classical_profile_is_the_agent_every_classical_number_ran_with(scen
     absorption on), so no classical result moves (results/dev/onnx_profile_sweep.json: the byte-for-byte rerun).
     tau_scout, fill and survey_value stay off: measured, not adopted (results/dev/tune_sweep.json). fallback_l2 is on
     for every profile since its dev run (results/dev/zero_candidate_fallback.json, measured on v1); the classical numbers
-    ran before it, with it off, and it changes only a photo with no candidate. v1-policy2's knobs are off for it."""
+    ran before it, with it off, and it changes only a photo with no candidate. v1-policy2's knobs are off for it, and
+    batch-yield's next_ev is 0 (off) for every profile."""
     from dataclasses import asdict
 
     from drishyam.agent import PROFILES
@@ -999,7 +1000,8 @@ def test_the_classical_profile_is_the_agent_every_classical_number_ran_with(scen
         "seed_from_looks": True, "v0": 2.0, "survey": True, "verify": True, "absorb": True, "order": "score", "seed": 0,
         "governor": True, "fill": False, "survey_value": True,
         "t_hat_ms": None, "fallback_l2": True, "tau_confirm_lo": 0.35, "tau_confirm_hi": 0.65,
-        "grid": False, "crit_weight": 1.0, "crit_floor": 0.0, "crit_confirm": "off", "merge_critical": False}
+        "grid": False, "crit_weight": 1.0, "crit_floor": 0.0, "crit_confirm": "off", "merge_critical": False,
+        "next_ev": 0.0}
 
 
 def test_a_job_takes_its_segmenters_profile_by_name_and_a_knob_set_explicitly_wins(scene, monkeypatch):
@@ -1768,3 +1770,129 @@ def test_with_policy2_off_every_event_is_the_agents_before_policy2(name, monkeyp
                                                        segmenter=seg).run())), sort_keys=True)
                for mod, kw in ((agent, P2_OFF), (off, {}))]
     assert streams[0] == streams[1]
+
+
+# ---- batch-yield (JobConfig.next_ev): the patch-leaving rule `drishyam batch --batch-yield` sets under pressure -----
+def without_batch_yield(monkeypatch):
+    """drishyam.agent without its lines marked `# batch-yield`: the agent before the rule."""
+    import re
+    import sys
+    import types
+
+    from drishyam import agent
+
+    src = Path(agent.__file__).read_text()
+    kept = "".join(ln for ln in src.splitlines(keepends=True) if not re.search(r"#\s*batch-yield\b", ln))
+    assert kept != src
+    mod = types.ModuleType("drishyam._agent_without_batch_yield")
+    mod.__package__ = "drishyam"
+    monkeypatch.setitem(sys.modules, mod.__name__, mod)
+    exec(compile(kept, "drishyam/agent.py without batch-yield", "exec"), mod.__dict__)  # noqa: S102 -- our own source
+    assert "next_ev" in agent.JobConfig.__dataclass_fields__ and "next_ev" not in mod.JobConfig.__dataclass_fields__
+    return mod
+
+
+def without_value(events):
+    """The stream with the `value` field taken off the step records, once it is checked to be on exactly the
+    best-score ones (the only trace change next_ev 0 makes)."""
+    out = []
+    for e in events:
+        if e["type"] == "step":
+            assert ("value" in e) == (e["cause"] == "best-score"), (e["cause"], sorted(e))
+            e = {k: v for k, v in e.items() if k != "value"}
+        out.append(e)
+    return out
+
+
+@pytest.mark.parametrize("name", [*(p.stem for p in SAMPLE_PHOTOS), "blots@v1", "spots@v1", "soft_disc@v1"])
+def test_with_next_ev_0_every_event_is_the_agents_before_batch_yield_but_the_value_field(name, monkeypatch):
+    """Every bundled sample on the classical engine, and three synthetic photos under v1's profile (policy2 on): at
+    next_ev 0, the default, the whole event stream equals the agent's with batch-yield's lines removed, apart from the
+    `value` field on best-score steps."""
+    import json
+
+    from drishyam import agent
+
+    off = without_batch_yield(monkeypatch)
+    paths = {p.stem: p for p in SAMPLE_PHOTOS}
+    img = (cv2.imread(str(paths[name])) if name in paths else
+           {"blots": blots, "spots": spots, "soft_disc": soft_disc}[name.split("@")[0]](3000, 2250))
+    seg = (Unsure if name.startswith("blots") else Sure)(ONNX) if name.endswith("@v1") else None
+    ours, before = (list(mod.Job(img, mod.JobConfig(), clock=FakeClock(), job_id="j_test", segmenter=seg).run())
+                    for mod in (agent, off))
+    assert any(s["cause"] == "best-score" for s in steps(ours)) or not ours[1]["candidates"]
+    assert (json.dumps(_no_wall_clock(without_value(ours)), sort_keys=True)
+            == json.dumps(_no_wall_clock(before), sort_keys=True))
+
+
+def yield_job(img, seg=None, **cfg):
+    job = Job(img, JobConfig(thumbs=False, **cfg), clock=FakeClock(), job_id="j_test", segmenter=seg)
+    return job, list(job.run())
+
+
+def test_a_next_ev_above_every_prior_halts_after_one_look_and_lists_what_it_skipped():
+    """next_ev 100 is above any look's value (a prior is at most 1). The first look still runs (no look yet), then the
+    next best-score look is worth less: the job halts, cause batch-yield, its rationale giving both values, and every
+    candidate it did not look at is not assessed, so nothing it skipped reads as clean."""
+    import re
+
+    img = spots(4608, 3456)
+    full = looks_of(yield_job(img, Sure(ONNX), survey=False, verify=False)[1])
+    _, events = yield_job(img, Sure(ONNX), survey=False, verify=False, next_ev=100.0)
+    looks, done = looks_of(events), events[-1]
+    (halt,) = [s for s in steps(events) if s["decision"]["action"] == "halt"]
+    assert [s["cause"] for s in looks] == ["best-score"] and _no_wall_clock(looks) == _no_wall_clock(full[:1])
+    assert (done["status"], done["cause"], halt["cause"]) == ("halted", "batch-yield", "batch-yield")
+    value, nev = map(float, re.fullmatch(r"best look's value (\S+) < next_ev (\S+) \(the next photo's first look's "
+                                         r"value\)", halt["rationale"]).groups())
+    assert nev == 100.0 and value == pytest.approx(full[1]["value"], rel=1e-3) and full[1]["cause"] == "best-score"
+    na = [a for a in done["work_order"]["not_assessed"] if "region" in a]
+    assert len(na) >= 4 and sorted(a["region"] for a in na) == sorted(done["unvisited"])
+    assert all(a["reason"] == "not looked at: batch-yield halted the job first" and a["action"] == "check-by-eye"
+               for a in na)
+    assert done["work_order"]["status"] == "incomplete"
+
+
+@pytest.mark.parametrize("case", ["scene", "scene-no-survey", "blots@v1"])
+def test_batch_yield_never_cuts_a_forced_look(scene, case):
+    """At next_ev 100 every look the full job takes before its second best-score choice still runs: the survey and
+    the rules' follow-ups after it (verify-new-mask, entropy>tau, v1-policy2's confirm-critical; each case has at
+    least one), and the halt comes only where the argmax would have chosen."""
+    img, seg, kw = {"scene": (scene, None, {}), "scene-no-survey": (scene, None, {"survey": False}),
+                    "blots@v1": (blots(4608, 3456), Unsure(ONNX), {"survey": False})}[case]
+    full, cut = (looks_of(yield_job(img, seg, next_ev=v, **kw)[1]) for v in (0.0, 100.0))
+    m = next(i for i, s in enumerate(full) if i and s["cause"] == "best-score")
+    assert m >= 2 and all(s["cause"] != "best-score" for s in cut[1:])
+    assert _no_wall_clock(cut) == _no_wall_clock(full[:m])
+
+
+def test_batch_yield_halts_only_on_a_best_score_look_strictly_below_next_ev():
+    """next_ev equal to the least value of any best-score look after the first: no look is below it, so the job runs
+    as at next_ev 0 to its own end; the next float above it halts exactly at that look."""
+    img = spots(4608, 3456)
+    full = looks_of(yield_job(img, Sure(ONNX), survey=False, verify=False)[1])
+    vals = [s["value"] for s in full[1:] if s["cause"] == "best-score"]
+    low = min(vals)
+    at = next(i for i, s in enumerate(full) if i and s.get("value") == low)
+    assert 1 < at and vals.count(low) == 1
+    _, same = yield_job(img, Sure(ONNX), survey=False, verify=False, next_ev=low)
+    assert _no_wall_clock(looks_of(same)) == _no_wall_clock(full) and same[-1]["cause"] == "exhausted"
+    _, cut = yield_job(img, Sure(ONNX), survey=False, verify=False, next_ev=float(np.nextafter(low, 1.0)))
+    assert _no_wall_clock(looks_of(cut)) == _no_wall_clock(full[:at]) and cut[-1]["cause"] == "batch-yield"
+
+
+def test_the_next_photos_first_look_is_worth_its_triage_prior_max_under_v1_grid():
+    """next_ev is the next photo's triage prior_max: its first look's value with severity 1, entropy 0 and unseen 1.
+    Under v1-policy2 the regions are grid tiles whose prior is their best candidate's, so the best tile's prior is
+    still the photo's best candidate prior, and with nothing seen yet (no survey) the first look is worth exactly that.
+    (With the survey, which v1 runs, the first best-score look's value also carries what the survey seeded.)"""
+    from drishyam import batch
+
+    img = spots(4608, 3456)
+    tri = batch.triage(img, JobConfig(thumbs=False),
+                       lambda im, cfg, **kw: Job(im, cfg, clock=FakeClock(), segmenter=Sure(ONNX), **kw))
+    job, events = yield_job(img, Sure(ONNX), survey=False)
+    grid = [r for r in job.regions.values() if r.box is not None]
+    assert job.cfg.grid and grid and all(r.id.startswith("g") for r in grid) and len(grid) < tri["candidates"]
+    assert max(r.prior for r in grid) == tri["prior_max"] > 0
+    assert looks_of(events)[0]["cause"] == "best-score" and looks_of(events)[0]["value"] == tri["prior_max"]
