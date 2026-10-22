@@ -16,7 +16,7 @@ app itself never sends 429.
 ## `GET /api/health`
 
 ```json
-{"ok": true, "version": "1.1.0", "opencv": "5.0.0", "build": "stock (not COOL)", "segmenter": "classical-v1",
+{"ok": true, "version": "1.1.1", "opencv": "5.0.0", "build": "stock (not COOL)", "segmenter": "classical-v1",
  "segmenter_licence": "MIT (no learned weights)", "max_upload_bytes": 4400000, "max_pixels": 25000000,
  "host": "local", "arch": "x86_64", "commit": null,
  "cv2_build": {"hal": "YES (ipp (ver 0.0.1))", "cpu_baseline": "SSE SSE2 SSE3 SSSE3 SSE4_1",

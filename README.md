@@ -1,6 +1,6 @@
 # Drishyam
 
-**[Watch the 4-minute film](https://github.com/vj-io/drishyam/releases/download/v1.1.0/drishyam.mp4)** (also on
+**[Watch the 4-minute film](https://github.com/vj-io/drishyam/releases/download/v1.1.1/drishyam.mp4)** (also on
 the live site) · **[Try the live demo](https://d1xg58guluup8c.cloudfront.net)**
 
 Drishyam is an inspection agent for bridge photos, for inspectors with a backlog of large photos to check. On each
