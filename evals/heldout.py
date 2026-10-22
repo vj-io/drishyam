@@ -13,6 +13,7 @@ Nothing is tuned here.
 from __future__ import annotations
 
 import argparse
+import collections
 import hashlib
 import itertools
 import json
@@ -21,7 +22,9 @@ from pathlib import Path
 
 import numpy as np
 
-from evals import dev_sweep, harness
+from drishyam.agent import POLICY2, POLICY2_OFF
+from drishyam.findings import is_critical
+from evals import dev_sweep, harness, policy2
 
 REPO = harness.REPO
 RUNS = REPO / "runs" / "model-eval"
@@ -49,6 +52,25 @@ PRIOR = ("v1 had been scored on two of these sets before, once each, on 2026-10-
          "earlier jobs were the install's smoke jobs on three of the demo's bridge photos (the main checkout's "
          "runs/model-smoke/), and no run folder under runs/ or a worktree names it.")
 NAMES = {"codebrim": "CODEBRIM eval200", "synth": "synth200", "large": "synth_large, 4608×3456", "clean": "clean"}
+# A configuration of one model, scored beside it after its own dev rule: run folder prefix, run script tag, model.
+CONFIGS = {"v1-policy2": ("onnx-p2", "dacl10k+policy2", "v1")}
+ALL = {}  # every model, each followed by its configurations: (run folder prefix, run script tag, model)
+for _m, (_p, _t) in MODELS.items():
+    ALL |= {_m: (_p, _t, _m), **{c: v for c, v in CONFIGS.items() if v[2] == _m}}
+POLICY2_COMMAND = ("runs/heldout/run_policy2.sh (v1-policy2, later, after its dev rule chose it): the leakage check, then "
+                   "python -m evals.harness --cost-model fixed --workers 6 --micro-arm local-macos-x86-dacl10k-retime with "
+                   "DRISHYAM_ONNX set on data/codebrim (--n 200) and data/synth200 (--n 200), as evals.model_eval runs them "
+                   "but without --publish, and on data/synth_clean (--n 51 --seed 11 --chaos 0,0,0), with v1's profile "
+                   "taking agent.POLICY2 (its default since the dev choice) and the zero-candidate fallback on")
+PRIOR_POLICY2 = ("v1-policy2 is v1 with the configuration results/dev/policy2_sweep.json chose on the dev splits (g_s60: "
+                 "first looks on the tiling grid, a confirm look at the same level for a critical mask under confidence 0.6, "
+                 "which otherwise goes to a person as needs-a-look, critical classes weighted x2 in the look score, "
+                 "overlapping critical findings of one class merged) and the zero-candidate fallback on. It is v1's third "
+                 "read of CODEBRIM eval200 and synth200 and its second of the clean set: v1 was scored on CODEBRIM eval200 "
+                 "and synth200 on 2026-10-18 (unpublished, see prior_exposure) and on all three in its published run here. "
+                 "A held-out run of v1 with the fallback alone was started on 2026-10-21 in another worktree and stopped; "
+                 "its output was never read or used. This configuration was chosen on dev after those reads, by a rule "
+                 "stated before its dev run, and nothing was changed after this read.")
 r4 = lambda x: round(float(x), 4) if isinstance(x, (float, np.floating)) else x
 
 
@@ -146,6 +168,84 @@ def verdicts(pairs: dict) -> dict:
     return out
 
 
+def verdicts_vs(pairs: dict, c: str, b: str) -> dict:
+    """Configuration c against its model b at the 30 % cap, by the same standard: recall better / same / worse on
+    CODEBRIM eval200 and synth200, a clean harm, and (outside the criterion) critical boxes and ms ratios."""
+    out = {}
+    for s in ("codebrim", "synth"):
+        if p := pairs.get(f"{s}@0.3: {c} / {b}"):
+            out[s] = ("worse", "same", "better")[1 + side(p["recall"][1], 1)]
+            out[f"{s}_critical"], out[f"{s}_ms"] = p["critical"], p["ms"]
+    if p := pairs.get(f"clean@0.3: {c} / {b}"):
+        out["clean_harm"] = any(side(p[f][1], 0) > 0 for f in ("boxes_per_photo_diff", "any_box_share_diff"))
+    return out
+
+
+BASELINES = ("downscale", "tiling@L2", "tiling@L1", "tiling@L0")
+MATRIX_CAPS = ("0.3", "0.1")  # the cap the rule read, and about L2 tiling's pixels on CODEBRIM
+
+
+def _gate(c: dict) -> dict:
+    """A Drishyam job's two tiers in v1-policy2's terms. v1's runs predate them: nothing was held (its shown boxes are its
+    drafted ones) and sign-offs were not recorded, so both sides count critical findings by each finding's final measure
+    (`signoffs`, a slight undercount: a finding made critical by a coarser look is missed) and v1-policy2's exact count
+    is kept beside it (`signoffs_exact`)."""
+    approx = sum(is_critical(f["cls"], f["area"]) for f in c["preds_union"])
+    return {**c, "preds_look": c.get("preds_look", []), "preds_all": c.get("preds_all", c["preds"]),
+            "needs_look": c.get("needs_look", 0), "signoffs": approx, "signoffs_exact": c.get("signoffs"), "reviews": 0}
+
+
+def policy2_read(p2: list[dict], v1: list[dict], records: list[dict]) -> dict:
+    """v1-policy2 against v1 on one held-out set, both at the matrix caps, with the baselines of v1-policy2's own run
+    (checked against v1's run of them): rows by evals.dev_sweep.row (v1-policy2 paired with v1 at its cap) on every
+    photo and on the hard subset (evals.policy2), and the compute-savings vs accuracy matrix: pixels and modelled ms
+    against recall of what a person is shown and drafted critical-class recall, each policy against L2 tiling, L1
+    tiling, the downscale and v1, with paired 95 % bootstrap CIs."""
+    same = {k: all(a["configs"][k]["preds"] == b["configs"][k]["preds"] and a["configs"][k]["wall_s"] == b["configs"][k]["wall_s"]
+                   for a, b in zip(p2, v1, strict=True)) for k in BASELINES}
+    merged = [{**a, "configs": {**{k: a["configs"][k] for k in BASELINES},
+                                **{f"{m}@{cap}": _gate(x["configs"][f"drishyam@{cap}"]) for cap in MATRIX_CAPS
+                                   for m, x in (("v1", b), ("v1-policy2", a))}}} for a, b in zip(p2, v1, strict=True)]
+    keys, n = list(merged[0]["configs"]), len(records)
+    scored = {k: harness.score_config(k, records, merged, "preds") for k in keys}
+    shown = {k: harness.score_config(k, records, merged, "preds" if k in BASELINES else "preds_all") for k in keys}
+    ref = lambda k: f"v1@{k.rpartition('@')[2]}" if k.startswith("v1-policy2@") else None
+    rows = {k: {a: r4(b) for a, b in dev_sweep.row(k, records, merged, scored, ref(k)).items() if a != "per_image"}
+            for k in keys}
+    matrix = {}
+    for k in keys:
+        x = rows[k]
+        m = {"pixels_frac": x["pixels_frac"], "ms_per_job": x["ms_per_job"], "recall_shown": r4(shown[k]["recall"]),
+             "recall_shown_ci": harness.boot_ci(harness.recall_of(shown[k]), n),
+             **{f: x.get(f) for f in ("crit_recall", "crit_recall_ci", "critical_per_image", "signoffs_per_image",
+                                      "needs_look_per_image", "look_per_image")}}
+        exact = [r["configs"][k].get("signoffs_exact") for r in merged]
+        if k not in BASELINES and None not in exact:
+            m["signoffs_exact_per_image"] = r4(sum(exact) / n)
+        for b in ("tiling@L2", "tiling@L1", "downscale", f"v1@{k.rpartition('@')[2]}"):
+            if b in scored and b != k and shown[b]["recall"]:
+                cv, cci = policy2.ratio_of(policy2.crit_cols(scored[k], records), policy2.crit_cols(scored[b], records), n)
+                m[f"vs {b}"] = {"recall_shown": [r4(shown[k]["recall"] / shown[b]["recall"]), harness.ratio_ci(shown[k], shown[b], n)],
+                                "crit_recall": [r4(cv) if cv is not None else None, cci],
+                                "pixels": r4(x["pixels_frac"] / rows[b]["pixels_frac"]),
+                                "ms": r4(x["ms_per_job"] / rows[b]["ms_per_job"])}
+        matrix[k] = m
+    keep = [i for i, rec in enumerate(records) if policy2.hard_reasons(rec)]
+    hard = {"photos": len(keep), "of": n, "indices": keep,
+            "reasons": dict(collections.Counter(why for i in keep for why in policy2.hard_reasons(records[i]))),
+            "small_critical_boxes": sum(len(policy2.small_critical(records[i])) for i in keep),
+            "rows": {k: {a: r4(b) for a, b in v.items()} for k, v in policy2.subset_rows(records, merged, keep, keys, "v1").items()}
+            if keep else {}}
+    looks = {k: dict(collections.Counter(f"{t['action']}:{t['cause']}" for r in merged for t in r["configs"][k]["trace"]
+                                         if t["action"] != "halt")) for k in keys if "trace" in merged[0]["configs"][k]}
+    share = lambda c, pick: r4(sum(v for a, v in c.items() if pick(a)) / max(1, sum(c.values())))
+    rates = {k: {"escalation_rate": share(c, lambda a: a.startswith("escalate:")),
+                 "verify_rate": share(c, lambda a: a.startswith("verify:")),
+                 "confirm_rate": share(c, lambda a: a == "verify:confirm-critical")} for k, c in looks.items()}
+    return {"baselines_same_as_v1s_run": same, "rows": rows, "matrix": matrix, "hard": hard, "looks_by_action_cause": looks,
+            "rates": rates}
+
+
 def markdown(out: dict) -> str:
     """The held-out tables docs/report.md quotes at the 30 % cap (tests/test_evals.py checks the report holds them)."""
     ci = lambda c: "–" if c is None or None in c else f"{c[0]:.2f}–{c[1]:.2f}"
@@ -181,38 +281,50 @@ def main(argv=None) -> dict:
     dev = json.loads((REPO / "results" / "dev" / "model_choice_dev.json").read_text())
     log = (REPO / "runs" / "heldout" / "log.txt").read_text()
     starts = dict(re.findall(r"^\S+ (\S+) start \| .* \| HEAD (\w+)", log, re.MULTILINE))  # the last start of each call wins
-    table, pairs, datasets, runs = {}, {}, {}, {}
+    table, pairs, datasets, runs, acted = {}, {}, {}, {}, {}
     for s, (path, n, seed) in SETS.items():
         records, _ = harness.load_records(REPO / path, n, seed=seed)
         data_id = harness.dataset_sha256(records)
         datasets[s] = {"n": len(records), **data_id}
-        got = {m: r for m, (prefix, _) in MODELS.items() if (r := load(prefix, s, records, data_id))}
+        got = {m: r for m, (prefix, _, _) in ALL.items() if (r := load(prefix, s, records, data_id))}
         for m, r in got.items():
-            cost = dev["models"][m]["cost_table"]["file"]
-            if not r["summary"]["cost_model"]["source"].startswith(cost + " ") or r["segmenter"] != dev["models"][m]["segmenter"]:
+            dm = dev["models"][ALL[m][2]]  # a configuration is charged and checked as its model
+            cost = dm["cost_table"]["file"]
+            if not r["summary"]["cost_model"]["source"].startswith(cost + " ") or r["segmenter"] != dm["segmenter"]:
                 raise SystemExit(f"{m} on {s}: scored {r['segmenter']} on {r['summary']['cost_model']['source']}, not "
-                                 f"{dev['models'][m]['segmenter']} on {cost}")
+                                 f"{dm['segmenter']} on {cost}")
             profiles = {x["configs"][k]["profile"] for x in r["results"] for k in CAPS}
-            if profiles != {dev["models"][m]["profile"]}:
-                raise SystemExit(f"{m} on {s} ran profiles {profiles}, not {dev['models'][m]['profile']}")
+            if profiles != {dm["profile"]}:
+                raise SystemExit(f"{m} on {s} ran profiles {profiles}, not {dm['profile']}")
+            fallback = {x["configs"][k]["switches"].get("fallback_l2", False) for x in r["results"] for k in CAPS}
+            if fallback != {m in CONFIGS}:  # runs from before the switch existed ran without the fallback
+                raise SystemExit(f"{m} on {s} ran fallback_l2 {fallback}")
+            knobs = {tuple(x["configs"][k]["switches"].get(n, v) for n, v in POLICY2_OFF.items()) for x in r["results"] for k in CAPS}
+            if knobs != {tuple({**POLICY2_OFF, **(POLICY2[dm["profile"]] if m in CONFIGS else {})}.values())}:
+                raise SystemExit(f"{m} on {s} ran v1-policy2's knobs {knobs}")  # the models ran before the knobs existed
             prov = r["summary"]["provenance"]
-            runs[f"{m} {s}"] = {"folder": f"runs/model-eval/{MODELS[m][0]}-{s}", "code_commit": starts.get(MODELS[m][1]),
+            runs[f"{m} {s}"] = {"folder": f"runs/model-eval/{ALL[m][0]}-{s}", "code_commit": starts.get(ALL[m][1]),
                                 "finished": prov["timestamp"],  # the harness takes its provenance at the end of a run
                                 **{k: prov.get(k) for k in ("load_avg_start", "load_avg_end", "machine")}}
         scored = {m: {k: harness.score_config(k, records, r["results"]) for k in KEYS} for m, r in got.items()}
         x = {m: {k: per_image(records, r["results"], k) for k in CAPS} for m, r in got.items()}
+        for c in (c for c in got if c in CONFIGS):
+            acted[f"{c} {s}"] = policy2_read(got[c]["results"], got[ALL[c][2]]["results"], records)
         for k in CAPS:
             table[f"{s}@{k[9:]}"] = {m: row(k, records, r["results"], scored[m]) for m, r in got.items()}
-            for ma, mb in itertools.combinations(got, 2):
+            for ma, mb in itertools.combinations([m for m in got if m in MODELS], 2):
                 pairs[f"{s}@{k[9:]}: {ma} / {mb}"] = compare(scored[ma][k], scored[mb][k], x[ma][k], x[mb][k], len(records))
+            for c, b in ((c, ALL[c][2]) for c in got if c in CONFIGS):
+                pairs[f"{s}@{k[9:]}: {c} / {b}"] = compare(scored[c][k], scored[b][k], x[c][k], x[b][k], len(records))
         for base in ("downscale", "tiling@L0"):
             table[f"{s}:{base}"] = {m: row(base, records, r["results"], scored[m]) for m, r in got.items()}
     pub = {p.parent.name: json.loads(p.read_text()) for p in sorted((REPO / "public" / "results").glob("*_dacl10k*/summary.json"))}
     leaks = {json.dumps(v["leakage"], sort_keys=True) for v in pub.values() if "leakage" in v}
     if len(leaks) > 1:
         raise SystemExit("the published CODEBRIM summaries carry different leakage counts")
-    crit, other = losses({k: v for k, v in pairs.items() if k.split("@")[0] in DEV_SETS})
-    large_crit, large_other = losses({k: v for k, v in pairs.items() if k.startswith("large")})
+    models_only = {k: v for k, v in pairs.items() if not any(f" {c} / " in k for c in CONFIGS)}
+    crit, other = losses({k: v for k, v in models_only.items() if k.split("@")[0] in DEV_SETS})
+    large_crit, large_other = losses({k: v for k, v in models_only.items() if k.startswith("large")})
     ver = verdicts(pairs)
     best = [m for m in MODELS if all(v["clean_harm"] is False and "worse" not in (v["codebrim"], v["synth"])
                                      and "better" in (v["codebrim"], v["synth"]) for k, v in ver.items() if k.startswith(m + " vs"))
@@ -252,6 +364,31 @@ def main(argv=None) -> dict:
         "prior_exposure": PRIOR, "leakage": json.loads(leaks.pop()) if leaks else None, "published": sorted(f"public/results/{k}/summary.json" for k in pub),
         "table": table, "pairs": pairs,
     }
+    for c, (_, tag, b) in CONFIGS.items():  # only once its runs exist, so the file without them is as it was
+        if done := [s for s in SETS if f"{c} {s}" in runs]:
+            out["what"] += (f" {c}, v1 with the configuration its dev rule chose, was scored once more, later, beside v1 "
+                            f"(whose runs were not repeated): see the {c} block.")
+            out["commands"] = [*COMMANDS, POLICY2_COMMAND]
+            leak = json.loads((REPO / "runs" / "heldout" / f"leakage-{tag}.json").read_text())
+            if out["leakage"] and {k: leak[k] for k in out["leakage"] if k != "calibration"} != {
+                    k: v for k, v in out["leakage"].items() if k != "calibration"}:
+                raise SystemExit(f"{c}'s leakage check counts differ from the published ones")
+            out[c] = {"model": b, "sets": done, "prior_exposure": PRIOR_POLICY2,
+                      "configuration": POLICY2[out["models"][b]["profile"]],
+                      "dev_rule": "results/dev/policy2_sweep.json (rule stated in 54b5601, before its dev run)",
+                      "verdict_vs_v1": verdicts_vs(pairs, c, b), "read": {s: acted[f"{c} {s}"] for s in done},
+                      "leakage": f"the check ran again before this run (runs/heldout/leakage-{tag}.json): the same counts "
+                                 "as the published leakage block"}
+            if {"codebrim", "synth", "clean"} <= set(done):  # the dev rule's clauses as written, read on the counterparts
+                rd = out[c]["read"]
+                out[c]["dev_rule_on_held_out"] = {
+                    "clauses": policy2.clauses({"synth_dev": rd["synth"]["rows"], "real": rd["codebrim"]["rows"],
+                                                "clean": rd["clean"]["rows"]}, c),
+                    "note": ("results/dev/policy2_sweep.json's clauses (evals.policy2.clauses, unchanged) on the held-out "
+                             "counterparts of its splits (synth200 for synth_dev, CODEBRIM eval200 for dev100, the clean set "
+                             "for the clean dev split), against v1 at the 30 % cap. Reported, not a decision: the "
+                             "configuration was adopted on dev. Sign-offs here count critical findings by each finding's "
+                             "final measure on both sides (v1's runs did not record them).")}
     Path(REPO / a.out).write_text(json.dumps(out, indent=1, ensure_ascii=False) + "\n")
     print(markdown(out), statement, sep="\n\n")
     return out

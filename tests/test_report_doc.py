@@ -148,7 +148,8 @@ def classical_quotes() -> list:
             f"the stop rule ends {halts('synth', '1.0')['stop-rule']} of 200 synthetic jobs"]
 
 
-GLANCE = (("v1", "**v1 (live)**"), ("v2a", "v2a"), ("v2b", "v2b"), ("v2c", "v2c"), ("classical-v1", "classical engine"))
+GLANCE = (("v1", "**v1 (live)**"), ("v1-policy2", "v1-policy2 (code default, not deployed)"), ("v2a", "v2a"),
+          ("v2b", "v2b"), ("v2c", "v2c"), ("classical-v1", "classical engine"))
 INSPECTION_PHOTOS = 2536  # one detailed drone inspection of one bridge (docs/impact-sources.md, ODOT SPR 787)
 
 
@@ -181,6 +182,85 @@ def heldout_quotes() -> list:
             (f"no efflorescence ({s1['per_class']['efflorescence']:.2f}) and almost no exposed rebar "
              f"({s1['per_class']['exposed_rebar']:.2f}), where the classical engine finds {sc['per_class']['efflorescence']:.2f} "
              f"and {sc['per_class']['exposed_rebar']:.2f}")]
+
+
+def p2() -> tuple:
+    """v1-policy2's held-out block, its CODEBRIM and synth200 reads, and its pair with v1."""
+    out = load("results/heldout_models.json")
+    b = out["v1-policy2"]
+    assert b["sets"] == ["codebrim", "synth", "clean"] and all(b["dev_rule_on_held_out"]["clauses"].values())
+    assert all(all(r["baselines_same_as_v1s_run"].values()) for r in b["read"].values())
+    return b, b["read"]["codebrim"], b["read"]["synth"], out["pairs"]
+
+
+def policy2_quotes() -> list:
+    """What both glance blocks and report section 8 say of v1-policy2's one held-out read, losses with gains."""
+    _, cb, _, pr = p2()
+    m, mv, m1 = cb["matrix"]["v1-policy2@0.3"], cb["matrix"]["v1@0.3"], cb["matrix"]["v1-policy2@0.1"]
+    crit, rec = pr["codebrim@0.3: v1-policy2 / v1"]["critical"], pr["codebrim@0.3: v1-policy2 / v1"]["recall"]
+    srec, cr = pr["synth@0.3: v1-policy2 / v1"]["recall"], m["vs v1@0.3"]["crit_recall"]
+    pc, pv = cb["rows"]["v1-policy2@0.3"]["per_class"], cb["rows"]["v1@0.3"]["per_class"]
+    rt, rv = cb["rates"]["v1-policy2@0.3"], cb["rates"]["v1@0.3"]
+    t2, t21 = m["vs tiling@L2"], m1["vs tiling@L2"]
+    return [(f"it sends {m['critical_per_image']:.2f} critical boxes per photo to a person instead of "
+             f"{mv['critical_per_image']:.2f} ({crit[0]:.2f}×, CI {ci(crit[1])}) and about {m['signoffs_per_image']:.2f} "
+             f"critical findings instead of {mv['signoffs_per_image']:.2f}"),
+            f"lists {m['needs_look_per_image']:.2f} masks per photo as needs-a-look",
+            f"recall is unchanged ({rec[0]:.2f}×, CI {ci(rec[1])}), on synth200 {srec[0]:.2f}× ({ci(srec[1])})",
+            (f"critical-class recall is not higher ({cr[0]:.2f}×, {ci(cr[1])}; exposed rebar "
+             f"{pc['exposed_rebar']:.2f} against {pv['exposed_rebar']:.2f})"),
+            (f"verify now fires on {100 * rt['verify_rate']:.1f} % of looks ({100 * rt['confirm_rate']:.1f} % confirm "
+             f"looks) instead of {100 * rv['verify_rate']:.1f} %, escalation on {100 * rt['escalation_rate']:.1f} %"),
+            (f"{t2['recall_shown'][0]:.2f}× its recall at {t2['pixels']:.2f}× its pixels, and "
+             f"{t21['recall_shown'][0]:.2f}× ({ci(t21['recall_shown'][1])}) at the 10 % cap")]
+
+
+def policy2_cost_quotes() -> list:
+    """Report section 8's losses for v1-policy2: synth200's boxes, the hard subsets' small critical boxes, ms, pixels."""
+    _, cb, sy, pr = p2()
+    d = pr["synth@0.3: v1-policy2 / v1"]["boxes_per_photo_diff"]
+    hs, hc, m = sy["hard"]["rows"], cb["hard"]["rows"], cb["matrix"]["v1-policy2@0.3"]
+    ms = pr["codebrim@0.3: v1-policy2 / v1"]["ms"]
+    return [f"more boxes per photo ({d[0]:+.2f}, CI {d[1][0]:+.2f} to {d[1][1]:+.2f})",
+            (f"it finds {hs['v1-policy2@0.3']['small_critical_recall']:.2f} of synth200's small critical boxes against "
+             f"v1's {hs['v1@0.3']['small_critical_recall']:.2f}, and {hc['v1-policy2@0.3']['small_critical_recall']:.2f} "
+             f"against {hc['v1@0.3']['small_critical_recall']:.2f} on CODEBRIM, where L1 tiling finds "
+             f"{hc['tiling@L1']['small_critical_recall']:.2f}"),
+            (f"modelled ms per CODEBRIM job are {ms[0]:.2f}× v1's (CI {ci(ms[1])}), pixels "
+             f"{m['vs v1@0.3']['pixels']:.2f}×"),
+            f"v1-policy2's exact count is {m['signoffs_exact_per_image']:.2f}"]
+
+
+def policy2_rows() -> list:
+    """Report section 8's v1-policy2 matrix: each policy's pixels, modelled ms, recall of what a person is shown and
+    drafted critical-class recall on CODEBRIM eval200 and synth200, and its recall ratios to the baselines and v1."""
+    _, cb, sy, _ = p2()
+    f = lambda v, c: "–" if v is None else f"{v:.3f} ({ci(c)})"
+    r = lambda m, k: f"{m[k]['recall_shown'][0]:.2f} ({ci(m[k]['recall_shown'][1])})" if k in m else "–"
+    rows = []
+    for name, rd in (("CODEBRIM eval200", cb), ("synth200", sy)):
+        for k in ("downscale", "tiling@L2", "tiling@L1", "v1@0.3", "v1-policy2@0.3", "v1@0.1", "v1-policy2@0.1"):
+            m = rd["matrix"][k]
+            rows.append(f"| {name} | {k} | {m['pixels_frac']:.3f} | {m['ms_per_job']:.0f} | "
+                        f"{f(m['recall_shown'], m['recall_shown_ci'])} | {f(m['crit_recall'], m['crit_recall_ci'])} | "
+                        f"{m['critical_per_image']:.2f} | {r(m, 'vs tiling@L2')} | {r(m, 'vs tiling@L1')} | "
+                        f"{r(m, 'vs downscale')} | {r(m, 'vs v1@' + k.rpartition('@')[2]) if k.startswith('v1-') else '–'} |")
+    return rows
+
+
+def policy2_gate_rows() -> list:
+    """The human gate and the hard subsets, v1 against v1-policy2 at the 30 % cap."""
+    b, cb, sy, _ = p2()
+    rows = []
+    for name, rd in (("CODEBRIM eval200", cb), ("synth200", sy), ("clean", b["read"]["clean"])):
+        h = rd["hard"]
+        for k in ("v1@0.3", "v1-policy2@0.3"):
+            m, x, t = rd["matrix"][k], h["rows"].get(k, {}), rd["rates"][k]
+            small = "–" if x.get("small_critical_recall") is None else f"{x['small_critical_recall']:.2f}"
+            rows.append(f"| {name} | {k} | {m['critical_per_image']:.2f} | {m['signoffs_per_image']:.2f} | "
+                        f"{m['needs_look_per_image']:.2f} | {100 * t['verify_rate']:.1f} % | {100 * t['escalation_rate']:.1f} % | "
+                        f"{h['photos']} of {h['of']} | {small} |")
+    return rows
 
 
 def v1_look_quotes() -> list:
@@ -245,7 +325,7 @@ def test_glance_quotes_are_the_json():
     for name, text in (("README.md", README), ("docs/report.md", REPORT)):
         glance = text.split("## Results at a glance\n")[1].split("\n## ")[0]
         assert [r for r in glance_rows() if r not in glance] == [], name
-        want = classical_quotes()[:3] + heldout_quotes() + v1_look_quotes() + live_quotes()
+        want = classical_quotes()[:3] + heldout_quotes() + v1_look_quotes() + live_quotes() + policy2_quotes()
         assert [w for w in want if w not in flat(glance)] == [], name
     assert pitch_quote() in flat(README.split("## Results at a glance\n")[0])
     # moved out of the glance: tuning, cascade, INT8 and prefetching to both docs' results; Arm against x86 to the
@@ -367,6 +447,9 @@ def readme_quotes() -> list:
 
 def test_report_prose_quotes_are_the_json():
     assert [w for w in report_quotes() if w not in flat(REPORT)] == []
+    section8 = REPORT.split("## 8. Evaluation")[1].split("\n## 9.")[0]
+    assert [w for w in policy2_quotes() + policy2_cost_quotes() if w not in flat(section8)] == []
+    assert [r for r in policy2_rows() + policy2_gate_rows() if r not in section8] == []
     assert [w for w in readme_quotes() if w not in flat(README)] == []
 
 

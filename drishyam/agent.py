@@ -117,6 +117,18 @@ WEIGHTS = {"onnx:drishyam_dacl10k.onnx": "c49416c10087f3c1baa8443b53fc839a3d8eb2
 SLA_MS = 500.0
 SLA_MS_BY_PROFILE = {"onnx:drishyam_dacl10k.onnx": 1500.0}
 
+# policy2: v1-policy2's knobs (JobConfig grid, crit_weight, crit_floor, crit_confirm, merge_critical) by profile, for a
+# policy2: JobConfig field left None; a profile not listed, or a knob it does not set, takes POLICY2_OFF, the agent before
+# policy2: them. results/dev/policy2_sweep.json states the rule, grid and dev runs they were chosen by.
+# policy2: v1 takes g_s60, the one configuration the rule chose of the 8 it listed (results/dev/policy2_sweep.json, 30 %
+# policy2: cap, paired 95 % CIs against v1 as it was): on CODEBRIM dev100 sign-offs per photo 2.12 to 1.34, critical
+# policy2: boxes 7.24 to 6.38, recall of what a person is shown x1.02 (0.99-1.05), critical-class recall x0.98
+# policy2: (0.95-1.02); nothing measurable moved on synth_dev or the clean split. It does not match L2 tiling.
+POLICY2: dict = {"onnx:drishyam_dacl10k.onnx": {"grid": True, "crit_weight": 2.0, "crit_floor": 0.6,  # policy2
+                                               "crit_confirm": "shift", "merge_critical": True}}  # policy2
+POLICY2_OFF = {"grid": False, "crit_weight": 1.0, "crit_floor": 0.0, "crit_confirm": "off", "merge_critical": False}  # policy2
+CRIT_CLASSES = ("exposed_rebar", "spalling")  # policy2: the classes findings.is_critical can make critical
+
 
 def profile_for(segmenter) -> str:
     """The PROFILES key of a segmenter (its `name`), or classical-v1 for one not calibrated: a name not listed, or
@@ -169,10 +181,21 @@ class JobConfig:
     # A fixed predicted cost per look, {"warp": ms, "segment": ms, "segment:<model>": ms}, instead of live p95s:
     # scores and the stop rule then do not move with machine load. The caps still run on the real clock.
     t_hat_ms: dict | None = None
+    # fallback: when the overview proposes no candidate, one look at L2 whose window spans the whole photo before the
+    # fallback: job ends (cause fallback-l2), then the rules' follow-ups; off, such a photo gets no look at all. On for
+    # fallback: every profile since it passed the rule stated before its dev run (results/dev/zero_candidate_fallback.json,
+    # fallback: v1 at the 30 % cap; it acted on 1 dev photo of 190); every number published before it ran with it off.
+    fallback_l2: bool = True  # fallback
     # cascade: with a confirm net (Job(confirm=...), drishyam.cascade; none by default), the scout entropy band, both
     # cascade: ends included, in which the confirm net segments a look again. Not tuned: it straddles tau.
     tau_confirm_lo: float = 0.35  # cascade
     tau_confirm_hi: float = 0.65  # cascade
+    # policy2: v1-policy2 (None: the profile's value in POLICY2, else POLICY2_OFF's):
+    grid: bool | None = None  # policy2: first looks on the first level's tile grid (`_tiles`), one per tile holding a candidate
+    crit_weight: float | None = None  # policy2: x the look score's severity of a region seen as a CRIT_CLASSES class
+    crit_floor: float | None = None  # policy2: a mask that would make a new critical finding, under this confidence, is held
+    crit_confirm: str | None = None  # policy2: a held mask's confirm look: "shift" (its level, recentred), "finer" or "off"
+    merge_critical: bool | None = None  # policy2: a critical mask mostly inside a critical finding of its class joins it
 
 
 @dataclass
@@ -202,6 +225,7 @@ class Region:
     done: bool = False
     verified: bool = False
     extra_used: bool = False
+    held: list = field(default_factory=list)  # policy2: (class, Look, confidence, step, area) its confirm look decides
 
 
 def _rect_on(shape, window, level_scale):
@@ -226,6 +250,8 @@ class Job:
         self.cfg = replace(cfg, profile=name, **{k: v for k, v in PROFILES[name].items() if getattr(cfg, k) is None})
         if self.cfg.sla_ms is None:
             self.cfg = replace(self.cfg, sla_ms=SLA_MS_BY_PROFILE.get(name, SLA_MS))
+        self.cfg = replace(self.cfg, **{k: v for k, v in {**POLICY2_OFF, **POLICY2.get(name, {})}.items()  # policy2
+                                         if getattr(self.cfg, k) is None})  # policy2
         self.id = job_id or "j_" + secrets.token_hex(3)
         self.planner = planner
         self.kill = kill
@@ -276,6 +302,7 @@ class Job:
         a = self._unseen(win, level)
         u = r.entropy if self.cfg.use_uncertainty else 0.0
         s = SEVERITY.get(r.cls, 1.0)
+        s *= self.cfg.crit_weight if r.cls in CRIT_CLASSES else 1.0  # policy2
         ev = r.prior * s * (1 + u) * a
         return ev / max(self._t_hat(), 1e-3), ev, a, s, u
 
@@ -397,6 +424,9 @@ class Job:
                                              and _inside(box, f.box) >= 0.5), None)):
             return dom, "absorbed"
         same = [f for f in self.findings if f.cls == cls and (f.region == r.id or imaging.box_iou(f.box, box) > 0.3)]
+        if not same and self.cfg.merge_critical and is_critical(cls, m["area_px"]):  # policy2: one finding per critical
+            same = [f for f in self.findings if f.cls == cls and f.critical  # policy2: defect: a mask mostly inside (IoS
+                    and max(_inside(box, f.box), _inside(f.box, box)) >= 0.5]  # policy2: >= 0.5) one of its class joins it
         if same:
             f = same[0]
             f.agent_update(confidence=conf, measure=m, box=box, step=self.step, level=level, crop_jpeg_b64=thumb,
@@ -406,6 +436,58 @@ class Job:
                     verify_iou=verify_iou)
         self.findings.append(f)
         return f, "new"
+
+    def _triage(self, r, cause, seg, to_l0, level, present, first, replaying):  # policy2
+        # policy2: v1-policy2's gate before a person. A confirm look (cause confirm-critical, at the region made for it)
+        # policy2: drafts only the held classes it confirms: its own mask at or above crit_floor, or one overlapping the
+        # policy2: held mask at IoU >= IOU_AGREE; every other held class goes to a person as needs-a-look. Any other look
+        # policy2: holds each mask that would make a new critical finding under crit_floor and queues one confirm look
+        # policy2: for them (crit_confirm), or without one sends them to a person at once. Returns (to draft, a note).
+        cfg = self.cfg  # policy2
+        if cause == "confirm-critical":  # policy2
+            self.pending.discard(r.id)  # policy2
+            ok = [k for k, lk, *_ in r.held if k in present and (seg.confidence[k] >= cfg.crit_floor or (look_iou(  # policy2
+                lk.mask(k), lk.to_l0, seg.mask(k), to_l0) or 0.0) >= IOU_AGREE)]  # policy2
+            self.not_assessed += [self._needs_look(k, lk, c, s, f"not confirmed by its L{level} confirm look")  # policy2
+                                  for k, lk, c, s, _ in r.held if k not in ok]  # policy2
+            return ok, f"; confirm look: {', '.join(ok) or 'none'} of {', '.join(h[0] for h in r.held)} confirmed"  # policy2
+        held = [c for c in present if seg.confidence[c] < cfg.crit_floor and self._new_critical(r, c, seg, to_l0, level)]  # policy2
+        if not held:  # policy2
+            return present, ""  # policy2
+        look = Look(level, seg.labels, to_l0, held[0])  # policy2
+        items = [(c, look, seg.confidence[c], self.step, measure(seg.mask(c), 2**level, linear=False)["area_px"])  # policy2
+                 for c in held]  # policy2
+        lvl = min(level - (cfg.crit_confirm == "finer"), first)  # policy2: never coarser than a first look
+        names = ", ".join(f"{c} {seg.confidence[c]:.2f}" for c in held)  # policy2
+        keep = [c for c in present if c not in held]  # policy2
+        if cfg.crit_confirm in ("shift", "finer") and lvl >= 0 and cfg.verify and not self.settings.batch and not replaying:  # policy2
+            ys, xs = np.nonzero(np.isin(seg.labels, [CLASSES.index(c) for c in held]))  # policy2
+            (fx, fy), = imaging.map_points(to_l0, [[float(xs.mean()), float(ys.mean())]])  # policy2
+            rc = Region(f"{r.id}.c{self.step}", int(fx), int(fy), r.prior, lvl, looks=[look], extra_used=True, held=items)  # policy2
+            self.regions[rc.id] = rc  # policy2
+            self.pending.add(rc.id)  # policy2
+            why = f"{names} under the floor {cfg.crit_floor:g} at L{level} (step {self.step}): confirming at L{lvl}"  # policy2
+            self.forced.append(("verify", rc, lvl, "confirm-critical", why + ", centred on the mask"))  # policy2
+            return keep, f"; {names} under the floor {cfg.crit_floor:g}: held for a confirm look at L{lvl}"  # policy2
+        self.not_assessed += [self._needs_look(c, look, cf, s, "no confirm look") for c, _, cf, s, _ in items]  # policy2
+        return keep, f"; {names} under the floor {cfg.crit_floor:g}: sent to a person, needs a look"  # policy2
+
+    def _new_critical(self, r, c, seg, to_l0, level) -> bool:  # policy2
+        # policy2: whether this look's mask of c would put a critical finding before a person that is not there yet:
+        # policy2: critical by area as _log_finding measures it, and joining no critical finding of c by its rules
+        mask = seg.mask(c)  # policy2
+        if not is_critical(c, measure(mask, 2**level, linear=c == "crack")["area_px"]):  # policy2
+            return False  # policy2
+        box = imaging.l0_box(cv2.boundingRect(cv2.findNonZero(mask)), to_l0, self.image.shape[1::-1])  # policy2
+        return not any(f.cls == c and f.critical and (f.region == r.id or imaging.box_iou(f.box, box) > 0.3 or (  # policy2
+            self.cfg.merge_critical and max(_inside(box, f.box), _inside(f.box, box)) >= 0.5)) for f in self.findings)  # policy2
+
+    def _needs_look(self, cls, look, conf, step, why) -> dict:  # policy2
+        # policy2: a held mask as a not-assessed entry: a person checks it by eye, and the work order is never ready meanwhile
+        box = imaging.l0_box(cv2.boundingRect(cv2.findNonZero(look.mask(cls))), look.to_l0, self.image.shape[1::-1])  # policy2
+        return {"step": step, "box": box, "reason": f"{cls} at L{look.level}, confidence {conf:.2f} under the floor "  # policy2
+                f"{self.cfg.crit_floor:g}: not a critical finding; {why}", "action": "check-by-eye",  # policy2
+                "kind": "needs-a-look", "cls": cls, "confidence": round(float(conf), 3)}  # policy2
 
     def _settle(self, r, chk, level, best, target, now_f, critical, drafted, new_events, areas):
         """After a look that queued no escalation: settle its comparison with the coarser look (`chk`, from
@@ -508,6 +590,9 @@ class Job:
                "pixels_used": self.budget.pixels_used, "pixels_frac": round(self.budget.pixels_used / (W * H), 4)}
 
         self.regions = {c.id: Region(c.id, c.cx, c.cy, c.prior, first, box=c.box) for c in cands}
+        if cfg.grid and cands:  # policy2: one first look per tile of the first level's grid that holds a candidate
+            self.regions = _grid_regions(cands, pyr[first].shape[:2], first, cfg.size)  # policy2
+        self.pending: set = set()  # policy2: confirm regions whose confirm look has not run
         self.seen = [np.zeros(sal.shape, bool) for _ in range(len(pyr))]
         self.looked = np.zeros(sal.shape, bool)  # seen by a look other than the survey: coverage_looked
         self.forced: deque = deque()
@@ -536,6 +621,18 @@ class Job:
         if not cands and not self.replay:  # nothing proposed is not a clean photo: no look will run, so a person looks
             self.not_assessed.append({"step": 0, "box": [0, 0, W, H], "reason": "no candidate region was proposed",
                                       "action": "check-by-eye"})
+        # fallback: the overview's L3 pyramid can blur a hairline crack away, so a photo the prior is silent on gets one
+        # fallback: look at L2 spanning it (a gaze of the long side / 4 px, never under `size`), governed and capped
+        # fallback: like any look; it stays not assessed whatever that look drafts. A resumed job replays the look.
+        whole = max(cfg.size, math.ceil(max(W, H) / 4))  # fallback
+        if cfg.fallback_l2 and not cands and self.replay and self.replay[0][3:] == (2, whole):  # fallback
+            self.not_assessed.append({"step": 0, "box": [0, 0, W, H],  # fallback
+                                      "reason": "no candidate region was proposed", "action": "check-by-eye"})  # fallback
+        elif cfg.fallback_l2 and not cands and not self.replay:  # fallback
+            self.settings.size = whole  # fallback
+            r = self.regions["w0"] = Region("w0", W // 2, H // 2, 0.0, 2)  # fallback
+            why = f"no candidate region was proposed: one L2 look of {self.settings.size} px spans the photo"  # fallback
+            self.forced.append(("gaze", r, 2, "fallback-l2", why))  # fallback
         asked: set = set()  # (finding id, class) pairs already sent to review as ambiguous
         self.followups = 0  # events that follow the step record just yielded (its findings and review requests)
         self.drills: set = set()  # the chaos drills that fired (each on its fixed step)
@@ -619,6 +716,7 @@ class Job:
                     break
             # 4. the look itself
             size = self.settings.size
+            self.settings.size = min(size, cfg.size)  # fallback: a whole-photo look's gaze is its own, not the next look's
             cx, cy, window = self._window(r.cx, r.cy, level, size)
             (crop, to_l0), warp_ms = self._timed("warp", imaging.gaze, pyr, cx, cy, level, size=size)
             q, _ = self._timed("quality", imaging.quality, crop)
@@ -643,6 +741,8 @@ class Job:
             self.seen[level][y0:y1, x0:x1] = True
             if cause != "survey" and not (cause == "replay" and self.step == 1 and level > first):  # nor its replay
                 self.looked[y0:y1, x0:x1] = True
+            if cause == "fallback-l2":  # fallback: the first look, and a whole-photo one is no closer than the survey
+                self.looked[:] = False  # fallback
             sal_max = round(float(sal[y0:y1, x0:x1].max()), 4) if y1 > y0 and x1 > x0 else 0.0
 
             # 5. what the measurements say to do next
@@ -658,6 +758,7 @@ class Job:
             seeded = self._seed(seg, to_l0, valid, level) if q["ok"] else []
             new_events, follow, drafted, critical = [], None, {}, None
             batch = self.settings.batch
+            batch = batch or cause == "confirm-critical"  # policy2: a confirm look never escalates
             if not q["ok"]:
                 r.done = True
                 self.not_assessed.append({"step": self.step, "box": imaging.l0_box((0, 0, size, size), to_l0, (W, H)),
@@ -668,6 +769,8 @@ class Job:
                 follow = ("escalate", r, level - 1, "area<A_min", f"{best} area {area} px < {cfg.a_min} at L{level}")
             else:
                 present = self._present(seg, to_l0, level, rejected) if best else []
+                present, held_note = self._triage(r, cause, seg, to_l0, level, present, first, replaying)  # policy2
+                why += held_note  # policy2
                 if 0 < level == self.min_level and not batch and (seg.entropy > tau or (best and area < cfg.a_min)):
                     # the escalation the rules call for, held: what this look saw, and what it drafted of it
                     saw = (f"entropy {seg.entropy:.2f} > {tau}" if seg.entropy > tau
@@ -686,6 +789,8 @@ class Job:
                         # The check compared class chk["class"] across the two looks: evidence about that class's finding.
                         f, kind = self._log_finding(r, c, seg, crop, to_l0, level,
                                                     chk["iou"] if chk and c == chk["class"] else None)
+                        if cause == "confirm-critical" and kind != "absorbed" and not f.critical:  # policy2: the held
+                            f.hold(self.step, a := next(h[4] for h in r.held if h[0] == c), critical_rule(c, a))  # policy2: look's area
                         drafted[c] = f
                         if c == best:
                             look.finding = f.id
@@ -805,6 +910,8 @@ class Job:
                                    "reason": f"not looked at: {halt_cause} halted the job first",
                                    "action": "check-by-eye", "region": r.id}
                                   for r in self.regions.values() if not r.looks and r.box is not None]
+        self.not_assessed += [self._needs_look(k, lk, c, s, "the job ended before its confirm look")  # policy2
+                              for rid in sorted(self.pending) for k, lk, c, s, _ in self.regions[rid].held]  # policy2
         self.work_order = work_order(self.id, self.findings, self.gaze_path, self.not_assessed)
         self.work_order["profile"] = cfg.profile  # the levels it looked at were this segmenter's (PROFILES)
         self.work_order["weights_sha256"] = getattr(self.segmenter, "sha256", None)  # the model that looked (WEIGHTS)
@@ -834,6 +941,37 @@ def survey_look(cands, l0_size, size, first, max_level, looks) -> tuple[int, int
     x1, y1 = min(W, max(c.box[0] + c.box[2] for c in cands)), min(H, max(c.box[1] + c.box[3] for c in cands))
     level = min(max_level, math.ceil(math.log2(max(x1 - x0, y1 - y0, 1) / size)))
     return ((x0 + x1) // 2, (y0 + y1) // 2, level) if level > first else None
+
+
+def _tiles(h: int, w: int, size: int, overlap: float = 0.2) -> list[tuple[int, int, int, int]]:  # policy2
+    # policy2: (x0, y0, x1, y1) tiles of an h x w level image, as evals.harness.slice_boxes cuts them (SAHI's
+    # policy2: get_slice_bboxes: stride size x (1 - overlap), the last row and column pulled back to the edge): the
+    # policy2: tiling baseline's own grid, so a grid look sees what a tile sees
+    ov, boxes, y_min, y_max = int(overlap * size), [], 0, 0  # policy2
+    while y_max < h:  # policy2
+        x_min = x_max = 0  # policy2
+        y_max = y_min + size  # policy2
+        while x_max < w:  # policy2
+            x_max = x_min + size  # policy2
+            xe, ye = min(w, x_max), min(h, y_max)  # policy2
+            boxes.append((max(0, xe - size), max(0, ye - size), xe, ye))  # policy2
+            x_min = x_max - ov  # policy2
+        y_min = y_max - ov  # policy2
+    return boxes  # policy2
+
+
+def _grid_regions(cands, shape, level: int, size: int) -> dict:  # policy2
+    # policy2: one Region per tile of the level's grid (`_tiles` of a level image of `shape`) holding a candidate's
+    # policy2: centre, each candidate counted in the first tile (in tile order) that holds it; the region's centre and
+    # policy2: box are the tile's in L0 px, its prior its candidates' best
+    s, out, left = 2**level, {}, list(cands)  # policy2
+    for i, (x0, y0, x1, y1) in enumerate(_tiles(*shape, size)):  # policy2
+        mine = [c for c in left if x0 * s <= c.cx < x1 * s and y0 * s <= c.cy < y1 * s]  # policy2
+        if mine:  # policy2
+            left = [c for c in left if c not in mine]  # policy2
+            out[f"g{i + 1}"] = Region(f"g{i + 1}", (x0 + x1) * s // 2, (y0 + y1) * s // 2, max(c.prior for c in mine),  # policy2
+                                      level, box=(x0 * s, y0 * s, (x1 - x0) * s, (y1 - y0) * s))  # policy2
+    return out  # policy2
 
 
 REVIEW_KINDS = ("critical", "ambiguous", "disagree", "class-change", "unconfirmed")
@@ -918,6 +1056,9 @@ def validate_replay(replay: list, shape, max_size: int = 512) -> list[tuple[str,
         size = rest[0] if rest else None
         if not (0 <= x < W and 0 <= y < H and 0 <= level <= 3):
             raise ValueError("replay decision outside the image or level range")
+        if level == 2 and size == max(max_size, math.ceil(max(W, H) / 4)):  # fallback: the whole-photo look's gaze
+            out.append((action, x, y, level, size))  # fallback
+            continue  # fallback
         if size is not None and not MIN_GAZE <= size <= max_size:
             raise ValueError(f"replay gaze size must be {MIN_GAZE}..{max_size}")
         out.append((action, x, y, level, size))

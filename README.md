@@ -27,6 +27,7 @@ drifts from that file or, for the Lambda timings, from [docs/aws.md](docs/aws.md
 | Segmenter | CODEBRIM recall (95 % CI) | chance | IoU-only (chance) | synth200 recall (95 % CI) | clean photos with a box | critical boxes per CODEBRIM photo |
 | --- | --- | --- | --- | --- | --- | --- |
 | **v1 (live)** | 0.49 (0.44–0.54) | 0.30 | 0.25 (0.08) | 0.64 (0.61–0.67) | 0 of 51 | 9.60 |
+| v1-policy2 (code default, not deployed) | 0.49 (0.44–0.53) | 0.31 | 0.26 (0.09) | 0.62 (0.59–0.66) | 0 of 51 | 8.75 |
 | v2a | 0.48 (0.43–0.52) | 0.30 | 0.24 (0.08) | 0.61 (0.57–0.64) | 9 of 51 | 4.38 |
 | v2b | 0.49 (0.44–0.53) | 0.28 | 0.25 (0.08) | 0.57 (0.53–0.61) | 9 of 51 | 4.65 |
 | v2c | 0.48 (0.44–0.53) | 0.28 | 0.23 (0.07) | 0.57 (0.54–0.61) | 22 of 51 | 3.71 |
@@ -36,6 +37,7 @@ drifts from that file or, for the Lambda timings, from [docs/aws.md](docs/aws.md
   chosen on the dev splits only ([results/dev/model_choice_dev.json](results/dev/model_choice_dev.json)); held out
   it is again the only model with no measurable loss against any other. These are its second scorings (one earlier,
   unpublished). Its CC BY-NC 4.0 weights are release assets of v1.1.0, not in git.
+- **v1-policy2, v1's default in the code (not deployed; the live site runs v1):** one configuration chosen on the dev splits by a rule committed before its run and scored once held out (v1's third read; section 8). On CODEBRIM it sends 8.75 critical boxes per photo to a person instead of 9.60 (0.91×, CI 0.84–0.98) and about 1.15 critical findings instead of 2.17, and it lists 0.20 masks per photo as needs-a-look for a person to check by eye; recall is unchanged (0.99×, CI 0.97–1.01), on synth200 0.98× (0.95–1.00); critical-class recall is not higher (0.99×, 0.96–1.02; exposed rebar 0.14 against 0.16). On CODEBRIM verify now fires on 14.1 % of looks (5.0 % confirm looks) instead of 9.4 %, escalation on 5.8 %. It still does not beat L2 tiling: 0.98× its recall at 1.40× its pixels, and 0.83× (0.76–0.89) at the 10 % cap.
 - **What the held-out runs measured:** the governor off and the 512-px FP32 net on every look. Live, the v1
   profile's SLA is 1500 ms, so looks stay on the 512-px FP32 net unless steps exceed 1.5 s. v1's finest look is L1
   (half size) on a 2048-px photo and L2 on a 4608-px one, so on these photos it never looks at full resolution.

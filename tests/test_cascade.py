@@ -228,7 +228,7 @@ def test_without_a_confirm_net_every_event_is_the_agents_before_the_cascade(name
     for mod in (agent, off):
         job = mod.Job(img, mod.JobConfig(profile=profile), clock=FakeClock(), job_id="j_test", segmenter=seg)
         streams.append(json.dumps(_strip(list(job.run())), sort_keys=True))
-    assert streams[0] == streams[1] and '"confirm' not in streams[0]
+    assert streams[0] == streams[1] and not re.search(r'"confirm(_sha256)?":', streams[0])  # no cascade record
 
 
 def test_the_confirm_net_is_named_by_its_own_variable_only(tiny_onnx, monkeypatch, no_cached_confirm):

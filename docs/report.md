@@ -18,6 +18,7 @@ photos; chance is the same model's boxes moved to random places, and IoU-only dr
 | Segmenter | CODEBRIM recall (95 % CI) | chance | IoU-only (chance) | synth200 recall (95 % CI) | clean photos with a box | critical boxes per CODEBRIM photo |
 | --- | --- | --- | --- | --- | --- | --- |
 | **v1 (live)** | 0.49 (0.44–0.54) | 0.30 | 0.25 (0.08) | 0.64 (0.61–0.67) | 0 of 51 | 9.60 |
+| v1-policy2 (code default, not deployed) | 0.49 (0.44–0.53) | 0.31 | 0.26 (0.09) | 0.62 (0.59–0.66) | 0 of 51 | 8.75 |
 | v2a | 0.48 (0.43–0.52) | 0.30 | 0.24 (0.08) | 0.61 (0.57–0.64) | 9 of 51 | 4.38 |
 | v2b | 0.49 (0.44–0.53) | 0.28 | 0.25 (0.08) | 0.57 (0.53–0.61) | 9 of 51 | 4.65 |
 | v2c | 0.48 (0.44–0.53) | 0.28 | 0.23 (0.07) | 0.57 (0.54–0.61) | 22 of 51 | 3.71 |
@@ -27,6 +28,7 @@ photos; chance is the same model's boxes moved to random places, and IoU-only dr
   dev splits only (`results/dev/model_choice_dev.json`); held out it is again the only model with no measurable
   loss against any other. These are its second scorings (one earlier, unpublished). Its CC BY-NC 4.0 weights are
   release assets of v1.1.0, not in git.
+- **v1-policy2, v1's default in the code (not deployed; the live site runs v1):** one configuration chosen on the dev splits by a rule committed before its run and scored once held out (v1's third read; section 8). On CODEBRIM it sends 8.75 critical boxes per photo to a person instead of 9.60 (0.91×, CI 0.84–0.98) and about 1.15 critical findings instead of 2.17, and it lists 0.20 masks per photo as needs-a-look for a person to check by eye; recall is unchanged (0.99×, CI 0.97–1.01), on synth200 0.98× (0.95–1.00); critical-class recall is not higher (0.99×, 0.96–1.02; exposed rebar 0.14 against 0.16). On CODEBRIM verify now fires on 14.1 % of looks (5.0 % confirm looks) instead of 9.4 %, escalation on 5.8 %. It still does not beat L2 tiling: 0.98× its recall at 1.40× its pixels, and 0.83× (0.76–0.89) at the 10 % cap.
 - **What the held-out runs measured:** the governor off and the 512-px FP32 net on every look. Live, the v1
   profile's SLA is 1500 ms, so looks stay on the 512-px FP32 net unless steps exceed 1.5 s. v1's finest look is L1
   (half size) on a 2048-px photo and L2 on a 4608-px one, so on these photos it never looks at full resolution.
@@ -542,11 +544,13 @@ At the 30 % cap (pixels ratio and per-class recall are in the JSON):
 | Set | Model | recall (95 % CI) | IoU-only | chance | precision | boxes / photo | critical / photo | × L0 tiling (95 % CI) | × downscale (95 % CI) | modelled ms / job |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | CODEBRIM eval200 | v1 | 0.493 (0.44–0.54) | 0.253 | 0.299 | 0.077 | 45.8 | 9.60 | 1.39 (1.25–1.52) | 1.18 (1.11–1.28) | 3434 |
+| CODEBRIM eval200 | v1-policy2 | 0.489 (0.44–0.53) | 0.261 | 0.310 | 0.080 | 44.2 | 8.75 | 1.38 (1.25–1.51) | 1.17 (1.09–1.27) | 3516 |
 | CODEBRIM eval200 | v2a | 0.480 (0.43–0.52) | 0.244 | 0.301 | 0.081 | 41.3 | 4.38 | 1.06 (0.99–1.14) | 1.11 (1.03–1.18) | 3281 |
 | CODEBRIM eval200 | v2b | 0.487 (0.44–0.53) | 0.251 | 0.285 | 0.075 | 44.4 | 4.65 | 1.03 (0.97–1.09) | 1.10 (1.03–1.19) | 8079 |
 | CODEBRIM eval200 | v2c | 0.484 (0.44–0.53) | 0.234 | 0.283 | 0.063 | 53.9 | 3.71 | 1.03 (0.96–1.10) | 1.20 (1.13–1.27) | 4422 |
 | CODEBRIM eval200 | classical-v1 | 0.194 (0.16–0.23) | 0.080 | 0.122 | 0.002 | 921.0 | 1.73 | 0.94 (0.85–1.04) | 0.98 (0.90–1.06) | 1726 |
 | synth200 | v1 | 0.639 (0.61–0.67) | 0.623 | 0.064 | 0.336 | 6.3 | 0.81 | 0.94 (0.90–0.97) | 1.05 (1.00–1.09) | 1718 |
+| synth200 | v1-policy2 | 0.624 (0.59–0.66) | 0.611 | 0.053 | 0.317 | 6.6 | 0.85 | 0.92 (0.88–0.95) | 1.02 (0.98–1.07) | 1730 |
 | synth200 | v2a | 0.607 (0.57–0.64) | 0.587 | 0.062 | 0.334 | 6.0 | 0.91 | 0.83 (0.79–0.86) | 1.17 (1.11–1.25) | 1772 |
 | synth200 | v2b | 0.573 (0.53–0.61) | 0.541 | 0.041 | 0.315 | 6.0 | 0.68 | 0.78 (0.74–0.82) | 1.18 (1.11–1.25) | 4287 |
 | synth200 | v2c | 0.573 (0.54–0.61) | 0.531 | 0.081 | 0.202 | 9.4 | 1.13 | 0.77 (0.73–0.81) | 1.24 (1.17–1.31) | 2142 |
@@ -559,6 +563,7 @@ On the 51 clean photos (50 synthetic photos with distractors and no damage, plus
 | Model | boxes / clean photo (95 % CI) | photos with a box | critical boxes / photo | modelled ms / job |
 | --- | --- | --- | --- | --- |
 | v1 | 0.000 (0.00–0.00) | 0 of 51 | 0.000 | 1567 |
+| v1-policy2 | 0.000 (0.00–0.00) | 0 of 51 | 0.000 | 1556 |
 | v2a | 0.529 (0.12–1.04) | 9 of 51 | 0.000 | 1605 |
 | v2b | 0.510 (0.14–1.02) | 9 of 51 | 0.020 | 3914 |
 | v2c | 3.157 (1.74–4.67) | 22 of 51 | 0.000 | 1963 |
@@ -578,6 +583,7 @@ Each pair on the same photos, at the 30 % cap (paired 95 % bootstrap CIs; the cr
 | v2b / v2c | 1.01 (0.96–1.05) | 1.00 (0.95–1.05) | -2.65 (-4.12 to -1.29) | -0.25 (-0.41 to -0.10) |
 | v2b / classical-v1 | 2.51 (2.14–2.96) | 1.20 (1.10–1.31) | -6.57 (-9.12 to -4.18) | -0.49 (-0.63 to -0.33) |
 | v2c / classical-v1 | 2.49 (2.13–2.94) | 1.20 (1.10–1.31) | -3.92 (-6.86 to -0.82) | -0.24 (-0.41 to -0.04) |
+| v1-policy2 / v1 | 0.99 (0.97–1.01) | 0.98 (0.95–1.00) | +0.00 (+0.00 to +0.00) | +0.00 (+0.00 to +0.00) |
 
 Held-out confirms the dev choice: v1 is again the only model with no measurable loss against any other on CODEBRIM eval200, synth200 or the clean set. By the same criterion it is now also better than each of the others, which
 no model was on dev:
@@ -639,6 +645,69 @@ thresholds 32 and 0.8 separate them; crops that drop 5 % of the frame are not fo
 kagglehub download, its train, validation and test-dev folders) it finds no candidate at all: none of the 200 eval
 photos is within hash distance 64 of any dacl10k image (the `leakage` block of each published CODEBRIM summary, run
 before each model's evaluation, the same each time).
+
+### v1-policy2, held out (one read)
+
+v1-policy2 is v1 with one configuration chosen on the dev splits: first looks on the tiling grid's tiles that hold a
+candidate, a confirm look at the same level (recentred) for a critical mask under confidence 0.6, which otherwise goes
+to a person as a needs-a-look entry instead of a critical finding, exposed rebar and spalling weighted 2× in the look
+score, overlapping critical findings of one class merged, and the zero-candidate fallback on
+([API contract](api-contract.md)). The rule, a grid of 8 configurations and 5 ablations, the metrics and the commands
+were committed before any of them ran ([results/dev/policy2_sweep.json](../results/dev/policy2_sweep.json), commit
+54b5601); two passed every clause, and the one that found more critical-class boxes became v1's default in the code
+(`drishyam.agent.POLICY2`). The live site still runs v1 as above: nothing was deployed. It was then scored **once** on
+the held-out sets with v1's recipe and cost table (`runs/heldout/run_policy2.sh`, at commit 44d891d; the leakage
+check first, the same counts). This is v1's third read of CODEBRIM eval200 and synth200 and its second of the clean
+set; a held-out run of v1 with the fallback alone was started and stopped, and its output was never read or used.
+The OpenCV 5 changes merged afterwards (6a36f44) give the same jobs to the byte on all 190 dev photos, for v1, for
+v1-policy2 and for the baselines, so the read stands for the merged code; it was not repeated. Every clause of the dev
+rule also holds on the held-out counterparts (`dev_rule_on_held_out`). The baselines in its run are v1's run's, box
+for box.
+
+What it changes. On CODEBRIM it sends 8.75 critical boxes per photo to a person instead of 9.60 (0.91×, CI 0.84–0.98) and about 1.15 critical findings instead of 2.17 (each finding's final measure on both sides, since v1's runs did not record
+sign-offs; v1-policy2's exact count is 1.17), and it lists 0.20 masks per photo as needs-a-look for a person to check by eye. Its recall is unchanged (0.99×, CI 0.97–1.01), on synth200 0.98× (0.95–1.00). Its critical-class recall is not higher (0.99×, 0.96–1.02; exposed rebar 0.14 against 0.16).
+On CODEBRIM verify now fires on 14.1 % of looks (5.0 % confirm looks) instead of 9.4 %, escalation on 5.8 %, because the confirm looks fire on CODEBRIM's large photos, where v1's finest level is
+L2 and a mask drafted there got no verify before; on synth200 they almost never fire (v1's critical masks there are
+confident or absent). Against L2 tiling on CODEBRIM it does not do better: 0.98× its recall at 1.40× its pixels, and 0.83× (0.76–0.89) at the 10 % cap. Every clean photo stays box-free.
+
+What it costs. On synth200 it finds a little less than v1 (the ratio's interval only just reaches 1.00) and puts
+more boxes per photo (+0.29, CI +0.04 to +0.56); on the hard photos (a critical-class box under 1 % of the photo) it
+finds 0.32 of synth200's small critical boxes against v1's 0.39, and 0.26 against 0.26 on CODEBRIM, where L1 tiling
+finds 0.42; modelled ms per CODEBRIM job are 1.02× v1's (CI 0.99–1.05), pixels 1.03×. It does not raise
+critical-class recall, which was the rule's objective among the configurations that passed; what it does is lower the
+human gate's load at no measurable recall loss, and make a verify fire where v1 could not.
+
+Compute against accuracy at the 30 % and 10 % caps (recall of what a person is shown, drafted critical-class recall;
+ratios are recall ratios with paired 95 % CIs):
+
+| Set | Policy | pixels | modelled ms / job | recall shown (95 % CI) | critical-class recall (95 % CI) | critical boxes / photo | × L2 tiling | × L1 tiling | × downscale | × v1, same cap |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| CODEBRIM eval200 | downscale | 0.073 | 612 | 0.418 (0.36–0.46) | 0.380 (0.31–0.44) | 1.99 | 0.83 (0.77–0.89) | 0.81 (0.73–0.89) | – | – |
+| CODEBRIM eval200 | tiling@L2 | 0.105 | 3343 | 0.503 (0.45–0.55) | 0.429 (0.38–0.48) | 5.22 | – | 0.98 (0.93–1.03) | 1.20 (1.13–1.31) | – |
+| CODEBRIM eval200 | tiling@L1 | 0.419 | 12930 | 0.514 (0.47–0.55) | 0.449 (0.41–0.49) | 9.63 | 1.02 (0.97–1.07) | – | 1.23 (1.12–1.37) | – |
+| CODEBRIM eval200 | v1@0.3 | 0.142 | 3434 | 0.493 (0.44–0.54) | 0.446 (0.39–0.51) | 9.60 | 0.98 (0.94–1.02) | 0.96 (0.90–1.01) | 1.18 (1.11–1.28) | – |
+| CODEBRIM eval200 | v1-policy2@0.3 | 0.146 | 3516 | 0.491 (0.44–0.54) | 0.441 (0.38–0.50) | 8.75 | 0.98 (0.94–1.01) | 0.96 (0.90–1.01) | 1.18 (1.10–1.28) | 1.00 (0.98–1.02) |
+| CODEBRIM eval200 | v1@0.1 | 0.091 | 2542 | 0.424 (0.36–0.48) | 0.405 (0.33–0.47) | 7.59 | 0.84 (0.77–0.90) | 0.83 (0.74–0.90) | 1.02 (0.93–1.10) | – |
+| CODEBRIM eval200 | v1-policy2@0.1 | 0.090 | 2527 | 0.417 (0.36–0.47) | 0.396 (0.33–0.46) | 6.27 | 0.83 (0.76–0.89) | 0.81 (0.73–0.89) | 1.00 (0.91–1.08) | 0.98 (0.96–1.01) |
+| synth200 | downscale | 0.250 | 590 | 0.610 (0.58–0.64) | 0.683 (0.64–0.73) | 0.57 | 1.12 (1.08–1.16) | 0.87 (0.83–0.91) | – | – |
+| synth200 | tiling@L2 | 0.062 | 598 | 0.544 (0.51–0.58) | 0.600 (0.54–0.67) | 0.36 | – | 0.78 (0.73–0.81) | 0.89 (0.86–0.92) | – |
+| synth200 | tiling@L1 | 0.500 | 3542 | 0.701 (0.67–0.73) | 0.730 (0.69–0.78) | 0.56 | 1.29 (1.23–1.36) | – | 1.15 (1.10–1.20) | – |
+| synth200 | v1@0.3 | 0.256 | 1718 | 0.639 (0.61–0.67) | 0.726 (0.68–0.77) | 0.81 | 1.17 (1.12–1.23) | 0.91 (0.88–0.94) | 1.05 (1.00–1.09) | – |
+| synth200 | v1-policy2@0.3 | 0.257 | 1730 | 0.626 (0.59–0.66) | 0.713 (0.67–0.76) | 0.85 | 1.15 (1.10–1.21) | 0.89 (0.86–0.92) | 1.03 (0.98–1.07) | 0.98 (0.96–1.00) |
+| synth200 | v1@0.1 | 0.099 | 605 | 0.392 (0.36–0.42) | 0.409 (0.36–0.46) | 0.23 | 0.72 (0.66–0.78) | 0.56 (0.52–0.60) | 0.64 (0.60–0.70) | – |
+| synth200 | v1-policy2@0.1 | 0.099 | 605 | 0.371 (0.34–0.40) | 0.387 (0.33–0.45) | 0.23 | 0.68 (0.63–0.74) | 0.53 (0.49–0.57) | 0.61 (0.56–0.66) | 0.95 (0.89–1.01) |
+
+The human gate and the hard subsets at the 30 % cap (critical findings by each finding's final measure; the hard
+subset's last column is the share of its small critical-class boxes found):
+
+| Set | Policy | critical boxes / photo | critical findings / photo | needs-a-look / photo | verify looks | escalations | hard photos | small critical boxes found |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| CODEBRIM eval200 | v1@0.3 | 9.60 | 2.17 | 0.00 | 9.4 % | 5.9 % | 57 of 200 | 0.26 |
+| CODEBRIM eval200 | v1-policy2@0.3 | 8.75 | 1.15 | 0.20 | 14.1 % | 5.8 % | 57 of 200 | 0.26 |
+| synth200 | v1@0.3 | 0.81 | 0.27 | 0.00 | 27.6 % | 3.5 % | 51 of 200 | 0.39 |
+| synth200 | v1-policy2@0.3 | 0.85 | 0.28 | 0.01 | 27.8 % | 3.5 % | 51 of 200 | 0.32 |
+| clean | v1@0.3 | 0.00 | 0.00 | 0.00 | 0.0 % | 0.0 % | 0 of 51 | – |
+| clean | v1-policy2@0.3 | 0.00 | 0.00 | 0.00 | 0.0 % | 0.0 % | 0 of 51 | – |
 
 ### Measured and not adopted
 
