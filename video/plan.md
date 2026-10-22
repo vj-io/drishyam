@@ -12,7 +12,7 @@ stamping in at each chapter.
 | --- | --- | --- |
 | `public/video/drishyam.mp4` | the video (H.264 + AAC, poster baked in as frame 0) | no: `public/video/*.mp4` is ignored; it ships to the site bucket at deploy time and as a release asset |
 | `public/video/drishyam.vtt` | captions, the same cues as the burned-in ones (written by the same build as the MP4) | yes |
-| `public/video/poster.jpg` | the agent's confirm look on the rebar in the live run (line `l5`, step 3: the camera panel with its crop and its reason, "confirm look: none of exposed_rebar confirmed"), settled | yes |
+| `public/video/poster.jpg` | the agent's confirm look on the rebar in the live run (line `l5`, step 3: the camera panel with its crop and WHY THIS LOOK, "...the confirm look did not confirm it, so a person checks it by eye"), settled | yes |
 | `brag-output/drishyam-short.mp4` | 15-20 s 9:16 cut: the cold open's run, the sign-off (the typing at real time, then a jump cut to Approve), ending on the settled APPROVED stamp of the spalling and the URL; labelled "recorded 2026-10-22 · live site · v1 · v1-policy2" and "the rebar went to a person to check by eye"; its three lines are o1, "Only a person can approve a critical finding." and "Try it live: the trained v1."; v1's held-out result in the lower third, with what v1-policy2 changes (8.75 critical boxes per photo, 0.91×; recall 0.99×) | no (brag-output/ is ignored) |
 | `brag-output/standin/film/` | `build.py --standin`: the film with the stand-in real-photo runs, if `--make-standin` made them (nothing is pending any more): `drishyam-standin.mp4`, `drishyam-standin.vtt`, `poster-standin.jpg`, `plan-tables.md` | no |
 
@@ -141,7 +141,7 @@ the line from the real summary, measures the whole film (both real photos) again
 summary charged another machine's cost table is refused.
 
 The live site runs v1 with the v1-policy2 look policy (since 2026-10-22), and the footage is of that build (the
-`/api/health` recorded with it, `video/live/health.json`: commit c1830c4). `video/live/aws-smoke.log` is a copy of
+`/api/health` recorded with it, `video/live/health.json`: commit ed7a080). `video/live/aws-smoke.log` is a copy of
 the main checkout's `runs/aws-smoke.log` (every `scripts/aws.sh smoke` run's `/api/health` and step p95) up to
 2026-10-21T11:38:30Z: `docs/aws.md` and `tests/test_live_state_doc.py` quote its eleven v1 runs, so the two smoke runs
 of 2026-10-22 (adf9474, c1830c4) are not in the copy yet. The build groups the runs by the segmenter their health
@@ -173,10 +173,9 @@ writes `health.json` and the boxes of its key fields, the segmenter's and the wh
 
 ## Length
 
-The committed tables below are the layout of 247.9 s: `r8` gained what the live look policy changes. The committed
-`public/video/drishyam.vtt` and poster, and the MP4, are still the render of 243.6 s from before that line (239.9 s
-before the live chapter was re-recorded on 2026-10-22); the next full render, after the live chapter is recorded
-again, brings them back in step. With the trained segmenter's line,
+Nothing is pending: the committed tables below are the film as rendered, 247.9 s (239.9 s before the live chapter
+was re-recorded on 2026-10-22; its new lines say more about the rebar, and `r8` says what the live look policy
+changes). With the trained segmenter's line,
 both real photos and the portraits on, the narration first measured 285 s; it came to 4:00 by cutting words and
 holds, not chapters:
 
@@ -201,9 +200,11 @@ and AWS and Arm (the arm Lambda, its latency then and now).
 ## How the footage is used, honestly
 
 - Every frame of the demo chapters is a screencast of a real job on https://d1xg58guluup8c.cloudfront.net
-  (recorded 2026-10-22, live jobs `j_61ace4` guided, `j_e1aec5` break it, `j_7d4406` KILL, `j_75944f` Resume), on the
-  build the site runs now: v1 with the v1-policy2 look policy (`video/live/health.json`: `onnx:drishyam_dacl10k.onnx`,
-  commit c1830c4). It replaced the footage of 2026-10-18, recorded on the classical engine. Each run's trace is saved,
+  (recorded 2026-10-22 at about 07:26Z, live jobs `j_ec6d1c` guided, `j_c81586` break it, `j_76da9f` KILL, `j_2df829`
+  Resume), on the build the site runs now: v1 with the v1-policy2 look policy (`video/live/health.json`:
+  `onnx:drishyam_dacl10k.onnx`, commit ed7a080, the deploy whose step panel words the held-mask and confirm-look
+  reasons). It replaced the footage of 2026-10-18, recorded on the classical engine, and a first recording of
+  2026-10-22 (c1830c4), whose step panel printed the raw rationale. Each run's trace is saved,
   token fields and embedded images removed, in `video/live/*.ndjson`; every live-run number in the voice or on screen
   comes from those files and `video/live/order_status.json`. Before the footage plays, `l0` says when and on what, with
   the camera on the recorded response's own `"segmenter"` field; `o1` says "its trained engine", and the cold open's
@@ -250,6 +251,9 @@ and AWS and Arm (the arm Lambda, its latency then and now).
 - `docs/architecture.png` is shown as committed. Its segment box says "default: classical, no weights" (the code's
   default); the deployed site opts in to v1, as `a4` says over it. Its footnote cites `segment.py:239` for `cv2.dnn.ENGINE_NEW`;
   the call is now at `drishyam/segment.py:298`. The claim itself (the one OpenCV-5-only call) still holds.
+- The site's step panel (FIG. 2.3b) has a fixed height, so at step 3 the last line of its WHAT IT SAW box is clipped
+  by the box. The camera's view of that panel ends above WHAT IT SAW (`film.js`, the step-3 key), so the clipped line
+  is not in the film; the fix belongs in the site.
 - Clicking "Try KILL" clears the last job, so the page re-lays out and scrolls back to the viewer; at about 7x speed
   the "How it works" sheet passes through the window for a fraction of a second, and after KILL the page scrolls up to
   the Demo sheet's head, where Resume is. It is the real page doing it.
@@ -387,7 +391,7 @@ and AWS and Arm (the arm Lambda, its latency then and now).
 | real-photo failure (text only) | image_0001435: exposed_rebar reported as corrosion | `public/results/codebrim/failures_text.json` | [category='Rebar, spall and stain confusion'].what_happened |
 | guided run: share of pixels read | 0.2487 | `video/live/guided.ndjson` | done.summary.pixels_frac |
 | guided run: critical findings | 1 | `video/live/guided.ndjson` | done.summary.critical_pending |
-| guided run: agent seconds | 3.902 | `video/live/guided.ndjson` | done.summary.seconds |
+| guided run: agent seconds | 5.955 | `video/live/guided.ndjson` | done.summary.seconds |
 | survey look: full width / L3 width | 8 | `video/live/guided.ndjson` | job.levels[0][0] / job.levels[3][0] |
 | privacy pass: faces, people, vehicles blurred | [0, 0, 0] | `video/live/guided.ndjson` | job.privacy |
 | survey look: what it drafted | ["corrosion", "spalling"] | `video/live/guided.ndjson` | finding[step=1], first state |
@@ -401,7 +405,7 @@ and AWS and Arm (the arm Lambda, its latency then and now).
 | ground truth (synthetic): boxes touched by a finding of their class / by the needs-a-look entry | [["spalling", "spalling", "crack"], ["exposed_rebar"]] | `public/samples/index.json` | bridge_03 boxes against the findings and not_assessed |
 | the work order after the sign-off: status, approvals | ["incomplete", 1] | `video/live/order_status.json` | status, approvals |
 | planner drill: rejected strategy | rm -rf / | `video/live/break.ndjson` | planner[status=rejected].reason |
-| governor drill: segmenter p95 (ms) | 2288.6 | `video/live/break.ndjson` | step[5].runtime.p95_ms['segment:accurate'] |
+| governor drill: segmenter p95 (ms) | 2355.4 | `video/live/break.ndjson` | step[5].runtime.p95_ms['segment:accurate'] |
 | governor drill: model switched to | fast | `video/live/break.ndjson` | step[5].model |
 | governor drill: the segmenter's SLA (ms) | 1500 | `video/live/break.ndjson` | step[5].governor.rationale |
 | KILL drill: halt cause | kill-switch | `video/live/kill.ndjson` | done.cause |
@@ -414,7 +418,7 @@ and AWS and Arm (the arm Lambda, its latency then and now).
 | /api/health arch | aarch64 | `video/live/health.json` | arch |
 | /api/health host | aws-lambda | `video/live/health.json` | host |
 | /api/health build | stock (not COOL) | `video/live/health.json` | build |
-| /api/health commit | c1830c48446ebddf8d163eadbd571e97f46e3d05 | `video/live/health.json` | commit |
+| /api/health commit | ed7a0801e282984250432a64e9cac31771363e84 | `video/live/health.json` | commit |
 | /api/health segmenter | onnx:drishyam_dacl10k.onnx | `video/live/health.json` | segmenter |
 | MCP: first verify call | 6 | `docs/mcp-session/exchange.jsonl` | [tool=verify][0].n |
 | MCP: its IoU | 0.0 | `docs/mcp-session/exchange.jsonl` | [tool=verify][0].content[0].value.iou |

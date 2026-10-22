@@ -380,7 +380,9 @@ function buildLive() {
     KF(cw - 1.9, 560, 470, 1150), KF(cw + 0.15, 330, 560, 900),
     KF(ev['step:1'] - 0.6, 380, 560, 1060), KF(ev['step:2'] + 0.4, 340, 560, 900),
     KF(ev['step:2'] + 2.0, 950, 735, 660),   // step 2's decision: the spalling critical, the rebar held for a confirm look
-    KF(ev['step:3'] + 0.3, 950, 355, 640), KF(ev['step:3'] + 1.8, 950, 750, 660),   // the confirm look, then "a person checks it by eye"
+    // the confirm look: its crop and WHY THIS LOOK, the view ending above WHAT IT SAW (the site's panel clips that box's
+    // last line) through the hold's push; then the decision panel's "a person checks it by eye"
+    KF(ev['step:3'] + 0.3, 948, 289, 600), KF(ev['step:3'] + 1.8, 950, 750, 660),
     KF(ev['step:4'] + 0.3, 420, 560, 1000), KF(ev['done:guided'] + 0.3, 560, 330, 1080),
     KF(ev['click:Sign them off'], 640, 560, 1240), KF(ev['click:Sign them off'] + 1.4, 330, 720, 840),
     KF(ev[`approved:${N - 1}`] + 0.3, 420, 700, 900), KF(ev[`approved:${N - 1}`] + 1.2, 945, 400, 700),

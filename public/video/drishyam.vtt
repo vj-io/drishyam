@@ -169,53 +169,57 @@ On 200 real CODEBRIM photos, held out, the trained v1 finds 49 %:
 two and a half times the classical engine's 1 in 5.
 
 43
-00:03:05.956 --> 00:03:08.176
+00:03:05.956 --> 00:03:08.277
 But its boxes find 30 % at random,
 
 44
-00:03:08.186 --> 00:03:12.296
+00:03:08.287 --> 00:03:12.321
 and a person gets five and a half times the critical boxes.
 
 45
-00:03:12.306 --> 00:03:18.781
-On 51 undamaged synthetic photos, the classical engine flags 2 in 3; v1, none.
+00:03:12.331 --> 00:03:16.615
+The live policy sends a tenth fewer, with recall unchanged.
 
 46
-00:03:19.431 --> 00:03:22.676
-Our own wall, no ground truth: no region was proposed,
+00:03:16.625 --> 00:03:23.100
+On 51 undamaged synthetic photos, the classical engine flags 2 in 3; v1, none.
 
 47
-00:03:22.686 --> 00:03:26.914
-so the trained segmenter never ran, and missed the hairline crack.
+00:03:23.750 --> 00:03:26.995
+Our own wall, no ground truth: no region was proposed,
 
 48
-00:03:27.764 --> 00:03:32.081
-On a second wall, one close look flagged a crack on the lower of two we traced,
+00:03:27.005 --> 00:03:31.233
+so the trained segmenter never ran, and missed the hairline crack.
 
 49
-00:03:32.091 --> 00:03:34.805
-and never looked closely at most of the wall.
+00:03:32.083 --> 00:03:36.400
+On a second wall, one close look flagged a crack on the lower of two we traced,
 
 50
-00:03:35.655 --> 00:03:36.979
-Failures in the open:
+00:03:36.410 --> 00:03:39.124
+and never looked closely at most of the wall.
 
 51
-00:03:36.989 --> 00:03:41.749
-graffiti read as spalling, a formwork line as a crack, glare, and blur.
+00:03:39.974 --> 00:03:41.298
+Failures in the open:
 
 52
-00:03:41.799 --> 00:03:45.864
-Only the glare gate caught its case; three fixes are not built yet.
+00:03:41.308 --> 00:03:46.068
+graffiti read as spalling, a formwork line as a crack, glare, and blur.
 
 53
-00:03:46.514 --> 00:03:52.382
-Pixels, not millimetres. AI-assisted, not an inspection. Only a person can approve.
+00:03:46.118 --> 00:03:50.183
+Only the glare gate caught its case; three fixes are not built yet.
 
 54
-00:03:53.432 --> 00:03:57.436
-make test, make eval, and one script for the AWS stack.
+00:03:50.833 --> 00:03:56.701
+Pixels, not millimetres. AI-assisted, not an inspection. Only a person can approve.
 
 55
-00:03:57.986 --> 00:04:01.650
+00:03:57.751 --> 00:04:01.755
+make test, make eval, and one script for the AWS stack.
+
+56
+00:04:02.305 --> 00:04:05.969
 Drishyam. It looks where it matters, and asks a human first.
