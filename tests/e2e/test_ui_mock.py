@@ -1374,6 +1374,9 @@ def test_a_person_checks_the_needs_a_look_entry_by_eye(browser, base):
         check.get_by_role("button", name="Defect found").click()
         expect(check.locator(".finding__err")).to_contain_text("reviewer name")  # the name is required, as on the cards
         assert not LIVE["reviews"]
+        for close in p.get_by_role("button", name="Close notification").all():  # the replay's revision notes, for the shots
+            close.click()
+        expect(p.locator(".win--toast")).to_have_count(0)
         s.to(".check", "center")
         s.shot(f"needs-look-{size['width']}-before.png")
         check.get_by_label("Reviewer").fill("A. Engineer")
@@ -1390,6 +1393,7 @@ def test_a_person_checks_the_needs_a_look_entry_by_eye(browser, base):
         expect(p.locator("#say-4")).to_contain_text("Checked by eye: ready to send")
         expect(p.locator("#done .stack > .note").first).to_contain_text(f"Work order {WO_ID} is ready")
         expect(p.locator("#done .stack > .note").first).to_contain_text("1 defect found by eye")
+        expect(p.locator("#checks .fgroup__hist")).to_have_text("checked")
         expect(check.get_by_role("button", name="Defect found")).to_have_count(0)
         s.to(".check", "center")
         s.shot(f"needs-look-{size['width']}-after.png")
