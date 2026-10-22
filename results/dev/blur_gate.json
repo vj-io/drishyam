@@ -102,6 +102,54 @@
   "dev_read": "none: evals.blur_gate dev never ran under the replaced rule; no dev or held-out photo was read by the replaced rule's code or this one before this file was committed"
  },
  "splits": {
+  "synth_dev": "data/synth_dev, 60 photos, seed 4242 (2048 x 1536)",
+  "clean": "data/synth_clean_dev, 30 photos with no damage, seed 4243",
+  "real": "CODEBRIM dev100: evals/codebrim_dev100.txt in data/codebrim (none in eval200)",
+  "check": "each split's dataset sha256 (ground truth and images) must equal results/dev/model_choice_dev.json's datasets; the run refuses otherwise"
+ },
+ "code": "e2c6aafe9310a0ebbb9338b76c79cfb7b01bd6a8: the both-gates gate, its tests and evals/blur_gate.py, committed before this file; the run records the commit it runs at",
+ "commands": [
+  "DRISHYAM_ONNX=models/drishyam_dacl10k.onnx .venv/bin/python -m evals.blur_gate dev --workers 6, from the checkout under test. It refuses to run unless this file is committed as it stands and holds no outputs, unless its arms equal the code's (imaging.BLUR_GATES) and imaging.REBLUR_MAX equals calibration.reblur_max; it records this file's commit and time, its own start, the code commit and its tracked changes; it writes run, gate_pooled, splits, clauses, verdict and adopted into this file, and every view's numbers to runs/blur_gate/dev_views.json.gz (not committed). No image is written.",
+  "Then the verdict is read from this file by the rule above, unchanged, and committed.",
+  "Then DRISHYAM_ONNX=models/drishyam_dacl10k.onnx .venv/bin/python -m evals.blur_gate real01 adds real_01_fallback_look (it refuses before the verdict is in this file, or twice)."
+ ],
+ "if_adopted": "JobConfig.blur_gate's default becomes \"both\" for every profile, in its own commit, and the unit suite runs again; every number published before it ran with the Laplacian gate, and is said to wherever it is reported beside the new gate's. Scoring v1 with it on a held-out set is a separate step for the owner to approve; nothing runs on held-out data in this test, and nothing is written to public/.",
+ "run": {
+  "rule_commit": "45c3ef7024bd4715113514dda23eca79aaed31df",
+  "rule_committed": "2026-10-23T00:42:27+05:30",
+  "run_started": "2026-10-23T00:42:35+05:30",
+  "code": {
+   "commit": "45c3ef7024bd4715113514dda23eca79aaed31df",
+   "tracked_changes": ""
+  },
+  "segmenter": "onnx:drishyam_dacl10k.onnx drishyam_dacl10k.onnx@c49416c10087",
+  "micro_arm": "local-macos-x86-dacl10k-retime",
+  "finished": "2026-10-23T00:48:19+05:30",
+  "views_file": "runs/blur_gate/dev_views.json.gz"
+ },
+ "gate_pooled": {
+  "photos": 190,
+  "views": 851,
+  "refused_as_is": {
+   "laplacian": 49,
+   "both": 6
+  },
+  "refused_blurred": {
+   "laplacian": 846,
+   "both": 838
+  },
+  "as_is_diff": -0.0505,
+  "as_is_diff_ci": [
+   -0.0836,
+   -0.0235
+  ],
+  "blurred_diff": -0.0094,
+  "blurred_diff_ci": [
+   -0.0176,
+   -0.0023
+  ]
+ },
+ "split_results": {
   "synth_dev": {
    "n": 60,
    "dataset_gt_sha256": "ab3ea45abb852fa21e2696721060a4952819196b2959085d6f27866726b74bd3",
@@ -3687,48 +3735,6 @@
    }
   }
  },
- "code": "e2c6aafe9310a0ebbb9338b76c79cfb7b01bd6a8: the both-gates gate, its tests and evals/blur_gate.py, committed before this file; the run records the commit it runs at",
- "commands": [
-  "DRISHYAM_ONNX=models/drishyam_dacl10k.onnx .venv/bin/python -m evals.blur_gate dev --workers 6, from the checkout under test. It refuses to run unless this file is committed as it stands and holds no outputs, unless its arms equal the code's (imaging.BLUR_GATES) and imaging.REBLUR_MAX equals calibration.reblur_max; it records this file's commit and time, its own start, the code commit and its tracked changes; it writes run, gate_pooled, splits, clauses, verdict and adopted into this file, and every view's numbers to runs/blur_gate/dev_views.json.gz (not committed). No image is written.",
-  "Then the verdict is read from this file by the rule above, unchanged, and committed.",
-  "Then DRISHYAM_ONNX=models/drishyam_dacl10k.onnx .venv/bin/python -m evals.blur_gate real01 adds real_01_fallback_look (it refuses before the verdict is in this file, or twice)."
- ],
- "if_adopted": "JobConfig.blur_gate's default becomes \"both\" for every profile, in its own commit, and the unit suite runs again; every number published before it ran with the Laplacian gate, and is said to wherever it is reported beside the new gate's. Scoring v1 with it on a held-out set is a separate step for the owner to approve; nothing runs on held-out data in this test, and nothing is written to public/.",
- "run": {
-  "rule_commit": "45c3ef7024bd4715113514dda23eca79aaed31df",
-  "rule_committed": "2026-10-23T00:42:27+05:30",
-  "run_started": "2026-10-23T00:42:35+05:30",
-  "code": {
-   "commit": "45c3ef7024bd4715113514dda23eca79aaed31df",
-   "tracked_changes": ""
-  },
-  "segmenter": "onnx:drishyam_dacl10k.onnx drishyam_dacl10k.onnx@c49416c10087",
-  "micro_arm": "local-macos-x86-dacl10k-retime",
-  "finished": "2026-10-23T00:48:19+05:30",
-  "views_file": "runs/blur_gate/dev_views.json.gz"
- },
- "gate_pooled": {
-  "photos": 190,
-  "views": 851,
-  "refused_as_is": {
-   "laplacian": 49,
-   "both": 6
-  },
-  "refused_blurred": {
-   "laplacian": 846,
-   "both": 838
-  },
-  "as_is_diff": -0.0505,
-  "as_is_diff_ci": [
-   -0.0836,
-   -0.0235
-  ],
-  "blurred_diff": -0.0094,
-  "blurred_diff_ci": [
-   -0.0176,
-   -0.0023
-  ]
- },
  "clauses": {
   "recall_holds_synth_dev": true,
   "recall_holds_real": true,
@@ -3736,5 +3742,8 @@
   "clean_share_with_a_box_does_not_rise": true
  },
  "verdict": "Harm",
- "adopted": false
+ "adopted": false,
+ "notes": [
+  "The run (evals.blur_gate at e2c6aaf) wrote its per-split results under the key `splits`, as the rule's commands said, over the rule's own `splits` field (the split descriptions and the sha256 check). After the run the descriptions were restored from 45c3ef7 and the results moved, unchanged, to `split_results`; the script now writes `split_results` and refuses to write a key the rule already holds. No number, clause or verdict changed."
+ ]
 }

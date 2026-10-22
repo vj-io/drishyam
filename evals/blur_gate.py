@@ -272,12 +272,14 @@ def main(argv=None) -> None:
     adopted = word == "Gain" and all(cl.values())
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "dev_views.json.gz").write_bytes(gzip.compress(json.dumps(res["views"]).encode()))
-    doc.update({"run": {"rule_commit": commit, "rule_committed": committed, "run_started": started, "code": code,
-                        "segmenter": harness.segmenter_id(default_segmenter()), "micro_arm": MICRO_ARM,
-                        "finished": datetime.now().astimezone().isoformat(timespec="seconds"),
-                        "views_file": str((OUT / "dev_views.json.gz").relative_to(harness.REPO))},
-                "gate_pooled": res["pooled"], "splits": res["splits"], "clauses": cl,
-                "verdict": word, "adopted": adopted})
+    out = {"run": {"rule_commit": commit, "rule_committed": committed, "run_started": started, "code": code,
+                   "segmenter": harness.segmenter_id(default_segmenter()), "micro_arm": MICRO_ARM,
+                   "finished": datetime.now().astimezone().isoformat(timespec="seconds"),
+                   "views_file": str((OUT / "dev_views.json.gz").relative_to(harness.REPO))},
+           "gate_pooled": res["pooled"], "split_results": res["splits"], "clauses": cl, "verdict": word,
+           "adopted": adopted}
+    assert not set(out) & set(doc), set(out) & set(doc)  # the run adds to the rule, never over it
+    doc.update(out)
     RULE_FILE.write_text(json.dumps(doc, indent=1, default=float) + "\n")
     print(json.dumps({k: doc[k] for k in ("gate_pooled", "clauses", "verdict", "adopted")}, indent=1, default=float))
 
