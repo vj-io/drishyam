@@ -4,7 +4,7 @@ The web demo (the FastAPI app and the static site) runs on AWS only, as one CDK 
 `us-east-1`: the API on Lambda arm64 (Graviton) and the static site in a private S3 bucket, both reached
 only through CloudFront and AWS WAF.
 
-**Status: deployed** on 2026-10-21 (India time) to `us-east-1`, last from commit c1830c4 on 2026-10-22 (below). The v1 deploy
+**Status: deployed** on 2026-10-21 (India time) to `us-east-1`, last from commit a4419e2 on 2026-10-22 (below). The v1 deploy
 itself came from commit dda3080, with the v1 segmenter
 (`ONNX=models/drishyam_dacl10k.onnx ONNX_FP16=models/drishyam_dacl10k.fp16.onnx RESERVED=none scripts/aws.sh deploy`)
 and the submission film in the site bucket (`video/drishyam.mp4`, served with byte ranges). The smoke run
@@ -30,7 +30,23 @@ the second job after 2 steps, and `tests/e2e/test_ui_live.py https://d1xg58guluu
 smoke 2026-10-21T04:21:29Z https://d1xg58guluup8c.cloudfront.net commit=02219a2e435ea90058fcb87f03d69f30cc3f2b4d package=r7K9s9XZtHmkq0+f2OtXiTy1CUyFo5xf2GzQkv6UJMs= ttfb_first=0.857872s ttfb_warm=0.728508s step_p95_ms=973.3 result=pass
 ```
 
-The current build: the site was redeployed from commit c1830c4 on 2026-10-22. Its Lambda package is the one
+The current build: the site was redeployed from commit a4419e2 on 2026-10-22, release 1.1.1: version 1.1.1 in
+`/api/health` and the film re-recorded on the live site (4:08, `video/drishyam.mp4` in the bucket, 123,597,576 bytes).
+`tests/e2e/test_ui_live.py https://d1xg58guluup8c.cloudfront.net` passed twice against it, and then its smoke run
+(`WAF_LOOP=1`) passed: a job on `bridge_03.jpg` ended `awaiting_review` after 6 steps, KILL halted the second job
+after 3 steps, both 403 checks held, the WAF answered 429 at the 15th empty-bodied job start, and the step p95 was
+647.6 ms over 6 steps:
+
+```
+smoke 2026-10-22T08:34:06Z https://d1xg58guluup8c.cloudfront.net commit=a4419e258978398f8cbfa1726a508b203399de45 package=Y4Y1LAkpmyjEKcPpGQbA0FkZLza/ibwmZ1MLFToC8Wo= ttfb_first=0.924834s ttfb_warm=1.017152s step_p95_ms=647.6 result=pass
+```
+
+Before it, ed7a080 fixed the step detail, which printed v1-policy2's raw reasons (the film's re-recorded footage
+showed them). Its first deploy failed on a DNS error reaching the CDK asset bucket, and two live browser runs against
+the old build then failed the 40 s pace check on a slow network (42.5 and 45.6 s). Redeployed, `/api/health`
+reported ed7a080 and `tests/e2e/test_ui_live.py` passed twice.
+
+Before that, the site was redeployed from commit c1830c4 on 2026-10-22. Its Lambda package is the one
 adf9474 deployed (the same `CodeSha256`); it changes the site only: v1-policy2's held-mask reasons in plain words
 (the live browser suite had found raw class names such as `exposed_rebar` on screen), the work order's sentence for
 held masks, and the pages saying v1-policy2 is live. `tests/e2e/test_ui_live.py https://d1xg58guluup8c.cloudfront.net`
