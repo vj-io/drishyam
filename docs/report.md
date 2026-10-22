@@ -849,6 +849,14 @@ triage stays the default. On a 2,536-photo backlog (`results/backlog_2536/summar
 them holding a critical defect), ran 587 and queued 684 critical findings for a person, for $0.316 of Bedrock within a
 $0.50 budget. The batch's report stays blocked until a person reviews them.
 
+`drishyam batch --batch-yield` (off by default) changes the plan from what the jobs measure: under budget pressure,
+a job leaves its photo once its best next look is worth less than the next photo's first look (Charnov's marginal
+value theorem, 1976; no LLM). Forced looks are never cut, and what a yield skips is listed as not assessed. Under the
+rule committed before its run (`results/dev/batch_yield.json`, 190 dev photos, v1-policy2), it shows no measurable
+difference: critical recall 0.551 against the triage's 0.481 at half the budget (×1.15, CI 0.995–1.47), 93 photos
+reached instead of 64, and 413 not-assessed entries instead of 173. It stays off. A real batch on 24 photos matched
+the replay exactly.
+
 ## 11. Responsible use and limits
 
 - Evidence-first UI: crop, measurements and gaze step before any confidence
