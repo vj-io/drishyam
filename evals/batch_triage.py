@@ -51,9 +51,10 @@ def make(img, cfg, **kw):
     return batch.make_job(img, cfg, cost_model="fixed", micro_arm=MICRO_ARM, **kw)
 
 
-def photo_task(rec: dict) -> dict:
+def photo_task(rec: dict, make=make) -> dict:
     """One photo's triage and full job, with what the replay needs: the seconds used after the overview and after
-    each look, and for each labelled critical defect the first look after which a critical finding queues it."""
+    each look, and for each labelled critical defect the first look after which a critical finding queues it.
+    `make`: the Job factory (evals.router_eval passes one on another cost table)."""
     img, _ = batch.load(rec["path"])
     cfg = JobConfig(thumbs=False)
     tri = batch.triage(img, cfg, make)
@@ -77,9 +78,10 @@ def full_seconds(p: dict) -> float:
     return p["post"][-1] if p["post"] else p["overview_s"]
 
 
-def replay(photos: list[dict], order, budget: float, triage: bool) -> dict:
-    """The batch run_batch would run: photos in `order` (indices into `photos`), each job's seconds cap what is left."""
-    spent = sum(p["triage"]["seconds"] for p in photos) if triage else 0.0
+def replay(photos: list[dict], order, budget: float, triage: bool, extra: float = 0.0) -> dict:
+    """The batch run_batch would run: photos in `order` (indices into `photos`), each job's seconds cap what is left;
+    `extra`: further seconds charged before the first job (a router's $)."""
+    spent = (sum(p["triage"]["seconds"] for p in photos) if triage else 0.0) + extra
     found = found_iou = false = reached = 0
     first = None
     for i in order:

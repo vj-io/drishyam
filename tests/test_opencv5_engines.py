@@ -44,8 +44,11 @@ def test_missing_weights_stop_before_any_timing(tmp_path):
     assert not (tmp_path / "x").exists()
 
 
-def load(name: str) -> dict:
-    return json.loads((REPO / "results" / "local-macos-x86" / name).read_text())
+def load(name: str, arm: str = "local-macos-x86") -> dict:
+    return json.loads((REPO / "results" / arm / name).read_text())
+
+
+GITHUB = ("linux-aarch64", "linux-x86_64")  # bench-arm64.yml's engines job, run 39617514621
 
 
 def ms(t: dict) -> str:
@@ -126,5 +129,60 @@ def test_engines_section_is_the_json():
     assert [w for w in want if w not in section()] == []
 
 
+def github_rows():
+    """Every row that runs on the GitHub runners, and the null slot: p50 / p95 on the Arm runner at 1 and 4 threads,
+    then on the x86 one, then each runner's parity with its deployed net."""
+    arm, x86 = (load(RUNS[0], a) for a in GITHUB)
+    n = arm["config"]["all_threads"]
+    by = {(r["file"], r["engine"], r["size"]): r for r in x86["rows"]}
+    for r in (r for r in arm["rows"] if r["runs"]):
+        x = by[r["file"], r["engine"], r["size"]]
+        cells = lambda pre: " | ".join(ms(d[f"{pre}forward_threads{t}"]) for d in (r, x) for t in (1, n))  # noqa: B023
+        yield (f"| {LABEL[r['file']]} | `ENGINE_{r['engine'].upper()}` | {r['size']} | {cells('')} | "
+               f"{dp(r['vs_reference'])} | {dp(x['vs_reference'])} |")
+        if "null_forward_threads1" in r:
+            yield (f"| FP32, the same net in a second timing slot (null) | `ENGINE_NEW` | {r['size']} | "
+                   f"{cells('null_')} | | |")
+
+
+def github_figures() -> list[str]:
+    """The phrases the section takes from the two GitHub runs."""
+    fp32, fp16 = "drishyam_dacl10k.onnx", "drishyam_dacl10k.fp16.onnx"
+    arm, x86 = (load(RUNS[0], a) for a in GITHUB)
+    rel = lambda v: ", ".join(f"x{x:.2f}" for x in v)
+    pct = lambda v: f"{100 * max(abs(x - 1) for x in v):.0f} %"
+    out = []
+    for name, d in (("Arm", arm), ("x86", x86)):
+        p = d["provenance"]
+        out += [f"{p['cpu']}, {p['logical_cpus']} logical CPUs, {p['machine']}",
+                f"load average {p['load_avg'][0]} at the start and {d['load_avg_end'][0]} at the end",
+                f"`cv2_custom_hal` {p['cv2_custom_hal']}",
+                f"{name}: {rel(ratios(d, (fp32 + ' static', 'classic'), (fp32, 'new')))}",
+                f"{name} {rel(ratios(d, (fp16, 'new'), (fp32, 'new')))}",
+                (f"{name} {pct(ratios(d, (fp32, 'new'), (fp32, 'new'), 'null_forward_threads{}'))}, the static copy "
+                 f"on `ENGINE_NEW` {pct(ratios(d, (fp32 + ' static', 'new'), (fp32, 'new')))}")]
+    pixels = arm["config"]["crops"] * 256 * 256
+    bad = (1 - next(r for r in arm["rows"] if (r["file"], r["engine"], r["size"]) == (fp32 + " static", "classic", 256))
+           ["vs_reference"]["argmax_agreement"]) * pixels
+    assert abs(bad - round(bad)) < 0.4  # the six-decimal agreement pins the count
+    return out + [f"{round(bad)} of the {pixels:,} pixels"]
+
+
+def test_github_runs_are_the_json():
+    text = section()
+    rows = list(github_rows())
+    assert len(rows) == 12 and [r for r in rows if " ".join(r.split()) not in text] == []
+    mac = load(RUNS[0])
+    status = lambda d: {(r["file"], r["engine"], r["size"]): (r["loads"], r["runs"]) for r in d["rows"]}
+    for a in GITHUB:
+        d = load(RUNS[0], a)
+        assert d["arm"] == a and d["config"]["all_threads"] == 4 and status(d) == status(mac)
+        assert {(r["file"], r["engine"]) for r in d["rows"] if SHAPE in r.get("error", "")} == {
+            ("drishyam_dacl10k.onnx", "classic"), ("drishyam_dacl10k.fp16.onnx", "classic")}
+        assert d["onnx_runtime_in_build"] == "NO" and "not Lambda" in d["provenance"]["label"]
+    assert [f for f in github_figures() if f not in text] == []
+
+
 if __name__ == "__main__":
     print(*table_rows(), sep="\n")
+    print(*github_rows(), *github_figures(), sep="\n")

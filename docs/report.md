@@ -115,7 +115,7 @@ Critical findings (exposed rebar; spalling above 40 000 px²) wait in `pending_r
 or with `drishyam review`, can approve or reject them; nothing the agent, the MCP tools or the planner can call reaches
 that transition.
 
-No LLM runs in the live demo. The deployed agent is the rule policy above (the stack sets no
+No LLM runs in the live demo (the batch CLI's optional Nova Lite router is in section 10). The deployed agent is the rule policy above (the stack sets no
 `DRISHYAM_PLANNER_URL`), and the planner failure drills use planners scripted to time out or answer junk. The LLM
 path is the MCP server: section 10 links a recorded session in which Claude chose each call from the measured
 values.
@@ -181,17 +181,50 @@ limits and the cost table, is [aws.md](aws.md).
 | Segment | classical engine: `cvtColor`, `createCLAHE`, `GaussianBlur`, `medianBlur`, `morphologyEx`, `inRange`, `dilate`, `connectedComponentsWithStats`; ONNX engine: `dnn.readNetFromONNX(path, engine=cv2.dnn.ENGINE_NEW)` | `segment.py` |
 | Measure and verify | `morphologyEx` (hit-or-miss thinning), `findContours`, `minAreaRect`, `arcLength`, `approxPolyDP`; cross-level mask IoU through `warpPerspective` and `dilate` | `measure.py`, `agent.py` |
 
-Only one call is specific to OpenCV 5: the `engine=cv2.dnn.ENGINE_NEW` argument (`OnnxSegmenter._load` in `segment.py`), on the opt-in
-ONNX path, which `tests/test_segment.py` exercises with a tiny ONNX model. The live demo runs v1 on that path (since
-2026-10-21), so it uses this one OpenCV-5-only API; it runs on the stock OpenCV 5.0.0 wheel.
+**What OpenCV 5 adds, and what the pipeline does with it.** "New in 5.0" means absent from the latest 4.x wheel,
+opencv-python-headless 4.14.0.94 (`results/local-macos-x86/opencv_builds.json`). [bench.md](bench.md), "OpenCV 5
+features in the pipeline", has every figure, the rule a change had to pass (the agent's traces identical to the byte
+on the ten demo samples and four synth_dev images, with both segmenters, and a measured speed-up) and what was not
+adopted. The timings are this Mac's (a heavily shared machine) unless a runner is named; both new benchmarks also
+ran once on GitHub's Arm and x86 runners (run 39665440222, quiet VMs, not the Lambda).
+
+- `ENGINE_NEW` (new in 5.0): `engine=cv2.dnn.ENGINE_NEW` in `OnnxSegmenter._load` (`segment.py`, exercised by
+  `tests/test_segment.py` with a tiny ONNX model) is the only engine that reads v1, which the live demo runs since
+  2026-10-21 on the stock 5.0.0 wheel. On 5.0 `readNet` gives it to the NanoDet privacy detector too: 4.14 took
+  x1.95 (1.79-2.13) of 5.0's time on that forward here, and x1.59 (1.59-1.60) on the Arm runner.
+- 5.0's bilinear warp without lookup tables (new in 5.0): 4.14 took x1.60 (1.38-1.85) of 5.0's time on the gaze's
+  `warpPerspective` and x2.43 (2.07-2.86) on an oblique one, with a different output; on the Arm runner x1.53
+  (1.53-1.54) and x1.80 (1.79-1.81), but on the EPYC runner 4.14's warp was the faster. The warp is cheap next to a
+  segmenter look, so a job barely moves.
+- The engine selector with `ENGINE_CLASSIC` on a static-shape copy of v1 (the selector is new in 5.0; the classic
+  engine is 4.x's): `OnnxSegmenter(engine="classic")`, off. On this Mac the agent's traces with it were identical on
+  14 of 14 photos, every argmax equal, but its looks took x1.30 (1.29-1.32) of `ENGINE_NEW`'s time on 16 threads. On
+  GitHub's Neoverse-N2 runner it ran v1's forward in x0.38 of `ENGINE_NEW`'s time, and at the agent level it passes
+  both tests there: the same 14 traces identical, and its looks took x0.39 (0.39-0.40) of
+  `ENGINE_NEW`'s time on one thread and x0.44 (0.44-0.45) on two, the Lambda function's thread count. It is the
+  largest gain found for the live v1. It stays off: the owner kept `ENGINE_NEW` live (2026-10-22), so this is
+  reported as a finding, not a change (bench/repro/README.md, 3). Shipping it would need a copy written at build time
+  into `models/` (the Lambda package lacks the `onnx` package that makes it), one code change (read that file by path,
+  keep hashing the original) and a check on the deployed Graviton.
+- The new engine's profiling mode (`Net.setProfilingMode(DNN_PROFILE_DETAILED)`, new in 5.0), in
+  `bench/opencv5_features.py`: v1's time per layer on both engines. Here its twelve 3x3 convolutions are 81 % of
+  `ENGINE_NEW`'s time on one thread. On the Arm runner they took 800.6 against 248.5 ms on the two engines, more than
+  the whole gap: the new engine's 2.6 times longer forward there is its 3x3 convolution.
+- `CV_Bool` (new in 5.0): the NumPy bool footprint as a `copyTo` mask in `segment.restrict`. Identical, faster in
+  three of its four timings here, where it failed the rule (one interval reaches 1.02). On both GitHub runners it
+  passes (x0.91 to x0.95 of the NumPy time). It is on since 2026-10-22 (`CV_BOOL_MASKS`): the owner chose the result
+  on Arm, where the function runs, after seeing both. Its output is identical on all three machines, so no published
+  number moves.
+- `reduceArgMax` (OpenCV 4.6, not new) in `segment.finish`: identical, x0.52 to x0.74 of NumPy's time, adopted
+  (`CV_ARGMAX`); on a whole look the gain is within this machine's noise.
 
 **What OpenCV 5's DNN module loaded, and what it did not.** The v1 model loads only on `ENGINE_NEW`:
 `ENGINE_CLASSIC` stops at the decoder's `Shape` node (`Assertion failed: !isDynamicShape in function 'parseShape'`)
 on the FP32 file and on both statically quantized copies (`results/local-macos-x86/int8.json`; the other three models
 were not tried on it). The cause is the export's symbolic input H and W (`[1, 3, 'h', 'w']`, so one file runs at both
 the 512 and the 256 size): a copy with them fixed loads on `ENGINE_CLASSIC` and matches the deployed net to max |dprob| 2.1e-5,
-while the FP16 copy loads there but fails its first forward; the engine timings, a minimal repro and the pending Arm
-run are in [bench.md](bench.md), "OpenCV 5 DNN engines for v1". `training/parity.py` checks every export against its PyTorch
+while the FP16 copy loads there but fails its first forward; the engine timings (this Mac, and GitHub's Arm and x86
+runners) and a minimal repro are in [bench.md](bench.md), "OpenCV 5 DNN engines for v1". `training/parity.py` checks every export against its PyTorch
 checkpoint through `OnnxSegmenter` on `ENGINE_NEW` (20 crops, FP32 tolerance max |dprob| 1e-3) and refuses an FP32
 file over it. A DeepLabV3+ (the dacl10k paper's baseline architecture, `--arch deeplabv3plus` in
 `training/train_dacl10k.py`) was tried first for v2c and dropped: its FP32 export, with the 19-to-6 class merge in the
@@ -716,7 +749,14 @@ handed the exposed-rebar finding to a human with the disagreement as the reason;
 a spalling finding; at step 20 the remaining pixel budget ended the search. Its prompt states the decision rules
 (entropy above 0.5 means zoom, IoU below 0.5 means disagreement; [prompt.txt](mcp-session/prompt.txt)), so the
 session shows the tools carrying measured evidence to an LLM more than autonomous planning. The transcript also
-notes the large spall it missed.
+notes the large spall it missed. On the live v1 engine, [mcp-session-v1/transcript.md](mcp-session-v1/transcript.md)
+records two more sessions with the same bridge and rules, plus L1 as v1's finest level. On `bridge_03.jpg`
+a verify measured spalling IoU 0.468 between L2 and L1, and L1 read the bars that L2 called exposed rebar as
+corrosion, so Claude handed both critical findings to a human with those reasons. It also spent a look on the crack
+the rule agent's stop rule left unvisited: 4 of the 4 ground-truth boxes against the rule agent's 3, at the same
+17.1 % of the pixels, in one session whose client had read the ground truth beforehand. On the team's `real_01.jpg`,
+where the overview proposes no candidate and the rule agent takes no look, Claude gazed at a faint line it saw in the
+heatmap, and v1 flagged one crack and nothing else; the measured width (34-69 px) is the mask's, not the hairline's.
 
 ### Across a backlog
 
@@ -729,6 +769,16 @@ and every photo it did not reach listed as not assessed. Its ordering is not sho
 (`results/dev/batch_triage.json`: triage against random order ×1.23, CI 0.64–1.64; against file order ×1.45,
 CI 0.53–4.00, under a rule stated before the run), and its up-front pass makes it slower to the first critical than
 that file order; the per-photo agent sets the ceiling.
+
+`drishyam batch --router nova` maps every photo through Amazon Nova Lite on Bedrock: the blurred overview and the OpenCV measurements go in, a strict JSON label (Clear, Requires zoom, Critical) comes back, any failure falls back to
+the rule triage, and accepted replies are cached by sha256. It then reduces: Clear photos are listed as not assessed,
+Critical ones run first, and the router's $ is charged to the budget. Under the rule committed before any paid call
+the result is harm (`results/dev/router_eval.json`): critical recall 0.181 against the triage's 0.497 (×0.36,
+CI 0.13–0.67) and random order's 0.331 (×0.55, CI 0.21–0.88). Free of its $, its order is no measurable gain (×1.14,
+CI 0.98–1.44), and its clears missed 9 of 81 photos holding a critical defect (0.111, CI 0.060–0.198), so the rule
+triage stays the default. On a 2,536-photo backlog (`results/backlog_2536/summary.md`) it cleared 867 photos (40 of
+them holding a critical defect), ran 587 and queued 684 critical findings for a person, for $0.316 of Bedrock within a
+$0.50 budget. The batch's report stays blocked until a person reviews them.
 
 ## 11. Responsible use and limits
 

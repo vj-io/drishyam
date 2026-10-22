@@ -7,7 +7,8 @@ person. It approves nothing.
 
 ```bash
 drishyam batch FOLDER [MORE FOLDERS, PHOTOS OR .txt LISTS] [--usd-cap TOTAL] [--seconds-cap TOTAL] \
-    [--photo-pixel-cap 0.3] [--photo-usd-cap 0.05] [--photo-seconds-cap 20] [--cost-model live|fixed] [--out runs]
+    [--photo-pixel-cap 0.3] [--photo-usd-cap 0.05] [--photo-seconds-cap 20] [--cost-model live|fixed] [--out runs] \
+    [--router rule|nova]
 # a person reviews each critical finding in its photo's work order, as for one photo
 drishyam review runs/batch-<id>/<job>/work_order.json f1 approve --by "A. Engineer"
 # then the batch report is recomputed from the work orders and signed again
@@ -22,7 +23,7 @@ step. Each run leaves `runs/batch-<id>/`:
 
 | File | What it holds |
 | --- | --- |
-| `batch_trace.jsonl` | One record per batch decision (`triaged`, `ordered`, `started`, `finished`, `budget-stop`, `killed`, `refreshed`), each with its `cause`, a `rationale` that cites the measured values, and the seconds spent so far |
+| `batch_trace.jsonl` | One record per batch decision (`triaged`, with `--router nova` also `routed` and `cleared`, then `ordered`, `started`, `finished`, `budget-stop`, `killed`, `refreshed`), each with its `cause`, a `rationale` that cites the measured values, and the seconds spent so far |
 | `<job>/trace.jsonl`, `<job>/work_order.json`, `<job>/crops/` | Each photo's own run, exactly what `drishyam run` writes |
 | `inspection.json` | The report, sealed with the work-order HMAC (`findings.sign`) |
 | `inspection.md` | The same, for a person: status, the human queue, everything not assessed, each photo in the order run |
@@ -109,6 +110,155 @@ per-photo agent's reach, this dev backlog cannot separate that from chance. The 
 orchestrates the backlog, and it does not depend on the ranking: one budget, a stop with every photo it did not reach
 listed, one human queue, and a sealed report.
 
+## A live LLM router: `--router nova`
+
+`drishyam batch --router nova` puts a live LLM, Amazon Nova Lite (`amazon.nova-lite-v1:0`) on Amazon Bedrock in
+us-east-1, between the triage and the runs ([drishyam/router.py](../drishyam/router.py)). `--router rule`, the
+default, is the batch above, unchanged.
+
+1. **Map, one call per photo.** The router sends the photo's own L3 overview, the pyramid level the saliency map and
+   the survey read, decoded and with people already blurred, at most 896 px on its long side (Nova rescales any image
+   so one side passes 896 px, so a larger one buys no detail), and the OpenCV measurements of it: the triage's
+   candidate count and priors, saliency statistics (mean, 95th percentile, share above 0.5) and the quality gate run
+   on the overview. No file name or path is sent. One fixed prompt asks for one JSON object,
+   `{"label": "Clear" | "Requires zoom" | "Critical", "reason": "<one line>"}`, at temperature 0 with at most 120
+   output tokens. Eight calls run at once while the next photos are decoded.
+2. **Validation.** The reply must be exactly that object (or the whole reply as one ```` ```json ```` block, which
+   Nova Lite adds): exactly the two keys, one of the three labels, and a reason of 1 to 200 printable characters
+   with no newline and none of `` <>[]`|\ ``. Anything else is `rejected`; a timeout (30 s), a throttle, an access
+   error or any other exception is a `fallback`. Either way the photo gets the rule triage's treatment, label
+   Requires zoom: it is run, in prior-sum order, and never cleared. Every reply is one `routed` line of
+   batch_trace.jsonl with its status, the cause, the latency and its $; a rejected reply's first 200 characters are
+   kept there too.
+3. **Cache.** An accepted reply is cached by the photo's sha256 together with the model and the prompt
+   (`DRISHYAM_ROUTER_CACHE`, default `~/.drishyam/router_cache`), so a rerun of the same photos makes no call and
+   costs nothing, whatever the files are named. Failures are not cached: a rerun asks again.
+4. **Reduce.** A Clear photo gets no job. It is listed under not assessed as "cleared by the router (not looked at
+   closely)" with the router's reason, and the action "look at it, or run it with --router rule"; it is never
+   reported as assessed or clean, and a batch with a cleared photo is never `ready`. Critical photos run first, then
+   Requires zoom, each in the triage's order, under the batch budget, which is also charged the router's Bedrock $
+   as seconds at the agent's $0.339 per hour (on a rerun, cached labels cost nothing and charge nothing). The human
+   gate is the per-photo one, unchanged: the router only orders and clears, and no label approves anything.
+5. **Kill.** The kill switch stops the map step before the next photo's triage or before the next reply is taken
+   (calls not yet started are cancelled), and the reduce step as before. A batch killed during the map clears
+   nothing: every photo is listed as not reached.
+
+The router sees pixels, which the planner never does ([planner.py](../drishyam/planner.py) gets numbers only), so
+text painted on a wall could steer its label, though the prompt says to ignore it. A label can only order a photo or
+clear it, and a cleared photo stays in the report as not assessed. Credentials come from the default AWS chain
+(`AWS_PROFILE`); a profile made by `aws login` also needs `pip install "botocore[crt]"`.
+
+**Price.** On-demand Nova Lite in us-east-1 is $0.00006 per 1,000 input tokens and $0.00024 per 1,000 output tokens
+(AWS Price List API, `USE1-NovaLite-input-tokens` and `-output-tokens`, read 2026-10-21); an image is billed as input
+tokens. Measured: a 2048x1536 photo's 256x192 overview is about 830 input tokens ($0.000057 a call), a 4608x3456
+photo's 576x432 overview about 2,036 ($0.00013 a call), and a reply about 30 output tokens.
+
+### Does the router help? (dev only)
+
+`python -m evals.router_eval` writes [results/dev/router_eval.json](../results/dev/router_eval.json). The backlog is
+the dev splits only: synth_dev (60), the first 30 of synth_clean_dev and CODEBRIM dev100, 190 photos in a seeded
+shuffle (file order). Each photo's job runs once with v1 (`onnx:drishyam_dacl10k.onnx`, its FP16 net as the fast
+model) on the fixed costs of results/local-macos-x86-dacl10k-retime/micro.json, and any order and budget is replayed
+from those runs as in the triage evaluation above; each photo is routed once through drishyam.router. The 190 jobs
+take 487.1 s run in full; triage costs 7.3 s; the router's 190 calls cost $0.0163, which the batch charges as 173.5
+s. A real `drishyam batch --router nova` run at the primary budget matched the replay: 71 photos reached, 209
+labelled critical defects queued (its labels came from the cache, so it charged no router $, as the replay with the
+router's $ not charged).
+
+**The rule, committed before any paid router call (0d38696, `RULE` in evals/router_eval.py).** The primary metric is
+critical recall within a total budget of half the seconds the 190 jobs take in full, the router arm charged its
+triage and its Bedrock $. Gain: the paired 95 % bootstrap CIs of router / rule triage and of router / random order
+both lie above 1. Harm: either lies below 1. Safety: the share of photos holding a labelled critical defect that the
+router clears, with a Wilson 95 % CI; clearing is called safe only if its upper bound is at most 0.05.
+
+**Verdict: harm, and clearing is not shown safe.**
+
+At the primary budget (243.6 s, of which the router's $ is 173.5 s):
+
+| Arm | Critical recall (of 370) | IoU-only | Photos reached | First critical queued at | Queued criticals matching no label |
+| --- | --- | --- | --- | --- | --- |
+| router, its $ charged | 0.181 (67) | 0.059 | 19 | 181.5 s | 27 |
+| router, its $ not charged | 0.565 (209) | 0.149 | 71 | 8.0 s | 83 |
+| rule triage | 0.497 (184) | 0.124 | 64 | 8.0 s | 77 |
+| file order | 0.332 (123) | 0.097 | 92 | 3.0 s | 53 |
+| random order | 0.331 (122.4) | 0.102 | 95.5 | 6.1 s | 49.9 |
+
+Recall ratios of the router to each arm, with paired 95 % bootstrap CIs (1000 resamples within each split):
+
+| Budget | vs rule triage | vs random | $ not charged, vs rule triage | $ not charged, vs random |
+| --- | --- | --- | --- | --- |
+| a quarter (121.8 s) | 0 (0-0) | 0 (0-0) | 1.44 (1.07-3.31) | 1.46 (0.96-2.51) |
+| **half (243.6 s), primary** | **0.36 (0.13-0.67)** | **0.55 (0.21-0.88)** | 1.14 (0.98-1.44) | 1.71 (1.53-1.85) |
+| three quarters (365.3 s) | 0.88 (0.67-0.94) | 1.08 (0.82-1.17) | 1.03 (0.98-1.08) | 1.27 (1.19-1.32) |
+
+What the numbers say:
+
+- **The router costs more than it saves.** One call is $0.000086 a photo on this backlog, 36 % of the modelled $
+  of the photo's whole v1 job ($0.000241). Routing all 190 photos costs 173.5 s of the 243.6 s budget, so the router
+  arm reaches 19 photos where the triage alone reaches 64; at a quarter of the budget it reaches none.
+- **Its order, free, is no measurable gain over the triage.** With its $ not charged, Critical first and Clear
+  skipped queues 209 critical defects against the triage's 184: 1.14 (CI 0.98-1.44).
+- **It clears photos that hold critical defects.** It cleared 36 of the 190 photos: 8 of the 32 with no labelled
+  defect, 19 with only non-critical ones, and 9 of the 81 holding a labelled critical defect (miss rate 0.111, Wilson
+  CI 0.060-0.198; 2 of 29 on synth_dev, 7 of 52 on CODEBRIM). Those 9 hold 16 of the 370 labelled critical defects,
+  9 of which the agent queues when it runs them in full.
+- **It rarely says Critical.** Labels against the labels (rows: label; columns: router, Clear / Requires zoom /
+  Critical): no defect 8 / 24 / 0, non-critical 19 / 58 / 0, critical 9 / 68 / 4; accuracy 0.37. All four
+  Critical calls were right, all on CODEBRIM.
+- **Latency and failures.** At a 10 s timeout the first pass timed out 37 of the 190 calls (19 %, most of them
+  4608x3456 CODEBRIM photos; 9 timed out again on a second pass, with the machine at a load average of 100 to 500
+  from other work); one such call alone took 5.9 s. Failures are not cached, so each rerun asked again; at 30 s every
+  photo had an accepted reply (p50 1.2 s on the first pass, 1.7 s for the last 10, the slowest 3.0 s). No reply was
+  rejected once the ```json fence was accepted.
+
+On this dev backlog the live router is a net loss: one Nova Lite call per photo costs about a third of what running
+the photo's job in full costs. On top of that it skips photos the agent would have found critical defects in.
+`--router rule` stays the default.
+
+### A 2,536-photo backlog, end to end
+
+[results/backlog_2536/summary.md](../results/backlog_2536/summary.md) (numbers in
+[summary.json](../results/backlog_2536/summary.json); made by [evals/backlog_2536.py](../evals/backlog_2536.py)).
+The backlog is the size of the St. Johns Bridge inspection and uses dev-safe photos only. It holds 1,220 fresh
+synthetic photos with damage (seed 2536, used by no evaluation) and 1,216 without (seeds 2537, 2539, 2541 and 2543),
+all 4608x3456 (CODEBRIM's commonest size) and labelled. The 100 CODEBRIM dev photos are mixed in, and all 2,536 are
+listed in a seeded shuffle. Two seeds were dropped on the way: `evals.synth` died at this size in efflorescence()
+on seed 2536 (photo 200) and seed 2538 (photo 137). The damage set is therefore the first 1,220 mixes of
+`stratify(1280, 2536)` that render; 5 of 1,225 could not be drawn. It ran as
+
+```bash
+DRISHYAM_ONNX=models/drishyam_dacl10k.onnx DRISHYAM_ONNX_FP16=models/drishyam_dacl10k.fp16.onnx AWS_PROFILE=drishyam \
+  drishyam batch data/backlog_2536/backlog.txt --router nova --cost-model fixed \
+  --micro-arm local-macos-x86-dacl10k-retime --usd-cap 0.50
+```
+
+with a stated total of $0.50, modelled: v1's compute at $0.339 an hour plus the router's Bedrock $.
+
+| | |
+| --- | --- |
+| Triaged and routed | 2,536 (2,436 calls; the 100 CODEBRIM photos came from the dev run's cache) |
+| Router labels | 867 Clear, 1,664 Requires zoom, 5 Critical; 8 fell back to the triage (30 s timeouts), 0 rejected |
+| Run | 587 photos (the 5 Critical, then 582 Requires zoom); 1,082 not reached; 867 cleared, not looked at |
+| Queued for a person | 684 critical findings, all pending review; they hit 607 of the 1,568 labelled critical defects |
+| Wrongly cleared | 40 of the 746 photos holding a labelled critical defect (0.054, Wilson CI 0.040-0.072); 294 of the 746 were run |
+| Labels against the labels | accuracy 0.43; it cleared 675 of the 1,218 photos with no labelled defect and 152 of the 572 with only non-critical ones |
+| $ | Bedrock $0.316 (4.94 M input and 79 k output tokens) and $0.184 of modelled compute: $0.500 of the $0.50 |
+| Time | 72 minutes on the wall; routing was charged 3,352 s, 63 % of the 5,310 s budget; triage 168 s |
+| Router latency | p50 1.35 s, p95 4.7 s, slowest 30 s (the timeout) |
+
+The batch ends `blocked`: 684 critical findings wait for `drishyam review`, and 1,949 photos are listed as not
+assessed, each with its reason (cleared by the router, with its one-line reason, or not reached: budget-stop). As on
+dev, routing took most of the budget. The router cleared half of the clean photos, but also 40 photos that hold a
+labelled critical defect.
+
+### Cost
+
+Bedrock spend for all of this work: CloudWatch counts 2,816 Nova Lite invocations in account 242441136319, with
+5,430,840 input and 90,472 output tokens: **$0.35** at the list price. That covers an access check, two pilots, the
+dev passes including the calls that timed out and so were not counted in the reports, one probe, and the 2,536-photo
+run. The cost estimate was written before the first paid call: $0.31 expected, $0.83 worst case, 5 USD cap. No other
+AWS resource was created.
+
 ## Not done
 
 - No MCP tool: a read-only `batch_status` would be small, but it would change the MCP allow-list of twelve that
@@ -119,3 +269,10 @@ listed, one human queue, and a sealed report.
   not reached, never as clean.
 - Non-critical review requests (ambiguous, disagree, class change, unconfirmed) stay in each photo's trace; the batch
   queue holds the critical findings, which are what blocks a work order.
+- The router runs from the CLI only: no web, MCP or Lambda path calls it, and nothing in infra/ changed.
+- The router reads one small overview. At 2048x1536 that is 256x192 px, where a 1-2 px crack is gone; it cannot see
+  what the per-photo agent zooms for, so it can order and skip photos but not assess one.
+- A call that times out is not cached and its tokens are not counted: Bedrock may still bill it, so the router's $
+  in the report is a floor (CloudWatch's token counts for the model are the bill).
+- The cache has no expiry or size cap (one small JSON file per photo).
+- Each Clear is one model's judgement of a thumbnail; nothing re-checks a sample of the cleared photos.

@@ -13,7 +13,7 @@ It is built on OpenCV 5 for the OpenCV AI Competition 2026, powered by AWS. Dris
 seen*.
 
 - **Live demo:** https://d1xg58guluup8c.cloudfront.net (stock OpenCV 5 on AWS Lambda arm64 behind CloudFront, *not COOL*; [docs/aws.md](docs/aws.md))
-- **Report:** [docs/report.md](docs/report.md) · **Architecture:** [docs/architecture.png](docs/architecture.png) · **Agent loop:** [docs/agent-loop.svg](docs/agent-loop.svg) · **Claude driving it over MCP (recorded):** [docs/mcp-session/transcript.md](docs/mcp-session/transcript.md) · **Why it matters, with sources:** [docs/impact-sources.md](docs/impact-sources.md)
+- **Report:** [docs/report.md](docs/report.md) · **Architecture:** [docs/architecture.png](docs/architecture.png) · **Agent loop:** [docs/agent-loop.svg](docs/agent-loop.svg) · **Claude driving it over MCP (recorded):** [live v1 engine, 2026-10-21](docs/mcp-session-v1/transcript.md) · [classical engine, 2026-10-18](docs/mcp-session/transcript.md) · **Why it matters, with sources:** [docs/impact-sources.md](docs/impact-sources.md)
 - **PRD:** [docs/PRD.md](docs/PRD.md) · **Requirement traceability:** [docs/requirements.md](docs/requirements.md) · **Security model:** [docs/security.md](docs/security.md) · **API:** [docs/api-contract.md](docs/api-contract.md) · **MCP:** [docs/mcp.md](docs/mcp.md)
 
 ## Results at a glance
@@ -93,7 +93,7 @@ carotene: the Lambda's own `cv2.getBuildInformation()`, as its `GET /api/health`
 and parallel framework "pthreads" ([results/lambda-cv2-build.json](results/lambda-cv2-build.json), fetched
 2026-10-21), the same as on GitHub's arm64 runner ([results/linux-aarch64/micro.json](results/linux-aarch64/micro.json)).
 
-No LLM runs in the live demo: the deployed agent is the rule policy above, and its planner failure drills use planners scripted to time out or answer junk. The LLM path is the MCP server; in a [recorded session](docs/mcp-session/transcript.md) Claude chose each call from the measured IoU and entropy (its prompt states the decision rules). The full system, AWS included, is in [docs/architecture.png](docs/architecture.png), and the loop in [docs/agent-loop.svg](docs/agent-loop.svg).
+No LLM runs in the live demo (the batch CLI's optional Nova Lite router is below): the deployed agent is the rule policy above, and its planner failure drills use planners scripted to time out or answer junk. The LLM path is the MCP server; in [recorded sessions on the live v1 engine](docs/mcp-session-v1/transcript.md) Claude chose each call from what the server measured and the crops it returned (its prompt states the decision rules): on `bridge_03` it found all 4 labelled defects with the rule agent's 17.1 % of the pixels (the rule agent stopped before the crack; the session was not blind: Claude had read the sample's labels and the earlier transcript), and on our wall photo, where the rule agent takes no look, it looked along the faint line in the overview and flagged the crack (no ground truth; the session's limits are in the transcript). An [earlier session](docs/mcp-session/transcript.md) used the classical engine. The full system, AWS included, is in [docs/architecture.png](docs/architecture.png), and the loop in [docs/agent-loop.svg](docs/agent-loop.svg).
 
 ## Run it
 
@@ -150,6 +150,7 @@ A backlog of photos ([docs/batch.md](docs/batch.md)): triage every photo with th
 unchanged per-photo agent in order of evidence under one total budget, list every photo it did not reach as not
 assessed, and write a signed inspection report with one queue of critical findings for a person. On the 90-photo dev
 backlog the ordering is no measurable gain (×1.23 against random order, 95 % CI 0.64–1.64).
+`--router nova` adds a live LLM router: Amazon Nova Lite on Bedrock labels each photo's blurred overview Clear, Requires zoom or Critical, Clear photos get no job and are listed as not assessed, and any bad reply, timeout or error falls back to the triage. On dev it loses under the rule committed before any paid call: its Bedrock $ leaves it 19 photos at half the full-run budget, so it queues 0.18 of the critical defects against the triage's 0.50 (×0.36, CI 0.13–0.67), and it cleared 9 of 81 photos holding a critical defect, so `--router rule` stays the default. A 2,536-photo backlog ran end to end in 72 min for $0.32 of Bedrock: 867 cleared, 587 run, 684 critical findings queued for a person ([batch.md](docs/batch.md#a-live-llm-router---router-nova)).
 
 ```bash
 uv run drishyam batch public/samples --seconds-cap 30

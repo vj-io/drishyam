@@ -110,7 +110,8 @@ def fixed_cost_job(img, cfg, micro_arm: str, kw: dict):
 
     from .segment import default_segmenter
 
-    costs = op_costs(cost_rows(micro_arm, default_segmenter().name), img.shape[1], img.shape[0])
+    seg = kw.get("segmenter") or default_segmenter()
+    costs = op_costs(cost_rows(micro_arm, seg.name), img.shape[1], img.shape[0])
     return FixedCostJob(img, cfg, costs, **kw)
 
 
@@ -217,12 +218,17 @@ def cmd_batch(a) -> int:
     show = lambda rec: print(f"{rec['decision']}  {Path(rec.get('photo', '')).name}  {rec['cause']}: "
                              f"{rec['rationale']}", file=sys.stderr)
     cfg = JobConfig(pixel_cap=a.photo_pixel_cap, usd_cap=a.photo_usd_cap, seconds_cap=a.photo_seconds_cap)
+    rt = None
+    if a.router == "nova":
+        from . import router
+
+        rt = router.Router(router.Nova())
     main_thread = threading.current_thread() is threading.main_thread()
     old = signal.signal(signal.SIGINT, on_sigint) if main_thread else None
     try:
         bdir = batch.run_batch(paths, Path(a.out), cfg, a.usd_cap, a.seconds_cap,
                                kill=lambda: stop.is_set() or governor.global_kill(), key=key,
-                               cost_model=a.cost_model, micro_arm=a.micro_arm, progress=show)
+                               cost_model=a.cost_model, micro_arm=a.micro_arm, progress=show, router=rt)
     finally:
         if old is not None:
             signal.signal(signal.SIGINT, old)
@@ -232,6 +238,10 @@ def cmd_batch(a) -> int:
           f"{c['ready']} ready, {c['not assessed']} not assessed")
     print(f"spent {r['spent']['seconds']:.2f} s (${r['spent']['usd']:.5f}), triage {r['spent']['triage_seconds']:.2f} s"
           + (f"; stopped: {r['stop']['cause']}" if r["stop"] else ""))
+    if ro := r.get("router"):
+        print(f"router {ro['name']}: {ro['labels']}, {ro['calls']} calls, {ro['cached']} cached, "
+              f"{ro['status']['rejected'] + ro['status']['fallback']} fell back; ${ro['usd']:.5f}; {c['cleared']} "
+              "cleared photos are listed as not assessed")
     print(f"report {bdir / 'inspection.md'} (signed: {bdir / 'inspection.json'})")
     if c["pending"]:
         print(f"{c['pending']} critical findings wait for a person: drishyam review <work order> <finding id> "
@@ -385,6 +395,9 @@ def _parser() -> argparse.ArgumentParser:
     b.add_argument("--out", default="runs", help="directory for the batch folder (default runs)")
     b.add_argument("--cost-model", choices=("live", "fixed"), default="live", help="as run's --cost-model")
     b.add_argument("--micro-arm", default="linux-aarch64", metavar="ARM", help="as run's --micro-arm")
+    b.add_argument("--router", choices=("rule", "nova"), default="rule",
+                   help="rule (default): triage order only; nova: Amazon Nova Lite on Bedrock labels each overview Clear, "
+                   "Requires zoom or Critical (AWS credentials; Clear photos get no job and are listed as not assessed)")
     b.add_argument("--report", metavar="DIR", help="after reviews: recompute DIR/inspection.json from its work orders")
     b.set_defaults(func=cmd_batch)
 
