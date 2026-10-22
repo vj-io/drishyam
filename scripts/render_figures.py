@@ -48,12 +48,12 @@ def fig41(browser) -> None:
     pg.evaluate("document.fonts.ready")
     pg.locator("#bench").scroll_into_view_if_needed()
     pg.wait_for_timeout(800)
-    label, chart, note = (pg.locator(s).first.bounding_box() for s in ("#bench .dataset", "#bench svg.chart", "#bench .bench .note"))
+    label, chart, legend = (pg.locator(s).first.bounding_box() for s in ("#bench .dataset", "#bench svg.chart", "#bench .legend"))
     pad = 12
     x0, y0 = chart["x"] - pad, label["y"] - pad
     out = ROOT / "docs/recall_vs_pixels.png"
     pg.screenshot(path=str(out), clip={"x": x0, "y": y0, "width": chart["width"] + 2 * pad,
-                                       "height": note["y"] + note["height"] - y0})  # stops above the folded data table
+                                       "height": legend["y"] + legend["height"] + pad - y0})  # the notes sit in a side column since the UI audit
     srv.shutdown()
     img = cv2.imread(str(out))
     cv2.imwrite(str(out), cv2.resize(img, (1200, round(img.shape[0] * 1200 / img.shape[1])), interpolation=cv2.INTER_AREA))
