@@ -16,7 +16,7 @@ app itself never sends 429.
 ## `GET /api/health`
 
 ```json
-{"ok": true, "version": "1.1.0", "opencv": "5.0.0", "build": "stock (not COOL)", "segmenter": "classical-v1",
+{"ok": true, "version": "1.1.1", "opencv": "5.0.0", "build": "stock (not COOL)", "segmenter": "classical-v1",
  "segmenter_licence": "MIT (no learned weights)", "max_upload_bytes": 4400000, "max_pixels": 25000000,
  "host": "local", "arch": "x86_64", "commit": null,
  "cv2_build": {"hal": "YES (ipp (ver 0.0.1))", "cpu_baseline": "SSE SSE2 SSE3 SSSE3 SSE4_1",
@@ -143,6 +143,10 @@ Event types, in order:
 {"type": "error", "message": "..."}
 ```
 
+`coverage` counts the survey look, so it can read 1.0 beside a work order whose `not_assessed` lists regions no
+closer look saw: how much was looked at closely is `coverage_looked`, which the site shows whenever the record has
+it (`coverage` only for a recording older than it, labelled "seen at any level").
+
 `prep_ms` on the `job` event is the server's time before the job's clock starts, in whole milliseconds:
 `read` (receiving the upload), `decode` (`imaging.decode_image`) and `privacy` (the face, person and
 vehicle blur, `privacy.privacy_pass`). None of it is in a step's `latency_ms`, in `seconds_used`,
@@ -242,15 +246,17 @@ floor, the value of a look that finds nothing, so a photo with nothing to find c
 holds only once every candidate still worth a look (unseen > 0) has been shown by a look at least as fine as its
 own first look (L1 by default): a coarser look (the survey, L2 or L3) cannot resolve what that look would, a
 hairline crack for one, so its seed orders candidates but never ends a job. The stop rule therefore never ends a job on a saliency prior and a coarse view alone,
-nor before it has seen anything (an overview that proposes no candidate ends the job `exhausted` with no look, and its
-work order lists the whole photo as not assessed); on a photo whose candidates lie apart the floor rarely binds and the cap ends it. A `stop-rule` halt names the binding term:
+nor before it has seen anything (an overview that proposes no candidate gets one whole-photo look at L2, cause
+`fallback-l2`, then ends `exhausted`, and its work order lists the whole photo as not assessed: see the zero-candidate
+fallback below); on a photo whose candidates lie apart the floor rarely binds and the cap ends it. A `stop-rule` halt names the binding term:
 `"best score 1.2e-04 < lambda 2.0e-04 (floor: eps x v0 / t_hat)"` or `"... (eps x value/cost)"`.
 
 Step `decision.action` values: `gaze` (first look at a region, or the survey), `escalate`
 (one level finer, same centre, because the last look was uncertain), `verify`
 (one level finer to confirm a mask), `halt`. Look `cause` values:
-`survey`, `best-score`, `entropy>tau`, `area<A_min`, `verify-new-mask`, `iou<0.5`,
-`planner:<strategy>`, `replay`, and `random-order` (only under the `order="random"` ablation).
+`survey`, `fallback-l2`, `best-score`, `entropy>tau`, `area<A_min`, `verify-new-mask`, `iou<0.5`,
+`confirm-critical` (v1-policy2's confirm look, below), `planner:<strategy>`, `replay`, and `random-order` (only under
+the `order="random"` ablation).
 `governor.cause` values: `p95>SLA`, `warp-spike`, `usd≥80%`. Halt `cause` values: `stop-rule`,
 `exhausted`, `cap-hit`, `kill-switch`, `planner:stop`. `planner_status.status` is `accepted`,
 `rejected` or `fallback` (a timeout or a network error), as on the `planner` event. A planner's
@@ -357,6 +363,62 @@ the job halting, with that size in `decision.args.size` and a rationale ending `
 leaves (108134 px)"` (synth_dev recall x1.03, clean boxes x1.40); and `survey_value`, which when False keeps the
 survey's finds out of the stop rule's value found per ms (no measurable effect).
 
+### Zero-candidate fallback (on by default)
+
+`JobConfig.fallback_l2` (True): when the overview proposes no candidate, the job spends one look at L2 whose window
+spans the whole photo before it ends (`decision.action` `gaze`, `cause` `fallback-l2`, region `w0`, a gaze of
+max(512, long side / 4) px centred on the photo, `decision.args.size` saying which), with the profile's accurate net.
+It takes the normal look path: the governor checks KILL and the caps first (a pixel cap it would exceed halts the job,
+`cap-hit`, with no look; on a 1024 × 768 photo the look is 33 % of the pixels), it is charged its pixels and its
+fixed-cost ms, the rules queue its follow-ups (an escalation or a verify one level finer where the profile allows it),
+and what it drafts is reported like any look's findings, critical ones held for a person. The photo keeps its
+`not_assessed` entry (`no candidate region was proposed`) whatever the look drafts, so its work order is never
+`ready`, and `coverage_looked` does not count the look. A resume replays it (`[action, x, y, 2, size]`; that size,
+and only at L2, may exceed the 512-px gaze). Why: on our wall photo IMG_2332 (`public/samples/real_01.jpg`, no ground
+truth) the saliency prior peaks at 0.22 against its 0.5 threshold, and the v1 net sees a hairline crack on a
+whole-photo L2 view that a whole-photo L3 view misses; that photo motivated the rule and is not evidence for it. It
+passed the rule stated before its dev run (`results/dev/zero_candidate_fallback.json`, v1 at the 30 % cap): recall
+did not drop on synth_dev or CODEBRIM dev100 and clean false alarms did not rise, but the pass rests on 1 dev photo of
+190, the only one with no candidate (a 2048 × 1536 CODEBRIM photo, whose one crack it found: recall ×1.0025, CI
+1.00–1.0093, +11.8 modelled ms per dev100 job); synth_dev and the clean dev split have none, so no clean photo tested
+its false alarms on dev. It is a `JobConfig` field, not a profile value, so it is on for every profile; every number
+published before it (the classical engine's, v1's first held-out numbers, v2a to v2c) ran with it off. A held-out run of
+v1 with the fallback alone was started and stopped unread; v1's one held-out read with it on is v1-policy2's
+(`"v1-policy2"` in `results/heldout_models.json`, report section 8).
+
+### v1-policy2 (v1's default; off for every other profile)
+
+Five `JobConfig` knobs, each None by default: a profile listed in `drishyam.agent.POLICY2` takes its values there (only
+v1's, by name and released weights), any other takes `POLICY2_OFF` (every knob off: the agent before them). `grid`:
+the first looks are the tiles of the first level's 20 %-overlap 512-px grid (`agent._tiles`, the tiling baseline's own
+`slice_boxes`) that hold an overview candidate's centre, one region per tile (id `g<n>`, prior the best of its
+candidates'), so no two first looks re-read one tile. `crit_weight`: the look score's severity, times this, for a
+region seen as `exposed_rebar` or `spalling`. `crit_floor`: a mask that would put a new critical finding before a person
+(critical by area, joining no critical finding of its class) but whose class confidence is under the floor is not
+drafted; the step's rationale says so (`"; spalling 0.55 under the floor 0.6: held for a confirm look at L2"`).
+`crit_confirm`: `shift` queues one look at the same level with the window recentred on the mask, `finer` one level finer
+(past `min_view`, for this look only); it is a `verify` with `cause` `confirm-critical`, region `<region>.c<step>`, never
+escalates, and drafts only the held classes it confirms (its own mask at or above the floor, or one overlapping the held
+mask at IoU ≥ 0.5), held critical by the area the held look measured. A held mask that is not confirmed, has no confirm
+look (`off`), or whose confirm look never ran (a cap, KILL, `max_steps`) becomes a `not_assessed` entry of `kind`
+`needs-a-look`:
+
+```json
+{"step": 7, "box": [1820, 940, 610, 380], "reason": "spalling at L2, confidence 0.55 under the floor 0.6: not a critical finding; not confirmed by its L2 confirm look",
+ "action": "check-by-eye", "kind": "needs-a-look", "cls": "spalling", "confidence": 0.55}
+```
+
+so the order is never `ready` while one is there. `merge_critical`: a critical mask mostly inside (intersection over
+the smaller box ≥ 0.5) a critical finding of its class joins it: one decision instead of two. Nothing here approves
+anything: every critical finding the agent keeps waits in `pending_review` for a person. A resumed job (replay) runs no
+confirm look: a mask the replayed looks hold goes to `needs-a-look` at once. v1 takes `grid` on, `crit_weight` 2,
+`crit_floor` 0.6, `crit_confirm` `shift` and `merge_critical` on: of 8 configurations listed before their dev run
+(`results/dev/policy2_sweep.json`), the one that passed every clause of the rule stated with them and found the most
+critical-class boxes. On CODEBRIM dev100 it cut sign-offs per photo from 2.12 to 1.34 and critical boxes from 7.24 to
+6.38 at no measurable loss of recall (what a person is shown ×1.02, CI 0.99–1.05; drafted critical-class recall ×0.98,
+0.95–1.02), with 0.14 needs-a-look entries per photo; it did not raise critical-class recall, and it does not match L2
+tiling (×0.85 of its recall at the 10 % cap). Its held-out read is in report section 8.
+
 ### Two-model cascade (off by default)
 
 `drishyam.cascade` lets a fast scout segment every look and a stronger net segment again only the looks that need it.
@@ -451,7 +513,8 @@ the classical engine); a work order the MCP tools draft has neither, since there
 `not_assessed` lists every window the quality gate refused (`reason` `blur`, `glare` or `dark`; `box` clipped to the
 image), and, with `step` 0, every blown-out or black area the overview found larger than 5 % of the image, which gets
 no look at all, so an area the agent could not read never passes for a clean one. With `action` `check-by-eye` it also
-lists the whole photo when the overview proposed no candidate (`reason` `no candidate region was proposed`) and, after
+lists the whole photo when the overview proposed no candidate (`reason` `no candidate region was proposed`, whatever
+the zero-candidate fallback look drafted) and, after
 a `kill-switch` or `cap-hit` halt, each candidate no look of its own reached (`region` names it).
 
 ### Downloaded work-order file

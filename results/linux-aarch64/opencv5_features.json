@@ -1,0 +1,1606 @@
+{
+ "arm": "linux-aarch64",
+ "config": {
+  "threads": [
+   1,
+   2,
+   4
+  ],
+  "all_threads": 4,
+  "rounds": 21,
+  "looks": 24,
+  "photos": [
+   "bridge_01",
+   "bridge_02",
+   "bridge_03",
+   "bridge_04",
+   "bridge_05",
+   "bridge_06",
+   "bridge_07",
+   "bridge_08",
+   "real_01",
+   "real_02",
+   "synth_dev/s0001",
+   "synth_dev/s0002",
+   "synth_dev/s0003",
+   "synth_dev/s0004"
+  ],
+  "dev": "evals.synth seed 4242, first 4 of 60",
+  "onnx": [
+   "models/drishyam_dacl10k.onnx",
+   "models/drishyam_dacl10k.fp16.onnx"
+  ],
+  "defaults": {
+   "CV_ARGMAX": true,
+   "CV_COMPARE": false,
+   "CV_BOOL_MASKS": false
+  },
+  "units": {
+   "CV_ARGMAX": [
+    "finish"
+   ],
+   "CV_COMPARE": [
+    "finish",
+    "restrict"
+   ],
+   "CV_BOOL_MASKS": [
+    "restrict"
+   ],
+   "all": [
+    "segment_view"
+   ]
+  },
+  "boot": 2000
+ },
+ "provenance": {
+  "cv2": "5.0.0",
+  "build_info_sha256": "4460ffe25568d7f496997f0593f568f4d91ee4740c97f057b2986c237e8a386c",
+  "cv2_baseline": "NEON FP16",
+  "cv2_dispatch": "NEON_DOTPROD NEON_FP16 NEON_BF16",
+  "cv2_parallel_framework": "pthreads",
+  "cv2_custom_hal": "YES (carotene (ver 0.0.1) KleidiCV (ver 26.03))",
+  "cv2_file": "/home/runner/work/drishyam/drishyam/.venv/lib/python3.13/site-packages/cv2/__init__.py",
+  "under_opt_cool": false,
+  "build": "stock (not COOL)",
+  "machine": "Linux 7.0.0-1017-azure aarch64",
+  "platform": "Linux-7.0.0-1017-azure-aarch64-with-glibc2.39",
+  "cpu": "Neoverse-N2",
+  "logical_cpus": 4,
+  "cv2_threads": 4,
+  "python": "3.13.16",
+  "numpy": "2.5.4",
+  "timestamp": "2026-10-21T19:53:00Z",
+  "load_avg": [
+   0.19,
+   0.14,
+   0.1
+  ],
+  "label": "GitHub ubuntu-24.04-arm runner, not Lambda"
+ },
+ "identity": {
+  "classical": {
+   "photos": 14,
+   "events": 210,
+   "looks": 62,
+   "identical": {
+    "null": 14,
+    "CV_ARGMAX": 14,
+    "CV_COMPARE": 14,
+    "CV_BOOL_MASKS": 14,
+    "all": 14
+   },
+   "differ": {
+    "null": [],
+    "CV_ARGMAX": [],
+    "CV_COMPARE": [],
+    "CV_BOOL_MASKS": [],
+    "all": []
+   }
+  },
+  "v1": {
+   "photos": 14,
+   "events": 171,
+   "looks": 49,
+   "identical": {
+    "null": 14,
+    "CV_ARGMAX": 14,
+    "CV_COMPARE": 14,
+    "CV_BOOL_MASKS": 14,
+    "all": 14
+   },
+   "differ": {
+    "null": [],
+    "CV_ARGMAX": [],
+    "CV_COMPARE": [],
+    "CV_BOOL_MASKS": [],
+    "all": []
+   }
+  }
+ },
+ "timing": {
+  "classical": {
+   "CV_ARGMAX": {
+    "finish": {
+     "inputs": 24,
+     "threads1": {
+      "off_p50_ms": 184.393,
+      "on_p50_ms": 144.999,
+      "null_p50_ms": 184.209,
+      "on": {
+       "ratio": 0.7861,
+       "ci": [
+        0.7831,
+        0.789
+       ]
+      },
+      "null": {
+       "ratio": 1.006,
+       "ci": [
+        1.0004,
+        1.0133
+       ]
+      }
+     },
+     "threads2": {
+      "off_p50_ms": 153.287,
+      "on_p50_ms": 113.982,
+      "null_p50_ms": 153.115,
+      "on": {
+       "ratio": 0.7434,
+       "ci": [
+        0.7423,
+        0.7445
+       ]
+      },
+      "null": {
+       "ratio": 1.0001,
+       "ci": [
+        0.9983,
+        1.0016
+       ]
+      }
+     },
+     "threads4": {
+      "off_p50_ms": 133.246,
+      "on_p50_ms": 94.235,
+      "null_p50_ms": 133.48,
+      "on": {
+       "ratio": 0.7074,
+       "ci": [
+        0.7038,
+        0.71
+       ]
+      },
+      "null": {
+       "ratio": 0.9994,
+       "ci": [
+        0.996,
+        1.0017
+       ]
+      }
+     }
+    }
+   },
+   "CV_COMPARE": {
+    "finish": {
+     "inputs": 24,
+     "threads1": {
+      "off_p50_ms": 183.06,
+      "on_p50_ms": 183.57,
+      "null_p50_ms": 183.634,
+      "on": {
+       "ratio": 1.0028,
+       "ci": [
+        0.9971,
+        1.0116
+       ]
+      },
+      "null": {
+       "ratio": 1.0043,
+       "ci": [
+        0.9995,
+        1.0123
+       ]
+      }
+     },
+     "threads2": {
+      "off_p50_ms": 154.343,
+      "on_p50_ms": 154.995,
+      "null_p50_ms": 154.099,
+      "on": {
+       "ratio": 1.0082,
+       "ci": [
+        0.9995,
+        1.0195
+       ]
+      },
+      "null": {
+       "ratio": 1.0071,
+       "ci": [
+        0.9977,
+        1.0195
+       ]
+      }
+     },
+     "threads4": {
+      "off_p50_ms": 134.927,
+      "on_p50_ms": 135.234,
+      "null_p50_ms": 135.038,
+      "on": {
+       "ratio": 1.0044,
+       "ci": [
+        0.9991,
+        1.0107
+       ]
+      },
+      "null": {
+       "ratio": 1.0031,
+       "ci": [
+        0.9986,
+        1.0104
+       ]
+      }
+     }
+    },
+    "restrict": {
+     "inputs": 9,
+     "threads1": {
+      "off_p50_ms": 35.203,
+      "on_p50_ms": 35.176,
+      "null_p50_ms": 35.244,
+      "on": {
+       "ratio": 0.9989,
+       "ci": [
+        0.9962,
+        1.0014
+       ]
+      },
+      "null": {
+       "ratio": 0.9983,
+       "ci": [
+        0.9944,
+        1.0017
+       ]
+      }
+     },
+     "threads2": {
+      "off_p50_ms": 32.018,
+      "on_p50_ms": 32.276,
+      "null_p50_ms": 32.116,
+      "on": {
+       "ratio": 1.0064,
+       "ci": [
+        1.0043,
+        1.0089
+       ]
+      },
+      "null": {
+       "ratio": 1.0013,
+       "ci": [
+        0.9986,
+        1.0037
+       ]
+      }
+     },
+     "threads4": {
+      "off_p50_ms": 30.239,
+      "on_p50_ms": 30.373,
+      "null_p50_ms": 30.166,
+      "on": {
+       "ratio": 1.0052,
+       "ci": [
+        1.0021,
+        1.0083
+       ]
+      },
+      "null": {
+       "ratio": 0.9998,
+       "ci": [
+        0.9962,
+        1.0029
+       ]
+      }
+     }
+    }
+   },
+   "CV_BOOL_MASKS": {
+    "restrict": {
+     "inputs": 9,
+     "threads1": {
+      "off_p50_ms": 36.101,
+      "on_p50_ms": 34.075,
+      "null_p50_ms": 36.225,
+      "on": {
+       "ratio": 0.9458,
+       "ci": [
+        0.9432,
+        0.9485
+       ]
+      },
+      "null": {
+       "ratio": 1.0022,
+       "ci": [
+        0.9994,
+        1.0051
+       ]
+      }
+     },
+     "threads2": {
+      "off_p50_ms": 32.443,
+      "on_p50_ms": 30.454,
+      "null_p50_ms": 32.487,
+      "on": {
+       "ratio": 0.9382,
+       "ci": [
+        0.9357,
+        0.9407
+       ]
+      },
+      "null": {
+       "ratio": 1.0019,
+       "ci": [
+        0.999,
+        1.0048
+       ]
+      }
+     },
+     "threads4": {
+      "off_p50_ms": 30.174,
+      "on_p50_ms": 28.096,
+      "null_p50_ms": 30.227,
+      "on": {
+       "ratio": 0.9317,
+       "ci": [
+        0.9282,
+        0.9352
+       ]
+      },
+      "null": {
+       "ratio": 1.0011,
+       "ci": [
+        0.9981,
+        1.0038
+       ]
+      }
+     }
+    }
+   },
+   "all": {
+    "segment_view": {
+     "inputs": 24,
+     "threads1": {
+      "off_p50_ms": 1139.306,
+      "on_p50_ms": 1102.674,
+      "null_p50_ms": 1139.972,
+      "on": {
+       "ratio": 0.9691,
+       "ci": [
+        0.9684,
+        0.9701
+       ]
+      },
+      "null": {
+       "ratio": 1.0005,
+       "ci": [
+        0.9994,
+        1.0016
+       ]
+      }
+     },
+     "threads2": {
+      "off_p50_ms": 1041.224,
+      "on_p50_ms": 1004.193,
+      "null_p50_ms": 1040.036,
+      "on": {
+       "ratio": 0.9644,
+       "ci": [
+        0.9629,
+        0.9659
+       ]
+      },
+      "null": {
+       "ratio": 0.9999,
+       "ci": [
+        0.9985,
+        1.0013
+       ]
+      }
+     },
+     "threads4": {
+      "off_p50_ms": 967.434,
+      "on_p50_ms": 931.391,
+      "null_p50_ms": 968.412,
+      "on": {
+       "ratio": 0.9616,
+       "ci": [
+        0.9592,
+        0.9638
+       ]
+      },
+      "null": {
+       "ratio": 0.9984,
+       "ci": [
+        0.9962,
+        1.0004
+       ]
+      }
+     }
+    }
+   }
+  },
+  "v1": {
+   "CV_ARGMAX": {
+    "finish": {
+     "inputs": 24,
+     "threads1": {
+      "off_p50_ms": 164.697,
+      "on_p50_ms": 123.497,
+      "null_p50_ms": 164.58,
+      "on": {
+       "ratio": 0.7507,
+       "ci": [
+        0.7475,
+        0.7553
+       ]
+      },
+      "null": {
+       "ratio": 1.0,
+       "ci": [
+        0.998,
+        1.0021
+       ]
+      }
+     },
+     "threads2": {
+      "off_p50_ms": 133.43,
+      "on_p50_ms": 92.437,
+      "null_p50_ms": 132.969,
+      "on": {
+       "ratio": 0.6917,
+       "ci": [
+        0.6886,
+        0.6943
+       ]
+      },
+      "null": {
+       "ratio": 0.9992,
+       "ci": [
+        0.9958,
+        1.0026
+       ]
+      }
+     },
+     "threads4": {
+      "off_p50_ms": 111.32,
+      "on_p50_ms": 71.361,
+      "null_p50_ms": 111.842,
+      "on": {
+       "ratio": 0.6418,
+       "ci": [
+        0.6397,
+        0.644
+       ]
+      },
+      "null": {
+       "ratio": 1.0049,
+       "ci": [
+        1.0014,
+        1.0085
+       ]
+      }
+     }
+    }
+   },
+   "CV_COMPARE": {
+    "finish": {
+     "inputs": 24,
+     "threads1": {
+      "off_p50_ms": 162.257,
+      "on_p50_ms": 161.894,
+      "null_p50_ms": 162.45,
+      "on": {
+       "ratio": 0.9977,
+       "ci": [
+        0.9961,
+        0.9992
+       ]
+      },
+      "null": {
+       "ratio": 1.0009,
+       "ci": [
+        0.9993,
+        1.0025
+       ]
+      }
+     },
+     "threads2": {
+      "off_p50_ms": 130.975,
+      "on_p50_ms": 130.961,
+      "null_p50_ms": 131.073,
+      "on": {
+       "ratio": 1.0002,
+       "ci": [
+        0.9986,
+        1.0018
+       ]
+      },
+      "null": {
+       "ratio": 1.0004,
+       "ci": [
+        0.9984,
+        1.0023
+       ]
+      }
+     },
+     "threads4": {
+      "off_p50_ms": 110.84,
+      "on_p50_ms": 110.85,
+      "null_p50_ms": 111.047,
+      "on": {
+       "ratio": 0.9961,
+       "ci": [
+        0.9881,
+        1.0024
+       ]
+      },
+      "null": {
+       "ratio": 0.9976,
+       "ci": [
+        0.9912,
+        1.0027
+       ]
+      }
+     }
+    },
+    "restrict": {
+     "inputs": 9,
+     "threads1": {
+      "off_p50_ms": 29.978,
+      "on_p50_ms": 30.097,
+      "null_p50_ms": 29.991,
+      "on": {
+       "ratio": 1.0031,
+       "ci": [
+        1.0,
+        1.0061
+       ]
+      },
+      "null": {
+       "ratio": 1.0024,
+       "ci": [
+        0.9996,
+        1.0052
+       ]
+      }
+     },
+     "threads2": {
+      "off_p50_ms": 28.263,
+      "on_p50_ms": 28.128,
+      "null_p50_ms": 28.122,
+      "on": {
+       "ratio": 0.9978,
+       "ci": [
+        0.994,
+        1.0019
+       ]
+      },
+      "null": {
+       "ratio": 0.9993,
+       "ci": [
+        0.9955,
+        1.0035
+       ]
+      }
+     },
+     "threads4": {
+      "off_p50_ms": 26.79,
+      "on_p50_ms": 26.748,
+      "null_p50_ms": 26.923,
+      "on": {
+       "ratio": 0.9979,
+       "ci": [
+        0.9943,
+        1.0018
+       ]
+      },
+      "null": {
+       "ratio": 1.0023,
+       "ci": [
+        1.0,
+        1.0046
+       ]
+      }
+     }
+    }
+   },
+   "CV_BOOL_MASKS": {
+    "restrict": {
+     "inputs": 9,
+     "threads1": {
+      "off_p50_ms": 30.12,
+      "on_p50_ms": 28.069,
+      "null_p50_ms": 29.978,
+      "on": {
+       "ratio": 0.9307,
+       "ci": [
+        0.928,
+        0.9336
+       ]
+      },
+      "null": {
+       "ratio": 0.9963,
+       "ci": [
+        0.9929,
+        0.9997
+       ]
+      }
+     },
+     "threads2": {
+      "off_p50_ms": 27.962,
+      "on_p50_ms": 25.888,
+      "null_p50_ms": 27.961,
+      "on": {
+       "ratio": 0.9251,
+       "ci": [
+        0.9219,
+        0.9284
+       ]
+      },
+      "null": {
+       "ratio": 0.9973,
+       "ci": [
+        0.9933,
+        1.0012
+       ]
+      }
+     },
+     "threads4": {
+      "off_p50_ms": 26.927,
+      "on_p50_ms": 24.862,
+      "null_p50_ms": 26.916,
+      "on": {
+       "ratio": 0.9212,
+       "ci": [
+        0.9174,
+        0.9253
+       ]
+      },
+      "null": {
+       "ratio": 0.9978,
+       "ci": [
+        0.994,
+        1.0016
+       ]
+      }
+     }
+    }
+   },
+   "all": {
+    "segment_view": {
+     "inputs": 0
+    }
+   }
+  }
+ },
+ "profile": {
+  "512": {
+   "threads1": {
+    "new": {
+     "layers": 159,
+     "wall_p50_ms": 889.58,
+     "profiled_ms": 888.52,
+     "by_kind": {
+      "conv 3x3": {
+       "layers": 12,
+       "ms": 800.57
+      },
+      "conv 1x1": {
+       "layers": 46,
+       "ms": 53.68
+      },
+      "depthwise conv 3x3": {
+       "layers": 9,
+       "ms": 7.02
+      },
+      "Resize": {
+       "layers": 5,
+       "ms": 6.29
+      },
+      "depthwise conv 5x5": {
+       "layers": 6,
+       "ms": 6.09
+      },
+      "TransformLayout": {
+       "layers": 18,
+       "ms": 4.46
+      },
+      "ReduceMax": {
+       "layers": 5,
+       "ms": 3.58
+      },
+      "Mul": {
+       "layers": 9,
+       "ms": 3.54
+      },
+      "Concat": {
+       "layers": 10,
+       "ms": 2.17
+      },
+      "Gather": {
+       "layers": 15,
+       "ms": 0.54
+      },
+      "ReduceMean": {
+       "layers": 8,
+       "ms": 0.48
+      },
+      "Slice": {
+       "layers": 1,
+       "ms": 0.06
+      },
+      "Shape": {
+       "layers": 5,
+       "ms": 0.02
+      },
+      "Unsqueeze": {
+       "layers": 10,
+       "ms": 0.01
+      }
+     }
+    },
+    "classic": {
+     "layers": 185,
+     "wall_p50_ms": 347.4,
+     "profiled_ms": 346.69,
+     "by_kind": {
+      "conv 3x3": {
+       "layers": 12,
+       "ms": 248.53
+      },
+      "conv 1x1": {
+       "layers": 46,
+       "ms": 53.0
+      },
+      "depthwise conv 5x5": {
+       "layers": 6,
+       "ms": 21.76
+      },
+      "Resize": {
+       "layers": 5,
+       "ms": 7.52
+      },
+      "depthwise conv 3x3": {
+       "layers": 9,
+       "ms": 6.62
+      },
+      "ReduceMax": {
+       "layers": 5,
+       "ms": 3.63
+      },
+      "ReduceMean": {
+       "layers": 8,
+       "ms": 1.89
+      },
+      "Concat": {
+       "layers": 5,
+       "ms": 1.55
+      },
+      "Add": {
+       "layers": 10,
+       "ms": 0.66
+      },
+      "Gather": {
+       "layers": 5,
+       "ms": 0.63
+      },
+      "Mul": {
+       "layers": 9,
+       "ms": 0.55
+      },
+      "Identity": {
+       "layers": 1,
+       "ms": 0.28
+      },
+      "Slice": {
+       "layers": 1,
+       "ms": 0.07
+      },
+      "Const": {
+       "layers": 6,
+       "ms": 0.01
+      },
+      "HardSwish": {
+       "layers": 20,
+       "ms": 0.0
+      },
+      "Relu": {
+       "layers": 29,
+       "ms": 0.0
+      },
+      "HardSigmoid": {
+       "layers": 8,
+       "ms": 0.0
+      }
+     }
+    }
+   },
+   "threads2": {
+    "new": {
+     "layers": 159,
+     "wall_p50_ms": 448.3,
+     "profiled_ms": 446.89,
+     "by_kind": {
+      "conv 3x3": {
+       "layers": 12,
+       "ms": 400.54
+      },
+      "conv 1x1": {
+       "layers": 46,
+       "ms": 28.03
+      },
+      "depthwise conv 3x3": {
+       "layers": 9,
+       "ms": 3.61
+      },
+      "Resize": {
+       "layers": 5,
+       "ms": 3.25
+      },
+      "depthwise conv 5x5": {
+       "layers": 6,
+       "ms": 3.21
+      },
+      "TransformLayout": {
+       "layers": 18,
+       "ms": 2.57
+      },
+      "Mul": {
+       "layers": 9,
+       "ms": 1.87
+      },
+      "ReduceMax": {
+       "layers": 5,
+       "ms": 1.87
+      },
+      "Concat": {
+       "layers": 10,
+       "ms": 1.19
+      },
+      "Gather": {
+       "layers": 15,
+       "ms": 0.39
+      },
+      "ReduceMean": {
+       "layers": 8,
+       "ms": 0.3
+      },
+      "Slice": {
+       "layers": 1,
+       "ms": 0.04
+      },
+      "Shape": {
+       "layers": 5,
+       "ms": 0.02
+      },
+      "Unsqueeze": {
+       "layers": 10,
+       "ms": 0.01
+      }
+     }
+    },
+    "classic": {
+     "layers": 185,
+     "wall_p50_ms": 197.52,
+     "profiled_ms": 196.54,
+     "by_kind": {
+      "conv 3x3": {
+       "layers": 12,
+       "ms": 144.37
+      },
+      "conv 1x1": {
+       "layers": 46,
+       "ms": 27.96
+      },
+      "depthwise conv 5x5": {
+       "layers": 6,
+       "ms": 11.12
+      },
+      "Resize": {
+       "layers": 5,
+       "ms": 3.87
+      },
+      "depthwise conv 3x3": {
+       "layers": 9,
+       "ms": 3.39
+      },
+      "ReduceMax": {
+       "layers": 5,
+       "ms": 1.92
+      },
+      "ReduceMean": {
+       "layers": 8,
+       "ms": 1.02
+      },
+      "Concat": {
+       "layers": 5,
+       "ms": 0.9
+      },
+      "Add": {
+       "layers": 10,
+       "ms": 0.62
+      },
+      "Gather": {
+       "layers": 5,
+       "ms": 0.62
+      },
+      "Mul": {
+       "layers": 9,
+       "ms": 0.43
+      },
+      "Identity": {
+       "layers": 1,
+       "ms": 0.23
+      },
+      "Slice": {
+       "layers": 1,
+       "ms": 0.07
+      },
+      "Const": {
+       "layers": 6,
+       "ms": 0.01
+      },
+      "HardSwish": {
+       "layers": 20,
+       "ms": 0.0
+      },
+      "Relu": {
+       "layers": 29,
+       "ms": 0.0
+      },
+      "HardSigmoid": {
+       "layers": 8,
+       "ms": 0.0
+      }
+     }
+    }
+   },
+   "threads4": {
+    "new": {
+     "layers": 159,
+     "wall_p50_ms": 226.87,
+     "profiled_ms": 224.98,
+     "by_kind": {
+      "conv 3x3": {
+       "layers": 12,
+       "ms": 200.13
+      },
+      "conv 1x1": {
+       "layers": 46,
+       "ms": 14.54
+      },
+      "depthwise conv 3x3": {
+       "layers": 9,
+       "ms": 2.19
+      },
+      "Resize": {
+       "layers": 5,
+       "ms": 1.68
+      },
+      "depthwise conv 5x5": {
+       "layers": 6,
+       "ms": 1.67
+      },
+      "TransformLayout": {
+       "layers": 18,
+       "ms": 1.46
+      },
+      "ReduceMax": {
+       "layers": 5,
+       "ms": 0.99
+      },
+      "Mul": {
+       "layers": 9,
+       "ms": 0.99
+      },
+      "Concat": {
+       "layers": 10,
+       "ms": 0.7
+      },
+      "Gather": {
+       "layers": 15,
+       "ms": 0.34
+      },
+      "ReduceMean": {
+       "layers": 8,
+       "ms": 0.26
+      },
+      "Slice": {
+       "layers": 1,
+       "ms": 0.03
+      },
+      "Shape": {
+       "layers": 5,
+       "ms": 0.01
+      },
+      "Unsqueeze": {
+       "layers": 10,
+       "ms": 0.01
+      }
+     }
+    },
+    "classic": {
+     "layers": 185,
+     "wall_p50_ms": 131.74,
+     "profiled_ms": 130.75,
+     "by_kind": {
+      "conv 3x3": {
+       "layers": 12,
+       "ms": 102.82
+      },
+      "conv 1x1": {
+       "layers": 46,
+       "ms": 14.51
+      },
+      "depthwise conv 5x5": {
+       "layers": 6,
+       "ms": 5.65
+      },
+      "Resize": {
+       "layers": 5,
+       "ms": 2.0
+      },
+      "depthwise conv 3x3": {
+       "layers": 9,
+       "ms": 1.73
+      },
+      "ReduceMax": {
+       "layers": 5,
+       "ms": 1.04
+      },
+      "Concat": {
+       "layers": 5,
+       "ms": 0.65
+      },
+      "Gather": {
+       "layers": 5,
+       "ms": 0.6
+      },
+      "Add": {
+       "layers": 10,
+       "ms": 0.59
+      },
+      "ReduceMean": {
+       "layers": 8,
+       "ms": 0.56
+      },
+      "Mul": {
+       "layers": 9,
+       "ms": 0.31
+      },
+      "Identity": {
+       "layers": 1,
+       "ms": 0.23
+      },
+      "Slice": {
+       "layers": 1,
+       "ms": 0.07
+      },
+      "Const": {
+       "layers": 6,
+       "ms": 0.01
+      },
+      "HardSwish": {
+       "layers": 20,
+       "ms": 0.0
+      },
+      "Relu": {
+       "layers": 29,
+       "ms": 0.0
+      },
+      "HardSigmoid": {
+       "layers": 8,
+       "ms": 0.0
+      }
+     }
+    }
+   },
+   "log": []
+  },
+  "256": {
+   "threads1": {
+    "new": {
+     "layers": 159,
+     "wall_p50_ms": 226.98,
+     "profiled_ms": 226.49,
+     "by_kind": {
+      "conv 3x3": {
+       "layers": 12,
+       "ms": 203.58
+      },
+      "conv 1x1": {
+       "layers": 46,
+       "ms": 14.25
+      },
+      "depthwise conv 3x3": {
+       "layers": 9,
+       "ms": 1.79
+      },
+      "depthwise conv 5x5": {
+       "layers": 6,
+       "ms": 1.68
+      },
+      "Resize": {
+       "layers": 5,
+       "ms": 1.6
+      },
+      "TransformLayout": {
+       "layers": 18,
+       "ms": 1.03
+      },
+      "ReduceMax": {
+       "layers": 5,
+       "ms": 0.89
+      },
+      "Mul": {
+       "layers": 9,
+       "ms": 0.89
+      },
+      "Concat": {
+       "layers": 10,
+       "ms": 0.48
+      },
+      "ReduceMean": {
+       "layers": 8,
+       "ms": 0.13
+      },
+      "Gather": {
+       "layers": 15,
+       "ms": 0.12
+      },
+      "Slice": {
+       "layers": 1,
+       "ms": 0.02
+      },
+      "Shape": {
+       "layers": 5,
+       "ms": 0.01
+      },
+      "Unsqueeze": {
+       "layers": 10,
+       "ms": 0.01
+      }
+     }
+    },
+    "classic": {
+     "layers": 185,
+     "wall_p50_ms": 80.44,
+     "profiled_ms": 80.13,
+     "by_kind": {
+      "conv 3x3": {
+       "layers": 12,
+       "ms": 53.43
+      },
+      "conv 1x1": {
+       "layers": 46,
+       "ms": 13.89
+      },
+      "depthwise conv 5x5": {
+       "layers": 6,
+       "ms": 6.41
+      },
+      "Resize": {
+       "layers": 5,
+       "ms": 2.25
+      },
+      "depthwise conv 3x3": {
+       "layers": 9,
+       "ms": 1.79
+      },
+      "ReduceMax": {
+       "layers": 5,
+       "ms": 0.92
+      },
+      "ReduceMean": {
+       "layers": 8,
+       "ms": 0.46
+      },
+      "Concat": {
+       "layers": 5,
+       "ms": 0.39
+      },
+      "Mul": {
+       "layers": 9,
+       "ms": 0.17
+      },
+      "Add": {
+       "layers": 10,
+       "ms": 0.16
+      },
+      "Gather": {
+       "layers": 5,
+       "ms": 0.15
+      },
+      "Identity": {
+       "layers": 1,
+       "ms": 0.06
+      },
+      "Slice": {
+       "layers": 1,
+       "ms": 0.02
+      },
+      "Const": {
+       "layers": 6,
+       "ms": 0.01
+      },
+      "HardSwish": {
+       "layers": 20,
+       "ms": 0.0
+      },
+      "Relu": {
+       "layers": 29,
+       "ms": 0.0
+      },
+      "HardSigmoid": {
+       "layers": 8,
+       "ms": 0.0
+      }
+     }
+    }
+   },
+   "threads2": {
+    "new": {
+     "layers": 159,
+     "wall_p50_ms": 117.15,
+     "profiled_ms": 116.43,
+     "by_kind": {
+      "conv 3x3": {
+       "layers": 12,
+       "ms": 103.78
+      },
+      "conv 1x1": {
+       "layers": 46,
+       "ms": 7.62
+      },
+      "depthwise conv 3x3": {
+       "layers": 9,
+       "ms": 0.95
+      },
+      "depthwise conv 5x5": {
+       "layers": 6,
+       "ms": 0.91
+      },
+      "Resize": {
+       "layers": 5,
+       "ms": 0.88
+      },
+      "TransformLayout": {
+       "layers": 18,
+       "ms": 0.69
+      },
+      "ReduceMax": {
+       "layers": 5,
+       "ms": 0.52
+      },
+      "Mul": {
+       "layers": 9,
+       "ms": 0.51
+      },
+      "Concat": {
+       "layers": 10,
+       "ms": 0.33
+      },
+      "Gather": {
+       "layers": 15,
+       "ms": 0.12
+      },
+      "ReduceMean": {
+       "layers": 8,
+       "ms": 0.1
+      },
+      "Slice": {
+       "layers": 1,
+       "ms": 0.02
+      },
+      "Shape": {
+       "layers": 5,
+       "ms": 0.01
+      },
+      "Unsqueeze": {
+       "layers": 10,
+       "ms": 0.01
+      }
+     }
+    },
+    "classic": {
+     "layers": 185,
+     "wall_p50_ms": 43.27,
+     "profiled_ms": 42.94,
+     "by_kind": {
+      "conv 3x3": {
+       "layers": 12,
+       "ms": 28.1
+      },
+      "conv 1x1": {
+       "layers": 46,
+       "ms": 7.81
+      },
+      "depthwise conv 5x5": {
+       "layers": 6,
+       "ms": 3.33
+      },
+      "Resize": {
+       "layers": 5,
+       "ms": 1.17
+      },
+      "depthwise conv 3x3": {
+       "layers": 9,
+       "ms": 0.96
+      },
+      "ReduceMax": {
+       "layers": 5,
+       "ms": 0.53
+      },
+      "ReduceMean": {
+       "layers": 8,
+       "ms": 0.27
+      },
+      "Concat": {
+       "layers": 5,
+       "ms": 0.26
+      },
+      "Add": {
+       "layers": 10,
+       "ms": 0.16
+      },
+      "Mul": {
+       "layers": 9,
+       "ms": 0.14
+      },
+      "Gather": {
+       "layers": 5,
+       "ms": 0.12
+      },
+      "Identity": {
+       "layers": 1,
+       "ms": 0.06
+      },
+      "Slice": {
+       "layers": 1,
+       "ms": 0.02
+      },
+      "Const": {
+       "layers": 6,
+       "ms": 0.01
+      },
+      "HardSwish": {
+       "layers": 20,
+       "ms": 0.0
+      },
+      "Relu": {
+       "layers": 29,
+       "ms": 0.0
+      },
+      "HardSigmoid": {
+       "layers": 8,
+       "ms": 0.0
+      }
+     }
+    }
+   },
+   "threads4": {
+    "new": {
+     "layers": 159,
+     "wall_p50_ms": 59.76,
+     "profiled_ms": 59.21,
+     "by_kind": {
+      "conv 3x3": {
+       "layers": 12,
+       "ms": 52.07
+      },
+      "conv 1x1": {
+       "layers": 46,
+       "ms": 4.11
+      },
+      "depthwise conv 3x3": {
+       "layers": 9,
+       "ms": 0.59
+      },
+      "depthwise conv 5x5": {
+       "layers": 6,
+       "ms": 0.49
+      },
+      "Resize": {
+       "layers": 5,
+       "ms": 0.47
+      },
+      "TransformLayout": {
+       "layers": 18,
+       "ms": 0.43
+      },
+      "ReduceMax": {
+       "layers": 5,
+       "ms": 0.32
+      },
+      "Mul": {
+       "layers": 9,
+       "ms": 0.3
+      },
+      "Concat": {
+       "layers": 10,
+       "ms": 0.22
+      },
+      "Gather": {
+       "layers": 15,
+       "ms": 0.11
+      },
+      "ReduceMean": {
+       "layers": 8,
+       "ms": 0.07
+      },
+      "Slice": {
+       "layers": 1,
+       "ms": 0.01
+      },
+      "Shape": {
+       "layers": 5,
+       "ms": 0.01
+      },
+      "Unsqueeze": {
+       "layers": 10,
+       "ms": 0.01
+      }
+     }
+    },
+    "classic": {
+     "layers": 185,
+     "wall_p50_ms": 22.91,
+     "profiled_ms": 22.51,
+     "by_kind": {
+      "conv 3x3": {
+       "layers": 12,
+       "ms": 14.3
+      },
+      "conv 1x1": {
+       "layers": 46,
+       "ms": 4.2
+      },
+      "depthwise conv 5x5": {
+       "layers": 6,
+       "ms": 1.68
+      },
+      "Resize": {
+       "layers": 5,
+       "ms": 0.62
+      },
+      "depthwise conv 3x3": {
+       "layers": 9,
+       "ms": 0.53
+      },
+      "ReduceMax": {
+       "layers": 5,
+       "ms": 0.34
+      },
+      "Concat": {
+       "layers": 5,
+       "ms": 0.2
+      },
+      "ReduceMean": {
+       "layers": 8,
+       "ms": 0.17
+      },
+      "Add": {
+       "layers": 10,
+       "ms": 0.16
+      },
+      "Mul": {
+       "layers": 9,
+       "ms": 0.12
+      },
+      "Gather": {
+       "layers": 5,
+       "ms": 0.11
+      },
+      "Identity": {
+       "layers": 1,
+       "ms": 0.05
+      },
+      "Slice": {
+       "layers": 1,
+       "ms": 0.02
+      },
+      "Const": {
+       "layers": 6,
+       "ms": 0.01
+      },
+      "HardSwish": {
+       "layers": 20,
+       "ms": 0.0
+      },
+      "Relu": {
+       "layers": 29,
+       "ms": 0.0
+      },
+      "HardSigmoid": {
+       "layers": 8,
+       "ms": 0.0
+      }
+     }
+    }
+   },
+   "log": []
+  }
+ },
+ "engine": {
+  "photos": 14,
+  "identical": 14,
+  "differ": [],
+  "looks": 49,
+  "accurate_looks": 49,
+  "max_dprob": 1.481175422668457e-05,
+  "argmax_differs_px": 0,
+  "pixels": 12845056,
+  "timed_looks": 8,
+  "threads1": {
+   "off_p50_ms": 7213.755,
+   "on_p50_ms": 2792.632,
+   "null_p50_ms": 7167.398,
+   "on": {
+    "ratio": 0.3905,
+    "ci": [
+     0.3859,
+     0.396
+    ]
+   },
+   "null": {
+    "ratio": 0.9954,
+    "ci": [
+     0.9855,
+     1.002
+    ]
+   }
+  },
+  "threads2": {
+   "off_p50_ms": 3673.588,
+   "on_p50_ms": 1623.808,
+   "null_p50_ms": 3672.392,
+   "on": {
+    "ratio": 0.4444,
+    "ci": [
+     0.4389,
+     0.4514
+    ]
+   },
+   "null": {
+    "ratio": 0.9987,
+    "ci": [
+     0.9937,
+     1.0041
+    ]
+   }
+  },
+  "threads4": {
+   "off_p50_ms": 1884.32,
+   "on_p50_ms": 1098.849,
+   "null_p50_ms": 1890.325,
+   "on": {
+    "ratio": 0.5832,
+    "ci": [
+     0.5818,
+     0.5848
+    ]
+   },
+   "null": {
+    "ratio": 1.003,
+    "ci": [
+     1.0013,
+     1.0048
+    ]
+   }
+  }
+ },
+ "load_avg_end": [
+  4.13,
+  2.33,
+  1.36
+ ]
+}

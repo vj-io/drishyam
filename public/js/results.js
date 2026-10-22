@@ -185,7 +185,8 @@ function versusDownscale(hs) {
 }
 
 /** Hero chips, each a measured fact with its caveat, every pixel figure a share of the image's own pixels.
- * #stat-real holds v1 on CODEBRIM (`v1`: {real, synth}, its summaries) when published, else `real` (the classical runs). */
+ * #stat-real, the first chip, holds v1 on CODEBRIM (`v1.real`, its summary) when published, else `real` (the classical
+ * runs); the other three are the classical engine's. */
 function heroChips(sum, real, v1) {
   // Exhaustive tiling (the most pixels) is the PRD's reference point for the headline ratio.
   const tiling = points(sum.policies?.tiling).pop();
@@ -213,11 +214,17 @@ function heroChips(sum, real, v1) {
       + `${num(target) ? ` Target was ${pct(target)}: ${ratio >= target ? 'met' : 'missed'}.` : ''}`
       + `${vsDown ? `${vsDown} (${dec(hs.recall_ratio_vs_downscale)}×, 95 % CI ${dec(ds[0])}–${dec(ds[1])}).` : ''}`);
   }
-  const facts = v1Facts(v1?.real, real, v1?.synth, sum);
+  // v1's chip, first and two lines long: its interval, chance and the classical engine's recall (its costs and misses
+  // are in FIG. 4.2's note)
+  const v1p = atCap(v1?.real);
+  const v1ci = interval(v1p?.recall_ci);
   const rd = headline(real?.policies);
-  if (facts) {
+  if (num(v1p?.recall)) {
     fill('stat-real', `Live engine (v1), real bridge photos (CODEBRIM${num(v1.real.n_images) ? `, ${v1.real.n_images}` : ''})`,
-      atCap(v1.real).recall, { decimals: 2, prefix: 'recall ' }, facts[0].toUpperCase() + facts.slice(1));
+      v1p.recall, { decimals: 2, prefix: 'recall ' },
+      `at the ${pct(v1.real.headline_stats.budget)} pixel cap${v1ci ? ` (CI ${dec(v1ci[0])}–${dec(v1ci[1])})` : ''}`
+      + `${num(v1p.chance_recall) ? `; chance ${dec(v1p.chance_recall)}` : ''}`
+      + `${num(atCap(real)?.recall) ? `, classical engine ${dec(atCap(real).recall)}` : ''}.`);
   } else if (rd) {
     const others = [...points(real.policies.downscale), ...points(real.policies.tiling)].map((p) => p.recall);
     const [lo, hi] = [Math.min(rd.recall, ...others), Math.max(rd.recall, ...others)];
@@ -255,7 +262,7 @@ function heroChips(sum, real, v1) {
   const fired = (am.planner_recovery?.timeout?.fired ?? 0) + (am.planner_recovery?.malformed?.fired ?? 0) + (am.governor_response?.fired ?? 0);
   const ok = (am.planner_recovery?.recovered_total ?? 0) + (am.governor_response?.recovered ?? 0);
   if (fired > 0) {
-    fill('stat-ops', 'Failure drills', ok, { suffix: ` / ${fired} recovered` },
+    fill('stat-ops', 'Classical engine, failure drills', ok, { suffix: ` / ${fired} recovered` },
       'planner timeouts, malformed replies and slow-segmenter faults, injected on purpose');
   }
 }
@@ -288,7 +295,7 @@ function renderBench(sum, id, file, note, model, iou = false, extra = null) {
   const series = withModel ? [...SERIES, MODEL] : SERIES;
   const policies = withModel ? { ...sum.policies, model: model.sum.policies.drishyam } : sum.policies;
   const plot = h('div', {}, chart(policies, series, iou), legend(series), marks(policies, series, iou), dataTable(policies, series),
-    withModel ? h('p', { class: 'note' }, `Dashed red: Drishyam with v1, the dacl10k-trained segmenter the live demo runs since 2026-10-21, on the same images; the other lines use the classical engine.${model.text ? ` v1 held out: ${model.text}` : ''}`) : null);
+    withModel ? h('p', { class: 'note' }, `Dashed red: Drishyam with v1, the dacl10k-trained segmenter the live demo runs since 2026-10-21, on the same images, with its first look policy (v1-policy2, live since 2026-10-22, is under FIG. 4.2); the other lines use the classical engine.${model.text ? ` v1 held out: ${model.text}` : ''}`) : null);
   NARROW.addEventListener('change', () => plot.firstElementChild.replaceWith(chart(policies, series, iou)));
   root.replaceChildren(h('div', { class: 'stack' },
     h('p', { class: 'dataset' }, h('span', { class: 'dataset__k' }, 'dataset'), h('b', {}, String(sum.dataset ?? 'unlabelled'))),

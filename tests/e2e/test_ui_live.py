@@ -280,6 +280,13 @@ def run(base, server_log=None):
         index = json.loads((ROOT / "public/samples/index.json").read_text())
         real = next(s for s in index if s["file"] == "real_02.jpg")
         recorded = [json.loads(ln) for ln in (ROOT / "public/samples" / real["trace"]).read_text().splitlines()]
+        for s in index:  # v1's governor limit is 1500 ms (agent.SLA_MS_BY_PROFILE): a replay must not show the old 500 ms one
+            trace = [json.loads(ln) for ln in (ROOT / "public/samples" / s["trace"]).read_text().splitlines()] if "trace" in s else []
+            stale = [e["step"] for e in trace if e["type"] == "step" and "SLA 500 ms" in (e.get("governor") or {}).get("rationale", "")]
+            assert not stale, f"{s['trace']}: a p95>SLA switch under the old 500 ms limit at steps {stale}: re-record it"
+        slow = sum("p95>SLA" in (e.get("governor") or {}).get("causes", []) for e in recorded if e["type"] == "step")
+        done = recorded[-1]
+        looked = int(done["coverage_looked"] * 100 + 0.5)  # Math.round, as the page does
         expect(page.locator("#gallery .thumb--real .thumb__t")).to_have_text([real["title"]] * 2)
         jobs = sum("/api/jobs" in u for u in p.requests)
         page.locator("#guided-real").click()
@@ -291,6 +298,13 @@ def run(base, server_log=None):
         expect(page.locator("#job-text")).to_contain_text("(modelled)")
         expect(page.locator("#recap .recap__real")).to_contain_text("REAL PHOTO (ours), no ground truth")
         expect(page.locator("#recap .recap__real")).to_contain_text(real["note"])
+        expect(page.locator("#trace .chip", has_text="p95>SLA")).to_have_count(slow)
+        expect(page.locator("#recap")).to_contain_text(f"{looked} % of the salient area was looked at closely")
+        partial = done["work_order"]["status"] == "ready" and looked < 50
+        if partial:  # a partial look is not a clean result
+            expect(page.locator("#done .stack > .note").first).to_contain_text(
+                f"{looked} % of the salient area was looked at closely and nothing critical was found there; the rest was not looked at closely.")
+            expect(page.locator("#done")).not_to_contain_text("nothing critical needed a sign-off")
         p.plain()
         page.wait_for_timeout(1500)                       # the smooth scroll to the recap
         assert p.recap_in_view(), "the recap must be on screen at the end of the real-photo guided run"
@@ -302,7 +316,8 @@ def run(base, server_log=None):
         expect(page.locator("#job-pill")).to_have_text("needs a look", ignore_case=True)  # not "done": no look ran
         assert sum("/api/jobs" in u for u in p.requests) == jobs
         p.clean()
-        print("ok  real photos: the v1 runs replayed from their recordings (no server job), labelled, recap says what it flagged")
+        print("ok  real photos: the v1 runs replayed from their recordings (no server job), labelled, recap says what it flagged, "
+              f"no 500 ms p95>SLA switch, {looked} % looked at closely{', said beside ready' if partial else ''}")
 
         # 3c. The film: its poster, and its English captions track off by default (the captions are burned into the
         #     film), loading from this origin under the production CSP once turned on (every cue of

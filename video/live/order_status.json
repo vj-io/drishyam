@@ -1,0 +1,12 @@
+{
+ "status": "incomplete",
+ "approvals": [
+  {
+   "finding_id": "f1",
+   "decision": "approve",
+   "reviewer": "Demo reviewer",
+   "at": "2026-10-22T07:26:49Z",
+   "prev_token_sha256": "4dc485ced4714b70a981c9b0abd8c24c597361adce8a4a02760c02310c2e6b2e"
+  }
+ ]
+}

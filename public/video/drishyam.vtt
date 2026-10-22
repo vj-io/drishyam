@@ -1,225 +1,225 @@
 WEBVTT
 
 1
-00:00:01.500 --> 00:00:05.990
-It read a quarter of this photo's pixels, and found 3 critical findings.
+00:00:01.500 --> 00:00:06.278
+Its trained engine read a quarter of the pixels and flagged 1 critical finding.
 
 2
-00:00:06.040 --> 00:00:08.593
-It will not sign them off. A person must.
+00:00:06.328 --> 00:00:08.803
+It will not sign it off. A person must.
 
 3
-00:00:09.243 --> 00:00:16.150
+00:00:09.453 --> 00:00:16.360
 Drishyam, an Agentic Vision entry to the OpenCV AI Competition, powered by AWS.
 
 4
-00:00:17.200 --> 00:00:22.775
+00:00:17.410 --> 00:00:22.985
 Built by Vaibhav Jangid, lead engineer, and Bhavya Dhoot, design and presentation.
 
 5
-00:00:23.375 --> 00:00:29.284
+00:00:23.585 --> 00:00:29.494
 America has about 625,000 bridges, inspected at least every two years.
 
 6
-00:00:29.334 --> 00:00:34.031
+00:00:29.544 --> 00:00:34.241
 One drone inspection took more than 2,500 photos of one bridge.
 
 7
-00:00:34.081 --> 00:00:38.638
+00:00:34.291 --> 00:00:38.848
 Drishyam is for the engineer reviewing them: it zooms in only where needed.
 
 8
-00:00:39.288 --> 00:00:43.957
-It runs live on AWS: OpenCV 5 on an arm Lambda.
+00:00:39.498 --> 00:00:45.195
+Recorded 22 October on the live site: the trained v1 and its new look policy.
 
 9
-00:00:43.967 --> 00:00:48.064
-Watch it inspect a bridge; a privacy pass finds nothing to blur.
+00:00:45.205 --> 00:00:49.302
+Live on AWS: OpenCV 5 on an arm Lambda.
 
 10
-00:00:48.074 --> 00:00:51.507
-One survey look at the whole photo, at one eighth size.
+00:00:49.312 --> 00:00:53.409
+Watch it inspect a bridge; a privacy pass finds nothing to blur.
 
 11
-00:00:51.517 --> 00:00:56.268
-Entropy 0.69, above 0.5: unsure, so it zooms in.
+00:00:53.419 --> 00:00:58.526
+One survey look at the whole photo, at one eighth size, finds spalling and corrosion.
 
 12
-00:00:56.278 --> 00:01:00.032
-It moves to the best region and double-checks at full resolution.
+00:00:58.536 --> 00:01:01.939
+One level finer, the spalling is big enough to be critical,
 
 13
-00:01:00.042 --> 00:01:05.394
-The masks disagree: unconfirmed. Exposed rebar always goes to a person.
+00:01:01.949 --> 00:01:04.965
+but the rebar scores under the confidence floor.
 
 14
-00:01:05.404 --> 00:01:06.259
-A second spall;
+00:01:04.975 --> 00:01:09.462
+It takes one confirm look, centred on the rebar, and does not confirm it.
 
 15
-00:01:06.269 --> 00:01:11.422
-then it stops, the next look not worth its cost, and misses a crack it never visited.
+00:01:09.472 --> 00:01:14.067
+So the rebar goes to a person to check by eye, not as a critical finding.
 
 16
-00:01:11.922 --> 00:01:15.661
-Only a person can approve; then the server signs the work order.
+00:01:14.077 --> 00:01:18.199
+Three more looks find a crack; with every region looked at, it stops.
 
 17
-00:01:15.671 --> 00:01:19.455
-Change one character of the signature: the server refuses it.
+00:01:18.699 --> 00:01:20.974
+Only a person can approve the spalling;
 
 18
-00:01:20.005 --> 00:01:21.167
-Now, break it.
+00:01:20.984 --> 00:01:24.623
+the order stays incomplete until someone checks the rebar.
 
 19
-00:01:21.267 --> 00:01:24.911
-Slow the segmenter, and the governor switches to the fast model.
+00:01:24.633 --> 00:01:28.893
+Change one character of the order's signature: the server refuses it.
 
 20
-00:01:25.011 --> 00:01:28.652
-The planner drill sends a shell command; the allow-list rejects it.
+00:01:29.443 --> 00:01:30.605
+Now, break it.
 
 21
-00:01:28.752 --> 00:01:33.196
-KILL halts it before the next look; Resume replays the moves and carries on.
+00:01:30.705 --> 00:01:34.349
+Slow the segmenter, and the governor switches to the fast model.
 
 22
-00:01:33.296 --> 00:01:37.418
-No language model runs live; these planners are scripted to fail.
+00:01:34.449 --> 00:01:38.090
+The planner drill sends a shell command; the allow-list rejects it.
 
 23
-00:01:38.068 --> 00:01:42.210
-Over MCP, Claude drove the same tools on the same photo.
+00:01:38.190 --> 00:01:42.634
+KILL halts it before the next look; Resume replays the moves and carries on.
 
 24
-00:01:42.260 --> 00:01:46.800
-At call 6 the rebar masks disagreed, so Claude handed it to a human.
+00:01:42.734 --> 00:01:46.856
+No language model runs live; these planners are scripted to fail.
 
 25
-00:01:46.850 --> 00:01:51.990
-At call 18 they agreed on a spall; at call 20, the budget ended the search.
+00:01:47.506 --> 00:01:51.648
+Over MCP, Claude drove the same tools on the same photo.
 
 26
-00:01:52.040 --> 00:01:53.808
-It still missed the large spall.
+00:01:51.698 --> 00:01:56.238
+At call 6 the rebar masks disagreed, so Claude handed it to a human.
 
 27
-00:01:54.458 --> 00:01:59.058
-Each step is perception, decision and action, with a human gate at the end.
+00:01:56.288 --> 00:02:01.428
+At call 18 they agreed on a spall; at call 20, the budget ended the search.
 
 28
-00:01:59.068 --> 00:02:03.112
-CloudFront and a rate-limiting firewall front the arm Lambda;
+00:02:01.478 --> 00:02:03.246
+It still missed the large spall.
 
 29
-00:02:03.122 --> 00:02:06.752
-DynamoDB keeps kill flags, Secrets Manager the key.
+00:02:03.896 --> 00:02:08.496
+Each step is perception, decision and action, with a human gate at the end.
 
 30
-00:02:06.762 --> 00:02:12.882
-OpenCV does the looking: a pyramid, saliency, warpPerspective as a pan-tilt-zoom camera,
+00:02:08.506 --> 00:02:12.550
+CloudFront and a rate-limiting firewall front the arm Lambda;
 
 31
-00:02:12.892 --> 00:02:15.013
-a blur gate, face blurring.
+00:02:12.560 --> 00:02:16.190
+DynamoDB keeps kill flags, Secrets Manager the key.
 
 32
-00:02:15.023 --> 00:02:17.605
-Recorded on the classical segmenter;
+00:02:16.200 --> 00:02:22.320
+OpenCV does the looking: a pyramid, saliency, warpPerspective as a pan-tilt-zoom camera,
 
 33
-00:02:17.615 --> 00:02:22.464
-the site now runs the trained one, on OpenCV 5's new DNN engine.
+00:02:22.330 --> 00:02:24.451
+a blur gate, face blurring.
 
 34
-00:02:22.474 --> 00:02:28.990
-On Lambda a step took under 90 ms at p95 then, and under 1.2 s now.
+00:02:24.461 --> 00:02:29.491
+The site now runs v1 on OpenCV 5's new DNN engine.
 
 35
-00:02:29.640 --> 00:02:37.127
-On 200 synthetic photos it finds 87 % of full tiling's recall at 26 % of the pixels,
+00:02:29.501 --> 00:02:36.017
+On Lambda a step took under 90 ms at p95 then, and under 1.2 s now.
 
 36
-00:02:37.137 --> 00:02:39.608
-short of its 90 % target.
+00:02:36.667 --> 00:02:44.154
+On 200 synthetic photos it finds 87 % of full tiling's recall at 26 % of the pixels,
 
 37
-00:02:39.618 --> 00:02:42.045
-One downscaled pass does about as well.
+00:02:44.164 --> 00:02:46.635
+short of its 90 % target.
 
 38
-00:02:42.055 --> 00:02:45.614
-Ablations: only dropping the survey look loses recall,
+00:02:46.645 --> 00:02:49.072
+One downscaled pass does about as well.
 
 39
-00:02:45.624 --> 00:02:49.366
-and a random gaze order matches it on smaller photos.
+00:02:49.082 --> 00:02:52.641
+Ablations: only dropping the survey look loses recall,
 
 40
-00:02:49.376 --> 00:02:55.473
-On 200 real CODEBRIM photos, every classical method finds about 1 defect in 5;
+00:02:52.651 --> 00:02:56.393
+and a random gaze order matches it on smaller photos.
 
 41
-00:02:55.483 --> 00:02:56.898
-chance, 1 in 8.
+00:02:56.403 --> 00:03:01.606
+On 200 real CODEBRIM photos, held out, the trained v1 finds 49 %:
 
 42
-00:02:56.908 --> 00:03:01.866
-Held out, the trained segmenter finds 49 %, two and a half times as many;
+00:03:01.616 --> 00:03:05.946
+two and a half times the classical engine's 1 in 5.
 
 43
-00:03:01.876 --> 00:03:04.180
-but its boxes find 30 % at random,
+00:03:05.956 --> 00:03:08.277
+But its boxes find 30 % at random,
 
 44
-00:03:04.190 --> 00:03:08.446
+00:03:08.287 --> 00:03:12.321
 and a person gets five and a half times the critical boxes.
 
 45
-00:03:08.456 --> 00:03:14.369
-On 51 undamaged synthetic photos, the classical engine flags something 2 times in 3;
+00:03:12.331 --> 00:03:16.615
+The live policy sends a tenth fewer, with recall unchanged.
 
 46
-00:03:14.379 --> 00:03:16.251
-the trained one, never.
+00:03:16.625 --> 00:03:23.100
+On 51 undamaged synthetic photos, the classical engine flags 2 in 3; v1, none.
 
 47
-00:03:16.901 --> 00:03:20.146
+00:03:23.750 --> 00:03:26.995
 Our own wall, no ground truth: no region was proposed,
 
 48
-00:03:20.156 --> 00:03:24.384
+00:03:27.005 --> 00:03:31.233
 so the trained segmenter never ran, and missed the hairline crack.
 
 49
-00:03:25.234 --> 00:03:29.551
+00:03:32.083 --> 00:03:36.400
 On a second wall, one close look flagged a crack on the lower of two we traced,
 
 50
-00:03:29.561 --> 00:03:32.275
+00:03:36.410 --> 00:03:39.124
 and never looked closely at most of the wall.
 
 51
-00:03:33.225 --> 00:03:34.549
+00:03:39.974 --> 00:03:41.298
 Failures in the open:
 
 52
-00:03:34.559 --> 00:03:39.319
+00:03:41.308 --> 00:03:46.068
 graffiti read as spalling, a formwork line as a crack, glare, and blur.
 
 53
-00:03:39.369 --> 00:03:41.839
-2 of these four rules are not built yet.
+00:03:46.118 --> 00:03:50.183
+Only the glare gate caught its case; three fixes are not built yet.
 
 54
-00:03:42.489 --> 00:03:48.357
+00:03:50.833 --> 00:03:56.701
 Pixels, not millimetres. AI-assisted, not an inspection. Only a person can approve.
 
 55
-00:03:49.607 --> 00:03:53.611
+00:03:57.751 --> 00:04:01.755
 make test, make eval, and one script for the AWS stack.
 
 56
-00:03:54.161 --> 00:03:57.825
+00:04:02.305 --> 00:04:05.969
 Drishyam. It looks where it matters, and asks a human first.

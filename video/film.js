@@ -61,7 +61,7 @@ class Footage {
   constructor(host, w, h, url, warp, keys, opts = {}) {
     this.win = el('div', 'win', host); css(this.win, { width: w + 'px', height: h + 'px', zIndex: 1 });
     const bar = el('div', 'bar', this.win); el('i', '', bar); el('i', '', bar); el('i', '', bar);
-    this.url = el('div', 'url', bar, url); this.tag = el('div', 'tag', bar, '');
+    this.url = el('div', 'url', bar, url); if (opts.rec) el('div', 'rec', bar, opts.rec); this.tag = el('div', 'tag', bar, '');
     this.screen = el('div', 'screen', this.win); this.sw = w - 6; this.sh = h - 49 - 3;
     this.cam = el('div', 'cam', this.screen); css(this.cam, { width: '1280px', height: '1200px' });
     this.A = el('img', '', this.cam); this.B = el('img', '', this.cam);
@@ -128,11 +128,14 @@ const ORDER = F.order, SC = F.scenes;
 const TITLES = { open: 'Cold open', team: 'Team', problem: 'Problem and user', live: 'Live demo on AWS', break: 'Failure drills, human control', mcp: 'An LLM over MCP',
   arch: 'Architecture', results: 'Principal results', real: 'Real photos (ours)', failures: 'Failure cases', limits: 'Limits', repro: 'Reproduce', end: 'Links' };
 const LIT = D.lit, ENTRY = `${LIT.competition} · ${LIT.award} entry`;
+const RECTAG = `rec ${LIT.recorded} · ${D.health.segmenter}`;   // the footage's date and engine, in the bar of each window that plays it
 const PT = window.PRIVATE && window.PRIVATE.team && window.portraitChapter && window.PORTRAITS ? window.PRIVATE.team : null;   // the team's photos and portraits (private)
-const STRIPB = { open: 'live recording, synthetic sample photo bridge_03',
+const ENGINE = `trained ${D.model.name}, look policy v1-policy2`, ENG = `${D.model.name} · v1-policy2`;   // the live site's engine when the footage was recorded, and now (build.py data())
+const STRIPB = { open: `recorded ${LIT.recorded} · ${ENG} · synthetic photo bridge_03`,
   team: PT ? `our photos, drawn by OpenCV 5: ${PT.calls.map((c) => `<code>${c}</code>`).join(', ')}` : ENTRY,
   real: D.real.length ? `video/live · jobs ${D.real.map((r) => r.job).join(', ')} · ${D.real[0].engine}` : '',
-  problem: 'sources: docs/impact-sources.md', live: `recorded on ${D.urls.live.replace('https://', '')}, ${LIT.recorded}`, break: 'live: drills injected on purpose',
+  problem: 'sources: docs/impact-sources.md', live: `recorded ${LIT.recorded} on the live site · ${ENG}`,
+  break: `injected drills · recorded ${LIT.recorded} · ${ENG}`,
   mcp: 'docs/mcp-session: a recorded Claude session', arch: 'docs/architecture.png · docs/agent-loop.svg · public/docs/aws-simple.svg',
   results: 'public/results/*.json · results/heldout_models.json', failures: 'public/results/failures.json', limits: 'pixels, not millimetres', repro: D.urls.repo.replace('https://', ''), end: '' };
 
@@ -175,11 +178,12 @@ const RAILNOTE = {
   team: () => (PT ? `<b>${LIT.award}</b> entry, ${LIT.competition}. Feature regions placed by hand; every line traced by OpenCV at the pyramid level the window’s tag names.` : ''),
   real: (t) => { const R = D.real[D.real.length > 1 && t >= at('q2') - 0.6 ? 1 : 0];
     return `The team’s own photo, <b>${R.image}</b>. Job <b>${R.job}</b>: the trained segmenter <b>${D.model.name}</b>, ${R.profile}. “By eye” is the team’s reading, not ground truth.`; },
-  live: () => `Live job <b>${D.guided.job}</b> on ${D.health.host}, ${D.health.arch}, OpenCV ${D.health.opencv}, recorded ${LIT.recorded} with the <b>${D.health.segmenter}</b> engine; the agent took ${fmt(D.guided.seconds)} s. Retimed to the voice: the speed is in the window bar.`,
+  live: () => `Live job <b>${D.guided.job}</b> on ${D.health.host}, ${D.health.arch}, OpenCV ${D.health.opencv}, recorded ${LIT.recorded}: <b>${ENGINE}</b>; the agent took ${fmt(D.guided.seconds)} s. Retimed to the voice: the speed is in the window bar.`,
   break: () => 'Faults injected on purpose: a malformed planner reply, a slowed segmenter, a planner that stalls.',
   mcp: () => 'Calls, values and reasons are copied from <b>exchange.jsonl</b>. The rules were in Claude’s prompt; every value was measured by the tools.',
-  results: (t) => (t < at('r8') - 0.2 ? 'Classical segmenter, governor off, fixed per-call costs from the arm64 benchmark.'
-    : `Trained segmenter <b>${D.model.name}</b>: chosen on dev splits, scored once held out; the classical engine on the same photos.`),
+  results: (t) => (t < at('r6') - 0.2 ? 'Classical segmenter, governor off, fixed per-call costs from the arm64 benchmark.'
+    : t < at('r7') ? `Trained segmenter <b>${D.model.name}</b>, the engine the site runs: chosen on dev splits, scored once held out; the classical engine on the same photos.`
+    : `Synthetic photos with no damage: the classical engine at the 30 % cap, and <b>${D.model.name}</b> held out.`),
   failures: () => 'CODEBRIM photos are never shown: its licence bars sharing them.',
 };
 
@@ -199,7 +203,7 @@ function buildOpen() {
   const S = scene('open'), s = SC.open, ev = F.ev;
   const fw = new Footage(S.e, 1530, 836, D.urls.live.replace('https://', ''), F.warp.open, [
     KF(ev['step:1'] - 0.2, 360, 520, 760), KF(ev['step:3'], 340, 560, 640), KF(ev['step:4'] + 1.4, 330, 600, 560),
-    KF(ev['click:Sign them off'] + 0.9, 340, 700, 760), KF(ev['click:Sign them off'] + 2.6, 330, 690, 700)]);
+    KF(ev['click:Sign them off'] + 0.9, 340, 700, 760), KF(ev['click:Sign them off'] + 2.6, 330, 690, 700)], { rec: RECTAG });
   const big = el('div', 'title', S.e, `<div class="h1" style="font-size:120px">${LIT.title.split(', ').slice(0, 2).join(' · ')}<br>${LIT.title.split(', ')[2]}</div><div class="lab" style="margin-top:26px;font-size:26px">the site’s own figure note, public/index.html</div>`);
   css(big, { top: '230px' });
   const veil = el('div', 'abs', S.e); css(veil, { inset: 0, background: 'var(--chest)' });
@@ -209,7 +213,7 @@ function buildOpen() {
     await fw.draw(Math.max(t, F.warp.open.t0));
   });
   cue(s.t0 + 0.05, 'slam'); fw.clicksSfx();
-  railcall(1, (D.guided.pixels_frac * 100).toFixed(1) + ' %', `of the pixels read; ${D.guided.critical} critical findings`, at('o1') + 0.6, end('o2') + 0.3);
+  railcall(1, (D.guided.pixels_frac * 100).toFixed(1) + ' %', `of the pixels read; ${D.guided.critical} critical finding, and the rebar sent to a person to check by eye. Trained ${D.model.name}, recorded ${LIT.recorded}`, at('o1') + 0.6, end('o2') + 0.3);
 }
 
 // a camera over a board: keyframes [film t, cx, cy, width, push?], eased moves, a push-in while a view is held (a key's own push overrides the board's)
@@ -333,11 +337,16 @@ function buildLive() {
   // a. /api/health, as the browser shows it (walk.py), and the three values it reports, drawn out on leader lines
   const hw = el('div', 'abs', S.e); css(hw, { inset: 0 });
   const hwin = el('div', 'abs', hw); css(hwin, { left: '0px', top: '0px', width: '1530px', height: '330px' });
-  const H = new Footage(hwin, 1530, 330, D.urls.health.replace('https://', ''), { t0: s.t0, t1: s.t1, pts: [{ t: s.t0, f: 0 }, { t: s.t1, f: 1 }] }, [{ T: s.t0, c: [640, 360, 1280] }], { cursor: false });
+  const H = new Footage(hwin, 1530, 330, D.urls.health.replace('https://', ''), { t0: s.t0, t1: s.t1, pts: [{ t: s.t0, f: 0 }, { t: s.t1, f: 1 }] }, [{ T: s.t0, c: [640, 360, 1280] }], { cursor: false, rec: RECTAG });
   H.A.src = '../brag-output/work/walkrec/' + wk.shots[0]; loads.push(H.A.decode().catch(() => {})); css(H.A, { width: '1280px', height: '720px' });
+  // the response's "segmenter" field, where record.py --health measured it
+  const [SEG] = F.health_boxes[`"segmenter":"${D.health.segmenter}"`];
   H.draw = function (t) {
-    const w = lerp(1180, 1000, eio(seg(t, s.t0 + 0.3, s.t0 + 1.4))) * (1 - 0.14 * eio(seg(t, s.t0 + 1.4, F.warp.live.t0)));
-    const z = this.sw / w, c = [w / 2, this.sh / z / 2, z]; this.c = c;
+    // l0: the camera goes in on the segmenter field and pushes while it is said, then back out for l1's three callouts
+    const zin = eio(seg(t, LINE.l0.t + 0.2, LINE.l0.t + 1.1)) * (1 - eio(seg(t, at('l1') - 0.7, at('l1') + 0.2)));
+    const wl = lerp(1180, 1000, eio(seg(t, s.t0 + 0.3, s.t0 + 1.4))) * (1 - 0.14 * eio(seg(t, s.t0 + 1.4, F.warp.live.t0)));
+    const w = lerp(wl, 760 * (1 - 0.08 * seg(t, LINE.l0.t + 1.1, at('l1') - 0.7)), zin);
+    const z = this.sw / w, c = [lerp(wl / 2, SEG[0] + SEG[2] / 2, zin), this.sh / z / 2, z]; this.c = c;
     css(this.cam, { transform: `translate(${(this.sw / 2 - c[0] * z).toFixed(2)}px,${(this.sh / 2 - c[1] * z).toFixed(2)}px) scale(${z.toFixed(4)})` });
     this.tag.textContent = 'GET /api/health'; this.tag.className = 'tag'; this.A.style.opacity = 1; this.B.style.opacity = 0; css(this.cur, { opacity: 0 });
   };
@@ -354,21 +363,35 @@ function buildLive() {
     return { e, r, T, box, path, dot, i };
   });
   const foot = el('div', 'abs src', hw, `commit ${D.health.commit.slice(0, 7)} · the response is saved in video/live/health.json`); css(foot, { left: '0px', top: '720px', fontSize: '22px' });
+  const l0 = LINE.l0, dOut = at('l1') + 0.3, TS = l0.t + 0.9;   // the field lights at TS, its card follows; both cards leave as l1 begins
+  const segHl = el('div', 'hl', H.overlays); css(segHl, { border: '0', boxShadow: 'none', background: 'rgba(255,200,87,.42)' });
+  const segPath = svgEl('path', { fill: 'none', stroke: '#FFC857', 'stroke-width': 3.5, pathLength: 1, 'stroke-dasharray': 1 }, lead);
+  cue(TS, 'tick', 2);
+  // l0: what the footage ran (the /api/health recorded with it), and its look policy
+  const disc = [['RECORDED · this footage, ' + LIT.recorded, `trained ${D.model.name}`, `${D.health.segmenter}, commit ${D.health.commit.slice(0, 7)}, the site's /api/health that day (video/live/health.json)`, 'var(--amber)', TS + 0.45],
+    [`LOOK POLICY · since ${LIT.policy.split('since ')[1]}`, 'v1-policy2', `a critical mask under the confidence floor ${D.guided.held[2]} gets one confirm look, or goes to a person`, 'var(--amber)', l0.t + l0.dur * l0.say.indexOf('its new look') / l0.say.length]]
+    .map(([lab, big, sub, col, T], i) => { const b = el('div', 'box', hw, `<div class="lab">${lab}</div><div class="h1" style="font-size:76px;margin:16px 0 14px;white-space:nowrap;color:${col}">${big}</div><div class="mono" style="font-size:21px;line-height:1.35">${sub}</div>`);
+      css(b, { left: 30 + i * 760 + 'px', top: '440px', width: '710px', height: '250px', padding: '22px 26px', borderColor: col }); cue(T, i ? 'switch' : 'thud'); return { b, T }; });
   hls.forEach((h) => cue(h.T, 'tick', 4 + h.i));
   // b. the guided run on the live site
   const fw2 = el('div', 'abs', S.e); css(fw2, { inset: 0 });
-  const cw = ev['click:Watch it inspect a bridge'];
+  const cw = ev['click:Watch it inspect a bridge'], N = Object.keys(ev).filter((k) => k.startsWith('approved:')).length;   // N approvals in the sign-off
   const fw = new Footage(fw2, 1530, 836, D.urls.live.replace('https://', ''), F.warp.live, [
     KF(cw - 1.9, 560, 470, 1150), KF(cw + 0.15, 330, 560, 900),
     KF(ev['step:1'] - 0.6, 380, 560, 1060), KF(ev['step:2'] + 0.4, 340, 560, 900),
-    KF(ev['step:3'] + 0.3, 900, 380, 760), KF(ev['step:4'] + 0.3, 930, 700, 760),
-    KF(ev['step:5'] + 0.3, 420, 560, 1000), KF(ev['done:guided'] + 0.3, 560, 330, 1080),
-    KF(ev['click:Sign them off'], 640, 560, 1240), KF(ev['click:Sign them off'] + 2.6, 330, 720, 840),
-    KF(ev['click:Approve#0'] + 0.6, 330, 760, 720), KF(ev['approved:1'] - 1.6, 330, 560, 760), KF(ev['approved:2'] + 0.4, 640, 470, 1240), KF(ev['approved:2'] + 2.2, 940, 420, 900)]);
-  railcall(2, `${fmt(D.guided.entropy1)} &gt; ${D.guided.tau}`, 'entropy at L3: unsure, so it zooms in', at('l4') + 0.3, end('l4') + 0.3);
-  railcall(4, `IoU ${fmt(D.guided.iou, 3)}`, `mask IoU, L1 vs L0, under ${D.guided.iou_min}: unconfirmed. Exposed rebar always goes to a person`, at('l6') + 0.3, end('l6') + 0.3);
-  railcall('×', `${D.guided.missed.join(', ')} missed`, `the stop left regions ${D.guided.unvisited.join(' and ')} unvisited; the ${D.guided.missed[0]} in ${D.guided.unvisited[0]} was never seen`, at('l7') + LINE.l7.dur * 0.4, end('l7') + 0.3);
-  railcall('✓', 'a person', 'approves each critical finding; the server signs', at('l9') + 0.3, end('l9') + 0.3);
+    KF(ev['step:2'] + 2.0, 950, 735, 660),   // step 2's decision: the spalling critical, the rebar held for a confirm look
+    // the confirm look: its crop and WHY THIS LOOK, the view ending above WHAT IT SAW (the site's panel clips that box's
+    // last line) through the hold's push; then the decision panel's "a person checks it by eye"
+    KF(ev['step:3'] + 0.3, 948, 289, 600), KF(ev['step:3'] + 1.8, 950, 750, 660),
+    KF(ev['step:4'] + 0.3, 420, 560, 1000), KF(ev['done:guided'] + 0.3, 560, 330, 1080),
+    KF(ev['click:Sign them off'], 640, 560, 1240), KF(ev['click:Sign them off'] + 1.4, 330, 720, 840),
+    KF(ev[`approved:${N - 1}`] + 0.3, 420, 700, 900), KF(ev[`approved:${N - 1}`] + 1.2, 945, 400, 700),
+    KF(ev[`approved:${N - 1}`] + 3.6, 640, 580, 1240)], { rec: RECTAG });   // under l11, out to both stamps: APPROVED and the order SIGNED
+  const [hcls, hconf, floor, hlev] = D.guided.held, [ccls, cstep, crule] = D.guided.crit;
+  railcall(cstep, `${fmt(hconf)} &lt; ${floor}`, `${hcls.replace('_', ' ')} at L${hlev}, under the floor: held for a confirm look; the ${ccls} is critical`, at('l4') + 0.3, end('l4') + 0.3);
+  railcall(cstep + 1, 'check by eye', `its L${D.guided.confirm_level} confirm look did not confirm it: a needs-a-look entry, not a critical finding`, at('l6') + 0.2, end('l6') + 0.3);
+  railcall(D.guided.halt_step, `${D.guided.critical} critical`, `every candidate region looked at (${D.guided.stop[0]}); the ${D.guided.drafts.join(' and ')} are drafts, no sign-off`, at('l7') + LINE.l7.dur * 0.4, end('l7') + 0.3);
+  railcall('✓', 'a person', `approves the ${ccls}; the server signs. The order stays ${D.guided.order[0]}: the rebar is still to check by eye`, at('l9') + 0.3, end('l9') + 0.3);
   railcall('!', `HTTP ${D.tamper.status}`, D.tamper.error, at('l11') + 1.4, end('l11') + 0.6);
   // c. the tampered token, answered by the server
   const term = el('div', 'term', S.e); css(term, { right: '28px', bottom: '28px', width: '980px', zIndex: 9 });
@@ -384,7 +407,12 @@ function buildLive() {
       h.path.setAttribute('d', `M${x0.toFixed(1)} ${y0.toFixed(1)} V${((y0 + y1) / 2).toFixed(1)} H${x1} V${y1}`); h.path.setAttribute('stroke-dashoffset', 1 - q);
       h.dot.setAttribute('cx', x0); h.dot.setAttribute('cy', y0); h.dot.setAttribute('opacity', p);
       const bq = seg(t, h.T + 0.5, h.T + 0.8); css(h.box, { opacity: bq, transform: `translateY(${((1 - eo(bq)) * 24).toFixed(1)}px)` }); });
-      foot.style.opacity = seg(t, hls[2].T + 0.8, hls[2].T + 1.1); }
+      foot.style.opacity = seg(t, hls[2].T + 0.8, hls[2].T + 1.1);
+      { const p = seg(t, TS, TS + 0.3) * (1 - seg(t, dOut - 0.3, dOut)), [sx, sy] = H.toScreen(SEG[0] - 3, SEG[1], H.c), bw = (SEG[2] + 6) * H.c[2], bh = SEG[3] * H.c[2];
+        css(segHl, { opacity: p, left: sx + 'px', top: sy + 'px', width: bw + 'px', height: bh + 'px' });
+        const x0 = 3 + sx + bw / 2, y0 = 49 + sy + bh + 2, q = eio(seg(t, TS + 0.1, TS + 0.5));
+        segPath.setAttribute('d', `M${x0.toFixed(1)} ${y0.toFixed(1)} V${((y0 + 440) / 2).toFixed(1)} H385 V440`); segPath.setAttribute('stroke-dashoffset', 1 - q); segPath.setAttribute('opacity', p); }
+      disc.forEach(({ b, T }) => { const q = eo(seg(t, T, T + 0.35)), o = 1 - seg(t, dOut - 0.3, dOut); css(b, { opacity: Math.min(q, o), transform: `translateY(${((1 - q) * 24 - (1 - o) * 16).toFixed(1)}px)` }); }); }
     if (t >= F.warp.live.t0 - 0.25) await fw.draw(t);
     const T0 = at('l11') - 0.1, p = eo(seg(t, T0, T0 + 0.4)), ty = (u) => Math.floor(seg(t, T0 + 0.3 + u, T0 + 0.9 + u) * 200);
     term.style.opacity = p; term.style.transform = `translateY(${((1 - p) * 40).toFixed(1)}px)`;
@@ -392,7 +420,7 @@ function buildLive() {
     term.innerHTML = [L1, L2].map((l, i) => (ty(i * 0.4) >= full(l).length ? l : full(l).slice(0, ty(i * 0.4)))).join('\n') + (t > T0 + 1.6 ? '\n' + L3 : '\n<span class="caret"></span>');
   });
   cue(at('l11') + 0.2, 'type', 1.0); cue(at('l11') + 1.6, 'alert'); fw.clicksSfx();
-  for (const k of ['approved:0', 'approved:1', 'approved:2']) { const T = filmOf(fw.S, ev[k] + 0.2); if (T) cue(T, 'stamp'); }
+  for (let k = 0; k < N; k++) { const T = filmOf(fw.S, ev[`approved:${k}`] + 0.2); if (T) cue(T, 'stamp'); }
   for (const e of F.events.filter((e) => e.kind === 'type')) { const T = filmOf(fw.S, e.t0); if (T) cue(T, 'type', 0.5); }
 }
 
@@ -404,10 +432,10 @@ function buildBreak() {
     KF(ev['step-break:5'] - 1.2, 520, 520, 1200), KF(ev['step-break:5'] + 0.4, 330, 760, 760),
     KF(ev['step-break:6'] + 0.3, 900, 330, 760), KF(ev['click:Try KILL'] - 0.8, 400, 640, 900),
     KF(ev['click:KILL'] - 0.9, 900, 140, 900), KF(ev['done:kill'] + 0.6, 760, 300, 1100),
-    KF(ev['click:Resume'] + 0.1, 760, 300, 1060), KF(ev['step-resume:2'], 930, 560, 820), KF(ev['step-resume:3'] + 1.2, 380, 560, 900)]);
-  railcall(1, `p95 ${Math.round(D.break.p95)} ms`, `segmenter slowed on purpose: the governor picks the ${D.break.model} model`, at('b1') + 0.4, end('b1') + 0.3);
+    KF(ev['click:Resume'] + 0.1, 760, 300, 1060), KF(ev['step-resume:2'], 930, 560, 820), KF(ev['step-resume:3'] + 1.2, 380, 560, 900)], { rec: RECTAG });
+  railcall(1, `p95 ${Math.round(D.break.p95)} ms`, `segmenter slowed on purpose, over its ${D.break.sla} ms limit: the governor picks the ${D.break.model} model`, at('b1') + 0.4, end('b1') + 0.3);
   railcall(2, `“${D.break.planner_bad}”`, 'the planner drill’s reply: rejected by the allow-list', at('b2') + 0.3, end('b2') + 0.3);
-  railcall(3, D.kill.cause, 'halted before the next look; Resume replays', at('b3') + 0.3, end('b3') + 0.4);
+  railcall(3, D.kill.cause, `halted after ${D.kill.steps} looks; Resume replayed them, looked on, then the ${D.resume.stop[0].replace('-', ' ')} ended it with ${D.resume.stop[1].join(', ') || 'no region'} unvisited`, at('b3') + 0.3, end('b3') + 0.4);
   S.draws.push(async (t) => { await fw.draw(t); });
   fw.clicksSfx(); cue(at('b2') + 0.6, 'glitch'); cue(at('b3') + 0.5 * LINE.b3.dur, 'thud');
 }
@@ -554,23 +582,34 @@ function buildResults() {
     <table class="t" style="margin-top:12px"><tr><th>variant</th>${dsl.map((d) => `<th>${ab[d].label}</th>`).join('')}</tr>
     ${[['no-survey', 'no survey look'], ['no-verify', 'no verify'], ['no-uncertainty', 'no uncertainty term'], ['governor-on', 'governor on']].map(([k, n]) => `<tr><td>${n}</td>${dsl.map((d) => vr(ab[d][k])).join('')}</tr>`).join('')}
     <tr><td>random gaze order (95 % CI)</td>${dsl.map((d) => `<td class="n ${ab[d].random_hi < 1 ? 'bad' : ''}">${fmt(ab[d].random_lo)}–${fmt(ab[d].random_hi)}</td>`).join('')}</tr></table>`;
-  // P3: CODEBRIM, false alarms, the trained segmenter
-  const cb = D.codebrim, cl = D.clean, p3 = el('div', 'abs', board); css(p3, { left: '0px', top: P3Y + 'px', width: '1800px', height: '836px' });
-  p3.innerHTML = `<div class="box" style="left:0;top:0;width:740px;height:560px;padding:26px 30px">
-      <div class="lab">${cb.n} real photos · CODEBRIM</div><div class="h1 amber" style="font-size:100px;margin:12px 0;white-space:nowrap">about 1 in ${cb.one_in}</div>
-      <div class="mono" style="font-size:26px">defects found by every method, ours included (recall ${fmt(cb.range[0])}–${fmt(cb.range[1])}). Drishyam’s boxes placed at random would find ${fmt(cb.chance)}.</div>
-      <div class="mono amber" style="font-size:26px;margin-top:16px">The classical segmenter is the bottleneck.</div>
-      <div class="src" style="margin-top:16px">public/results/codebrim/summary.json · the licence bars showing the photos</div></div>
-    <div class="box" style="left:1000px;top:0;width:740px;height:560px;padding:26px 30px">
-      <div class="lab">${cl.n} synthetic photos with no damage</div><div class="h1 amber" style="font-size:104px;margin:8px 0">${pc(cl.any)}</div>
-      <div class="mono" style="font-size:26px">of them got a report from Drishyam (${pc(cl.cap)} cap)</div>
+  // P3: the headline board, the trained v1 on real photos, held out (r6, r8); the classical engine is its comparison row
+  const cb = D.codebrim, cl = D.clean, M = D.model, P2 = M.policy2, p3 = el('div', 'box amb', board); css(p3, { left: '0px', top: P3Y + 'px', width: '1530px', height: '836px' });
+  const tw = M.tiling_wins.length ? `tiling with ${M.name} at ${M.tiling_wins.join(' and ')} finds as much or more (${M.tiling.slice(0, M.tiling_wins.length).map(([px, r]) => `${fmt(r)} at ${fmt(px)} of the pixels`).join(', ')})` : 'no tiling level finds as much';
+  p3.innerHTML = `<div class="abs lab" style="left:30px;top:24px;font-size:21px"><span class="fig">FIG. 4.3</span><span style="margin-left:16px">${M.n} real photos · CODEBRIM · held out: chosen on dev splits, scored once</span></div>
+    <div class="abs" style="left:30px;top:84px;display:flex;align-items:flex-end;gap:44px"><div class="h1 amber" data-w="finds" data-l="r6" style="font-size:220px;line-height:.8;white-space:nowrap">${pc(M.recall)}</div>
+      <div style="padding-bottom:6px"><div class="h2" style="font-size:84px;white-space:nowrap">trained ${M.name}, held out</div>
+      <div class="mono" style="font-size:27px;margin-top:12px;white-space:nowrap">defect recall (95 % CI ${fmt(M.ci[0])}–${fmt(M.ci[1])}) at ${pc(M.pixels_frac)} of the pixels</div></div></div>
+    <div class="abs h2" data-w="two and a half" data-l="r6" style="left:30px;top:284px;font-size:40px;white-space:nowrap">${fmt(M.ratio[0], 1)}× the classical engine <span style="color:var(--line-2)">(${fmt(M.ratio[1][0])}–${fmt(M.ratio[1][1])})</span> · ${cb.n} real CODEBRIM photos</div>
+    <div class="box amb" data-w="random" data-l="r8" style="left:30px;top:346px;width:720px;height:228px;padding:16px 22px"><div class="lab amber" style="font-size:19px">chance · its boxes placed at random</div>
+      <div class="h2 amber" style="font-size:64px;margin:8px 0 6px">${pc(M.chance)}</div><div class="mono" style="font-size:21px">find ${fmt(M.chance)} of the defects; its own boxes ${fmt(M.recall)}</div></div>
+    <div class="box amb" data-w="a person" data-l="r8" style="left:780px;top:346px;width:720px;height:228px;padding:16px 22px"><div class="lab amber" style="font-size:19px">for a person to sign off</div>
+      <div class="h2 amber" style="font-size:64px;margin:8px 0 6px">${fmt(M.crit[0])} <span style="font-size:34px">critical boxes per photo</span></div><div class="mono" style="font-size:21px">classical engine ${fmt(M.crit[1])}: ${fmt(M.crit_ratio[0], 1)}× (${fmt(M.crit_ratio[1][0])}–${fmt(M.crit_ratio[1][1])})</div>
+      <div class="mono amber" data-w="the live policy" data-l="r8" style="font-size:19px;line-height:1.35;margin-top:8px">live policy v1-policy2: ${fmt(P2.crit)} critical boxes per photo (${fmt(P2.crit_ratio[0])}×, CI ${fmt(P2.crit_ratio[1][0])}–${fmt(P2.crit_ratio[1][1])}), recall ${fmt(P2.recall_ratio[0])}× (CI ${fmt(P2.recall_ratio[1][0])}–${fmt(P2.recall_ratio[1][1])})</div></div>
+    <div class="box" data-w="one in" data-l="r6" style="left:30px;top:592px;width:1470px;height:112px;padding:14px 22px;display:flex;align-items:center;gap:34px">
+      <div style="flex:none"><div class="lab" style="font-size:19px;white-space:nowrap">comparison · classical engine</div><div class="h2" style="font-size:52px;margin-top:6px;white-space:nowrap">about 1 in ${cb.one_in}</div></div>
+      <div class="mono" style="font-size:22px;line-height:1.35;color:var(--line-2)">every classical method, ours included: recall ${fmt(cb.range[0])}–${fmt(cb.range[1])}; its boxes at random ${fmt(cb.chance)}</div></div>
+    <div class="abs src" style="left:30px;top:718px;width:1470px;font-size:18px;line-height:1.42;white-space:normal">${tw} · near-duplicates in its training set (dacl10k): ${M.near_dups} · governor off · each engine charged its own cost table, timed on one machine (${M.machine}) · results/heldout_models.json · public/results/codebrim_dacl10k/summary.json · public/results/codebrim/summary.json · the licence bars showing the photos</div>`;
+  // the clean set (r7), to the right of the board, under the ablations
+  const p4 = el('div', 'box', board, `<div class="lab">${cl.n} synthetic photos with no damage</div><div class="h1 amber" style="font-size:104px;margin:8px 0">${pc(cl.any)}</div>
+      <div class="mono" style="font-size:26px">of them got a report from the classical engine (${pc(cl.cap)} cap)</div>
       <table class="t" style="margin-top:12px"><tr><th>boxes per image</th><th></th></tr><tr><td>Drishyam</td><td class="n">${fmt(cl.boxes)}</td></tr><tr><td>one downscale</td><td class="n">${fmt(cl.ds_boxes)}</td></tr><tr><td>L0 tiling</td><td class="n">${fmt(cl.tl_boxes)}</td></tr></table>
-      ${D.model ? `<div class="mono amber" style="font-size:24px;margin-top:10px">trained segmenter, held out: ${pc(D.model.clean_any[0])} of them</div>` : ''}
-      <div class="src" style="margin-top:4px;font-size:18px">public/results/clean/summary.json · results/heldout_models.json</div></div>
-    ${D.model ? `<div id="pend" class="box amb" style="left:0;top:600px;width:1740px;padding:16px 26px"><div class="lab amber">trained segmenter ${D.model.name} (dacl10k), held out on the same ${cb.n} CODEBRIM photos · governor off · each engine charged its own cost table, timed on one machine (${D.model.machine})</div>
-      <div class="mono" style="font-size:25px;margin-top:10px;white-space:normal"><span data-w="finds">recall ${fmt(D.model.recall)} (95 % CI ${fmt(D.model.ci[0])}–${fmt(D.model.ci[1])})</span> <span data-w="two and a half">vs ${fmt(D.model.classical)} classical: ${fmt(D.model.ratio[0])}× (${fmt(D.model.ratio[1][0])}–${fmt(D.model.ratio[1][1])})</span> · <span data-w="random">its boxes at random ${fmt(D.model.chance)}</span> · <span data-w="a person">critical boxes per photo ${fmt(D.model.crit[0])} vs ${fmt(D.model.crit[1])}</span><br>
-      <span data-w="random">${D.model.tiling_wins.length ? 'tiling with it at ' + D.model.tiling_wins.join(' and ') + ' finds as much or more (' + D.model.tiling.slice(0, D.model.tiling_wins.length).map(([px, r]) => `${fmt(r)} at ${fmt(px)} of the pixels`).join(', ') + ')' : 'no tiling level finds as much'} · near-duplicates in its training set: ${D.model.near_dups} · results/heldout_models.json</span></div></div>`
-      : '<div id="pend" class="stamp" style="left:330px;top:620px;font-size:46px">trained segmenter: results pending</div>'}`;
+      <div class="mono amber" style="font-size:24px;margin-top:10px">trained ${M.name}, held out: ${pc(M.clean_any[0])} of them</div>
+      <div class="src" style="margin-top:4px;font-size:18px">public/results/clean/summary.json · results/heldout_models.json</div>`);
+  css(p4, { left: P2X + 'px', top: P3Y + 'px', width: '740px', height: '560px', padding: '26px 30px' });
+  // each part of the board comes in as the voice says it (r6, r8), with a flash of the board (36 % in 0.1 s, then down) the activity audit sees
+  const said = [...p3.querySelectorAll('[data-w]')].map((e) => { const L = LINE[e.dataset.l], k = L.say.toLowerCase().indexOf(e.dataset.w);
+    if (k < 0) throw new Error(`results: "${e.dataset.w}" is not in ${e.dataset.l}`); return [e, L.t + L.dur * k / L.say.length]; });
+  const head49 = said[0][0], T49 = said[0][1];
   const VW = 1530, VH = 836;
   // the whole chart while it draws and the 85 % card is read; the card alone; the whole chart again for the 0.94x card;
   // each table framed so its first column and heading stay inside the view under the 8 % push
@@ -579,11 +618,10 @@ function buildResults() {
   const AX = P2X - 20 + 0.46 * 1400;
   const K = [[s.t0, 765, 418, 1660], [at('r1') + LINE.r1.dur * 0.72, 1330, 446, 760], [at('r3') + 0.1, 765, 418, 1660],
     [at('r5') - 0.2, AX, 260, 1400], ...AB.slice(1).map(([T], i) => [T - 0.2, AX, 268 + 6 * i, 1400]),
-    [at('r6') - 0.2, 380, P3Y + 300, 1150], [at('r8') - 0.1, 870, P3Y + 420, 1960, 0.04],
-    // the trained segmenter's line is long: a second stop part way through (still wide enough for the whole card), then the clean set
-    [at('r8') + LINE.r8.dur * 0.6, 870, P3Y + 470, 1880, 0.04], [at('r7') + 0.6, 1370, P3Y + 300, 1150]];   // the card stays until r8 ends
+    // the headline board whole (wide enough to stay whole under the push), a stop per phrase, then the clean set
+    [at('r6') - 0.2, 765, P3Y + 418, 1663], [said[1][1] - 0.2, 765, P3Y + 418, 1640, 0.04], [at('r8') - 0.1, 765, P3Y + 418, 1620, 0.04],
+    [at('r7') + 0.6, P2X + 370, P3Y + 280, 1150]];
   const cam = camBoard({ board, VW, VH }, K, 0.08);
-  const pend = $('#pend', p3);
   S.draws.push((t) => {
     cam(t);
     // the chart draws itself: axes, then each series point by point, then the callouts snap in
@@ -594,13 +632,10 @@ function buildResults() {
     const cp = seg(t, at('r1') + LINE.r1.dur * 0.35, at('r1') + LINE.r1.dur * 0.35 + 0.4), cp2 = seg(t, at('r3'), at('r3') + 0.4);
     card2.style.top = card.offsetTop + card.offsetHeight + 14 + 'px';   // stacked under the 85 % card, never over it
     css(card, { opacity: cp, transform: `scale(${(0.9 + 0.1 * spring(cp)).toFixed(3)})` }); css(card2, { opacity: cp2, transform: `scale(${(0.9 + 0.1 * spring(cp2)).toFixed(3)})` });
-    if (D.model) {   // a flash of the card per phrase (36 % in 0.1 s, then down): the activity audit sees it; the part said comes in
-      const said = LINE.r8.say.toLowerCase(), parts = [...pend.querySelectorAll('[data-w]')].map((e) => [e, at('r8') + LINE.r8.dur * Math.max(0, said.indexOf(e.dataset.w)) / said.length]);
-      parts.forEach(([e, T]) => { e.style.opacity = (0.12 + 0.88 * seg(t, T - 0.1, T + 0.2)).toFixed(3); });
-      const fl = Math.max(0, ...parts.map(([, T]) => (t < T ? 0 : t < T + 0.1 ? (t - T) / 0.1 : Math.max(0, 1 - (t - T - 0.1) / 0.6))));
-      pend.style.background = `linear-gradient(rgba(255,200,87,${(0.36 * fl).toFixed(3)}), rgba(255,200,87,${(0.36 * fl).toFixed(3)})), rgba(11,50,100,.92)`;
-    }
-    const sp = seg(t, at('r8') + 0.2, at('r8') + 0.45); css(pend, { opacity: sp, transform: `${D.model ? '' : 'rotate(-6deg) '}scale(${((D.model ? 1.1 : 1.6) - (D.model ? 0.1 : 0.6) * eo(sp)).toFixed(3)})` });
+    said.forEach(([e, T]) => { e.style.opacity = (0.12 + 0.88 * seg(t, T - 0.1, T + 0.2)).toFixed(3); });
+    head49.textContent = t < T49 - 0.1 ? pc(M.recall) : `${Math.round(100 * M.recall * eo(seg(t, T49 - 0.1, T49 + 0.6)))} %`;   // dim until said, then it counts up
+    const fl = Math.max(0, ...said.map(([, T]) => (t < T ? 0 : t < T + 0.1 ? (t - T) / 0.1 : Math.max(0, 1 - (t - T - 0.1) / 0.6))));
+    p3.style.background = `linear-gradient(rgba(255,200,87,${(0.36 * fl).toFixed(3)}), rgba(255,200,87,${(0.36 * fl).toFixed(3)})), rgba(11,50,100,.92)`;
     // each row group's highlight fades in as its words are said and out as the next group's come in (0.18 s, never a one-frame jump)
     const hot = (i) => Math.max(0, ...AB.map(([T, rows], j) => { const off = j < AB.length - 1 ? AB[j + 1][0] - 0.1 : end('r5') + 0.3;
       return rows.includes(i) ? seg(t, T - 0.1, T + 0.08) * (1 - seg(t, off, off + 0.18)) : 0; }));
@@ -608,7 +643,7 @@ function buildResults() {
       const w = hot(i); css(r, { background: `rgba(255,200,87,${(0.16 * w).toFixed(3)})`, outline: w > 0 ? `3px solid rgba(255,200,87,${w.toFixed(3)})` : 'none' }); });
   });
   let n = 0; for (const key of ['downscale', 'tiling', 'drishyam']) for (const _ of sy.policies[key]) cue(s.t0 + 1.4 + (n++) * 0.28, 'pop', n);
-  cue(s.t0 + 0.4, 'scribble', 0.9); cue(at('r8') + 0.25, 'stamp'); [at('r5'), at('r6'), at('r7')].forEach((T) => cue(T - 0.9, 'whoosh'));
+  cue(s.t0 + 0.4, 'scribble', 0.9); cue(T49, 'stamp'); cue(T49, 'count', 0.6); said.slice(1).forEach(([, T]) => cue(T, 'tick', 4)); [at('r5'), at('r6'), at('r7')].forEach((T) => cue(T - 0.9, 'whoosh'));
 }
 
 // 8b. a real photo of our own (video/live/real.*): the recorded job's looks and findings over the photo, then what
@@ -794,30 +829,51 @@ function buildEnd() {
 // ------------------------------------------------------------------ the 9:16 cut
 function buildShort() {
   document.body.classList.add('short'); css(document.documentElement, { width: '1080px', height: '1920px' }); css(document.body, { width: '1080px', height: '1920px' });
-  const Sh = window.SHORT, ev = F.ev, dur = Math.max(15.5, Sh.dur);
+  const Sh = window.SHORT, ev = F.ev, dur = Sh.dur, [l0, l1, l2] = Sh.lines, M = D.model;
   // it ends on the settled APPROVED stamp: the last recorded frame before the page scrolls on to the next finding
   const SETTLED = Math.max(...F.frames.filter((x) => x.t <= ev['approved:0'] + 1.5 && x.sy === F.frames.find((y) => y.t >= ev['approved:0']).sy).map((x) => x.t)) - ev['approved:0'];
   el('div', 'sheetframe', stage);
-  const top = el('div', 'abs', stage, `<div class="h1" style="font-size:118px">DRISHYAM</div><div class="lab" style="font-size:26px;margin-top:10px">one photo · a few looks · one human</div>`);
-  css(top, { left: '108px', top: '150px', width: '864px' });
-  // the footage's engine and date, on screen for the whole cut: the live site has run v1 since (the film's a4 line)
-  const rec = el('div', 'abs lab', stage, `recorded ${LIT.recorded} on the ${D.health.segmenter} engine · the site now runs v1`);
-  css(rec, { left: '108px', top: '340px', width: '864px', fontSize: '24px', color: 'var(--line-2)' });
-  const l0 = Sh.lines[0], l1 = Sh.lines[1];
-  const warp = { t0: 0, t1: dur, pts: [{ t: 0.2, f: ev['step:1'] - 0.3 }, { t: l0.t + l0.dur + 0.3, f: ev['step:4'] + 1.0 }, { cut: true, a: ev['step:4'] + 1.1, b: ev['click:Reviewer'] - 0.8 }, { t: dur, f: ev['approved:0'] + SETTLED }] };
-  const host = el('div', 'abs', stage); css(host, { left: '60px', top: '420px', width: '960px', height: '1000px' });
-  const fw = new Footage(host, 960, 1000, D.urls.live.replace('https://', ''), warp, [KF(ev['step:1'] - 0.3, 340, 560, 620), KF(ev['step:4'] + 0.6, 330, 600, 520), KF(ev['click:Reviewer'] - 0.6, 330, 700, 640), KF(ev['approved:0'] + 0.5, 340, 640, 660)]);
-  const cap = el('div', 'abs', stage); css(cap, { left: '108px', top: '1450px', width: '864px', textAlign: 'center' }); const cs = el('span', '', cap);
-  css(cs, { display: 'inline-block', padding: '12px 22px', background: 'rgba(4,20,44,.94)', border: '2.5px solid var(--line-3)', borderLeft: '8px solid var(--amber)', font: '500 36px/1.3 var(--fm)', color: 'var(--line)' });
-  const url = el('div', 'abs lab', stage, D.urls.live.replace('https://', '')); css(url, { left: '108px', top: '1440px', width: '864px', textAlign: 'center', fontSize: '28px', color: 'var(--amber)' });
-  const caps = [[l0.t, l0.t + l0.dur, LINE.o1.cap], [l1.t, l1.t + l1.dur, l1.text]];   // the captions of the two lines the short speaks
+  // the top 12 % and the bottom of the frame are the app's (motion-kit safe zones): the name, the label, the footage, the
+  // caption and the URL sit between them; the v1 card fills the lower third
+  const top = el('div', 'abs', stage, `<div class="h1" style="font-size:112px">DRISHYAM</div><div class="lab" style="font-size:24px;margin-top:10px">one photo · a few looks · one human</div>`);
+  css(top, { left: '108px', top: '236px', width: '864px' });
+  // the footage's date and engine, on screen for the whole cut (the film's l0 line), and what the run left for a person besides the sign-off
+  const rec = el('div', 'abs lab', stage, `recorded ${LIT.recorded} · live site · ${ENG}<br><span class="amber">the rebar went to a person to check by eye</span>`);
+  css(rec, { left: '108px', top: '390px', width: '864px', fontSize: '22px', lineHeight: '1.5', color: 'var(--line-2)' });
+  // the run (steps 1-4, retimed to line 1), a cut to the reviewer field, the typing at real time, a jump cut to the Approve
+  // click, the stamp at real time; the settled frame holds to the end
+  const P1 = l0.t + l0.dur + 0.3, TY = F.events.find((e) => e.kind === 'type' && e.t0 >= ev['click:Reviewer'] - 0.01);
+  const A = ev['click:Reviewer'] - 0.5, B = TY.t + 0.15, C = ev['click:Approve#0'] - 0.5, E = ev['approved:0'] + SETTLED;
+  const T2 = P1 + 0.1 + (B - A), T3 = T2 + 0.05 + (E - C);   // both pieces at 1x (a cut keeps the speed on both sides: film.js segments)
+  const warp = { t0: 0, t1: dur, pts: [{ t: 0.2, f: ev['step:1'] - 0.3 }, { t: P1, f: ev['step:4'] + 1.0 }, { cut: true, a: ev['step:4'] + 1.1, b: A }, { t: T2, f: B },
+    { cut: true, a: B + 0.05, b: C }, { t: T3, f: E }] };
+  const host = el('div', 'abs', stage); css(host, { left: '40px', top: '480px', width: '1000px', height: '880px' });
+  const fw = new Footage(host, 1000, 880, D.urls.live.replace('https://', ''), warp, [{ T: 0.2, c: [340, 560, 620] }, { T: P1 - 0.3, c: [330, 600, 520] },
+    { T: P1 + 0.3, c: [330, 700, 640] }, { T: T3 - 0.4, c: [340, 640, 660] }, { T: dur, c: [340, 650, 600] }]);
+  const cap = el('div', 'abs', stage); css(cap, { left: '108px', top: '1380px', width: '864px', height: '118px', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }); const cs = el('span', '', cap);
+  css(cs, { display: 'inline-block', padding: '10px 22px', background: 'rgba(4,20,44,.94)', border: '2.5px solid var(--line-3)', borderLeft: '8px solid var(--amber)', font: '500 34px/1.3 var(--fm)', color: 'var(--line)' });
+  const url = el('div', 'abs mono', stage, D.urls.live.replace('https://', '')); css(url, { left: '60px', top: '1508px', width: '960px', textAlign: 'center', font: '700 40px/1 var(--fm)', color: 'var(--amber)' });
+  // the lower third: what the site runs now, held out (the film's headline board, short form)
+  const P2 = M.policy2;
+  const card = el('div', 'box amb', stage, `<div class="lab amber" style="font-size:21px">trained ${M.name}, held out · the site runs it with v1-policy2</div>
+    <div style="display:flex;align-items:flex-end;gap:26px;margin-top:6px"><div class="h1 amber" style="font-size:120px;line-height:.85;white-space:nowrap;flex:none">${pc(M.recall)}</div>
+    <div class="mono" style="font-size:25px;line-height:1.35">recall on ${M.n} real CODEBRIM photos: ${fmt(M.ratio[0], 1)}× the classical engine</div></div>
+    <div class="mono" style="font-size:23px;margin-top:10px;color:var(--line-2)">chance ${pc(M.chance)} · ${fmt(M.crit[0])} critical boxes per photo for a person</div>
+    <div class="mono amber" style="font-size:23px;margin-top:4px">with v1-policy2: ${fmt(P2.crit)} (${fmt(P2.crit_ratio[0])}×), recall ${fmt(P2.recall_ratio[0])}×</div>`);
+  css(card, { left: '60px', top: '1572px', width: '960px', height: '250px', padding: '18px 26px' });
+  const big = card.querySelector('.h1'), TV = l2.t + l2.dur * l2.text.indexOf('trained') / l2.text.length;
+  const caps = [[l0.t, l0.t + l0.dur, LINE.o1.cap], [l1.t, l1.t + l1.dur, l1.text], [l2.t, l2.t + l2.dur, l2.text]];   // the captions of the three lines the short speaks
   window.DURATION = dur;
   window.render = async (t) => {
     const c = caps.find(([a, b]) => t >= a - 0.05 && t <= b + 0.3); cs.textContent = c ? c[2] : ''; cap.style.opacity = c ? 1 : 0;
-    url.style.opacity = seg(t, dur - 2.6, dur - 2.2); url.style.transform = `translateY(${(1 - seg(t, dur - 2.6, dur - 2.2)) * 20}px)`;
+    const u = seg(t, l2.t - 0.2, l2.t + 0.2); css(url, { opacity: u, transform: `translateY(${((1 - eo(u)) * 20).toFixed(1)}px)` });
+    const q = eo(seg(t, 0.9, 1.3)), fl = t < TV ? 0 : Math.max(0, 1 - (t - TV) / 0.6);
+    css(card, { opacity: q, transform: `translateY(${((1 - q) * 30).toFixed(1)}px)`, background: `linear-gradient(rgba(255,200,87,${(0.36 * fl).toFixed(3)}), rgba(255,200,87,${(0.36 * fl).toFixed(3)})), rgba(11,50,100,.92)` });
+    big.textContent = `${Math.round(100 * M.recall * eo(seg(t, 1.0, 1.7)))} %`;
     host.style.opacity = seg(t, 0, 0.3); await fw.draw(t);
+    if (t > T3 + 0.05) { fw.tag.textContent = 'LAST FRAME'; fw.tag.className = 'tag rt'; }   // the settled frame is held, not played
   };
-  fw.clicksSfx(); const T = filmOf(fw.S, ev['approved:0'] + 0.2); if (T) cue(T, 'stamp'); cue(dur - 2.4, 'final');
+  fw.clicksSfx(); const T = filmOf(fw.S, ev['approved:0'] + 0.2); if (T) cue(T, 'stamp'); cue(1.0, 'count', 0.7); cue(l2.t, 'final'); cue(TV, 'tick', 5);
   window.SFX = SFX.sort((a, b) => a.t - b.t);
   window.ready = Promise.all([document.fonts.load('700 60px "Archivo Narrow"'), document.fonts.load('500 30px "IBM Plex Mono"'), document.fonts.load('700 30px "IBM Plex Mono"'), document.fonts.ready, ...loads]).then(() => window.render(0));
 }

@@ -672,6 +672,43 @@ def test_heldout_reads_each_pair_in_both_directions_by_the_dev_criterion():
     assert other["v2a"] == ["codebrim@0.3 modelled ms per job x1.111 (CI 1.05-1.25) against v1"]
 
 
+def test_heldout_reads_policy2_beside_v1_with_its_matrix_and_hard_subset(tmp_path):
+    """evals.heldout.policy2_read on two synthetic photos (no held-out set): the baselines are checked against the
+    model's run, both sides' sign-offs are counted by each finding's final measure (v1's runs did not record them) with
+    the configuration's exact count kept, v1-policy2 is paired with v1 at each cap, and the matrix puts every policy
+    against L2 tiling, L1 tiling, the downscale and v1."""
+    from evals import heldout
+
+    synth.build_dataset(tmp_path / "s", n=2, seed=3, width=2048, height=1536)
+    recs, _ = harness.load_records(tmp_path / "s", 2, seed=3)
+
+    def results(**sw):
+        out = []
+        for r in recs:
+            img = cv2.imread(r["path"])
+            cfg = {"downscale": harness.run_downscale(img, harness.default_segmenter()),
+                   **{f"tiling@L{lv}": harness.run_tiling(img, harness.default_segmenter(), lv) for lv in (2, 1, 0)},
+                   **{f"drishyam@{c}": harness.run_drishyam(img, c, None, **sw) for c in (0.3, 0.1, 1.0)}}
+            for c in cfg.values():
+                c["wall_s"] = 0.5  # one value both runs share: the check compares boxes and modelled time
+            out.append({"id": r["id"], "width": img.shape[1], "height": img.shape[0], "configs": cfg})
+        return out
+
+    v1 = results()
+    for x in v1:  # a run from before the tiers: no needs-a-look, shown boxes or sign-off fields
+        for k in ("drishyam@0.3", "drishyam@0.1"):
+            for f in ("preds_look", "preds_all", "needs_look", "signoffs", "reviews"):
+                x["configs"][k].pop(f)
+    p2 = results(grid=True, crit_weight=2.0, merge_critical=True)
+    read = heldout.policy2_read(p2, v1, recs)
+    assert read["baselines_same_as_v1s_run"] == dict.fromkeys(heldout.BASELINES, True)
+    assert set(read["matrix"]) == {*heldout.BASELINES, "v1@0.3", "v1-policy2@0.3", "v1@0.1", "v1-policy2@0.1"}
+    m = read["matrix"]["v1-policy2@0.3"]
+    assert {"vs tiling@L2", "vs tiling@L1", "vs downscale", "vs v1@0.3"} <= set(m) and "signoffs_exact_per_image" in m
+    assert "signoffs_exact_per_image" not in read["matrix"]["v1@0.3"] and read["rows"]["v1-policy2@0.1"]["ref"] == "v1@0.1"
+    assert read["hard"]["of"] == 2 and set(read["hard"]["reasons"]) <= {"small-critical", "no-candidate"}
+
+
 def test_heldout_docs_quote_the_json():
     """docs/report.md holds the held-out tables and verdict as evals.heldout renders them from
     results/heldout_models.json, and the numbers its prose and README.md quote are the JSON's."""
@@ -764,3 +801,69 @@ def test_dev_sweep_runs_end_to_end_and_writes_its_rows(tmp_path, monkeypatch):
     assert all(len(r["per_image"]) == 2 and "vs_downscale_ci" in r for r in agents)
     # every variant after the first is compared, paired, with the first at its own cap
     assert [rows["rows"][k].get("ref") for k in ("a@1.0", "a@0.3", "b@1.0", "b@0.3")] == [None, None, "a@1.0", "a@0.3"]
+
+
+def test_the_hard_subset_reads_labels_and_the_overview_only(scene):
+    """A photo is hard when a critical-class ground-truth box (exposed rebar, spalling) covers under 1 % of it, or
+    when the overview proposes no candidate; a small crack, a large spall or a photo with candidates is not."""
+    from evals import policy2
+
+    from .test_agent import soft_disc
+
+    rec = lambda *boxes: {"id": "p", "width": 1000, "height": 1000, "boxes": [{"cls": c, "box": b} for c, b in boxes]}
+    assert policy2.hard_reasons(rec(("exposed_rebar", [0, 0, 99, 100])), scene) == ["small-critical"]
+    assert policy2.hard_reasons(rec(("spalling", [0, 0, 99, 100]), ("crack", [0, 0, 5, 5])), scene) == ["small-critical"]
+    assert policy2.hard_reasons(rec(("spalling", [0, 0, 100, 100]), ("crack", [0, 0, 5, 5])), scene) == []
+    assert policy2.hard_reasons(rec(), soft_disc(4000, 3000)) == ["no-candidate"]
+    both = policy2.hard_reasons(rec(("exposed_rebar", [0, 0, 10, 10])), soft_disc(4000, 3000))
+    assert both == ["small-critical", "no-candidate"]
+    assert policy2.HARD_AREA_FRAC == 0.01 and policy2.CRITICAL_CLASSES == ("exposed_rebar", "spalling")
+
+
+def test_the_policy2_grid_reaches_the_job_as_listed_and_its_rule_reads_each_clause():
+    """The grid, as dev_sweep reads it, sets exactly the JobConfig fields it lists (cur first, no knob); each clause of
+    the rule flips on its own CI, and a CI that could not be computed fails its clause."""
+    from drishyam.agent import JobConfig
+    from evals import dev_sweep, policy2
+
+    grid = dev_sweep.parse(policy2.spec("all"))
+    assert next(iter(grid)) == "cur" and grid["cur"] == {} and len(policy2.ELIGIBLE) == 8 and len(grid) == 14
+    assert all(set(sw) <= set(JobConfig.__dataclass_fields__) for sw in grid.values())
+    assert grid["g_f70"] == {"crit_weight": 2.0, "merge_critical": True, "grid": True, "crit_confirm": "finer",
+                             "crit_floor": 0.7}
+    good = {"recall_all_vs_ref_ci": [0.97, 1.02], "crit_recall_vs_ref_ci": [0.9, 1.0], "crit_diff_vs_ref_ci": [-2.0, -0.5],
+            "signoffs_diff_vs_ref_ci": [-1.0, 0.0], "all_diff_vs_ref_ci": [0.0, 0.1],
+            "images_with_any_all_vs_ref_ci": [-0.1, 0.0]}
+    rows = {s: {"k@0.3": dict(good)} for s in policy2.SPLITS}
+    assert all(policy2.clauses(rows, "k").values())
+    for split, field, ci, clause in (
+            ("synth_dev", "recall_all_vs_ref_ci", [0.9, 0.99], "recall_shown_holds_synth_dev"),
+            ("real", "crit_recall_vs_ref_ci", [0.8, 0.999], "critical_recall_holds_real"),
+            ("real", "crit_diff_vs_ref_ci", [-1.0, 0.0], "critical_boxes_fall_real"),
+            ("synth_dev", "crit_diff_vs_ref_ci", [0.01, 0.5], "critical_boxes_do_not_rise_synth_dev"),
+            ("real", "signoffs_diff_vs_ref_ci", [0.1, 0.3], "signoffs_do_not_rise_real"),
+            ("clean", "all_diff_vs_ref_ci", [0.03, 0.2], "clean_boxes_do_not_rise"),
+            ("clean", "images_with_any_all_vs_ref_ci", [None, None], "clean_share_with_a_box_does_not_rise")):
+        bad = {s: {"k@0.3": dict(good)} for s in policy2.SPLITS}
+        bad[split]["k@0.3"][field] = ci
+        assert [c for c, v in policy2.clauses(bad, "k").items() if not v] == [clause]
+
+
+def test_dev_sweep_rows_carry_critical_class_recall_and_policy2s_gate_counts(tmp_path, monkeypatch):
+    """Every dev row has critical-class recall (exposed_rebar and spalling, pooled), against L2 tiling when it ran; a
+    Drishyam row also has recall of everything a person is shown and the per-photo gate counts, and a variant after the
+    first gets their paired CIs against it (a variant identical to the reference: every difference exactly 0)."""
+    from evals import dev_sweep
+
+    synth.build_dataset(tmp_path / "tiny", n=3, seed=3, width=640, height=480)
+    monkeypatch.setitem(dev_sweep.SPLITS, "tiny", (tmp_path / "tiny", 3, 3))
+    out = tmp_path / "rows.json"
+    dev_sweep.main(["tiny", "1.0", "cur=;same=merge_critical:False;p2=crit_weight:2.0,merge_critical:True,grid:True",
+                    "--workers", "1", "--baselines", "2", "--out", str(out)])
+    rows = json.loads(out.read_text())["rows"]
+    assert set(rows) == {"downscale", "tiling@L2", "cur@1.0", "same@1.0", "p2@1.0"}
+    assert "crit_recall_ci" in rows["tiling@L2"] and "recall_all" not in rows["tiling@L2"]
+    cur, same = rows["cur@1.0"], rows["same@1.0"]
+    assert cur["recall_all"] == cur["recall"] and cur["look_per_image"] == 0 and "crit_recall_vs_tiling_L2_ci" in cur
+    assert all(same[f"{k}_diff_vs_ref_ci"] == [0.0, 0.0] for k in ("crit", "signoffs", "reviews", "look", "all"))
+    assert same["recall_all_vs_ref_ci"] == [1.0, 1.0] and "crit_diff_vs_ref_ci" in rows["p2@1.0"]

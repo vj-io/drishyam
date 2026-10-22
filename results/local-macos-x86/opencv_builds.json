@@ -1,0 +1,567 @@
+{
+ "arm": "local-macos-x86",
+ "config": {
+  "rounds": 24,
+  "repeats": 5,
+  "threads": 1,
+  "photo": "public/samples/bridge_03.jpg",
+  "others": [
+   "4.14.0.94"
+  ],
+  "boot": 2000
+ },
+ "provenance": {
+  "cv2": "5.0.0",
+  "build_info_sha256": "fe5f9337dbc8663639ee7bcb2deb09359893fc8d2aa5b6a447cee2a0117d2ec7",
+  "cv2_baseline": "SSE SSE2 SSE3 SSSE3 SSE4_1",
+  "cv2_dispatch": "SSE4_2 AVX FP16 AVX2 AVX512_SKX",
+  "cv2_parallel_framework": "GCD",
+  "cv2_custom_hal": "YES (ipp (ver 0.0.1))",
+  "cv2_file": "/Users/mac/Documents/Projects/opencv/.claude/worktrees/agent-a315cdd9445adaf3d/.venv/lib/python3.13/site-packages/cv2/__init__.py",
+  "under_opt_cool": false,
+  "build": "stock (not COOL)",
+  "machine": "Darwin 25.6.0 x86_64",
+  "platform": "macOS-26.7.1-x86_64-i386-64bit-Mach-O",
+  "cpu": "Intel(R) Core(TM) i9-9880H CPU @ 2.30GHz",
+  "logical_cpus": 16,
+  "cv2_threads": 16,
+  "python": "3.13.16",
+  "numpy": "2.5.4",
+  "timestamp": "2026-10-21T16:27:36Z",
+  "load_avg": [
+   149.01,
+   202.99,
+   196.11
+  ]
+ },
+ "variants": {
+  "5.0": {
+   "cv2": "5.0.0",
+   "numpy": "2.5.4",
+   "ipp": true,
+   "cv2_baseline": "SSE SSE2 SSE3 SSSE3 SSE4_1",
+   "cv2_dispatch": "SSE4_2 AVX FP16 AVX2 AVX512_SKX",
+   "cv2_parallel_framework": "GCD",
+   "cv2_custom_hal": "YES (ipp (ver 0.0.1))",
+   "api": {
+    "dnn.ENGINE_NEW": true,
+    "dnn.ENGINE_CLASSIC": true,
+    "dnn.Net.setProfilingMode": true,
+    "dnn.DNN_PROFILE_DETAILED": true,
+    "dnn.Net.setTracingMode": true,
+    "dnn.Net.getPerfProfile": true,
+    "CV_Bool": true,
+    "CV_32U": true,
+    "CV_64S": true,
+    "reduceArgMax": true,
+    "compare": true,
+    "hasNonZero": true,
+    "findContoursLinkRuns": true,
+    "ALGO_HINT_APPROX": true,
+    "ipp.setUseIPP": true,
+    "bool mask": true
+   },
+   "stages": {
+    "decode": {
+     "p50_ms": 285.981,
+     "same_output": true
+    },
+    "pyramid": {
+     "p50_ms": 102.823,
+     "same_output": true
+    },
+    "saliency": {
+     "p50_ms": 50.439,
+     "same_output": true
+    },
+    "gaze": {
+     "p50_ms": 11.1,
+     "same_output": true
+    },
+    "gaze_oblique": {
+     "p50_ms": 6.245,
+     "same_output": true
+    },
+    "quality": {
+     "p50_ms": 7.071,
+     "same_output": true
+    },
+    "enhance": {
+     "p50_ms": 22.304,
+     "same_output": true
+    },
+    "segment": {
+     "p50_ms": 445.206,
+     "same_output": true
+    },
+    "measure": {
+     "p50_ms": 15.771,
+     "same_output": true
+    },
+    "nanodet": {
+     "p50_ms": 306.841,
+     "same_output": true
+    },
+    "yunet": {
+     "p50_ms": 169.41,
+     "same_output": true
+    }
+   }
+  },
+  "5.0 null": {
+   "cv2": "5.0.0",
+   "numpy": "2.5.4",
+   "ipp": true,
+   "cv2_baseline": "SSE SSE2 SSE3 SSSE3 SSE4_1",
+   "cv2_dispatch": "SSE4_2 AVX FP16 AVX2 AVX512_SKX",
+   "cv2_parallel_framework": "GCD",
+   "cv2_custom_hal": "YES (ipp (ver 0.0.1))",
+   "api": {
+    "dnn.ENGINE_NEW": true,
+    "dnn.ENGINE_CLASSIC": true,
+    "dnn.Net.setProfilingMode": true,
+    "dnn.DNN_PROFILE_DETAILED": true,
+    "dnn.Net.setTracingMode": true,
+    "dnn.Net.getPerfProfile": true,
+    "CV_Bool": true,
+    "CV_32U": true,
+    "CV_64S": true,
+    "reduceArgMax": true,
+    "compare": true,
+    "hasNonZero": true,
+    "findContoursLinkRuns": true,
+    "ALGO_HINT_APPROX": true,
+    "ipp.setUseIPP": true,
+    "bool mask": true
+   },
+   "stages": {
+    "decode": {
+     "p50_ms": 296.574,
+     "same_output": true,
+     "vs_5.0": {
+      "ratio": 1.0187,
+      "ci": [
+       0.9113,
+       1.1265
+      ]
+     }
+    },
+    "pyramid": {
+     "p50_ms": 98.803,
+     "same_output": true,
+     "vs_5.0": {
+      "ratio": 0.96,
+      "ci": [
+       0.8934,
+       1.0275
+      ]
+     }
+    },
+    "saliency": {
+     "p50_ms": 54.842,
+     "same_output": true,
+     "vs_5.0": {
+      "ratio": 1.0023,
+      "ci": [
+       0.8685,
+       1.1386
+      ]
+     }
+    },
+    "gaze": {
+     "p50_ms": 12.836,
+     "same_output": true,
+     "vs_5.0": {
+      "ratio": 1.123,
+      "ci": [
+       0.9745,
+       1.2822
+      ]
+     }
+    },
+    "gaze_oblique": {
+     "p50_ms": 7.105,
+     "same_output": true,
+     "vs_5.0": {
+      "ratio": 1.1366,
+      "ci": [
+       0.9467,
+       1.3774
+      ]
+     }
+    },
+    "quality": {
+     "p50_ms": 7.64,
+     "same_output": true,
+     "vs_5.0": {
+      "ratio": 1.0805,
+      "ci": [
+       0.8967,
+       1.3001
+      ]
+     }
+    },
+    "enhance": {
+     "p50_ms": 21.408,
+     "same_output": true,
+     "vs_5.0": {
+      "ratio": 0.9575,
+      "ci": [
+       0.8507,
+       1.0689
+      ]
+     }
+    },
+    "segment": {
+     "p50_ms": 472.531,
+     "same_output": true,
+     "vs_5.0": {
+      "ratio": 1.0684,
+      "ci": [
+       0.9811,
+       1.1442
+      ]
+     }
+    },
+    "measure": {
+     "p50_ms": 15.585,
+     "same_output": true,
+     "vs_5.0": {
+      "ratio": 1.0094,
+      "ci": [
+       0.8338,
+       1.2108
+      ]
+     }
+    },
+    "nanodet": {
+     "p50_ms": 345.001,
+     "same_output": true,
+     "vs_5.0": {
+      "ratio": 1.0985,
+      "ci": [
+       1.0144,
+       1.1853
+      ]
+     }
+    },
+    "yunet": {
+     "p50_ms": 183.884,
+     "same_output": true,
+     "vs_5.0": {
+      "ratio": 1.0577,
+      "ci": [
+       0.9436,
+       1.1927
+      ]
+     }
+    }
+   }
+  },
+  "5.0 IPP off": {
+   "cv2": "5.0.0",
+   "numpy": "2.5.4",
+   "ipp": false,
+   "cv2_baseline": "SSE SSE2 SSE3 SSSE3 SSE4_1",
+   "cv2_dispatch": "SSE4_2 AVX FP16 AVX2 AVX512_SKX",
+   "cv2_parallel_framework": "GCD",
+   "cv2_custom_hal": "YES (ipp (ver 0.0.1))",
+   "api": {
+    "dnn.ENGINE_NEW": true,
+    "dnn.ENGINE_CLASSIC": true,
+    "dnn.Net.setProfilingMode": true,
+    "dnn.DNN_PROFILE_DETAILED": true,
+    "dnn.Net.setTracingMode": true,
+    "dnn.Net.getPerfProfile": true,
+    "CV_Bool": true,
+    "CV_32U": true,
+    "CV_64S": true,
+    "reduceArgMax": true,
+    "compare": true,
+    "hasNonZero": true,
+    "findContoursLinkRuns": true,
+    "ALGO_HINT_APPROX": true,
+    "ipp.setUseIPP": true,
+    "bool mask": true
+   },
+   "stages": {
+    "decode": {
+     "p50_ms": 285.662,
+     "same_output": true,
+     "vs_5.0": {
+      "ratio": 0.9739,
+      "ci": [
+       0.8928,
+       1.0523
+      ]
+     }
+    },
+    "pyramid": {
+     "p50_ms": 100.311,
+     "same_output": true,
+     "vs_5.0": {
+      "ratio": 1.012,
+      "ci": [
+       0.9141,
+       1.1304
+      ]
+     }
+    },
+    "saliency": {
+     "p50_ms": 52.857,
+     "same_output": false,
+     "vs_5.0": {
+      "ratio": 0.9858,
+      "ci": [
+       0.8841,
+       1.1041
+      ]
+     }
+    },
+    "gaze": {
+     "p50_ms": 11.257,
+     "same_output": true,
+     "vs_5.0": {
+      "ratio": 1.0879,
+      "ci": [
+       0.9328,
+       1.2794
+      ]
+     }
+    },
+    "gaze_oblique": {
+     "p50_ms": 6.872,
+     "same_output": true,
+     "vs_5.0": {
+      "ratio": 1.1224,
+      "ci": [
+       0.8784,
+       1.4039
+      ]
+     }
+    },
+    "quality": {
+     "p50_ms": 7.98,
+     "same_output": true,
+     "vs_5.0": {
+      "ratio": 1.149,
+      "ci": [
+       0.9836,
+       1.3591
+      ]
+     }
+    },
+    "enhance": {
+     "p50_ms": 22.12,
+     "same_output": true,
+     "vs_5.0": {
+      "ratio": 1.0654,
+      "ci": [
+       0.9198,
+       1.2133
+      ]
+     }
+    },
+    "segment": {
+     "p50_ms": 474.122,
+     "same_output": true,
+     "vs_5.0": {
+      "ratio": 1.054,
+      "ci": [
+       0.9691,
+       1.1354
+      ]
+     }
+    },
+    "measure": {
+     "p50_ms": 17.078,
+     "same_output": true,
+     "vs_5.0": {
+      "ratio": 1.0741,
+      "ci": [
+       0.9084,
+       1.2615
+      ]
+     }
+    },
+    "nanodet": {
+     "p50_ms": 388.155,
+     "same_output": true,
+     "vs_5.0": {
+      "ratio": 1.216,
+      "ci": [
+       1.1073,
+       1.3409
+      ]
+     }
+    },
+    "yunet": {
+     "p50_ms": 196.5,
+     "same_output": true,
+     "vs_5.0": {
+      "ratio": 1.0896,
+      "ci": [
+       0.9682,
+       1.2326
+      ]
+     }
+    }
+   }
+  },
+  "4.14.0.94": {
+   "cv2": "4.14.0",
+   "numpy": "2.5.4",
+   "ipp": true,
+   "cv2_baseline": "SSE SSE2 SSE3 SSSE3 SSE4_1",
+   "cv2_dispatch": "SSE4_2 AVX FP16 AVX2 AVX512_SKX",
+   "cv2_parallel_framework": "GCD",
+   "cv2_custom_hal": "YES (ipp (ver 0.0.1))",
+   "api": {
+    "dnn.ENGINE_NEW": false,
+    "dnn.ENGINE_CLASSIC": false,
+    "dnn.Net.setProfilingMode": false,
+    "dnn.DNN_PROFILE_DETAILED": false,
+    "dnn.Net.setTracingMode": false,
+    "dnn.Net.getPerfProfile": true,
+    "CV_Bool": false,
+    "CV_32U": false,
+    "CV_64S": false,
+    "reduceArgMax": true,
+    "compare": true,
+    "hasNonZero": true,
+    "findContoursLinkRuns": true,
+    "ALGO_HINT_APPROX": true,
+    "ipp.setUseIPP": true,
+    "bool mask": false
+   },
+   "stages": {
+    "decode": {
+     "p50_ms": 265.092,
+     "same_output": true,
+     "vs_5.0": {
+      "ratio": 0.8862,
+      "ci": [
+       0.807,
+       0.9639
+      ]
+     }
+    },
+    "pyramid": {
+     "p50_ms": 105.582,
+     "same_output": true,
+     "vs_5.0": {
+      "ratio": 1.0705,
+      "ci": [
+       1.0066,
+       1.1398
+      ]
+     }
+    },
+    "saliency": {
+     "p50_ms": 52.011,
+     "same_output": true,
+     "vs_5.0": {
+      "ratio": 0.9542,
+      "ci": [
+       0.8623,
+       1.0586
+      ]
+     }
+    },
+    "gaze": {
+     "p50_ms": 18.388,
+     "same_output": false,
+     "vs_5.0": {
+      "ratio": 1.6017,
+      "ci": [
+       1.3827,
+       1.846
+      ]
+     }
+    },
+    "gaze_oblique": {
+     "p50_ms": 16.813,
+     "same_output": false,
+     "vs_5.0": {
+      "ratio": 2.4326,
+      "ci": [
+       2.0735,
+       2.8557
+      ]
+     }
+    },
+    "quality": {
+     "p50_ms": 7.152,
+     "same_output": true,
+     "vs_5.0": {
+      "ratio": 0.9869,
+      "ci": [
+       0.8248,
+       1.1758
+      ]
+     }
+    },
+    "enhance": {
+     "p50_ms": 22.507,
+     "same_output": true,
+     "vs_5.0": {
+      "ratio": 0.9995,
+      "ci": [
+       0.8966,
+       1.0991
+      ]
+     }
+    },
+    "segment": {
+     "p50_ms": 427.707,
+     "same_output": true,
+     "vs_5.0": {
+      "ratio": 0.9762,
+      "ci": [
+       0.884,
+       1.0667
+      ]
+     }
+    },
+    "measure": {
+     "p50_ms": 15.811,
+     "same_output": true,
+     "vs_5.0": {
+      "ratio": 1.0148,
+      "ci": [
+       0.8756,
+       1.2016
+      ]
+     }
+    },
+    "nanodet": {
+     "p50_ms": 622.562,
+     "same_output": true,
+     "vs_5.0": {
+      "ratio": 1.947,
+      "ci": [
+       1.7867,
+       2.1344
+      ]
+     }
+    },
+    "yunet": {
+     "p50_ms": 196.418,
+     "same_output": true,
+     "vs_5.0": {
+      "ratio": 1.1222,
+      "ci": [
+       0.9888,
+       1.2884
+      ]
+     }
+    }
+   }
+  }
+ },
+ "load_avg_end": [
+  150.83,
+  183.26,
+  179.82
+ ]
+}

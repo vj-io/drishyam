@@ -11,6 +11,7 @@ from __future__ import annotations
 import functools
 import hashlib
 import os
+import tempfile
 import threading
 import time
 from dataclasses import dataclass, field
@@ -32,6 +33,20 @@ STRAIGHT_ASPECT = 20.0  # length over mean width, and the minAreaRect long side 
 STRAIGHT_CAUSE = "straight line: formwork or joint"
 PORE_ASPECT = 8.0  # a crack is drafted only if its measured length is at least this many mean widths: not a blob
 PORE_CAUSE = "not elongated: pore or bug hole"
+# OpenCV calls in place of NumPy ones whose output is the same to the byte; False is the NumPy form. Each is True
+# only if bench/opencv5_features.py found the agent's traces identical and the call measurably faster (docs/bench.md,
+# "OpenCV 5 features in the pipeline"; tests/test_opencv5_features.py checks the values against its JSON).
+CV_ARGMAX = True  # finish: cv2.reduceArgMax (OpenCV 4.6), the first maximum, as ndarray.argmax(axis=0) returns
+CV_COMPARE = False  # _clean: cv2.compare(CMP_EQ), 255 where NumPy's == gives 1 (identical, not measurably faster)
+CV_BOOL_MASKS = True  # restrict: cv2.copyTo with the bool footprint as a CV_Bool mask (new in OpenCV 5.0); identical,
+# faster in 3 of its 4 timings on the Mac, the fourth's interval reaching 1.02, so it fails the rule there. It passes
+# on GitHub's Arm runner, where Lambda runs, and the x86 one (docs/bench.md); on since 2026-10-22, the owner's choice.
+# The engine OnnxSegmenter reads its FP32 net with: "new" (ENGINE_NEW, the default) or "classic" (ENGINE_CLASSIC on
+# a static-shape copy per input size; the FP16 net stays on ENGINE_NEW, which alone runs it). Not adopted: on the x86
+# Mac the agent's traces matched but its looks were slower on 16 threads. On GitHub's Arm runner they matched too and
+# took 0.44 of the time on 2 threads, but the owner kept ENGINE_NEW live (2026-10-22): a finding, bench/repro/README.md,
+# 3. On Lambda it would need the copy made at build time, since `onnx` is not in the package (docs/bench.md).
+DNN_ENGINE = os.environ.get("DRISHYAM_DNN_ENGINE", "new")
 
 
 @dataclass
@@ -92,7 +107,7 @@ def _clean(labels: np.ndarray, probs: np.ndarray, ids) -> tuple[dict[str, int], 
     """Drop specks of the classes `ids` from `labels` (in place); their areas and mean confidences."""
     areas, conf = {}, {}
     for ci in ids:
-        m = (labels == ci).astype(np.uint8)
+        m = cv2.compare(labels, ci, cv2.CMP_EQ) if CV_COMPARE else (labels == ci).astype(np.uint8)
         _, lab, stats, _ = cv2.connectedComponentsWithStats(m, connectivity=8)
         small = stats[:, cv2.CC_STAT_AREA] < MIN_BLOB_PX
         small[0] = False
@@ -120,7 +135,10 @@ def _entropy(probs: np.ndarray) -> float:
 def finish(probs: np.ndarray, t0: float, model: str, net_px: int | None = None) -> Segmentation:
     """Labels, areas, confidences and entropy from a (C, H, W) probability stack. `net_px`: the pixels the engine
     computed on (default: the stack's own H x W)."""
-    labels = probs.argmax(axis=0).astype(np.uint8)
+    if CV_ARGMAX:
+        labels = cv2.reduceArgMax(probs.reshape(len(probs), -1), 0).reshape(probs.shape[1:]).astype(np.uint8)
+    else:
+        labels = probs.argmax(axis=0).astype(np.uint8)
     areas, conf = _clean(labels, probs, range(1, len(CLASSES)))
     return Segmentation(probs, labels, _entropy(probs), areas, conf, (time.perf_counter() - t0) * 1000, model,
                         probs[0].size if net_px is None else net_px)
@@ -134,9 +152,15 @@ def restrict(seg: Segmentation, valid: np.ndarray) -> Segmentation:
     if valid.all():
         return seg
     t0 = time.perf_counter()
-    probs = seg.probs * valid
+    if CV_BOOL_MASKS:  # copyTo leaves 0 outside the mask, as the product with False does
+        probs = np.zeros_like(seg.probs)
+        for p, out in zip(seg.probs, probs, strict=True):
+            cv2.copyTo(p, valid, out)
+        labels = cv2.copyTo(seg.labels, valid)
+    else:
+        probs = seg.probs * valid
+        labels = np.where(valid, seg.labels, 0).astype(np.uint8)
     probs[0] += ~valid
-    labels = np.where(valid, seg.labels, 0).astype(np.uint8)
     areas, conf = dict(seg.areas), dict(seg.confidence)
     a, c = _clean(labels, probs, [int(ci) for ci in np.unique(seg.labels[~valid]) if ci])
     areas.update(a)
@@ -285,16 +309,25 @@ class OnnxSegmenter:
     content before they are resized to the crop, so a non-square crop is never squashed.
     `class_map[i]` is the Drishyam class index that model channel i adds to, so a
     19-class dacl10k head collapses onto CODEBRIM's five defects plus background.
+    `engine` (default DNN_ENGINE, from DRISHYAM_DNN_ENGINE): "classic" reads the FP32 net on ENGINE_CLASSIC instead.
     """
 
     def __init__(self, path: str, fp16_path: str | None = None, input_size: int = 512,
-                 class_map: list[int] | None = None, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)):
+                 class_map: list[int] | None = None, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225),
+                 engine: str | None = None):
         self.name = f"onnx:{path.rsplit('/', 1)[-1]}"
         self.files = (path, fp16_path)  # what the nets were read from (evals.harness hashes them)
         st = os.stat(path)
         self.sha256 = _sha256(path, st.st_mtime_ns, st.st_size)  # the weights a profile was chosen with (agent.WEIGHTS)
-        self.nets = {"accurate": self._load(path)}
-        self.nets["fp16"] = self._load(fp16_path) if fp16_path else self.nets["accurate"]
+        self.engine = engine or DNN_ENGINE
+        if self.engine == "new":
+            self.nets = {"accurate": self._load(path)}
+            self.nets["fp16"] = self._load(fp16_path) if fp16_path else self.nets["accurate"]
+        elif self.engine == "classic":
+            self.nets = {"accurate": _classic(path, input_size),
+                         "fp16": self._load(fp16_path) if fp16_path else _classic(path, input_size // 2)}
+        else:
+            raise ValueError(f"engine {self.engine!r}: 'new' or 'classic'")
         self.size = input_size
         self.class_map = class_map
         self.mean = np.array(mean, np.float32).reshape(3, 1, 1)
@@ -331,6 +364,21 @@ class OnnxSegmenter:
             raise ValueError(f"model has {probs.shape[0]} classes; pass class_map to reach {len(CLASSES)}")
         probs = np.stack([cv2.resize(p, (w, h), interpolation=cv2.INTER_LINEAR) for p in probs])
         return finish(probs, t0, model, size * size)
+
+
+def _classic(path: str, size: int):
+    """`path` on ENGINE_CLASSIC, its symbolic input H and W set to `size` first (the classic importer folds every
+    Shape node into a constant and cannot import them: bench/repro/). The copy goes through a temporary file: in
+    5.0.0 readNetFromONNX(buffer, engine=ENGINE_CLASSIC) ignores the engine and returns an ENGINE_NEW net."""
+    import onnx  # a dev dependency; only this off-by-default engine needs it
+
+    m = onnx.load(path)
+    for d in m.graph.input[0].type.tensor_type.shape.dim[2:]:
+        if d.dim_param:
+            d.dim_value = size  # assigning the value clears dim_param (a oneof)
+    with tempfile.TemporaryDirectory() as tmp:
+        onnx.save(m, f"{tmp}/static{size}.onnx")
+        return cv2.dnn.readNetFromONNX(f"{tmp}/static{size}.onnx", engine=cv2.dnn.ENGINE_CLASSIC)
 
 
 def mask_iou(a: np.ndarray, b: np.ndarray) -> float:

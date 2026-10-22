@@ -2,7 +2,9 @@
 are published (results/heldout_models.json, public/results/{codebrim,synth}_dacl10k/). These tests fail if docs/,
 public/*.html, public/*.js, public/js/*.js, README.md or models/README.md say, in a sentence about the live or
 deployed demo, that it runs the classical engine (classical-v1), or that the trained segmenter's results are
-unpublished or that no trained model is live. `python -m tests.test_live_state_doc` prints every sentence it flags."""
+unpublished or that no trained model is live. They also fail if a line the 2026-10-21 re-grade found stale comes back,
+or if the Lambda build or cold start the docs quote drifts from results/lambda-cv2-build.json and
+video/live/aws-smoke.log. `python -m tests.test_live_state_doc` prints every sentence it flags."""
 import html
 import json
 import re
@@ -107,6 +109,76 @@ def test_the_sites_static_lines_quote_v1s_published_numbers():
     samples = json.loads((REPO / "public/samples/index.json").read_text())
     (note,) = [s["note"] for s in samples if s["title"] == "Exposed rebar"]
     assert rebar in page and rebar in note and chance in page
+
+
+# Lines the 2026-10-21 re-grade of v1.1.0 found stale against the live f12f50f build: none may come back. Each phrase
+# is matched case-insensitively in FILES and the architecture figure's sources, HTML and SVG with tags stripped.
+STALE_CLAIMS = {
+    "about 3 s": "the cold start: 0.86 to 6.27 s to the first byte over the v1 smoke runs (docs/aws.md, check 3)",
+    "build information is not": "GET /api/health returns the Lambda's cv2_build (results/lambda-cv2-build.json)",
+    "empty gaze path": "the wall's work order lists the whole photo as not_assessed, check-by-eye",
+    "halted after 2 steps in the": "the f12f50f smoke's KILL halted after 3 steps",
+    "zoom until": "v1 zooms in where it is unsure, no finer than L1 or L2 on these photos",
+    "l0 · re-segment": "v1 verifies one level finer, never at L0 on a 2048- or 4608-px photo",
+}
+# A deploy older than the live one is named only in the history that records it (and 03af85b as the model's install
+# commit in models/README.md), never as the current build.
+OLD_COMMITS = {"02219a2": {"docs/aws.md"}, "03af85b": {"models/README.md"}}
+FIGURES = [REPO / "docs/architecture.mmd", REPO / "docs/architecture.svg"]
+# The lines as the release had them: the check must flag each one.
+OLD_CLAIMS = [
+    "That one starts cold (about 3 s with v1), a short job can finish first.",
+    "([results/linux-aarch64/micro.json](results/linux-aarch64/micro.json); the Lambda's own build information is not recorded).",
+    "Its work order shows an empty gaze path and no finding, which a reader could take for a clean wall.",
+    "sent once step 2 has streamed: halted after 2 steps in the 02219a2 smoke run, section 5",
+    "2. Zoom until it’s sure",
+    "VERIFY L0 · RE-SEGMENT",
+]
+
+
+def flat_text(path: Path) -> str:
+    text = path.read_text()
+    if path.suffix in (".html", ".svg"):
+        text = html.unescape(re.sub(r"<[^>]+>", " ", text))
+    return " ".join(text.split())
+
+
+def stale_claims(text: str) -> list[str]:
+    return [p for p in STALE_CLAIMS if p in text.lower()]
+
+
+def test_the_stale_claims_the_regrade_found_stay_gone():
+    assert [s for s in OLD_CLAIMS if not stale_claims(" ".join(s.split()))] == []
+    found = [(p.relative_to(REPO).as_posix(), c) for p in FILES + FIGURES for c in stale_claims(flat_text(p))]
+    assert found == []
+    named = [(p.relative_to(REPO).as_posix(), c) for p in FILES + FIGURES for c, ok in OLD_COMMITS.items()
+             if c in p.read_text() and p.relative_to(REPO).as_posix() not in ok]
+    assert named == []
+
+
+def test_the_lambda_build_and_cold_start_are_the_recorded_ones():
+    """README.md and docs/report.md quote the Lambda's own cv2_build as results/lambda-cv2-build.json holds it; docs/aws.md
+    and public/js/api.js quote the range of the first /api/health's time to first byte over the v1 smoke runs in
+    video/live/aws-smoke.log."""
+    rec = json.loads((REPO / "results/lambda-cv2-build.json").read_text())["health"]
+    b = rec["cv2_build"]
+    assert rec["host"] == "aws-lambda" and rec["arch"] == "aarch64" and rec["segmenter"] == "onnx:drishyam_dacl10k.onnx"
+    readme, report = (flat_text(REPO / f) for f in ("README.md", "docs/report.md"))
+    for name, text, keys in (("README.md", readme, ("Custom HAL", "baseline", "dispatch", "parallel framework")),
+                             ("docs/report.md", report, ("hal", "cpu_baseline", "cpu_dispatch", "parallel"))):
+        want = [f'{k} "{v}"' for k, v in zip(keys, (b["hal"], b["cpu_baseline"], b["cpu_dispatch"], b["parallel"]), strict=True)]
+        assert [w for w in want if w not in text] == [], name
+    seg, firsts = None, []
+    for line in (REPO / "video/live/aws-smoke.log").read_text().splitlines():
+        if m := re.search(r'health: .*"segmenter":"([^"]+)"', line):
+            seg = m[1]
+        if line.startswith("smoke ") and seg == "onnx:drishyam_dacl10k.onnx":
+            firsts.append(float(re.search(r"ttfb_first=([\d.]+)s", line)[1]))
+    lo, hi = min(firsts), max(firsts)
+    aws = flat_text(REPO / "docs/aws.md")
+    assert len(firsts) == 11 and "over the eleven v1 smoke runs the first `/api/health`" in aws
+    assert f"took {lo:.2f} to {hi:.2f} s to its first byte" in aws
+    assert f"({lo:.2f} to {hi:.2f} s to the first byte over the v1 smoke runs)" in flat_text(REPO / "public/js/api.js")
 
 
 if __name__ == "__main__":

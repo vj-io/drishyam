@@ -7,7 +7,7 @@ flowchart TB
         MCPC["MCP client, e.g. Claude Code, local<br/>drishyam mcp over stdio<br/>12 allow-listed tools: no approve, no shell"]
     end
 
-    subgraph AWS["2 · AWS path (deployed, us-east-1; v1 live since 2026-10-21, commit 02219a2)"]
+    subgraph AWS["2 · AWS path (deployed, us-east-1; v1 live since 2026-10-21, commit f12f50f)"]
         CF["CloudFront + Origin Access Control on both origins<br/>site from a private S3 bucket · /api/* to the Function URL<br/>AWS WAF rate-based rules<br/>POST bodies carry x-amz-content-sha256"]
         FURL["Lambda Function URL<br/>AuthType AWS_IAM · InvokeMode RESPONSE_STREAM"]
         LAMBDA["Lambda arm64 (Graviton) · Python 3.12<br/>AWS Lambda Web Adapter → FastAPI web tier, web.py<br/>CSP · HMAC-SHA256 work-order token · per-job kill token"]
@@ -20,7 +20,7 @@ flowchart TB
     subgraph CORE["3 · Agent core, drishyam/"]
         POLICY["agent.py Job.run policy<br/>survey · best-score · entropy#gt;tau · area#lt;A_min<br/>verify-new-mask · iou#lt;0.5 · stop-rule"]
         GOV["governor.py check() before every step<br/>kill-switch · cap-hit · p95#gt;SLA · warp-spike · usd≥80%"]
-        PLAN["planner.py, optional LLM<br/>numeric digest → validate() allow-list<br/>→ planner-fallback on any failure"]
+        PLAN["planner.py, optional LLM<br/>numeric digest → validate() allow-list<br/>on any failure the rule choice stands"]
         GATE["findings.py human gate<br/>exposed_rebar, spalling ≥ 40 000 px² → pending_review<br/>only decide(actor='human') leaves it"]
         GOV --> POLICY
         PLAN --> POLICY

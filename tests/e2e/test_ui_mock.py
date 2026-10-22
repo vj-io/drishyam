@@ -27,7 +27,8 @@ Scenarios (a real Chromium, the document served with the production CSP header):
   severity they set, a floor-bound stop), 16. focus, contrast and repeats at 1440 and 375 px, 17. the phone tool row
   at 320/360/375 px (no overlap, no shift when the crop shows), 18. the film's player: poster, its captions track off
   (the captions are burned in) and loading when turned on, nothing of the MP4 fetched before Play, the hero link, and
-  inside 375 px, 19. Try KILL in the job bar before any run, 20. the hero without v1's summaries.
+  inside 375 px, 19. Try KILL in the job bar before any run, 20. the hero without v1's summaries, 21. a ready order
+  whose looks saw under half of the salient area says the rest was not looked at closely.
 Any CSP violation, console error or page error fails the run. wait_for_function is avoided on purpose
 (it is blocked by a strict CSP): every wait uses locators or polls page.evaluate.
 """
@@ -522,15 +523,22 @@ def test_desktop_mock(browser, base):
     expect(p.locator("#stat-cost .stat__s")).to_contain_text(
         "At the 30 % pixel cap of the headline: a cap ended 125 of 200 first, the stop rule 71, and 4 had looked at every candidate.")
     expect(p.locator("#stat-ops .stat__v")).to_have_text("49 / 50 recovered")
-    # the real-photo card is the live engine's, every number stated before the runs beside its recall
+    # the real-photo card is the live engine's and comes first, short: its interval and chance (REAL has no point at
+    # the 30 % cap, so no classical recall beside it); every number stated before the runs is in FIG. 4.2's note
+    expect(p.locator(".stats > .stat").first).to_have_id("stat-real")
     expect(p.locator("#stat-real .stat__k")).to_have_text("Live engine (v1), real bridge photos (CODEBRIM, 200)")
     expect(p.locator("#stat-real .stat__v")).to_have_text("recall 0.49")
+    expect(p.locator("#stat-real .stat__s")).to_have_text(
+        "at the 30 % pixel cap (CI 0.44–0.54); chance 0.30.")
+    lines = p.locator("#stat-real .stat__s").evaluate("e => Math.round(e.getBoundingClientRect().height / parseFloat(getComputedStyle(e).lineHeight))")
+    assert lines <= 2, f"the v1 card's note runs to {lines} lines"
+    expect(p.locator("#stat-ops .stat__k")).to_have_text("Classical engine, failure drills")
     for said in ("Recall 0.49 (95 % CI 0.44–0.54) at the 30 % pixel cap.",
                  "Its boxes at random places score 0.30, and with IoU-only matching it finds 0.25 against 0.08 by chance.",
                  "It sends 9.60 critical boxes per photo to a person, against the classical engine’s 1.73.",
                  "On the synthetic photos it finds 0.02 of the exposed rebar and 0.00 of the efflorescence, where the classical engine finds 0.57 and 0.16.",
                  "Measured with the governor off, the 512-px FP32 net on every look; live, the v1 engine keeps that net unless a step takes over 1.5 s."):
-        expect(p.locator("#stat-real .stat__s")).to_contain_text(said)
+        expect(p.locator("#bench-real")).to_contain_text(said.replace("Recall", "v1 held out: recall"))
     expect(p.locator("#bench svg.chart")).to_be_visible()
     expect(p.locator("#bench .legend li")).to_have_count(4)                       # three policies and v1's dashed line
     expect(p.locator("#bench .legend")).to_contain_text("Drishyam, v1 (the live engine)")
@@ -1259,6 +1267,43 @@ def test_halt_governor_note_and_critical_trigger(browser, base):
     print("ok  halt governor note and critical trigger rendered")
 
 
+def test_partial_look_is_not_a_clean_result(browser, base):
+    """A ready work order with nothing critical, whose looks saw under half of the salient area closely (the real
+    wall replay real_02: 21 %), says how much was looked at and that the rest was not, never "nothing critical needed
+    a sign-off" as if the wall were checked. A recording older than coverage_looked says "seen at some level"; at
+    half or more the order reads as before."""
+    for extra, seen in (({"coverage": 1.0, "coverage_looked": 0.21}, "looked at closely"), ({"coverage": 0.21}, "seen at some level"),
+                        ({"coverage": 1.0, "coverage_looked": 0.5}, None)):
+        events = [e for e in map(json.loads, JOB_LINES) if e["type"] != "review_request"]
+        for e in events:
+            if e["type"] == "finding":
+                e["finding"].update(critical=False, state="draft", critical_step=None, critical_rule=None)
+        done = {k: v for k, v in events[-1].items() if k not in ("coverage", "coverage_looked")}
+        done.update(status="completed", cause="exhausted", **extra)
+        done["summary"]["critical_pending"] = 0
+        done["work_order"].update(status="ready", not_assessed=[],
+                                  findings=[{**f, "critical": False, "state": "draft"} for f in done["work_order"]["findings"]])
+        events[-1] = done
+        reset_live([{"lines": [json.dumps(e) for e in events], "delay": 0}])
+        s = Session(browser, f"partial-{done['coverage']}-{done.get('coverage_looked')}", viewport={"width": 1440, "height": 900})
+        p = s.page
+        p.goto(f"{base}/")
+        expect(p.locator("#look")).to_be_enabled(timeout=T)
+        s.fast()
+        expect(p.locator("#job-pill")).to_have_text("done", timeout=T)
+        note = p.locator("#done .stack > .note").first
+        if seen is None:
+            expect(note).to_have_text(f"Work order {WO_ID} is ready: nothing critical needed a sign-off.")
+        else:
+            part = f"21 % of the salient area was {seen} and nothing critical was found there; the rest was not looked at closely."
+            expect(note).to_have_text(f"Work order {WO_ID} is ready: {part}")
+            expect(p.locator("#say-4")).to_contain_text(f"Ready: {part}")
+            expect(p.locator("#narrator")).to_contain_text(f"Ready: {part}")
+        s.check_clean()
+        s.context.close()
+    print("ok  a ready order at 21 % of the salient area says the rest was not looked at closely")
+
+
 def test_planner_status_shows_the_fallback_chip(browser, base):
     """The API keeps a look's own cause and puts a failed planner consultation in `planner_status`: the trace
     still flags that look `planner-fallback`."""
@@ -1491,7 +1536,13 @@ def test_contract_fields_in_words(browser, base):
       const finest = ['entropy 0.62 > 0.5, crack, exposed_rebar drafted here', 'exposed_rebar area 40 px < A_min 64, exposed_rebar not drafted']
         .map((saw) => m.brief({ step: 3, cause: 'best-score', rationale: `new crack mask at L1; L1 is the finest level for onnx:drishyam_dacl10k.onnx (min_view 0.3): ${saw}; no finer look` }))
         .concat(m.brief({ step: 4, cause: 'best-score', rationale: 'entropy 0.79 > 0.5 at L2; iou 0.227 < 0.5 between L2 and L1 not settled: L1 is the finest level for onnx:drishyam_dacl10k.onnx (min_view 0.3), no finer look' }));
-      return { kinds, unseen, finest }; }""")
+      const held = ['exposed_rebar 0.58 under the floor 0.6 at L2 (step 2): confirming at L1, centred on the mask; confirm look: none of exposed_rebar confirmed',
+        'new corrosion mask at L3; confirming at L2; exposed_rebar 0.58, spalling 0.41 under the floor 0.6: held for a confirm look at L1',
+        'no candidate region was proposed: one L2 look of 512 px spans the photo'].map((rationale) => m.brief({ step: 3, cause: 'best-score', rationale }));
+      const detail = ['exposed_rebar 0.58 under the floor 0.6 at L2 (step 2): confirming at L1, centred on the mask; confirm look: none of exposed_rebar confirmed',
+        'new corrosion mask at L3; confirming at L2; exposed_rebar 0.58 under the floor 0.6: held for a confirm look at L1']
+        .map((rationale, i) => m.explain({ step: 3 - i, cause: i ? 'verify' : 'confirm-critical', rationale, decision: { action: 'verify', args: { level: 1 } } }).join(' '));
+      return { kinds, unseen, finest, held, detail }; }""")
     assert said["kinds"] == ["critical", "disagree", "unconfirmed", "class-change", "ambiguous"], said["kinds"]  # a trace recorded before `kind`
     assert "severity 1 (the default: no look has shown it yet)" in said["unseen"], said["unseen"]
     for f in said["finest"]:  # the v1 engine's held verify (agent.py), in words: no profile name, no min_view
@@ -1499,6 +1550,13 @@ def test_contract_fields_in_words(browser, base):
     assert "unsure what it saw (0.62, over 0.5), it drafts crack, exposed rebar here" in said["finest"][0], said["finest"][0]
     assert "the exposed rebar is tiny (40 px, under 64 px), the exposed rebar is not drafted" in said["finest"][1], said["finest"][1]
     assert "1:4 and 1:2 looks disagree (23\u00a0% overlap), and it cannot settle it: 1/2 size is the finest" in said["finest"][2], said["finest"][2]
+    for f in said["detail"]:  # the step detail's "Why this look" for v1-policy2's confirm look and the look that held the mask
+        assert not re.search(r"\b\w+_\w+\b", f) and "under the confidence floor 0.6" in f, f
+    for f in said["held"]:  # v1-policy2's held masks and the zero-candidate fallback (agent.py), in words
+        assert not re.search(r"\b\w+_\w+\b|\bL\d\b", f), f
+    assert said["held"][0] == ("The exposed rebar (confidence 0.58) seen at step 2 was under the confidence floor 0.6, so it takes one "
+                               "confirm look at 1/2 size, centred on it, and the confirm look did not confirm it, so a person checks it by eye."), said["held"][0]
+    assert "The exposed rebar (confidence 0.58) and the spalling (0.41) are under the confidence floor 0.6, so it is held" in said["held"][1], said["held"][1]
     s.to(".win--findings")
     s.shot("desktop-contract-findings.png")
     s.check_clean()
@@ -1615,6 +1673,7 @@ if __name__ == "__main__":
             test_pending_states(browser, base)
             test_video_player(browser, base)
             test_halt_governor_note_and_critical_trigger(browser, base)
+            test_partial_look_is_not_a_clean_result(browser, base)
             test_planner_status_shows_the_fallback_chip(browser, base)
             test_kill_before_the_first_record(browser, base)
             test_kill_the_server_never_confirms(browser, base)

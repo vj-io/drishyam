@@ -68,15 +68,26 @@ function gapText() {
   if (!na.length) return '';
   if (!S.overview?.candidates?.length) return 'no candidate region was proposed, so the whole photo is not assessed';
   const skipped = na.filter((a) => a.region).length;
-  const unread = na.length - skipped;
+  const doubt = na.filter((a) => !a.region && / under the floor /.test(a.reason ?? '')).length;  // agent.py: a held critical mask
+  const unread = na.length - skipped - doubt;
   return [skipped ? `${skipped} candidate region${skipped === 1 ? ' was' : 's were'} never looked at` : '',
+    doubt ? `${doubt} possible critical defect${doubt === 1 ? ' was' : 's were'} too uncertain to draft and need${doubt === 1 ? 's' : ''} a person to check by eye` : '',
     unread ? `${unread} area${unread === 1 ? '' : 's'} could not be read` : ''].filter(Boolean).join(' and ');
+}
+/** A ready work order with nothing critical whose looks saw under half of the salient area closely, in words; '' otherwise. */
+function partText() {
+  const looked = S.done?.coverage_looked;
+  const share = looked ?? S.done?.coverage;  // a recording older than coverage_looked: its coverage counts the survey look
+  if (S.order?.status !== 'ready' || S.order.findings.some((f) => f.critical) || !(share < 0.5)) return '';
+  return `${Math.round(share * 100)} % of the salient area was ${looked == null ? 'seen at some level' : 'looked at closely'} `
+    + 'and nothing critical was found there; the rest was not looked at closely';
 }
 
 function syncSteps() {
   const run = S.mode === 'running' ? 'running' : S.done ? 'done' : 'waiting';
   const pending = pendingCount();
   const gap = S.done ? gapText() : '';
+  const part = S.done ? partText() : '';
   const states = [S.image ? 'done' : 'waiting', run, run, S.done && !pending && !gap ? 'done' : 'waiting'];
   states.forEach((state, i) => {
     el.states[i].dataset.state = state;
@@ -90,7 +101,8 @@ function syncSteps() {
       : gap ? `${!S.overview?.candidates?.length ? 'Not ready' : `${critical ? 'Signed' : 'Nothing critical in what it looked at'}, but not ready`}: `
         + `${gap}. The work order marks this as not assessed, so a person should look there. It does not say the wall is clean.`
       : critical ? 'Signed: ready to send. Download the signed work order below.'
-        : 'Nothing critical was found, so nothing needs your sign-off. The work order is ready.';
+        : part ? `Ready: ${part}. It does not say the wall is clean.`
+          : 'Nothing critical was found, so nothing needs your sign-off. The work order is ready.';
 }
 
 // ---- taskbar / mode -----------------------------------------------------------------------------------
@@ -549,11 +561,13 @@ function updateDone() {
   el.tbChecked.textContent = signers.length ? signers.join(', ') : 'human reviewer';
   const critical = S.order.findings.some((f) => f.critical);
   const gap = gapText();
+  const part = partText();
   S.ui.orderState.textContent = pending
     ? `Waiting for your sign-off (${pending}): work order ${S.order.id} is ${S.order.status} until a person approves or rejects each critical finding.`
     : gap ? `Work order ${S.order.id} is ${S.order.status}: ${gap}. A person should look there.`
     : critical ? `Signed: ready to send. Work order ${S.order.id} is ${S.order.status}.`
-      : `Work order ${S.order.id} is ${S.order.status}: nothing critical needed a sign-off.`;
+      : part ? `Work order ${S.order.id} is ${S.order.status}: ${part}.`
+        : `Work order ${S.order.id} is ${S.order.status}: nothing critical needed a sign-off.`;
   countUp(S.ui.pending, pending);
   setMode('done', el.text.textContent);
 }
@@ -621,9 +635,11 @@ function finish(ev) {
     : S.slow && !Q.skip ? `The agent took ${sm.seconds} s${modelled() ? ' (modelled)' : ''}${paced()}; we replayed it slowly so you can read it${serverTotal(sm.seconds)}.`
       : `Done in ${sm.seconds} s of ${agentTime()}: ${sm.steps} looks, ${(sm.pixels_frac * 100).toFixed(1)} % of the pixels${serverTotal(sm.seconds)}.`));
   const gap = gapText();
+  const part = partText();
   narrate(n ? `${n} critical finding${n === 1 ? ' needs' : 's need'} you. Sign ${n === 1 ? 'it' : 'them'} off in step 4: the agent cannot.`
     : gap ? `Not assessed: ${gap}. A person should look there; this is not a clean result.`
-      : 'Nothing critical was found, so nothing needs your sign-off.',
+      : part ? `Ready: ${part}.`
+        : 'Nothing critical was found, so nothing needs your sign-off.',
   `It stopped because ${stopWords(ev.cause, sm.steps)}${S.steps.length ? `: step ${S.steps.at(-1).step} says why` : ''}.`);
   findings.setReady();
   findings.refresh();

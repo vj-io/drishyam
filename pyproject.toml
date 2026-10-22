@@ -1,6 +1,6 @@
 [project]
 name = "drishyam"
-version = "1.1.0"
+version = "1.1.1"
 description = "Virtual-PTZ bridge inspector: decides where to look, zooms until it is sure, and stops when the next look is worth less than it costs."
 readme = "README.md"
 license = "MIT"

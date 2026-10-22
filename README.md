@@ -1,19 +1,19 @@
 # Drishyam
 
-**A virtual-PTZ inspector for bridge photos**, entered in the OpenCV AI Competition 2026, powered by AWS. It is for
-bridge inspectors working through photo backlogs (624,939 US bridges, 41,148 in poor condition, each routinely
-inspected at intervals of up to 24 months; [docs/impact-sources.md](docs/impact-sources.md)). Drishyam (Sanskrit:
-*that which is seen*) decides where to look in a huge photo, zooms in where it is unsure (with the live v1 engine,
-no finer than half size on a 2048-px photo), drafts findings with pixel measurements, asks a human to sign anything
-critical, and stops looking when the next look is worth less than it costs. Every camera move is an OpenCV
-`pyrDown` / `warpPerspective` / `resize` call. The live demo runs the stock opencv-python-headless 5.0.0 wheel on Lambda arm64.
-That pinned wheel's aarch64 build already includes KleidiCV 26.03 and carotene: on GitHub's arm64 runner its
-`cv2.getBuildInformation()` reads "Custom HAL: YES (carotene (ver 0.0.1) KleidiCV (ver 26.03))"
-([results/linux-aarch64/micro.json](results/linux-aarch64/micro.json); the Lambda's own build information is not
-recorded).
+**[Watch the 4-minute film](https://github.com/vj-io/drishyam/releases/download/v1.1.1/drishyam.mp4)** (also on
+the live site) · **[Try the live demo](https://d1xg58guluup8c.cloudfront.net)**
+
+Drishyam is an inspection agent for bridge photos, for inspectors with a backlog of large photos to check. On each
+photo it decides where to look, zooms in where it is unsure, marks cracks, spalling and exposed rebar with pixel
+measurements, and stops when one more look is worth less than it costs. A person signs every critical finding; the
+agent cannot. On 200 real bridge photos the live segmenter, v1, finds 0.49 of the labelled defects, 2.5 times what
+the classical engine finds, but boxes placed at random would already find 0.30.
+
+It is built on OpenCV 5 for the OpenCV AI Competition 2026, powered by AWS. Drishyam is Sanskrit for *that which is
+seen*.
 
 - **Live demo:** https://d1xg58guluup8c.cloudfront.net (stock OpenCV 5 on AWS Lambda arm64 behind CloudFront, *not COOL*; [docs/aws.md](docs/aws.md))
-- **Report:** [docs/report.md](docs/report.md) · **Architecture:** [docs/architecture.png](docs/architecture.png) · **Agent loop:** [docs/agent-loop.svg](docs/agent-loop.svg) · **Claude driving it over MCP (recorded):** [docs/mcp-session/transcript.md](docs/mcp-session/transcript.md) · **Why it matters, with sources:** [docs/impact-sources.md](docs/impact-sources.md)
+- **Report:** [docs/report.md](docs/report.md) · **Architecture:** [docs/architecture.png](docs/architecture.png) · **Agent loop:** [docs/agent-loop.svg](docs/agent-loop.svg) · **Claude driving it over MCP (recorded):** [live v1 engine, 2026-10-21](docs/mcp-session-v1/transcript.md) · [classical engine, 2026-10-18](docs/mcp-session/transcript.md) · **Why it matters, with sources:** [docs/impact-sources.md](docs/impact-sources.md)
 - **PRD:** [docs/PRD.md](docs/PRD.md) · **Requirement traceability:** [docs/requirements.md](docs/requirements.md) · **Security model:** [docs/security.md](docs/security.md) · **API:** [docs/api-contract.md](docs/api-contract.md) · **MCP:** [docs/mcp.md](docs/mcp.md)
 
 ## Results at a glance
@@ -26,19 +26,26 @@ drifts from that file or, for the Lambda timings, from [docs/aws.md](docs/aws.md
 
 | Segmenter | CODEBRIM recall (95 % CI) | chance | IoU-only (chance) | synth200 recall (95 % CI) | clean photos with a box | critical boxes per CODEBRIM photo |
 | --- | --- | --- | --- | --- | --- | --- |
-| **v1 (live)** | 0.49 (0.44–0.54) | 0.30 | 0.25 (0.08) | 0.64 (0.61–0.67) | 0 of 51 | 9.60 |
+| v1 (first look policy) | 0.49 (0.44–0.54) | 0.30 | 0.25 (0.08) | 0.64 (0.61–0.67) | 0 of 51 | 9.60 |
+| **v1-policy2 (live)** | 0.49 (0.44–0.53) | 0.31 | 0.26 (0.09) | 0.62 (0.59–0.66) | 0 of 51 | 8.75 |
 | v2a | 0.48 (0.43–0.52) | 0.30 | 0.24 (0.08) | 0.61 (0.57–0.64) | 9 of 51 | 4.38 |
 | v2b | 0.49 (0.44–0.53) | 0.28 | 0.25 (0.08) | 0.57 (0.53–0.61) | 9 of 51 | 4.65 |
 | v2c | 0.48 (0.44–0.53) | 0.28 | 0.23 (0.07) | 0.57 (0.54–0.61) | 22 of 51 | 3.71 |
 | classical engine | 0.19 (0.16–0.23) | 0.12 | 0.08 (0.03) | 0.48 (0.44–0.52) | 34 of 51 | 1.73 |
 
-- **v1 runs live since 2026-10-21** (deployed commit f12f50f, smoke-tested: [docs/aws.md](docs/aws.md)). It was
+- **v1 runs live since 2026-10-21**, with the v1-policy2 look policy since 2026-10-22 (deployed commit a4419e2, smoke-tested: [docs/aws.md](docs/aws.md)). It was
   chosen on the dev splits only ([results/dev/model_choice_dev.json](results/dev/model_choice_dev.json)); held out
   it is again the only model with no measurable loss against any other. These are its second scorings (one earlier,
   unpublished). Its CC BY-NC 4.0 weights are release assets of v1.1.0, not in git.
+- **v1-policy2, live since 2026-10-22 (deployed commit adf9474):** one configuration chosen on the dev splits by a rule committed before its run and scored once held out (v1's third read; section 8). On CODEBRIM it sends 8.75 critical boxes per photo to a person instead of 9.60 (0.91×, CI 0.84–0.98) and about 1.15 critical findings instead of 2.17, and it lists 0.20 masks per photo as needs-a-look for a person to check by eye; recall is unchanged (0.99×, CI 0.97–1.01), on synth200 0.98× (0.95–1.00); critical-class recall is not higher (0.99×, 0.96–1.02; exposed rebar 0.14 against 0.16). On CODEBRIM verify now fires on 14.1 % of looks (5.0 % confirm looks) instead of 9.4 %, escalation on 5.8 %. It still does not beat L2 tiling: 0.98× its recall at 1.40× its pixels, and 0.83× (0.76–0.89) at the 10 % cap.
 - **What the held-out runs measured:** the governor off and the 512-px FP32 net on every look. Live, the v1
   profile's SLA is 1500 ms, so looks stay on the 512-px FP32 net unless steps exceed 1.5 s. v1's finest look is L1
   (half size) on a 2048-px photo and L2 on a 4608-px one, so on these photos it never looks at full resolution.
+- **How much v1 zooms, and a tiling grid it does not beat:** on CODEBRIM at the 30 % cap an escalation fired on
+  5.9 % of v1's looks and a verify on 9.4 %, and an L2 tiling grid finds 0.50 with 0.10 of the pixels, against the
+  agent's 0.49 with 0.14; on synth200 an L1 grid finds 0.70 with 0.50 of the pixels, against 0.64 with 0.26
+  ([public/results/codebrim_dacl10k/summary.json](public/results/codebrim_dacl10k/summary.json),
+  [public/results/synth_dacl10k/summary.json](public/results/synth_dacl10k/summary.json)).
 - **Against the classical engine,** v1 finds 2.54× (2.16–3.01) its recall on CODEBRIM and 1.34× (1.24–1.45) on
   synth200, and puts no box on a clean photo where the classical engine puts 7.08 per photo. But chance is high on
   CODEBRIM because its boxes are large; it sends 5.5 times the critical boxes to the human gate (at that rate, about 24,000
@@ -75,11 +82,20 @@ flowchart TD
 ```
 
 1. **Look where it matters.** A saliency prior from imgproc ops (Sobel, black-hat, adaptive threshold, CLAHE, rust-hue `inRange`) ranks up to 20 candidate windows on the 1/8-scale overview.
-2. **Zoom until sure.** The next look is `argmax p·s·(1+u)·a / t̂` (prior × severity × uncertainty × unseen area ÷ predicted ms). An uncertain look (entropy > τ) or a tiny mask zooms one pyramid level finer on what it saw; a new confident mask is verified one level finer by mask IoU. With v1, the live engine, a look spans at least 0.3 of the photo's long side (its profile's `min_view`), so its finest level is L1 (half size) on a 2048-px photo and L2 on a 4608-px one; a look there is not escalated or verified further.
+2. **Zoom in where it is unsure.** The next look is `argmax p·s·(1+u)·a / t̂` (prior × severity × uncertainty × unseen area ÷ predicted ms). An uncertain look (entropy > τ) or a tiny mask zooms one pyramid level finer on what it saw; a new confident mask is verified one level finer by mask IoU. With v1, the live engine, a look spans at least 0.3 of the photo's long side (its profile's `min_view`), so its finest level is L1 (half size) on a 2048-px photo and L2 on a 4608-px one; a look there is not escalated or verified further.
 3. **Stop when a look is not worth its cost.** The job ends when the best next look is worth less than a quarter of the value per ms realised so far, or than the value of a look that finds nothing once every candidate left has been seen as finely as its first look would see it, inside pixel, $ and seconds caps and a p95-latency governor (switches model, then coarsens). Every step records the cause that chose it.
-4. **A human signs anything critical.** Exposed rebar and large spalling wait in `pending_review`; only a human (web review, or `drishyam review`) can approve or reject. The agent, the MCP tools and the optional LLM planner have no path to that transition.
+4. **A human signs anything critical.** Exposed rebar and large spalling wait in `pending_review`; only a human (web review, or `drishyam review`) can approve or reject. The agent, the MCP tools and the optional LLM planner have no path to that transition. The review does not check who sends it: the reviewer's name is self-asserted ([docs/security.md](docs/security.md), Known limits).
 
-No LLM runs in the live demo: the deployed agent is the rule policy above, and its planner failure drills use planners scripted to time out or answer junk. The LLM path is the MCP server; in a [recorded session](docs/mcp-session/transcript.md) Claude chose each call from the measured IoU and entropy (its prompt states the decision rules). The full system, AWS included, is in [docs/architecture.png](docs/architecture.png), and the loop in [docs/agent-loop.svg](docs/agent-loop.svg).
+It is for bridge inspectors working through photo backlogs: 624,939 US bridges, 41,148 in poor condition, each
+routinely inspected at intervals of up to 24 months ([docs/impact-sources.md](docs/impact-sources.md)). Every camera
+move is an OpenCV `pyrDown` / `warpPerspective` / `resize` call. The live demo runs the stock
+opencv-python-headless 5.0.0 wheel on Lambda arm64, whose aarch64 build already includes KleidiCV 26.03 and
+carotene: the Lambda's own `cv2.getBuildInformation()`, as its `GET /api/health` reports it, reads Custom HAL
+"YES (carotene (ver 0.0.1) KleidiCV (ver 26.03))", baseline "NEON FP16", dispatch "NEON_DOTPROD NEON_FP16 NEON_BF16"
+and parallel framework "pthreads" ([results/lambda-cv2-build.json](results/lambda-cv2-build.json), fetched
+2026-10-21), the same as on GitHub's arm64 runner ([results/linux-aarch64/micro.json](results/linux-aarch64/micro.json)).
+
+No LLM runs in the live demo (the batch CLI's optional Nova Lite router is below): the deployed agent is the rule policy above, and its planner failure drills use planners scripted to time out or answer junk. The LLM path is the MCP server; in [recorded sessions on the live v1 engine](docs/mcp-session-v1/transcript.md) Claude chose each call from what the server measured and the crops it returned (its prompt states the decision rules): on `bridge_03` it found all 4 labelled defects with the rule agent's 17.1 % of the pixels (the rule agent stopped before the crack; the session was not blind: Claude had read the sample's labels and the earlier transcript), and on our wall photo, where the rule agent takes no look, it looked along the faint line in the overview and flagged the crack (no ground truth; the session's limits are in the transcript). An [earlier session](docs/mcp-session/transcript.md) used the classical engine. The full system, AWS included, is in [docs/architecture.png](docs/architecture.png), and the loop in [docs/agent-loop.svg](docs/agent-loop.svg).
 
 ## Run it
 
@@ -110,12 +126,36 @@ check their sha256, then run with them.
 gh release download v1.1.0 --repo vj-io/drishyam --pattern 'drishyam_dacl10k*' --dir models
 ```
 
+Or without `gh`, the same three files with curl:
+
+```bash
+curl -fL -o models/drishyam_dacl10k.onnx https://github.com/vj-io/drishyam/releases/download/v1.1.0/drishyam_dacl10k.onnx
+```
+
+```bash
+curl -fL -o models/drishyam_dacl10k.fp16.onnx https://github.com/vj-io/drishyam/releases/download/v1.1.0/drishyam_dacl10k.fp16.onnx
+```
+
+```bash
+curl -fL -o models/drishyam_dacl10k.sha256 https://github.com/vj-io/drishyam/releases/download/v1.1.0/drishyam_dacl10k.sha256
+```
+
 ```bash
 shasum -a 256 -c models/drishyam_dacl10k.sha256
 ```
 
 ```bash
 DRISHYAM_ONNX=models/drishyam_dacl10k.onnx DRISHYAM_ONNX_FP16=models/drishyam_dacl10k.fp16.onnx uv run drishyam run public/samples/bridge_03.jpg --pixel-cap 0.3
+```
+
+A backlog of photos ([docs/batch.md](docs/batch.md)): triage every photo with the agent's own overview, run the
+unchanged per-photo agent in order of evidence under one total budget, list every photo it did not reach as not
+assessed, and write a signed inspection report with one queue of critical findings for a person. On the 90-photo dev
+backlog the ordering is no measurable gain (×1.23 against random order, 95 % CI 0.64–1.64).
+`--router nova` adds a live LLM router: Amazon Nova Lite on Bedrock labels each photo's blurred overview Clear, Requires zoom or Critical, Clear photos get no job and are listed as not assessed, and any bad reply, timeout or error falls back to the triage. On dev it loses under the rule committed before any paid call: its Bedrock $ leaves it 19 photos at half the full-run budget, so it queues 0.18 of the critical defects against the triage's 0.50 (×0.36, CI 0.13–0.67), and it cleared 9 of 81 photos holding a critical defect, so `--router rule` stays the default. A 2,536-photo backlog ran end to end in 72 min for $0.32 of Bedrock: 867 cleared, 587 run, 684 critical findings queued for a person ([batch.md](docs/batch.md#a-live-llm-router---router-nova)).
+
+```bash
+uv run drishyam batch public/samples --seconds-cap 30
 ```
 
 MCP server over stdio (12 allow-listed tools, no approve tool, no shell):

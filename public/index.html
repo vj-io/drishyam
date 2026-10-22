@@ -76,7 +76,7 @@
         <a class="btn" id="own" href="#step-photo">Try your own photo</a>
         <a class="cta__link" id="video-link" href="#video">Watch the 4-minute film</a>
       </div>
-      <p class="note" id="rebar-note">The guided run&rsquo;s photo shows exposed rebar, but the live v1 engine may label it differently: on our synthetic test photos it finds 0.02 of the exposed rebar (FIG. 4.1).</p>
+      <p class="note" id="rebar-note">On the guided run&rsquo;s photo the live engine, with the v1-policy2 look policy since 2026-10-22, scores the exposed rebar 0.58, under its 0.6 confidence floor; its confirm look does not confirm it, so the work order sends it to a person to check by eye rather than as a critical finding (v1&rsquo;s first look policy made it a critical finding at step 2, our runs of 2026-10-21; the spalling is still critical). One photo is not its accuracy: on our synthetic test photos it finds 0.02 of the exposed rebar (FIG. 4.1).</p>
       <p class="stakes">The US has 624,939 bridges (FHWA, 2026), and the rule is a routine inspection at intervals of up to 24 months (23 CFR 650.311). One drone inspection of a single bridge produced 2,536 photos. Someone has to look at every one. <a href="https://github.com/vj-io/drishyam/blob/main/docs/impact-sources.md" rel="noopener noreferrer">Sources</a></p>
       <ol class="claims" aria-label="How to use it">
         <li>Pick a photo</li>
@@ -84,10 +84,10 @@
         <li>Sign off what it flags</li>
       </ol>
       <ul class="stats" aria-label="Measured so far">
-        <li class="stat" id="stat-recall"><span class="stat__k">Synthetic test set</span><i class="stat__dim" aria-hidden="true"></i><b class="stat__v">see benchmarks</b><span class="stat__s">a hypothesis until it is measured</span></li>
-        <li class="stat" id="stat-cost"><span class="stat__k">Stops on its own</span><i class="stat__dim" aria-hidden="true"></i><b class="stat__v">see benchmarks</b><span class="stat__s">how often the stop rule ends a job</span></li>
-        <li class="stat" id="stat-ops"><span class="stat__k">Failure drills</span><i class="stat__dim" aria-hidden="true"></i><b class="stat__v">see benchmarks</b><span class="stat__s">planner and governor faults, injected on purpose</span></li>
         <li class="stat" id="stat-real"></li>
+        <li class="stat" id="stat-recall"><span class="stat__k">Classical engine, synthetic test set</span><i class="stat__dim" aria-hidden="true"></i><b class="stat__v">see benchmarks</b><span class="stat__s">a hypothesis until it is measured</span></li>
+        <li class="stat" id="stat-cost"><span class="stat__k">Classical engine: stops on its own</span><i class="stat__dim" aria-hidden="true"></i><b class="stat__v">see benchmarks</b><span class="stat__s">how often the stop rule ends a job</span></li>
+        <li class="stat" id="stat-ops"><span class="stat__k">Classical engine, failure drills</span><i class="stat__dim" aria-hidden="true"></i><b class="stat__v">see benchmarks</b><span class="stat__s">planner and governor faults, injected on purpose</span></li>
       </ul>
     </div>
 
@@ -120,22 +120,22 @@
           <text class="t-dim" x="220" y="46" text-anchor="middle">1:8</text>
         </g>
 
-        <!-- L1 window and its 1:2 dimension -->
+        <!-- L2 window and its 1:4 dimension -->
         <path class="d s3 at5 win1" pathLength="1" d="M245 168H365V288H245Z"/>
         <g class="dm dm--y at6">
           <path class="ext" d="M226 168H242M226 288H242"/>
           <path class="dimln" d="M232 172V284" marker-start="url(#ah)" marker-end="url(#ah)"/>
           <rect class="lblbg" x="222" y="219" width="20" height="18"/>
-          <text class="t-dim" x="232" y="231" text-anchor="middle" transform="rotate(-90 232 228)">1:2</text>
+          <text class="t-dim" x="232" y="231" text-anchor="middle" transform="rotate(-90 232 228)">1:4</text>
         </g>
 
-        <!-- L0 window and its 1:1 dimension -->
+        <!-- L1 window (the live v1 engine's finest look on a 2048-px photo) and its 1:2 dimension -->
         <path class="d s3 at7 win0" pathLength="1" d="M276 230H336V290H276Z"/>
         <g class="dm dm--x at8">
           <path class="ext" d="M276 294V312M336 294V312"/>
           <path class="dimln" d="M280 304H332" marker-start="url(#ah)" marker-end="url(#ah)"/>
           <rect class="lblbg" x="292" y="296" width="28" height="16"/>
-          <text class="t-dim" x="306" y="308" text-anchor="middle">1:1</text>
+          <text class="t-dim" x="306" y="308" text-anchor="middle">1:2</text>
         </g>
 
         <!-- exposed rebar inside the spall -->
@@ -150,12 +150,12 @@
         <g class="co at6">
           <path class="lead" d="M365 178L384 160H452"/><circle class="dot" cx="365" cy="178" r="3.5"/>
           <circle class="num" cx="466" cy="160" r="13"/><text class="t-num" x="466" y="165" text-anchor="middle">2</text>
-          <text class="t-co" x="486" y="157">ESCALATE</text><text class="t-sub" x="486" y="173">L2 &#8594; L1 &#183; UNSURE</text>
+          <text class="t-co" x="486" y="157">ESCALATE</text><text class="t-sub" x="486" y="173">L3 &#8594; L2 &#183; UNSURE</text>
         </g>
         <g class="co at8">
           <path class="lead" d="M336 240L360 230H452"/><circle class="dot" cx="336" cy="240" r="3.5"/>
           <circle class="num" cx="466" cy="230" r="13"/><text class="t-num" x="466" y="235" text-anchor="middle">3</text>
-          <text class="t-co" x="486" y="227">VERIFY</text><text class="t-sub" x="486" y="243">L0 &#183; RE-SEGMENT</text>
+          <text class="t-co" x="486" y="227">VERIFY</text><text class="t-sub" x="486" y="243">ONE LEVEL FINER</text>
         </g>
         <g class="co co--amber at9">
           <path class="lead" d="M314 266L382 318H452"/><circle class="dot" cx="314" cy="266" r="3.5"/>
@@ -168,8 +168,8 @@
       </svg>
       <ol class="art__key">
         <li><b>Survey</b> L3 &middot; whole photo at 1/8</li>
-        <li><b>Escalate</b> L2 &rarr; L1 &middot; unsure, zoom</li>
-        <li><b>Verify</b> L0 &middot; re-segment</li>
+        <li><b>Escalate</b> L3 &rarr; L2 &middot; unsure, zoom</li>
+        <li><b>Verify</b> one level finer &middot; the live v1 engine looks no finer than L1 on a 2048-px photo, L2 on a 4608-px one</li>
         <li><b>Exposed rebar</b> needs a human</li>
       </ol>
     </figure>
@@ -187,7 +187,7 @@
 <div class="notes" aria-hidden="true">
   <b>General notes</b>
   <span>1. Look where it matters</span>
-  <span>2. Zoom until it&rsquo;s sure</span>
+  <span>2. Zoom in where it is unsure</span>
   <span>3. Ask a human first</span>
   <span>4. Pixels, not millimetres</span>
   <span>5. Every move has a cause</span>
@@ -522,6 +522,7 @@
     <div class="win__bar"><span class="win__fig" aria-hidden="true">FIG. 4.2</span><h3 class="win__title" id="t-bench-real">Recall vs pixels: real bridge photos (CODEBRIM)</h3></div>
     <div class="win__body" id="bench-real"><p class="note">Loading benchmarks&hellip;</p></div>
     <p class="note win__cite">CODEBRIM: Mundt, Majumder, Murali, Panetsos and Ramesh, &ldquo;Meta-learning Convolutional Neural Architectures for Multi-target Concrete Defect Classification with the COncrete DEfect BRidge IMage Dataset&rdquo;, CVPR 2019. Its licence does not allow sharing the photos, so only the numbers appear here.</p>
+    <p class="note" id="policy2-note"><b>Live since 2026-10-22: v1-policy2.</b> The same v1 segmenter with a look policy chosen on the dev splits only and scored once on these held-out photos. On CODEBRIM it sends 8.75 critical boxes per photo to a person instead of 9.60 (0.91×, CI 0.84–0.98) and about 1.15 critical findings instead of 2.17; recall is unchanged (0.99×, CI 0.97–1.01), on synth200 0.98× (0.95–1.00). It still does not beat L2 tiling: 0.98× its recall at 1.40× its pixels, and 0.83× (0.76–0.89) at the 10 % cap (<a href="https://github.com/vj-io/drishyam/blob/main/docs/report.md#8-evaluation" rel="noopener noreferrer">report, section 8</a>).</p>
   </section>
   <section class="win pop" aria-labelledby="t-bench-cool">
     <div class="win__bar"><span class="win__fig" aria-hidden="true">FIG. 4.3</span><h3 class="win__title" id="t-bench-cool">COOL on Graviton: not run</h3></div>
@@ -571,7 +572,7 @@
       <div class="win__bar"><span class="win__fig" aria-hidden="true">FIG. 6.1</span><h3 class="win__title" id="t-guard">Five protections, all in the demo above</h3></div>
       <div class="win__body">
         <ol class="guards">
-          <li><b>Human sign-off.</b> Exposed rebar, and spalling of 40,000 px&sup2; or more, are critical. Only a person can approve, reject, close or downgrade them; the work order stays blocked until they do.</li>
+          <li><b>Human sign-off.</b> Exposed rebar, and spalling of 40,000 px&sup2; or more, are critical. Only a person can approve, reject, close or downgrade them; the work order stays blocked until they do. The agent, the MCP tools and the planner have no approve path; only the web review and <code>drishyam review</code> have one. Neither checks who is using it: the reviewer&rsquo;s name is self-asserted, and any client holding the signed work order, a script included, can send a review (<a href="https://github.com/vj-io/drishyam/blob/main/docs/security.md#known-limits-stated-not-hidden" rel="noopener noreferrer">security.md, Known limits</a>).</li>
           <li><b>KILL.</b> The KILL button tells the server to halt before the next look. The trace records the cause <i>kill-switch</i> and the state is kept, so Resume replays the looks made so far.</li>
           <li><b>Failure drills.</b> Three switches break things on purpose: a slow segmenter (the governor switches to the fast model), a planner that never answers (the rule planner takes over) and a planner that sends a shell command (the allow-list validator rejects it).</li>
           <li><b>Privacy blur.</b> Faces, people and vehicles are found with OpenCV DNN models and blurred before any look is taken. A photo in which one person fills more than a quarter of the frame is refused: this inspects structures, not people.</li>

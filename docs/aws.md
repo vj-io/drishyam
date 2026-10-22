@@ -4,7 +4,7 @@ The web demo (the FastAPI app and the static site) runs on AWS only, as one CDK 
 `us-east-1`: the API on Lambda arm64 (Graviton) and the static site in a private S3 bucket, both reached
 only through CloudFront and AWS WAF.
 
-**Status: deployed** on 2026-10-21 (India time) to `us-east-1`, last from commit f12f50f (below). The v1 deploy
+**Status: deployed** on 2026-10-21 (India time) to `us-east-1`, last from commit a4419e2 on 2026-10-22 (below). The v1 deploy
 itself came from commit dda3080, with the v1 segmenter
 (`ONNX=models/drishyam_dacl10k.onnx ONNX_FP16=models/drishyam_dacl10k.fp16.onnx RESERVED=none scripts/aws.sh deploy`)
 and the submission film in the site bucket (`video/drishyam.mp4`, served with byte ranges). The smoke run
@@ -30,7 +30,50 @@ the second job after 2 steps, and `tests/e2e/test_ui_live.py https://d1xg58guluu
 smoke 2026-10-21T04:21:29Z https://d1xg58guluup8c.cloudfront.net commit=02219a2e435ea90058fcb87f03d69f30cc3f2b4d package=r7K9s9XZtHmkq0+f2OtXiTy1CUyFo5xf2GzQkv6UJMs= ttfb_first=0.857872s ttfb_warm=0.728508s step_p95_ms=973.3 result=pass
 ```
 
-The current build: the site was redeployed from commit f12f50f on 2026-10-21: the app code of 4fe8e30 plus the
+The current build: the site was redeployed from commit a4419e2 on 2026-10-22, release 1.1.1: version 1.1.1 in
+`/api/health` and the film re-recorded on the live site (4:08, `video/drishyam.mp4` in the bucket, 123,597,576 bytes).
+`tests/e2e/test_ui_live.py https://d1xg58guluup8c.cloudfront.net` passed twice against it, and then its smoke run
+(`WAF_LOOP=1`) passed: a job on `bridge_03.jpg` ended `awaiting_review` after 6 steps, KILL halted the second job
+after 3 steps, both 403 checks held, the WAF answered 429 at the 15th empty-bodied job start, and the step p95 was
+647.6 ms over 6 steps:
+
+```
+smoke 2026-10-22T08:34:06Z https://d1xg58guluup8c.cloudfront.net commit=a4419e258978398f8cbfa1726a508b203399de45 package=Y4Y1LAkpmyjEKcPpGQbA0FkZLza/ibwmZ1MLFToC8Wo= ttfb_first=0.924834s ttfb_warm=1.017152s step_p95_ms=647.6 result=pass
+```
+
+Before it, ed7a080 fixed the step detail, which printed v1-policy2's raw reasons (the film's re-recorded footage
+showed them). Its first deploy failed on a DNS error reaching the CDK asset bucket, and two live browser runs against
+the old build then failed the 40 s pace check on a slow network (42.5 and 45.6 s). Redeployed, `/api/health`
+reported ed7a080 and `tests/e2e/test_ui_live.py` passed twice.
+
+Before that, the site was redeployed from commit c1830c4 on 2026-10-22. Its Lambda package is the one
+adf9474 deployed (the same `CodeSha256`); it changes the site only: v1-policy2's held-mask reasons in plain words
+(the live browser suite had found raw class names such as `exposed_rebar` on screen), the work order's sentence for
+held masks, and the pages saying v1-policy2 is live. `tests/e2e/test_ui_live.py https://d1xg58guluup8c.cloudfront.net`
+passed twice against it, and then its smoke run (`WAF_LOOP=1`) passed: KILL halted the second job after 2 steps,
+both 403 checks held, the WAF answered 429 at the 17th empty-bodied job start, and the step p95 was 979.4 ms over
+6 steps:
+
+```
+smoke 2026-10-22T05:24:18Z https://d1xg58guluup8c.cloudfront.net commit=c1830c48446ebddf8d163eadbd571e97f46e3d05 package=7OEG4ckT8LB95g7eWrj1Lv+D77os1Uu2zEgPl023EBg= ttfb_first=0.847742s ttfb_warm=0.906347s step_p95_ms=979.4 result=pass
+```
+
+Before it, the site was deployed from commit adf9474 on 2026-10-22, the first build with v1-policy2,
+v1's look policy chosen on dev and read once held out ([report, section 8](report.md#8-evaluation)), the
+zero-candidate fallback, and the OpenCV 5 flags `CV_ARGMAX` and `CV_BOOL_MASKS` (output-identical). The segmenter is
+still v1 on `ENGINE_NEW`. Its smoke run (`WAF_LOOP=1`, checks 1 to 5 and 7) passed: `/api/health` reported commit
+adf9474 from `aws-lambda` on `aarch64`, a job on `bridge_03.jpg` ended `awaiting_review` after 6 steps, KILL halted
+the second job after 3 steps, both 403 checks held, and the WAF answered 429 at the 16th empty-bodied job start. The
+step p95 was 1091.9 ms over 6 steps, under the 1500 ms limit, so the governor kept v1 on the 512-px net. The two
+live browser runs right after it failed before their first step: the smoke's WAF loop had rate-limited this
+address, and no job request reached the function. Run again 8 minutes later, the suite found the raw class names
+that c1830c4 fixes. The adf9474 smoke line:
+
+```
+smoke 2026-10-22T04:49:02Z https://d1xg58guluup8c.cloudfront.net commit=adf94742a77a447d33fa633557ce9a97dfe59bf7 package=7OEG4ckT8LB95g7eWrj1Lv+D77os1Uu2zEgPl023EBg= ttfb_first=1.269052s ttfb_warm=1.226468s step_p95_ms=1091.9 result=pass
+```
+
+The build before it: the site was deployed again from commit f12f50f on 2026-10-21: the app code of 4fe8e30 plus the
 re-rendered film. 4fe8e30 adds v1's governor limit of
 1500 ms (`agent.SLA_MS_BY_PROFILE`, set from the step p95s above, not from recall), work orders that mark a photo
 with no candidate region, and the regions a KILL or a cap left unvisited, as not assessed, and the site fixes from
@@ -258,9 +301,10 @@ classical engine. Since 2026-10-21 the live segmenter is v1, the CC BY-NC 4.0 da
    OpenCV wheel, not the COOL build). It is the p95 over one job's steps, a handful of numbers.
 3. KILL: a second job is started, `/api/kill` is sent once step 2 has streamed, and the job must end
    `halted` with cause `kill-switch`. The job holds its Lambda environment while it streams, so the kill lands in
-   another one; if that one starts cold (about 3 s with v1), a short job can finish first, as on the first smoke
-   after the v1 deploy (2026-10-20). So the browser (`public/js/api.js`) sends `GET /api/health` as soon as a job
-   starts streaming, which starts a second environment for a later KILL, and this script does the same during both
+   another one; if that one starts cold (over the eleven v1 smoke runs the first `/api/health`, cold when the
+   function was idle or just deployed, took 0.86 to 6.27 s to its first byte: `video/live/aws-smoke.log`), a short
+   job can finish first, as on the first smoke after the v1 deploy (2026-10-20). So the browser
+   (`public/js/api.js`) sends `GET /api/health` as soon as a job starts streaming, which starts a second environment for a later KILL, and this script does the same during both
    jobs and waits for that request before the kill. A KILL pressed during the very first job on a cold function can
    still arrive after a short job has finished.
 4. Behind CloudFront only: a `POST` without `x-amz-content-sha256` gets 403.
