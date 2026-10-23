@@ -894,7 +894,7 @@ def test_guided(browser, base):
     p = s.page
     p.goto(f"{base}/")
     expect(p.locator("#look")).to_be_enabled(timeout=T)
-    expect(p.locator("#guided")).to_contain_text(re.compile(r"under \d+ s"))
+    expect(p.locator("#guided")).to_contain_text(re.compile(r"\(about \d+ s\)"))   # test_ui_live.py times it
     p.click("#guided")
     until(lambda: LIVE["jobs"], "the guided job request", page=p)
     assert LIVE["jobs"][0]["query"].get("pace_ms") == ["1000"], LIVE["jobs"][0]["query"]
