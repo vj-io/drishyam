@@ -630,7 +630,7 @@
     </div>
     <div class="faq__item">
       <dt>Why not just tile the photo?</dt>
-      <dd>Tiling checks every 512 px tile at full resolution: 48 tiles for a 3000 &times; 2250 photo (turn on &ldquo;compare with tiling&rdquo; after a run to see them). The agent looks at the photo small first and zooms only where something might be, so it processes far fewer pixels. Whether it finds as much is measured in <a href="#benchmarks">Benchmarks</a>: with the classical engine, on the synthetic set it finds less than tiling, and one downscaled pass does at least as well; the dashed red line there is v1, the live segmenter, with its first look policy; the live policy since 2026-10-22, v1-policy2, is summarised under FIG. 4.2.</dd>
+      <dd>Tiling checks every 512 px tile at full resolution: 48 tiles for a 3000 &times; 2250 photo (turn on &ldquo;compare with tiling&rdquo; after a run to see them). The agent looks at the photo small first and zooms only where something might be, so it processes far fewer pixels than full-resolution tiling, but not fewer than a coarser grid: on CODEBRIM, v1-policy2 finds 0.98&times; the recall of L2 tiling (the same tiles on the photo at a quarter of its size) with 1.40&times; its pixels (FIG. 4.2). Whether it finds as much is measured in <a href="#benchmarks">Benchmarks</a>: with the classical engine, on the synthetic set it finds less than tiling, and one downscaled pass does at least as well; the dashed red line there is v1, the live segmenter, with its first look policy; the live policy since 2026-10-22, v1-policy2, is summarised under FIG. 4.2.</dd>
     </div>
     <div class="faq__item">
       <dt>What does it cost?</dt>
