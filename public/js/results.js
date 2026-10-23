@@ -399,7 +399,9 @@ function renderFailures(list, realList) {
   const fig = root.closest('.win')?.querySelector('.win__fig');
   if (fig) fig.textContent = n > 1 ? `FIG. 5.1–5.${n}` : 'FIG. 5.1';
   root.replaceChildren(h('div', { class: 'stack' },
-    h('p', { class: 'note' }, 'Where it was wrong, and the rule that would have caught it. Kept in the open on purpose.'),
+    h('p', { class: 'note' }, 'Where it was wrong, and the rule that would have caught it. Kept in the open on purpose. '
+      + 'These plates come from the classical engine’s published run on the 200 held-out synthetic images (2026-10-18, agent of '
+      + 'commit 832299b), not from v1, the engine the live demo runs.'),
     h('div', { class: 'fails' }, plates.map(([category, cases], i) => h('article', { class: 'fail' },
       h('div', { class: 'fail__fig' }, `FIG. 5.${i + 1}`),
       h('h4', { class: 'fail__t' }, category),
@@ -424,7 +426,7 @@ function realFailures(real, n) {
   return h('details', { class: 'data' },
     h('summary', {}, `FIG. 5.${n} · Real-photo failures (described; photos not redistributable)`),
     h('div', { class: 'stack' },
-      h('p', { class: 'note' }, `${real.length} cases from the CODEBRIM evaluation, written out because its licence does not allow sharing the photos.`),
+      h('p', { class: 'note' }, `${real.length} cases from the classical engine’s CODEBRIM evaluation (the same published runs, not v1), written out because its licence does not allow sharing the photos.`),
       table('Real-photo failures', ['photo', 'class', 'what happened'],
         real.map((f) => [String(f.id ?? ''), inWords(f.class ?? '–'), inWords(f.what_happened)])),
       table('Rules that would catch them', ['failure', 'rule that would catch it'],
