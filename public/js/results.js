@@ -7,7 +7,7 @@ import { size } from './panels.js';
 const SERIES = [
   ['downscale', 'downscale once', 'downscale', 'rect'],
   ['tiling', 'tiling (L2, L1, L0 grids)', 'tiling', 'diamond'],
-  ['drishyam', 'Drishyam', 'drishyam', 'circle'],
+  ['drishyam', 'Drishyam, classical engine', 'drishyam', 'circle'],  // summary.json and codebrim/summary.json: its published runs
 ];
 // v1's Drishyam curve on the same images (evals.model_eval --publish): the segmenter the live demo runs since 2026-10-21,
 // with its first look policy (v1-policy2, live since 2026-10-22, is #policy2-note under FIG. 4.2).
