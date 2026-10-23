@@ -152,8 +152,8 @@ OLD_CLAIMS = [
     "DRAWN 2026-10-21 · SCALE NTS · REV 1.1.0",
     "v1-policy2, live since 2026-10-22 (deployed commit adf9474)",
     "done (engine + export pipeline); trained dacl10k weights need a Kaggle GPU run",
-    "dropping a crack finding whose thinned centreline fits one straight line (a `cv2.fitLine` residual rule against "
-    "form joints and edges) is not built, so there is no before/after on `data/synth_dev` for it.",
+    ("dropping a crack finding whose thinned centreline fits one straight line (a `cv2.fitLine` residual rule against "
+     "form joints and edges) is not built, so there is no before/after on `data/synth_dev` for it."),
 ]
 
 
