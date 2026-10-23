@@ -13,7 +13,10 @@ const HOLD = 5000;  // the decision that finds the first critical damage stays t
 const GUIDE = 'bridge_03.jpg';  // exposed rebar: the default run ends with critical findings for a human
 const GUIDE_REAL = 'real_02.jpg';  // our own wall photo the v1 engine took a look at: its guided run replays the recorded job
 const GUIDE_PACE_MS = 1000;  // asks the server to wait this long between looks (pace_ms); its timings exclude the wait
-const KILL_WAIT_S = 8;  // a KILL pressed before the server's first record waits this long for it, then cancels the upload
+// A KILL pressed before the server's first record waits this long for it, then cancels the upload (and is never sent).
+// That record follows the upload, a cold start (0.86 to 6.27 s to the first byte over the v1 smoke runs, docs/aws.md),
+// the decode and the privacy blur: one took 6.97 s in a 2026-10-23 audit of the live site, about 1 s inside the old 8 s.
+const KILL_WAIT_S = 15;
 const NOTE = 'Press Run and the agent’s reasoning appears here, one decision at a time, in plain words.';
 // ?mock=1 replays public/fixtures/job.ndjson (its step times, its accurate/fast models and its injected drills say so);
 // the e2e test pins this date to the fixture's, so a re-recorded fixture must update it.

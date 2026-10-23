@@ -1530,11 +1530,11 @@ def test_kill_before_the_first_record(browser, base):
 
 
 def test_kill_the_server_never_confirms(browser, base):
-    """KILL is never reported as a kill the server did not make. No job record within 8 s of a KILL pressed before it:
+    """KILL is never reported as a kill the server did not make. No job record within 15 s of a KILL pressed before it:
     the page cancels the upload and says the server may run the job on. A KILL sent but never confirmed within 6 s:
     the page stops showing the job (pill "stopped", not "killed"), says the server may still be running it, and
     keeps what arrived for Resume."""
-    reset_live([{"lines": JOB_LINES, "delay": 0.25, "lead": 15}])
+    reset_live([{"lines": JOB_LINES, "delay": 0.25, "lead": 20}])
     s = Session(browser, "kill-unanswered", viewport={"width": 1440, "height": 900})
     p = s.page
     p.goto(f"{base}/")
@@ -1542,8 +1542,11 @@ def test_kill_the_server_never_confirms(browser, base):
     p.click("#look")
     until(lambda: LIVE["jobs"], "the upload to reach the server", page=p)
     p.click("#kill")
-    expect(p.locator("#job-pill")).to_have_text("ready", timeout=12_000)
-    expect(p.locator("#job-text")).to_contain_text("the server had not answered 8 s after KILL, so the page cancelled the upload")
+    expect(p.locator("#job-pill")).to_have_text("stopping")   # KILL queued, the wait counting up in the bar
+    p.wait_for_timeout(9000)                                   # past the old 8 s limit, KILL still waits for the job id
+    expect(p.locator("#job-pill")).to_have_text("stopping")
+    expect(p.locator("#job-pill")).to_have_text("ready", timeout=10_000)
+    expect(p.locator("#job-text")).to_contain_text("the server had not answered 15 s after KILL, so the page cancelled the upload")
     expect(p.locator("#job-text")).to_contain_text("it may run on, unseen, up to its time cap")
     expect(p.locator("#look")).to_be_enabled()
     assert not LIVE["kills"], "no job id ever arrived, so nothing could be sent"
@@ -1568,7 +1571,7 @@ def test_kill_the_server_never_confirms(browser, base):
     expect(p.locator("#resume")).to_be_visible()
     s.check_clean()
     s.context.close()
-    print("ok  KILL never confirmed: the upload is cancelled after 8 s, or the page stops showing the job after 6 s; neither is called a kill")
+    print("ok  KILL never confirmed: the upload is cancelled after 15 s, or the page stops showing the job after 6 s; neither is called a kill")
 
 
 def test_contract_fields_in_words(browser, base):
