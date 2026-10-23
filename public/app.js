@@ -275,7 +275,7 @@ function togglePlay() {
 function clearJob() {
   stopPlay();
   Object.assign(S, { job: null, overview: null, done: null, token: null, order: null, ui: null, rev: 0, planners: new Map(), critSeen: false, found: [], sent: [], crit: null });
-  el.tbChecked.textContent = 'human reviewer';
+  el.tbChecked.textContent = 'unsigned';  // until a person signs or checks by eye
   viewport.reset(null);
   S.steps = viewport.steps;
   trace.clear();
@@ -587,7 +587,7 @@ function updateDone() {
     replay(S.ui.pill, 'is-stamped');
   }
   const signers = [...new Set((S.order.approvals ?? []).map((a) => a.reviewer).filter(Boolean))];
-  el.tbChecked.textContent = signers.length ? signers.join(', ') : 'human reviewer';
+  el.tbChecked.textContent = signers.length ? signers.join(', ') : 'unsigned';
   const critical = S.order.findings.some((f) => f.critical);
   const gap = gapText();
   const part = partText();
