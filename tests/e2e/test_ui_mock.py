@@ -547,7 +547,7 @@ def test_desktop_mock(browser, base):
     # the real-photo card is the live engine's and comes first, short: its interval and chance (REAL has no point at
     # the 30 % cap, so no classical recall beside it); every number stated before the runs is in FIG. 4.2's note
     expect(p.locator(".stats > .stat").first).to_have_id("stat-real")
-    expect(p.locator("#stat-real .stat__k")).to_have_text("Live engine (v1), real bridge photos (CODEBRIM, 200)")
+    expect(p.locator("#stat-real .stat__k")).to_have_text("Live segmenter v1, first look policy: real bridge photos (CODEBRIM, 200)")
     expect(p.locator("#stat-real .stat__v")).to_have_text("recall 0.49")
     expect(p.locator("#stat-real .stat__s")).to_have_text(
         "at the 30 % pixel cap (CI 0.44–0.54); chance 0.30.")

@@ -227,7 +227,8 @@ function heroChips(sum, real, v1) {
   const v1ci = interval(v1p?.recall_ci);
   const rd = headline(real?.policies);
   if (num(v1p?.recall)) {
-    fill('stat-real', `Live engine (v1), real bridge photos (CODEBRIM${num(v1.real.n_images) ? `, ${v1.real.n_images}` : ''})`,
+    // codebrim_dacl10k/summary.json is v1's first look policy; v1-policy2, the live one, is FIG. 4.2's note
+    fill('stat-real', `Live segmenter v1, first look policy: real bridge photos (CODEBRIM${num(v1.real.n_images) ? `, ${v1.real.n_images}` : ''})`,
       v1p.recall, { decimals: 2, prefix: 'recall ' },
       `at the ${pct(v1.real.headline_stats.budget)} pixel cap${v1ci ? ` (CI ${dec(v1ci[0])}–${dec(v1ci[1])})` : ''}`
       + `${num(v1p.chance_recall) ? `; chance ${dec(v1p.chance_recall)}` : ''}`
