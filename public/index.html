@@ -493,7 +493,7 @@
     <section class="win pop" aria-labelledby="t-live">
       <div class="win__bar"><span class="win__fig" aria-hidden="true">FIG. 3.5</span><h3 class="win__title" id="t-live">What runs live, and what does not</h3></div>
       <div class="win__body stack">
-        <p class="say"><b>No LLM runs in this demo.</b> The live agent is the rule policy above, and the drill planners are scripted to fail. The LLM path is the MCP server: in a recorded session Claude chose each call from the numbers the tools measured: saliency priors, entropy, IoU and the budget left (its prompt states the decision rules). <a href="https://github.com/vj-io/drishyam/blob/main/docs/mcp-session/transcript.md" rel="noopener noreferrer">Read the recorded session</a>.</p>
+        <p class="say"><b>No LLM runs in this demo.</b> The live agent is the rule policy above, and the drill planners are scripted to fail. The LLM path is the MCP server: in sessions recorded on v1, the live engine, Claude chose each call from the numbers the tools measured: saliency priors, entropy, IoU and the budget left (its prompt states the decision rules). <a href="https://github.com/vj-io/drishyam/blob/main/docs/mcp-session-v1/transcript.md" rel="noopener noreferrer">Read the recorded sessions (v1 engine)</a>.</p>
         <p class="say"><b>OpenCV 5.</b> Since 2026-10-21 the live demo runs v1, our dacl10k-trained segmenter. It makes two OpenCV 5-only calls: <code>cv2.dnn.readNetFromONNX</code> with <code>engine=cv2.dnn.ENGINE_NEW</code> (<code>ENGINE_CLASSIC</code> cannot import the model), and, since 2026-10-22, <code>cv2.copyTo</code> with a NumPy bool mask read as <code>CV_Bool</code> (<code>segment.restrict</code>, <code>CV_BOOL_MASKS</code>). Run without the model (no <code>DRISHYAM_ONNX</code>), the agent uses the classical engine, which makes only the second. Since 2026-10-22 it looks with the policy v1-policy2 (FIG. 3.1 and 3.2). The engine that answered is named at the foot of the page.</p>
       </div>
     </section>
@@ -581,7 +581,7 @@
           <li><b>Privacy blur.</b> Faces, people and vehicles are found with OpenCV DNN models and blurred before any look is taken. A photo in which one person fills more than a quarter of the frame is refused: this inspects structures, not people.</li>
           <li><b>Signed work orders.</b> The work order is signed with HMAC-SHA256 and every sign-off returns a new signature, so an edited order no longer verifies. The download includes the signature.</li>
         </ol>
-        <p class="note guards__llm">No LLM runs in this demo: the live agent is the rule policy (FIG. 3.2); FIG. 3.5 says what runs live and where the LLM path is. <a href="https://github.com/vj-io/drishyam/blob/main/docs/mcp-session/transcript.md" rel="noopener noreferrer">Read the recorded MCP session</a>.</p>
+        <p class="note guards__llm">No LLM runs in this demo: the live agent is the rule policy (FIG. 3.2); FIG. 3.5 says what runs live and where the LLM path is. <a href="https://github.com/vj-io/drishyam/blob/main/docs/mcp-session-v1/transcript.md" rel="noopener noreferrer">Read the recorded MCP sessions (v1 engine)</a>.</p>
       </div>
     </section>
     <section class="win pop win--wide" aria-labelledby="t-auto">
@@ -663,7 +663,7 @@
           <li><a href="https://github.com/vj-io/drishyam/blob/main/docs/PRD.md" rel="noopener noreferrer">PRD</a></li>
           <li><a href="https://github.com/vj-io/drishyam/blob/main/docs/api-contract.md" rel="noopener noreferrer">API contract</a></li>
           <li><a href="https://github.com/vj-io/drishyam/blob/main/docs/mcp.md" rel="noopener noreferrer">MCP usage</a></li>
-          <li><a href="https://github.com/vj-io/drishyam/blob/main/docs/mcp-session/transcript.md" rel="noopener noreferrer">Claude drives it over MCP (recorded)</a></li>
+          <li><a href="https://github.com/vj-io/drishyam/blob/main/docs/mcp-session-v1/transcript.md" rel="noopener noreferrer">Claude drives it over MCP (recorded on v1)</a></li>
           <li><a href="https://github.com/vj-io/drishyam/blob/main/docs/architecture.png" rel="noopener noreferrer">Architecture diagram</a></li>
           <li><a href="https://github.com/vj-io/drishyam/blob/main/docs/impact-sources.md" rel="noopener noreferrer">Impact sources</a></li>
           <li><a href="?mock=1#demo">Recorded run</a></li>

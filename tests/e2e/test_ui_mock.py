@@ -1756,7 +1756,7 @@ def test_accessibility(browser, base):
         assert not problems, f"{size['width']} px: Tab stops without a visible ring, under the sticky bars or out of order: {problems[:6]}"
         text = p.evaluate("document.body.textContent.replace(/\\s+/g, ' ')")
         assert text.count("a payment-method restriction") == 1 and text.count("COOL on Graviton: not run") == 2, "the COOL reason once, both notices"
-        assert text.count("in a recorded session Claude chose each call") == 1 and text.count("No LLM runs in this demo") == 2
+        assert text.count("in sessions recorded on v1, the live engine, Claude chose each call") == 1 and text.count("No LLM runs in this demo") == 2
         s.check_clean()
         s.context.close()
     print("ok  accessibility: focus ring on every Tab stop, none under the bars, WCAG AA contrast, no explanation given twice")
