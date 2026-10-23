@@ -1,6 +1,6 @@
 %% Drishyam system architecture: the same content as docs/architecture.svg.
 %% cv2 names are the calls made in drishyam/imaging.py, privacy.py, segment.py, measure.py and agent.py.
-%% REV 1.1.1 (2026-10-22), the code of the live build 1227371.
+%% REV 1.1.1 (2026-10-22), the code of the live build 08cd9b3.
 flowchart TB
     subgraph CLIENTS["1 · Clients"]
         UI["Browser UI<br/>public/index.html + app.js, strict CSP<br/>upload · live trace · review · KILL"]
@@ -8,7 +8,7 @@ flowchart TB
         MCPC["MCP client, e.g. Claude Code, local<br/>drishyam mcp over stdio<br/>12 allow-listed tools: no approve, no shell"]
     end
 
-    subgraph AWS["2 · AWS path (deployed, us-east-1; v1 live since 2026-10-21, v1-policy2 since 2026-10-22; live build 1227371)"]
+    subgraph AWS["2 · AWS path (deployed, us-east-1; v1 live since 2026-10-21, v1-policy2 since 2026-10-22; live build 08cd9b3)"]
         CF["CloudFront + Origin Access Control on both origins<br/>site from a private S3 bucket · /api/* to the Function URL<br/>AWS WAF rate-based rules<br/>POST bodies carry x-amz-content-sha256"]
         FURL["Lambda Function URL<br/>AuthType AWS_IAM · InvokeMode RESPONSE_STREAM"]
         LAMBDA["Lambda arm64 (Graviton) · Python 3.12<br/>AWS Lambda Web Adapter → FastAPI web tier, web.py<br/>CSP · HMAC-SHA256 work-order token · per-job kill token"]
