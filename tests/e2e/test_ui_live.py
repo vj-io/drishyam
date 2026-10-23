@@ -126,6 +126,7 @@ def run(base, server_log=None):
         expect(page.locator("#gallery .thumb[data-file='bridge_03.jpg']")).to_have_attribute("aria-pressed", "true", timeout=15000)
         expect(page.locator("#look")).to_be_enabled(timeout=15000)
         expect(page.locator("#try-kill")).to_be_enabled()           # the KILL drill is offered before any run
+        expect(page.locator("#guided .cta__time")).to_have_text("(about 40 s)")   # the claim the timing below checks
         page.locator("#guided").click()
         t0 = time.time()
         expect(page.locator("#narrator")).to_contain_text("Sending the photo", timeout=2000)  # the page answers the click at once
@@ -143,7 +144,9 @@ def run(base, server_log=None):
         notes = set()
         status = p.wait_done(timeout=90, notes=notes)     # the whole guided run at reading speed, no Skip
         took = time.time() - t0
-        assert took < 40, f"the guided run took {took:.1f} s"
+        # The button says "about 40 s": live guided runs took 32.7 to 40.8 s from click to done, median about 36 s
+        # (docs/aws.md). 45 s allows that slow tail; a run over it would make the label wrong, not the test strict.
+        assert took < 45, f"the guided run took {took:.1f} s; the button says about 40 s"
         expect(page.locator("#job-text")).to_contain_text("we replayed it slowly so you can read it")
         p.plain()
         expect(page.locator("#findings .finding").first).to_be_visible()
