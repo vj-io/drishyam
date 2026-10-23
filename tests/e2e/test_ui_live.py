@@ -144,7 +144,7 @@ def run(base, server_log=None):
         notes = set()
         status = p.wait_done(timeout=90, notes=notes)     # the whole guided run at reading speed, no Skip
         took = time.time() - t0
-        # The button says "about 40 s": live guided runs took 32.7 to 40.8 s from click to done, median about 36 s
+        # The button says "about 40 s": live guided runs took 30.3 to 42.6 s from click to done, median about 36 s
         # (docs/aws.md). 45 s allows that slow tail; a run over it would make the label wrong, not the test strict.
         assert took < 45, f"the guided run took {took:.1f} s; the button says about 40 s"
         expect(page.locator("#job-text")).to_contain_text("we replayed it slowly so you can read it")

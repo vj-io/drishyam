@@ -338,7 +338,7 @@ photos: v1 put a box on 1, v2a on 5, v2b on 13, and v2a and v2b each put measura
 (+0.67 and +1.23 per photo). v1 sends more critical boxes to the human gate on CODEBRIM (7.24 per photo against
 4.22 and 3.94), and its modelled ms per CODEBRIM job are 1.05 times v2a's (CI 1.03-1.08; both tables were timed in
 one window). On dev only, the recommendation is v1 for the live engine, which runs it since 2026-10-21 (first deployed
-from commit f12f50f; the live build is 08cd9b3): it is the one model with no measurable loss against any other, at 2.00 times the classical engine's modelled ms per
+from commit f12f50f; the live build is 0e91cfc): it is the one model with no measurable loss against any other, at 2.00 times the classical engine's modelled ms per
 CODEBRIM job on this Mac (CI 1.89-2.11). v2b's ms there are about 2.5 times v2a's, but timed in one window a v2b
 look costs 0.87 to 1.04 times a v2a look: its table was timed at a higher machine load. v2c, compared later under the
 same criterion (five models; the reading of "each of the others" and v2c's own rule were committed before any v2c
