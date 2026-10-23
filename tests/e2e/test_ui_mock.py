@@ -1435,6 +1435,7 @@ def test_kill_before_the_first_record(browser, base):
     """KILL pressed while the photo is still on its way, before the server's first record (which carries the job id
     and kill token): the page says, in the bar and the NOTE, that KILL is queued, and sends it the moment the job
     record arrives. The server reads a KILL only after a step record, so look 1 runs and the halt comes at step 2.
+    From the click to the halt the pill reads "stopping", never "running" again, and the bar says KILL was sent.
     Meanwhile the camera panel says a job is on its way, never "No look yet. Press Run.". The operator-wide switch,
     set before the job began, halts it before any look: then nothing on the page says a state is kept or can be
     resumed, and the done state counts no looks and no findings. In a recording, KILL before its first record says
@@ -1448,12 +1449,21 @@ def test_kill_before_the_first_record(browser, base):
     until(lambda: LIVE["jobs"], "the upload to reach the server", page=p)       # its first record is 2.5 s away
     expect(p.locator("#cam-cap")).to_have_text("Sending the photo: the first look follows the server’s preparation")
     p.click("#kill")
+    expect(p.locator("#job-pill")).to_have_text("stopping")   # at once: the job id, and so the halt, are seconds away
+    p.evaluate("""() => { const bar = document.querySelector('#taskbar'), pill = document.querySelector('#job-pill');
+      const text = document.querySelector('#job-text'); window.__bar = [[pill.textContent, text.textContent]];
+      new MutationObserver(() => window.__bar.push([pill.textContent, text.textContent]))
+        .observe(bar, { subtree: true, childList: true, characterData: true }); }""")   # every state, however short
     expect(p.locator("#job-text")).to_contain_text("the page has no job id yet, so KILL is sent the moment it arrives")
     expect(p.locator("#narrator")).to_have_text("KILL queued: it is sent as soon as the server answers.")   # a phone reads the NOTE
     assert not LIVE["kills"], "nothing can be sent before the job id is known"
     until(lambda: LIVE["kills"], "POST /api/kill once the job record arrives", page=p)
     assert [{k: v for k, v in r.items() if k != "signed"} for r in LIVE["kills"]] == [{"job": JOB["job"], "kill_token": JOB["kill_token"]}]
     expect(p.locator("#job-pill")).to_have_text("halted", timeout=T)
+    bar = p.evaluate("window.__bar")
+    pills = [pill for pill, _ in bar]
+    assert pills.index("halted") > 0 and set(pills[:pills.index("halted")]) == {"stopping"}, f"KILL to halt: {bar}"
+    assert any(t == "KILL sent: stopping before the agent’s next look…" for pill, t in bar if pill == "stopping"), bar
     expect(p.locator(".trace__line .chip", has_text=re.compile("^kill-switch$"))).to_have_count(1)
     expect(p.locator("#job-text")).to_contain_text("Halted by KILL at step 1: the trace shows kill-switch and the state is kept.")
     expect(p.locator(".trace__line[data-step]")).to_have_count(2)            # look 1, then the halt
@@ -1514,7 +1524,8 @@ def test_kill_before_the_first_record(browser, base):
         s.context.close()
     finally:
         LIVE["fixture_delay"] = 0
-    print("ok  KILL before the first record: queued, sent once the job id arrives, halts after look 1; the operator switch "
+    print("ok  KILL before the first record: queued, the pill \"stopping\" from the click to the halt, sent once the job id "
+          "arrives, halts after look 1; the operator switch "
           "before any look keeps nothing; a recording says nothing had started")
 
 
@@ -1548,6 +1559,7 @@ def test_kill_the_server_never_confirms(browser, base):
     p.locator("#skip").click(timeout=T)
     expect(p.locator(".trace__line[data-step='1']")).to_be_visible(timeout=T)
     p.click("#kill")
+    expect(p.locator("#job-pill")).to_have_text("stopping")   # at once, until the halt or the 6 s limit
     until(lambda: LIVE["kills"], "POST /api/kill", page=p)
     expect(p.locator("#job-pill")).to_have_text("stopped", timeout=10_000)
     expect(p.locator("#job-text")).to_contain_text("The page stopped showing the job at step")

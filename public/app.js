@@ -771,11 +771,19 @@ function stop(why, unconfirmed = false) {
   setMode('killed', `Killed at step ${n}${why} — state preserved. Resume re-sends the photo and replays your ${n} moves.`);
 }
 
+/** KILL pressed, the halt not here yet: the pill says so at once, not "running", while the records the server sends before
+    it reads the KILL (it reads one only after a step record) still arrive. The halt, or stop(), sets the final state. */
+function stopping(text) {
+  el.pill.className = 'pill pill--stopping';
+  el.pill.textContent = 'stopping';
+  el.text.textContent = text;
+}
+
 /** POST /api/kill for `job` (its first record): the server halts before its next look and sends the kill-switch record. */
 function sendKill(job) {
   postKill(job.job, job.kill_token);
   skip();
-  el.text.textContent = 'KILL sent: the agent halts before its next look…';
+  stopping('KILL sent: stopping before the agent’s next look…');
   clearTimeout(S.killTimer);
   S.killTimer = setTimeout(() => {
     if (S.mode === 'running' && !S.arrived) stop(': the server did not confirm KILL within 6 s', true);
@@ -790,7 +798,7 @@ function kill() {
   if (!S.events.length && !recorded()) {  // the job id and kill token come with the server's first record (a Resume's too)
     if (S.killPending) return;
     S.killPending = true;
-    el.text.textContent = 'KILL pressed before the server answered: the page has no job id yet, so KILL is sent the moment it arrives.';
+    stopping('KILL pressed before the server answered: the page has no job id yet, so KILL is sent the moment it arrives.');
     narrate('KILL queued: it is sent as soon as the server answers.');
     clearTimeout(S.killTimer);
     S.killTimer = setTimeout(() => {  // no answer at all: cancel the upload rather than leave KILL doing nothing

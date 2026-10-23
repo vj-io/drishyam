@@ -253,7 +253,8 @@ img, canvas, svg { max-width: 100%; }
 .pill { display: inline-flex; align-items: center; gap: .55em; padding: .45em .8em; border: 2px solid var(--line-2); font: 700 12px/1 var(--f-mono); text-transform: uppercase; letter-spacing: .1em; color: var(--line); white-space: nowrap; }
 .pill--running { border-color: var(--amber); color: var(--amber); }
 .pill--running::before { content: ''; width: .65em; height: .65em; background: var(--amber); animation: blink .9s steps(2) infinite; }
-.pill--killed, .pill--stopped, .pill--error { border-color: var(--red); color: var(--red); }
+.pill--killed, .pill--stopped, .pill--stopping, .pill--error { border-color: var(--red); color: var(--red); }
+.pill--stopping::before { content: ''; width: .65em; height: .65em; background: var(--red); animation: blink .9s steps(2) infinite; }
 .pill--awaiting_review { border-style: dashed; border-color: var(--amber); color: var(--amber); }
 .pill--completed, .pill--signed { border-color: var(--amber); background: var(--amber); color: var(--amber-ink); }
 .pill--halted, .pill--budget { border-color: var(--sky); color: var(--sky); }
@@ -906,5 +907,5 @@ input:checked + .switch__ui::after { transform: translateX(22px); background: va
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; animation-delay: 0s !important; transition-duration: .001ms !important; }
-  .art .d, .art .dm, .art .co, .art .fade, .meter__fill, .btn--kill, .finding, .finding::before, .trace__line, .stamp, .is-stamped, .pill--running::before, .win--toast { animation: none !important; }
+  .art .d, .art .dm, .art .co, .art .fade, .meter__fill, .btn--kill, .finding, .finding::before, .trace__line, .stamp, .is-stamped, .pill--running::before, .pill--stopping::before, .win--toast { animation: none !important; }
 }
