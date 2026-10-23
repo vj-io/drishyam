@@ -136,7 +136,7 @@ const STRIPB = { open: `recorded ${LIT.recorded} · ${ENG} · synthetic photo br
   real: D.real.length ? `live jobs ${D.real.map((r) => r.job).join(', ')} · ${D.real[0].engine}` : '',
   problem: 'sources: docs/impact-sources.md', live: `recorded ${LIT.recorded} on the live site · ${ENG}`,
   break: `injected drills · recorded ${LIT.recorded} · ${ENG}`,
-  mcp: 'docs/mcp-session: a recorded Claude session', arch: 'docs/architecture.png · docs/agent-loop.svg · public/docs/aws-simple.svg',
+  mcp: 'docs/mcp-session-v1: a recorded Claude session on v1', arch: 'docs/architecture.png · docs/agent-loop.svg · public/docs/aws-simple.svg',
   results: 'public/results/*.json · results/heldout_models.json', failures: 'public/results/failures.json', limits: 'pixels, not millimetres', repro: D.urls.repo.replace('https://', ''), end: '' };
 
 let strip, stripA, stripB, stripNo, rail, chs = [], railNote, railCall, capBox, capSpan;
@@ -180,7 +180,7 @@ const RAILNOTE = {
     return `The team’s own photo, <b>${R.image}</b>. Job <b>${R.job}</b>: the trained segmenter <b>${D.model.name}</b>, ${R.profile}. “By eye” is the team’s reading, not ground truth.`; },
   live: () => `Live job <b>${D.guided.job}</b> on ${D.health.host}, ${D.health.arch}, OpenCV ${D.health.opencv}, recorded ${LIT.recorded}: <b>${ENGINE}</b>; the agent took ${fmt(D.guided.seconds)} s. Retimed to the voice: the speed is in the window bar.`,
   break: () => 'Faults injected on purpose: a malformed planner reply, a slowed segmenter, a planner that stalls.',
-  mcp: () => 'Calls, values and reasons are copied from <b>exchange.jsonl</b>. The rules were in Claude’s prompt; every value was measured by the tools.',
+  mcp: () => `Session on the live engine <b>${D.model.name}</b>. Calls, values and reasons are from <b>exchange.jsonl</b>; the rules were in Claude’s prompt. Not blind: it had read the labels.`,
   results: (t) => (t < at('r6') - 0.2 ? 'Classical segmenter, governor off, fixed per-call costs from the arm64 benchmark.'
     : t < at('r7') ? `Trained segmenter <b>${D.model.name}</b>, the engine the site runs: chosen on dev splits, scored once held out; the classical engine on the same photos.`
     : `Synthetic photos with no damage: the classical engine at the 30 % cap, and <b>${D.model.name}</b> held out.`),
@@ -447,13 +447,14 @@ function buildBreak() {
 // 6. an LLM over MCP: the recorded call table, one call at a time, and the crops Claude looked at
 function buildMcp() {
   const S = scene('mcp'), s = SC.mcp, m = D.mcp, B = boardView(S.e), H = B.board;
-  el('div', 'abs lab', H, `docs/mcp-session · ${LIT.client} → drishyam mcp over stdio · job ${m.job}`).style.cssText = 'left:0;top:0;font-size:21px';
-  const crops = Object.entries(m.crops).map(([f, [n, lvl, lab]]) => ['../docs/mcp-session/' + f, `call ${n} · gaze L${lvl}<br>${lab}`]);
+  el('div', 'abs lab', H, `docs/mcp-session-v1 · ${LIT.client} → drishyam mcp over stdio · job ${m.job}`).style.cssText = 'left:0;top:0;font-size:19px';
+  const crops = Object.entries(m.crops).map(([f, [n, lvl, lab]]) => [m.dir + f, `call ${n} · gaze L${lvl}<br>${lab}`]);
   const cx = crops.map(([src, lab], i) => { const b = el('div', 'abs', H); css(b, { left: '0px', top: 52 + i * 394 + 'px', width: '360px', height: '380px' });
     const im = img(src, b); css(im, { position: 'absolute', left: 0, top: 0, width: '300px', height: '300px', border: '3px solid var(--line)' });
     el('div', 'src', b, lab).style.cssText = 'position:absolute;left:0;top:312px;width:360px;font-size:24px;line-height:1.3;color:var(--line)'; return im; });
-  railcall(m.call_a, `IoU ${fmt(m.iou_a)}`, `mask IoU, L1 vs L0 at call ${m.call_a}: they disagree; exposed rebar is always critical`, at('m2') + 0.3, end('m2') + 0.3);
-  railcall(m.call_b, `IoU ${fmt(m.iou_b)}`, `at call ${m.call_b}: the spall is confirmed`, at('m3') + 0.3, at('m3') + LINE.m3.dur * 0.55);
+  railcall(m.call_a, `IoU ${fmt(m.iou_a)}`, `spalling mask, L2 vs L1 at call ${m.call_a}: under 0.5, they disagree; call ${m.call_h} hands it to a person`, at('m2') + 0.3, end('m2') + 0.3);
+  railcall(m.call_c, pc(m.pixels), `of the pixels at call ${m.call_c}: every candidate seen, so it stops`, at('m3') + LINE.m3.dur * 0.5, end('m3') + 0.3);
+  railcall('✓', `${m.found[0]} of ${m.found[1]}`, 'labelled defects found (synthetic ground truth). Not blind: it had read the labels', at('m4') + 0.2, end('m4') + 0.4);
   const box = el('div', 'abs', H); css(box, { left: '380px', top: '52px', width: '1150px', height: '650px', overflow: 'hidden', border: '3px solid var(--line)', background: 'rgba(8,42,85,.95)' });
   const tbl = el('table', 't', box); css(tbl, { position: 'absolute', left: 0, top: 0, width: '1144px', fontSize: '23px' });
   tbl.innerHTML = '<tr><th>#</th><th>call</th><th>what came back</th></tr>' + m.rows.map((r) => `<tr data-n="${r.n}"><td class="n">${r.n}</td><td>${r.call}</td><td style="white-space:normal">${r.got}</td></tr>`).join('');
@@ -461,9 +462,9 @@ function buildMcp() {
   const R = (n) => m.rows.find((r) => r.n === n);
   // m1: the 23 calls stream in, one at a time; then the camera goes back to the three that decided something
   const T0 = at('m1') + 0.3, T1 = end('m1') + 0.2, N = m.rows.length, IA = m.rows.findIndex((r) => r.n === m.call_a);
-  const beats = [{ n: m.call_a, T: at('m2') + 0.2, cls: 'bad', why: R(m.call_a + 1).why },
+  const beats = [{ n: m.call_a, T: at('m2') + 0.2, cls: 'bad', why: R(m.call_a).why },
     { n: m.call_b, T: at('m3') + 0.2, cls: 'good', why: R(m.call_b).why }, { n: m.call_c, T: at('m3') + LINE.m3.dur * 0.55, cls: 'good', why: R(m.call_c).why },
-    { n: m.rows[N - 1].n, T: at('m4') + 0.2, why: `Missed: the large spall around the rebar (box ${m.missed_box}). Logged: the rebar, the crack and the small spall (transcript.md).` }];
+    { n: m.rows[N - 1].n, T: at('m4') + 0.2, why: `${m.found[0]} of ${m.found[1]} labelled boxes found (the transcript's harness rule); work order: ${m.got_last}. Not blind: before recording, Claude had read the sample's labels and the earlier transcript.` }];
   for (let k = 0; k <= IA; k++) cue(T0 + (T1 - T0) * k / (IA + 1), 'tick', k % 9);
   beats.forEach((b) => cue(b.T, 'switch'));
   const rows = () => [...tbl.querySelectorAll('tr[data-n]')];
@@ -686,6 +687,7 @@ function buildReal() {
     const veil = el('div', 'abs', plate); css(veil, { inset: 0, background: 'rgba(7,34,71,.15)', opacity: 0 });   // light, and the line thin: the crack stays visible beside the team's line
     const sv = svgEl('svg', { width: PW, height: PH, viewBox: `0 0 ${PW} ${PH}`, class: 'abs', style: 'left:0;top:0;overflow:visible' }, plate);
     const scan = svgEl('rect', { x: 0, width: PW, height: 6, fill: '#FFC857', opacity: 0 }, sv);
+    const band = svgEl('rect', { x: 0, width: PW, height: 70, fill: '#072247', opacity: 0 }, sv), edge = svgEl('rect', { x: 0, width: PW, height: 4, fill: '#FFC857', opacity: 0 }, sv);   // a fallback look reading the whole photo
     const X = (b) => b.map((v) => v * k);
     const cands = R.cands.map((b) => svgEl('rect', { ...Object.fromEntries(['x', 'y', 'width', 'height'].map((a, i) => [a, X(b)[i]])), fill: 'none', stroke: '#E8F1FF', 'stroke-width': 3, 'stroke-dasharray': '10 8', opacity: 0 }, sv));
     // each line the team traced by eye: a dark band under a thin line, amber where a finding touches it, red where none does
@@ -726,13 +728,17 @@ function buildReal() {
         css(c, { left: CX + 'px', top: i * 168 + 'px', width: CW + 'px', height: '152px', padding: '14px 18px', overflow: 'hidden', borderColor: i === 4 ? (kP ? 'var(--amber)' : 'var(--red)') : 'var(--line)' });
         return { c, big, t0, v: c.children[1] }; });
     const lookAt = R.looks.map((L, i) => tRead + (tRep - tRead) * (i + 0.5) / R.looks.length);
+    if (fb && bt.look) lookAt[0] = T(bt.look);   // the fallback look lands as the voice says it; the overview's 1:2^L view stays until then
+    const ovEnd = fb ? lookAt[0] - 0.35 : tRead - 0.1;
     const ovRect = [10, 10, PW - 20, PH - 20], u0 = ri ? kin - 0.1 : s.t0 + 0.5;
     S.draws.push((t) => {
       if (!drawn && photo.complete && photo.naturalWidth) { small.getContext('2d').drawImage(photo, 0, 0, lw, lh); drawn = true; }
       // overview: the window takes the whole photo, the photo turns into its L3 copy while a scan line sweeps it
       const ov = seg(t, u0, u0 + 0.5), sc = seg(t, u0 + 0.4, tRead - 0.1);
-      small.style.opacity = (0.9 * eo(seg(t, u0 + 0.3, u0 + 0.7)) * (1 - seg(t, tRead - 0.1, tRead + 0.4))).toFixed(3);
+      small.style.opacity = (0.9 * eo(seg(t, u0 + 0.3, u0 + 0.7)) * (1 - seg(t, ovEnd, ovEnd + 0.5))).toFixed(3);
       scan.setAttribute('y', (sc * (PH - 6)).toFixed(1)); scan.setAttribute('opacity', sc > 0 && sc < 1 ? 0.85 : 0);
+      if (fb) { const q = seg(t, lookAt[0], tRep - 0.3), on = q > 0 && q < 1, y = q * (PH - 70);   // it reads the whole photo, until the gate refuses it
+        band.setAttribute('y', y.toFixed(1)); band.setAttribute('opacity', on ? 0.3 : 0); edge.setAttribute('y', (y + 66).toFixed(1)); edge.setAttribute('opacity', on ? 0.85 : 0); }
       cands.forEach((c) => c.setAttribute('opacity', seg(t, tRead - 0.1, tRead + 0.2)));
       // the window: off the photo's right edge, onto the whole photo, then to each look; it leaves after the last
       let rect = [PW + 40, PH * 0.3, 260, 260].map((v, i) => lerp(v, ovRect[i], eio(ov))), lab = `OVERVIEW · L${R.ov_level} · 1:${2 ** R.ov_level}`;

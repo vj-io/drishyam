@@ -123,12 +123,13 @@ def lines(D):
     add("break", "b3", "KILL halts it before the next look; Resume replays the moves and carries on.")   # where Resume stopped is on the rail card
     add("break", "b4", "No language model runs live; these planners are scripted to fail.")
 
-    # 6. an LLM driving the OpenCV tools over MCP (the rail note: the rules were in its prompt, the values measured)
-    assert m["iou_a"] < 0.5 <= m["iou_b"], m
-    add("mcp", "m1", "Over MCP, Claude drove the same tools on the same photo.")
-    add("mcp", "m2", "At call ", W(m["call_a"]), " the rebar masks disagreed, so Claude handed it to a human.")
-    add("mcp", "m3", "At call ", W(m["call_b"]), " they agreed on a spall; at call ", W(m["call_c"]), ", the budget ended the search.")
-    add("mcp", "m4", "It still missed the large spall.")
+    # 6. an LLM driving the OpenCV tools over MCP, on the live v1 engine (docs/mcp-session-v1, bridge_03; the rail note: the
+    # rules were in its prompt, the values measured). Its limit is said: it had read the sample's labels beforehand
+    assert m["iou_a"] < 0.5 and m["found"][0] == m["found"][1], m   # m2 says they disagreed, m4 says all of them
+    add("mcp", "m1", "Over MCP, Claude drove the same tools on the same photo, with v1.")
+    add("mcp", "m2", "At call ", W(m["call_a"]), " the spall's two masks disagreed, so Claude handed it to a human.")
+    add("mcp", "m3", "Then it looked at the crack, and stopped at call ", W(m["call_c"]), ", at ", P(m["pixels"]), " of the pixels.")
+    add("mcp", "m4", "It found all ", words(m["found"][0]), " labelled defects, but it had read the labels beforehand.")
 
     # 7. architecture
     add("arch", "a0", "Each step is perception, decision and action, with a human gate at the end.")
@@ -188,7 +189,7 @@ def lines(D):
                 "q says no region, one whole-photo look whose crack pixels the blur gate threw away, nothing flagged"
             assert L0["sharpness"] < D["sharp_min"] and any(x.startswith("re-shoot: blur") for x in R["na"]), R["na"]
             parts = [lead, "no region was proposed, so it looked at the whole photo. The segmenter saw crack pixels, but the blur gate refused this sharp view, and nothing was flagged."]
-            beats = {"eng": "wall", "read": "proposed", "rep": "refused", "end": "nothing"}   # the look lands as "looked at the whole photo" is said
+            beats = {"eng": "wall", "read": "proposed", "look": "whole photo", "rep": "refused", "end": "nothing"}   # film.js: the look lands on "whole photo"
         elif n == 0:   # the overview (saliency at a coarse level, no segmenter) proposed nothing, so no look ran the segmenter
             assert R["candidates"] == 0 and not R["found"] and seen and not any(R["paths_hit"]), "q says no region, nothing flagged, the crack missed"
             parts = [lead, "no region was proposed, so the trained segmenter never ran, and missed ", seen["say"], "."]

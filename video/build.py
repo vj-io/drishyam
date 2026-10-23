@@ -305,29 +305,41 @@ def data(model=MODEL, reals=REALS):
     f = "video/live/health.json"; h = load(f)
     D["health"] = {k: src(f"/api/health {k}", h[k], f, k) for k in ("opencv", "arch", "host", "build", "commit", "segmenter")}
 
-    # MCP session
-    f = "docs/mcp-session/exchange.jsonl"; ex = ndjson(f)
-    ver = [e for e in ex if e["tool"] == "verify"]
-    rs = next(e for e in ex if e["tool"] == "runtime_stats")
-    D["mcp"] = {"call_a": src("MCP: first verify call", ver[0]["n"], f, "[tool=verify][0].n"),
-                "iou_a": src("MCP: its IoU", ver[0]["content"][0]["value"]["iou"], f, "[tool=verify][0].content[0].value.iou"),
-                "call_b": src("MCP: second verify call", ver[1]["n"], f, "[tool=verify][1].n"),
-                "iou_b": src("MCP: its IoU", ver[1]["content"][0]["value"]["iou"], f, "[tool=verify][1].content[0].value.iou"),
+    # MCP session: the recorded session on the live v1 engine, bridge_03 (docs/mcp-session-v1); the 2026-10-18 session
+    # in docs/mcp-session ran on the classical engine
+    MCPD = "docs/mcp-session-v1"; TR = f"{MCPD}/transcript.md"
+    f = f"{MCPD}/bridge_03/exchange.jsonl"; ex = ndjson(f)
+    ver = [e for e in ex if e["tool"] == "verify"]; v = ver[0]["content"][0]["value"]
+    rs = next(e for e in ex if e["tool"] == "runtime_stats"); px = rs["content"][0]["value"]["budget"]["pixels_frac"]
+    tr = (ROOT / TR).read_text()
+    assert "This session ran on" not in tr and "The segmenter is v1, the live engine" in tr, "the chapter says the session ran on v1"
+    D["mcp"] = {"dir": f"../{MCPD}/bridge_03/",
+                "call_a": src("MCP: first verify call", ver[0]["n"], f, "[tool=verify][0].n"),
+                "iou_a": src("MCP: its IoU (L2 vs L1)", v["iou"], f, "[tool=verify][0].content[0].value.iou"),
                 "call_c": src("MCP: the budget check", rs["n"], f, "[tool=runtime_stats].n"),
+                "pixels": src("MCP: share of the pixels used at the budget check", px, f, "[tool=runtime_stats].content[0].value.budget.pixels_frac"),
                 "job": src("MCP: job id", ex[0]["content"][0]["value"]["job"], f, "[tool=open_image].content[0].value.job")}
+    assert v["kind"] == "disagree" and not v["agrees"], v
     hr = next(e for e in ex if e["tool"] == "request_human_review" and e["n"] > ver[0]["n"])
-    assert "always critical" in hr["args"]["reason"] and ver[0]["content"][0]["value"]["agrees"] is False, hr
-    D["mcp"]["rows"] = mcp_rows()
+    assert "disagree" in hr["args"]["reason"], hr
+    D["mcp"]["call_h"] = src("MCP: the call that sent the disagreeing spall to a human", hr["n"], f, "[tool=request_human_review, after the verify].n")
+    D["mcp"]["rows"] = mcp_rows(tr)
     D["mcp"]["crops"] = {}
-    for crop, lab in (("crops/img-004-1.jpg", "three rust bars"), ("crops/img-016-1.jpg", "a spall")):   # the two gaze crops the chapter shows, by the call that returned them
+    for crop, lab in (("crops/img-002-1.jpg", "three rust bars"), ("crops/img-011-1.jpg", "hairline crack")):   # the two gaze crops the chapter shows, by the call that returned them
         e = next(e for e in ex if any(c.get("file") == crop for c in e["content"]))
         why = next(r["why"] for r in D["mcp"]["rows"] if r["n"] == e["n"])
-        assert lab in why.lower(), f"transcript.md call {e['n']} no longer says {lab!r}: {why}"
-        D["mcp"]["crops"][crop] = src(f"MCP: call that returned {crop}, its level, its label", [e["n"], e["args"]["level"], lab], f"{f}; docs/mcp-session/transcript.md",
+        assert lab in why.lower(), f"{TR} call {e['n']} no longer says {lab!r}: {why}"
+        D["mcp"]["crops"][crop] = src(f"MCP: call that returned {crop}, its level, its label", [e["n"], e["args"]["level"], lab], f"{f}; {TR}",
                                       "[content.file=crop].n, .args.level; the label is in that call's 'why' cell")
-    tr = (ROOT / "docs/mcp-session/transcript.md").read_text()
-    D["mcp"]["missed_box"] = src("MCP: the large spall it missed (box)", re.search(r"\(box (\d+,\d+,\d+,\d+)\)", tr)[1], "docs/mcp-session/transcript.md", "'(box x,y,w,h)' after the call table")
-    src("MCP call table: call, what came back, why", f"{len(D['mcp']['rows'])} rows", "docs/mcp-session/transcript.md", "'How each measurement chose the next call' table")
+    D["mcp"]["call_b"] = D["mcp"]["crops"]["crops/img-011-1.jpg"][0]   # the look at the crack
+    # what the session found, as the transcript's comparison table scores it, and its limit (not blind)
+    row = lambda k: [c.strip() for c in re.search(rf"^\| {k}[^|]*\|(.*)\|\s*$", tr, re.M)[1].split("|")]   # rule agent, Claude on v1, Claude classical
+    got = re.match(r"(\d+) of (\d+)", row("Ground-truth boxes found")[1])
+    assert row("Pixels used")[1] == f"{100 * px:.1f} %", (row("Pixels used"), px)
+    D["mcp"]["found"] = src("MCP: labelled boxes of bridge_03 found (the transcript's harness rule)", [int(got[1]), int(got[2])], TR, "comparison table, 'Ground-truth boxes found', Claude over MCP (v1)")
+    D["mcp"]["blind"] = src("MCP: the session's limit", in_text(TR, "The session is not blind."), TR, "Honest limits")
+    D["mcp"]["got_last"] = D["mcp"]["rows"][-1]["got"]
+    src("MCP call table: call, what came back, why", f"{len(D['mcp']['rows'])} rows", TR, "the bridge_03 'how each measurement chose the next call' table")
 
     # AWS facts
     f = "public/docs/aws-simple.svg"; svg = (ROOT / f).read_text()
@@ -428,7 +440,7 @@ def data(model=MODEL, reals=REALS):
         "team": src("team and roles", in_text("README.md", "Vaibhav Jangid, lead engineer (agent policy, OpenCV pipeline, evaluation, AWS deployment)",
                                               "Bhavya Dhoot, design, demo and presentation (site design, video)"), "README.md", "Team"),
         "cites": src("problem-sheet citations", in_text("docs/impact-sources.md", "FHWA, Bridge Condition by Highway System 2026", "23 CFR 650.311", "SPR 787", "Table 4.1"), "docs/impact-sources.md", "sections 1, 2, 5"),
-        "client": src("MCP client", in_text("docs/mcp-session/transcript.md", "Claude (Opus 5.5) inside Claude Code"), "docs/mcp-session/transcript.md", "line 4"),
+        "client": src("MCP client", in_text("docs/mcp-session-v1/transcript.md", "Claude (Opus 5.5) inside Claude Code"), "docs/mcp-session-v1/transcript.md", "the client line"),
         "graviton": src("Lambda CPU", in_text("docs/aws.md", "arm64 (Graviton)"), "docs/aws.md", "line 4"),
         "behind": src("health card: what the Lambda sits behind", in_text("README.md", "behind CloudFront"), "README.md", "Live demo line"),
         "stack": src("reproduce sheet: what the CDK stack is", in_text("infra/drishyam_stack.py", "Lambda arm64 behind CloudFront and WAF"), "infra/drishyam_stack.py", "stack description"),
@@ -553,10 +565,11 @@ def real_run(base):
     return R
 
 
-def mcp_rows():
-    """The call table for the MCP chapter, as docs/mcp-session/transcript.md prints it (call, what came back, why)."""
+def mcp_rows(tr):
+    """The call table for the MCP chapter, as the transcript prints it for bridge_03 (call, what came back, why)."""
     rows = []
-    for line in (ROOT / "docs/mcp-session/transcript.md").read_text().splitlines():
+    sec = tr.split("## `bridge_03.jpg`", 1)[1].split("\n## ", 1)[0]
+    for line in sec.splitlines():
         m = re.match(r"\|\s*(\d+)\s*\|(.*)\|(.*)\|(.*)\|\s*$", line)
         if not m:
             continue
@@ -767,7 +780,7 @@ REQS = [   # competition requirement -> where the film covers it (scene ids or n
     ("Failure handling: 'Now break it' (slowed segmenter -> governor; malformed planner reply -> allow-list)", ["b0", "b1", "b2"]),
     ("Human control: 'Try KILL' (KILL halts with kill-switch, Resume replays, then the stop rule ends it with a region unvisited)", ["b3"]),
     ("Honesty: no LLM runs in the live demo; the drill planners are scripted", ["b4"]),
-    ("An LLM driving the OpenCV tools over MCP: IoU 0.00 at call 6 -> human; IoU 0.72 at call 18 -> confirmed; call 20 budget", ["mcp"]),
+    ("An LLM driving the OpenCV tools over MCP, on the live v1 engine (docs/mcp-session-v1, bridge_03): a measured mask disagreement sent to a human, the crack looked at, the budget check, the labelled defects found, and the session's limit (not blind)", ["mcp"]),
     ("Architecture: docs/agent-loop.svg, public/docs/aws-simple.svg, docs/architecture.png (AWS path and OpenCV layer)", ["arch"]),
     ("The live site now runs the trained segmenter v1 on OpenCV 5 DNN ENGINE_NEW, and its Lambda step p95 then and now (video/live/aws-smoke.log)", ["a4", "a5"]),
     ("Principal results: recall vs pixels, with one downscale, the tiling family and chance", ["r1", "r3"]),
@@ -921,6 +934,9 @@ def main():
     scenes, placed, total = measure(L)
     if total > 300:
         sys.exit(f"the film would run {total:.1f} s, over the 5-minute limit: shorten the narration")
+    if not a.standin:   # the site, README and report give the film's length: a change of length stops here until they say it
+        for rel in ("public/index.html", "README.md", "docs/report.md"):
+            in_text(rel, f"{int(total // 60)}:{int(total % 60):02d}")
     (WORK / "script.json").write_text(json.dumps([{"t": l["t"], "text": l["say"]} for l in placed], indent=1))
     narrate(WORK / "script.json", WORK / "narration.wav", WORK / "timings.json")
     ev, E = events()
