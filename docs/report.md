@@ -83,8 +83,8 @@ the triage of a backlog may cost. **Judges** need a trace in which an OpenCV out
 failure drills they can trigger, a live endpoint and honest failure cases. The **operator** who pays for the AWS
 account needs caps, a budget alert and one command that stops all spending.
 
-The narrated submission film (4:37, captions on) is an asset of the v1.1.2 release
-([drishyam.mp4](https://github.com/vj-io/drishyam/releases/download/v1.1.2/drishyam.mp4), not in git) and also plays
+The narrated submission film (4:37, captions on) is an asset of the v1.1.3 release
+([drishyam.mp4](https://github.com/vj-io/drishyam/releases/download/v1.1.3/drishyam.mp4), not in git) and also plays
 on the site's Docs and links sheet; `video/plan.md` says how it is built and where each number in it comes from.
 
 Not built yet: approval from an SNS email link (approval is the web review or `drishyam review`); the COOL
