@@ -11,7 +11,9 @@ implementation · 7 Related work · 8 Evaluation · 9 Failures · 10 Agentic evi
 
 Recall is the share of labelled defects found at the 30 % pixel cap, with paired 95 % bootstrap intervals over
 photos; chance is the same model's boxes moved to random places, and IoU-only drops the contains-the-centre match
-(section 8). Each segmenter was scored once on the held-out sets (`results/heldout_models.json`);
+(section 8). Each row was scored once on each held-out set (`results/heldout_models.json`), but v1 had been
+scored on CODEBRIM eval200 and synth200 once before (2026-10-18, unpublished): its row is its second scoring there,
+and v1-policy2's is v1's third read (section 8);
 `tests/test_report_doc.py` fails if a number here drifts from that file or, for the Lambda timings, from
 [aws.md](aws.md).
 

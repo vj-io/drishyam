@@ -21,8 +21,10 @@ seen*.
 
 Recall is the share of labelled defects found at the 30 % pixel cap, with paired 95 % bootstrap intervals over
 photos; chance is the same model's boxes moved to random places, and IoU-only drops the contains-the-centre match
-([report, section 8](docs/report.md#8-evaluation)). Each segmenter was scored once on the held-out sets
-([results/heldout_models.json](results/heldout_models.json)); `tests/test_report_doc.py` fails if a number here
+([report, section 8](docs/report.md#8-evaluation)). Each row was scored once on each held-out set
+([results/heldout_models.json](results/heldout_models.json)), but v1 had been scored on CODEBRIM eval200 and synth200
+once before (2026-10-18, unpublished): its row is its second scoring there, and v1-policy2's is v1's third read
+(report, section 8); `tests/test_report_doc.py` fails if a number here
 drifts from that file or, for the Lambda timings, from [docs/aws.md](docs/aws.md).
 
 | Segmenter | CODEBRIM recall (95 % CI) | chance | IoU-only (chance) | synth200 recall (95 % CI) | clean photos with a box | critical boxes per CODEBRIM photo (parts of findings) |
