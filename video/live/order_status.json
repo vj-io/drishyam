@@ -1,12 +1,28 @@
 {
- "status": "incomplete",
+ "status": "ready",
  "approvals": [
   {
    "finding_id": "f1",
    "decision": "approve",
    "reviewer": "Demo reviewer",
-   "at": "2026-10-22T07:26:49Z",
-   "prev_token_sha256": "4dc485ced4714b70a981c9b0abd8c24c597361adce8a4a02760c02310c2e6b2e"
+   "at": "2026-10-23T03:14:36Z",
+   "prev_token_sha256": "3955a2e8f630e57849977ba18c93f6aa0eda39c57e53fbe2b101d5f8de6ef9d3"
+  },
+  {
+   "not_assessed": 0,
+   "decision": "defect-found",
+   "reviewer": "Demo reviewer",
+   "at": "2026-10-23T03:14:46Z",
+   "prev_token_sha256": "20325c9e5a42cc9bd750084b806e52408941552b32dc951ee3e667f3ab133436"
+  }
+ ],
+ "resolutions": [
+  {
+   "cls": "exposed_rebar",
+   "decision": "defect-found",
+   "reviewer": "Demo reviewer",
+   "at": "2026-10-23T03:14:46Z",
+   "note": "exposed rebar in the spall"
   }
  ]
 }
