@@ -165,7 +165,8 @@ export class Findings {
           this.dim(m)),
         h('dl', { class: 'kv kv--px' },
           h('div', {}, h('dt', {}, 'length'), h('dd', {}, `${px(m.length_px, 1)} px`)),
-          h('div', {}, h('dt', {}, 'width'), h('dd', {}, `${px(m.width_px, 1)} px`)),
+          // with v1 a crack's width is its mask's, 15 to 17 crop px at every level (README, report section 11)
+          h('div', {}, h('dt', {}, 'mask width'), h('dd', {}, `${px(m.width_px, 1)} px${f.cls === 'crack' ? ' (the segmenter’s mask, not the crack)' : ''}`)),
           h('div', {}, h('dt', {}, 'area'), h('dd', {}, `${px(m.area_px)} px²`)),
           h('div', {}, h('dt', {}, 'orientation'), h('dd', {}, `${px(m.orientation_deg, 0)}°`)),
           trigger)),
