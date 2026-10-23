@@ -4,7 +4,7 @@ The web demo (the FastAPI app and the static site) runs on AWS only, as one CDK 
 `us-east-1`: the API on Lambda arm64 (Graviton) and the static site in a private S3 bucket, both reached
 only through CloudFront and AWS WAF.
 
-**Status: deployed** on 2026-10-21 (India time) to `us-east-1`, last from commit 08cd9b3 on 2026-10-23 (below). The v1 deploy
+**Status: deployed** on 2026-10-21 (India time) to `us-east-1`, last from commit 0e91cfc on 2026-10-23 (below). The v1 deploy
 itself came from commit dda3080, with the v1 segmenter
 (`ONNX=models/drishyam_dacl10k.onnx ONNX_FP16=models/drishyam_dacl10k.fp16.onnx RESERVED=none scripts/aws.sh deploy`)
 and the submission film in the site bucket (`video/drishyam.mp4`, served with byte ranges). The smoke run
@@ -30,7 +30,22 @@ the second job after 2 steps, and `tests/e2e/test_ui_live.py https://d1xg58guluu
 smoke 2026-10-21T04:21:29Z https://d1xg58guluup8c.cloudfront.net commit=02219a2e435ea90058fcb87f03d69f30cc3f2b4d package=r7K9s9XZtHmkq0+f2OtXiTy1CUyFo5xf2GzQkv6UJMs= ttfb_first=0.857872s ttfb_warm=0.728508s step_p95_ms=973.3 result=pass
 ```
 
-The current build: the site was redeployed from commit 08cd9b3 on 2026-10-23, release 1.1.3: version 1.1.3 in
+The current build: the site was redeployed from commit 0e91cfc on 2026-10-23, release 1.1.4: version 1.1.4 in
+`/api/health`, and the FAQ line that said the wall replays had lost their images corrected (they carry the heatmap
+and crops). Under `drishyam/` only the version string differs from 08cd9b3. CloudFront served the film at 139,555,354
+bytes, and the served `samples/real_01.ndjson`, `samples/real_02.ndjson`, `index.html` and `app.js` match the
+commit's by SHA-256. Two deploy attempts before it failed while CDK published its assets (`getaddrinfo ENOTFOUND` for
+the CDK assets bucket; the second then hung until it was stopped), before any CloudFormation change, so the site
+stayed on 08cd9b3 until this one. `tests/e2e/test_ui_live.py https://d1xg58guluup8c.cloudfront.net` passed twice
+against it (guided runs 42.6 s and 30.3 s), and then its smoke run (`WAF_LOOP=1`) passed: a job on `bridge_03.jpg`
+ended `awaiting_review` after 6 steps, KILL halted the second job after 3 steps, both 403 checks held, the WAF
+answered 429 at the 12th empty-bodied job start, and the step p95 was 967.5 ms over 6 steps:
+
+```
+smoke 2026-10-23T17:11:21Z https://d1xg58guluup8c.cloudfront.net commit=0e91cfcb76ffc1906f53584f53b93a9fa6fa1c6c package=heXxmtl34o/zNPFZZpQ98riqeoe40tb71eR7KsVPCas= ttfb_first=1.524002s ttfb_warm=1.133412s step_p95_ms=967.5 result=pass
+```
+
+Before it, the site was redeployed from commit 08cd9b3 on 2026-10-23, release 1.1.3: version 1.1.3 in
 `/api/health`, the film with the re-grade's fixes (4:37, `video/drishyam.mp4` in the bucket, 139,555,354 bytes, the
 size CloudFront served after the deploy), the site's re-grade fixes, and the real-wall replays re-recorded with their
 images (the served `samples/real_01.ndjson`, `samples/real_02.ndjson`, `index.html` and `app.js` match the commit's
