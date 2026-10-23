@@ -3,7 +3,10 @@
 Each figure below was checked against the primary source on 2026-10-18: the regulation text, the agency's own
 table, the standard's publisher, a ministry page, or the paper itself. Figures are copied as printed. A
 figure this file computes itself is labelled *computed*. Nothing here estimates reviewer time or time saved.
-On real photos Drishyam's recall is about 0.2 (README, CODEBRIM section), which does not support any
+On 200 real CODEBRIM photos at the 30 % pixel cap Drishyam finds 0.49 of the labelled defects with v1, the live
+segmenter, under its first look policy and under v1-policy2, the live one (chance 0.30 and 0.31: its boxes are
+large), and 0.19 with the classical engine (chance 0.12)
+([results/heldout_models.json](../results/heldout_models.json); README, Results at a glance). Neither supports any
 time-saving claim.
 
 | # | Figure | Status |
