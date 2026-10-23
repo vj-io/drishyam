@@ -128,6 +128,9 @@ STALE_CLAIMS = {
     "about 24,000": "a person signs critical findings, not boxes; the measured 2,536-photo backlog queued 684",
     "rev 1.1.0": "the figures are REV 1.1.1",
     "deployed commit adf9474": "the deployed commit is the one docs/aws.md names first; adf9474 first deployed v1-policy2",
+    # the 2026-10-23 audit of docs/requirements.md
+    "need a kaggle gpu run": "v1's trained weights are release assets of v1.1.0, live since 2026-10-21",
+    "is not built, so there is no": "segment.drop_straight_lines drops a straight crack component (commit 9857a5a)",
 }
 # A deploy older than the live one is named only in the history that records it (and 03af85b as the model's install
 # commit in models/README.md), never as the current build.
@@ -148,6 +151,9 @@ OLD_CLAIMS = [
     "it sends 5.5 times the critical boxes to the human gate (at that rate, about 24,000 for a 2,536-photo bridge inspection)",
     "DRAWN 2026-10-21 · SCALE NTS · REV 1.1.0",
     "v1-policy2, live since 2026-10-22 (deployed commit adf9474)",
+    "done (engine + export pipeline); trained dacl10k weights need a Kaggle GPU run",
+    "dropping a crack finding whose thinned centreline fits one straight line (a `cv2.fitLine` residual rule against "
+    "form joints and edges) is not built, so there is no before/after on `data/synth_dev` for it.",
 ]
 
 
@@ -169,6 +175,21 @@ def test_the_stale_claims_the_regrade_found_stay_gone():
     named = [(p.relative_to(REPO).as_posix(), c) for p in FILES + FIGURES for c, ok in OLD_COMMITS.items()
              if c in p.read_text() and p.relative_to(REPO).as_posix() not in ok]
     assert named == []
+
+
+def test_requirements_quote_the_published_numbers():
+    """docs/requirements.md's FR-20 status quotes the classical engine's published summaries at the 30 % cap
+    (policies["drishyam"][3]) and v1's held-out CODEBRIM recall, as README.md and docs/report.md do."""
+    req = flat_text(REPO / "docs/requirements.md")
+    want = []
+    for f in ("public/results/summary.json", "public/results/codebrim/summary.json"):
+        d = json.loads((REPO / f).read_text())
+        hs, dr = d["headline_stats"], d["policies"]["drishyam"][3]
+        want.append(f"{dr['recall']:.2f} recall at {dr['pixels_frac']:.2f} of the pixels, {hs['recall_ratio_vs_tiling']:.2f}× "
+                    f"exhaustive tiling at {hs['pixels_ratio_vs_tiling']:.2f}× its pixels, {hs['recall_ratio_vs_downscale']:.2f}× one downscale")
+    v1 = json.loads((REPO / "results/heldout_models.json").read_text())["table"]["codebrim@0.3"]["v1"]
+    want.append(f"({v1['recall']:.2f} recall on CODEBRIM at the 30 % cap)")
+    assert [w for w in want if w not in req] == []
 
 
 def test_the_lambda_build_and_cold_start_are_the_recorded_ones():
