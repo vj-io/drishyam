@@ -1,0 +1,76 @@
+{
+ "image": "IMG_2332",
+ "engine": "onnx:drishyam_dacl10k.onnx",
+ "profile": "live site (commit a2b8688), measured costs, 30 % pixel cap",
+ "seen": {
+  "say": "the hairline crack",
+  "classes": [
+   "crack"
+  ],
+  "paths": [
+   [
+    [
+     465,
+     15
+    ],
+    [
+     660,
+     375
+    ],
+    [
+     735,
+     600
+    ],
+    [
+     795,
+     720
+    ],
+    [
+     1020,
+     750
+    ],
+    [
+     1140,
+     818
+    ],
+    [
+     1275,
+     833
+    ],
+    [
+     1395,
+     930
+    ],
+    [
+     1560,
+     1050
+    ],
+    [
+     1770,
+     1155
+    ],
+    [
+     2025,
+     1350
+    ],
+    [
+     2145,
+     1590
+    ],
+    [
+     2280,
+     1800
+    ],
+    [
+     2340,
+     1965
+    ],
+    [
+     2430,
+     2250
+    ]
+   ]
+  ],
+  "by": "the team, by eye: not ground truth"
+ }
+}

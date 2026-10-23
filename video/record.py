@@ -4,8 +4,9 @@ https://d1xg58guluup8c.cloudfront.net, plus a log of where the mouse went and wh
     ~/.claude/brag-scaled-venv/bin/python video/record.py            # -> brag-output/work/rec/
 
 Flow (4 job starts, under the WAF's 10 per IP per 120 s): the guided run on bridge_03 ("Watch it inspect a
-bridge"), the human sign-off of each critical finding, "Now break it", "Try KILL" + KILL + Resume, then a
-tampered work-order token sent to /api/review. The work order after the sign-off (its status and approvals) goes to
+bridge"), the human sign-off of each critical finding, the rebar's needs-a-look entry checked by eye (Defect found:
+the photo shows the bars), "Now break it", "Try KILL" + KILL + Resume, then a tampered work-order token sent to
+/api/review. The work order after the sign-off and the check (its status, approvals and resolutions) goes to
 video/live/order_status.json. Each run's trace is saved through the page's own "Download
 trace.ndjson" button, with the token fields and embedded images removed, to video/live/<run>.ndjson (the source of every live-run
 number the video quotes).
@@ -24,7 +25,8 @@ OUT = ROOT / "brag-output" / "work" / "rec"
 LIVE = ROOT / "video" / "live"
 W, H = 1280, 1200
 REVIEWER = "Demo reviewer"   # not a person's name: the stamp shows it
-DONE = ("needs sign-off", "signed", "done", "halted", "budget spent")
+NOTE = "exposed rebar in the spall"   # what bridge_03 shows there: three bars in the spall (and its ground truth)
+DONE = ("needs sign-off", "signed", "done", "halted", "budget spent", "needs a look")
 SECRET = ("token", "kill_token")
 IMAGES = ("crop_jpeg_b64", "heatmap_png_b64")   # embedded pictures: not needed for any number, and most of the file
 
@@ -178,10 +180,26 @@ def main():
             card.locator(".chip--state", has_text="approved").wait_for(timeout=15000)
             log("approved", n=n)
             watch(1.5)
+        # 2b. checked by eye: the rebar's needs-a-look entry, the only not-assessed entry of this run. Defect found only
+        # because bridge_03 shows the bars there; any other entry stops the recording rather than get a decision
+        items = pg.locator("#checks .check")
+        if items.count() != 1 or "rebar" not in items.first.inner_text().lower():
+            sys.exit(f"expected one not-assessed entry, the rebar's: {[items.nth(i).inner_text()[:80] for i in range(items.count())]}")
+        watch(1.0)
+        click("#chk-0", "Check reviewer")
+        t = now(); pg.keyboard.type(REVIEWER, delay=65); log("type", text=REVIEWER, t0=t)
+        click("#chk-note-0", "Check note")
+        t = now(); pg.keyboard.type(NOTE, delay=45); log("type", text=NOTE, t0=t)
+        click("#checks .check[data-index='0'] button:has-text('Defect found')", "Defect found")
+        items.first.locator(".chip--state", has_text="checked by eye").wait_for(timeout=15000)
+        log("checked", n=0)
+        watch(1.5)
         watch(2.0)
         order = json.loads(download("order", "Download work_order.json"))
-        (LIVE / "order_status.json").write_text(json.dumps({"status": order["work_order"]["status"],   # the film's l9 reads it
-                                                           "approvals": strip(order["work_order"].get("approvals", []))}, indent=1))
+        wo = order["work_order"]
+        (LIVE / "order_status.json").write_text(json.dumps({"status": wo["status"],   # the film's l9 and l10 read it
+                                                           "approvals": strip(wo.get("approvals", [])),
+                                                           "resolutions": [strip({"cls": a.get("cls"), **a["resolution"]}) for a in wo.get("not_assessed", []) if a.get("resolution")]}, indent=1))
         token = order["token"]
 
         # 3. Now break it (from the recap)
@@ -245,5 +263,39 @@ def health():
     print(text, boxes)
 
 
+WALLS = {"IMG_2332": ("real_01.jpg", LIVE), "IMG_2330": ("real_02.jpg", LIVE / "variants" / "IMG_2330")}   # sample, the older run's folder
+
+
+def walls():
+    """The team's two wall photos, bundled as public/samples/real_0N.jpg (the same files), each run live with Look (2 job
+    starts; not Watch it on a real wall, which replays an older recording). Each trace, token fields and embedded images
+    removed, -> video/live/walls/<image>/real.ndjson, with a real.json: the older run's (what the team sees by eye) with
+    this run's engine and profile. The older runs stay where they are (docs/report.md cites them)."""
+    h = json.loads((LIVE / "health.json").read_text())
+    with sync_playwright() as p:
+        b = p.chromium.launch()
+        pg = b.new_page(viewport={"width": W, "height": H}, accept_downloads=True)
+        for image, (sample, old) in WALLS.items():
+            pg.goto(BASE + "/", wait_until="load")
+            pg.locator("#look:not([disabled])").wait_for(timeout=30000)
+            pg.locator(f"#gallery .thumb[data-file='{sample}']").click()
+            pg.locator(f"#gallery .thumb[data-file='{sample}'][aria-pressed='true']").wait_for(timeout=30000)
+            pg.locator("#look:not([disabled])").wait_for(timeout=30000)
+            pg.click("#look")
+            pg.wait_for_function("() => document.querySelector('#job-pill')?.textContent.trim().toLowerCase() === 'running'", timeout=30000)
+            pg.wait_for_function(f"d => d.includes(document.querySelector('#job-pill')?.textContent.trim().toLowerCase())", arg=list(DONE), timeout=150000)
+            with pg.expect_download() as dl:
+                pg.evaluate("() => [...document.querySelectorAll('#done button')].find(b => b.textContent.trim() === 'Download trace.ndjson').click()")
+            ev = [strip(json.loads(ln)) for ln in pathlib.Path(dl.value.path()).read_text().splitlines() if ln.strip()]
+            prof = next(e["profile"] for e in ev if e["type"] == "step")
+            cap = next(e for e in ev if e["type"] == "job")["budget"]["pixel_cap_frac"]
+            out = LIVE / "walls" / image; out.mkdir(parents=True, exist_ok=True)
+            (out / "real.ndjson").write_text("".join(json.dumps(e, separators=(",", ":")) + "\n" for e in ev))
+            meta = json.loads((old / "real.json").read_text())
+            (out / "real.json").write_text(json.dumps({**meta, "engine": prof, "profile": f"live site (commit {h['commit'][:7]}), measured costs, {round(100 * cap)} % pixel cap"}, indent=1) + "\n")
+            print(image, ev[0]["job"], prof, f"-> {out}", flush=True)
+        b.close()
+
+
 if __name__ == "__main__":
-    health() if "--health" in sys.argv else main()
+    health() if "--health" in sys.argv else walls() if "--walls" in sys.argv else main()
