@@ -180,7 +180,10 @@ MCP server over stdio (12 allow-listed tools, no approve tool, no shell):
 uv run drishyam mcp
 ```
 
-Tests: `make test` (unit, API, MCP, CLI, evals; same as CI) · browser e2e under the production CSP: `uv pip install playwright && .venv/bin/playwright install chromium && make e2e` · CI runs on x86 and arm64.
+Tests: `make test` (unit, API, MCP, CLI, evals; same as CI) · browser e2e under the production CSP: `uv pip install playwright==1.63.0 && .venv/bin/playwright install chromium && make e2e` (the version CI pins) · CI runs on x86 and arm64.
+
+Deploy: the AWS stack is CDK in [infra/](infra/); [docs/aws.md, Deploy in your own account](docs/aws.md#deploy-in-your-own-account)
+gives the steps, and the same file records each deployed commit with its smoke run.
 
 ## Results
 
