@@ -913,7 +913,8 @@ the replay exactly.
 ## 11. Responsible use and limits
 
 - Evidence-first UI: crop, measurements and gaze step before any confidence
-  number; an "AI-assisted, not an inspection" banner on every finding.
+  number; one "AI-assisted, not an inspection" banner above the findings list, the same words in the site's footer
+  and FAQ, and a `disclaimer` field in every work order.
 - Pixels only. No millimetres without a scale reference; no safety ratings. With v1 a crack's width is its mask's
   width, not the crack's: the mask is 15 to 17 crop pixels wide at every level, so the width scales with the look's
   level (in the MCP v1 session, 34 and 69 px for one hairline on `real_01`; section 10). Criticality is a pixel-area threshold
