@@ -552,12 +552,45 @@ def test_docs_link_only_files_that_exist():
         assert missing == [], path
 
 
-def test_no_codebrim_image_is_published():
-    """CODEBRIM's licence bars sharing its photos: no image file under a CODEBRIM path is tracked."""
+def published(root: Path = REPO) -> list[str]:
+    """The files the repository publishes: `git ls-files` in a checkout; outside one (GitHub's source zip, which holds
+    exactly the tracked files) every file on disk but those under a directory .gitignore names, as git would skip them."""
+    import fnmatch
+    import os
     import subprocess
 
-    files = subprocess.run(["git", "ls-files"], cwd=REPO, capture_output=True, text=True, check=True).stdout.split()
-    assert [f for f in files if "codebrim" in f.lower() and f.lower().endswith((".jpg", ".jpeg", ".png", ".webp"))] == []
+    if (root / ".git").exists():
+        return subprocess.run(["git", "ls-files"], cwd=root, capture_output=True, text=True, check=True).stdout.split()
+    gitignore = root / ".gitignore"
+    dirs = [ln.strip().rstrip("/") for ln in (gitignore.read_text().splitlines() if gitignore.exists() else [])
+            if ln.strip().endswith("/") and not ln.startswith(("#", "!"))]
+    out = []
+    for here, subdirs, files in os.walk(root):
+        rel = Path(here).relative_to(root)
+        # a pattern with a slash inside is anchored at the root; one without matches a directory of that name anywhere
+        subdirs[:] = [d for d in subdirs if not any(fnmatch.fnmatch((rel / d).as_posix(), g) if "/" in g
+                                                    else fnmatch.fnmatch(d, g) for g in dirs)]
+        out += [(rel / f).as_posix() for f in files]
+    return out
+
+
+def codebrim_images(files: list[str]) -> list[str]:
+    return [f for f in files if "codebrim" in f.lower() and f.lower().endswith((".jpg", ".jpeg", ".png", ".webp"))]
+
+
+def test_no_codebrim_image_is_published():
+    """CODEBRIM's licence bars sharing its photos: no image file under a CODEBRIM path is published (tracked, or on
+    disk in a copy without git, such as the source zip a judge may run `make test` from)."""
+    assert codebrim_images(published()) == []
+
+
+def test_without_git_the_codebrim_check_reads_the_disk(tmp_path):
+    """Outside a checkout the check still sees a published CODEBRIM image, and skips only what .gitignore keeps out."""
+    (tmp_path / ".gitignore").write_text("data/\nresults/codebrim/\n*.pyc\n")
+    for f in ("public/codebrim/a.jpg", "data/codebrim/b.jpg", "results/codebrim/c.png", "docs/x/codebrim_d.PNG"):
+        (tmp_path / f).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / f).write_bytes(b"")
+    assert sorted(codebrim_images(published(tmp_path))) == ["docs/x/codebrim_d.PNG", "public/codebrim/a.jpg"]
 
 
 if __name__ == "__main__":
