@@ -80,15 +80,18 @@ def lines(D):
     add("problem", "p1", "America has about ", W(round(num(imp["bridges"]), -3)), " bridges, inspected at least every two years.")
     hund = num(imp["photos"]) // 100   # 2,536 -> "twenty-five hundred": a figure costs the words it takes to say
     add("problem", "p2", "One drone inspection took more than ", (f"{words(hund)} hundred", f"{hund * 100:,}"), " photos of one bridge.")
-    add("problem", "p3", "Drishyam is for the engineer reviewing them: it zooms in only where needed.")
+    # the site's hero (public/index.html .lede, checked by build.py): not "only where needed", which no result shows
+    assert D["lit"]["lede"], "p3 is the hero's wording"
+    add("problem", "p3", "Drishyam is for the engineer reviewing them: it chooses where to look, zooms in where its segmenter is unsure, "
+        "drafts defects for review, and hands every critical finding to a person.")
 
-    # 4. the app working, live (recorded 2026-10-22 on the site as it runs now: the trained v1 with v1-policy2, l0 says so before it plays)
+    # 4. the app working, live (recorded 2026-10-23 on the site as it runs now: the trained v1 with v1-policy2, l0 says so before it plays)
     md = D.get("model")
-    assert D["lit"]["recorded"] == "2026-10-22", "l0 says October twenty-second"
+    assert D["lit"]["recorded"] == "2026-10-23", "l0 says October twenty-third"
     assert md and md["name"] == "v1" and a["now"]["segmenter"] == D["model_segmenter"] and a["now"]["segmenter"].startswith("onnx:"), "l0 and a4 say the site now runs the trained v1"
     assert h["segmenter"] == a["now"]["segmenter"], "l0: the footage ran the engine the live site runs (its last smoke run's /api/health)"
-    assert "v1-policy2 look policy since 2026-10-22" in D["lit"]["policy"], "l0 says its look policy is new"
-    add("live", "l0", "Recorded ", ("October twenty-second", "22 October"), " on the live site: the trained v1 and its new look policy.")
+    assert "v1-policy2, live since 2026-10-22" in D["lit"]["policy"], "l0 says its look policy is new"
+    add("live", "l0", "Recorded ", ("October twenty-third", "23 October"), " on the live site: the trained v1 and its new look policy.")
     add("live", "l1", "Live on AWS: OpenCV ", CV, " on an arm Lambda.")
     assert sum(g["privacy"]) == 0, "l2 says there was nothing to blur in this photo"
     add("live", "l2", "Watch it inspect a bridge; a privacy pass finds nothing to blur.")
@@ -104,9 +107,12 @@ def lines(D):
     add("live", "l6", "So the ", RB, " goes to a person to check by eye, not as a critical finding.")
     assert g["after"] == [3, ["crack"]] and g["stop"][0] == "exhausted" and g["stop"][2] == [] and "crack" in g["gt"][0], g["after"]
     add("live", "l7", "Three more looks find a crack; with every region looked at, it stops.")
-    assert g["order"] == ["incomplete", g["critical"]], "l9 says the order stays incomplete after the one approval"
-    add("live", "l9", "Only a person can approve the spalling; the order stays incomplete until someone checks the ", RB, ".")
+    add("live", "l9", "Only a person can approve the spalling.")
     L[-1]["pause"] = 0.5   # the footage cuts from the end of the run to the sign-off here (build.py footage_warp)
+    # then, on the page, a person checks the rebar's needs-a-look entry by eye: Defect found (the photo shows the bars), and
+    # only then is the order ready (build.py data() asserts the order, the decision and the ground truth)
+    assert g["order"] == ["ready", g["critical"]] and g["checked"][0] == "defect-found", (g["order"], g["checked"])
+    add("live", "l10", "A person then checks the ", RB, " by eye and ", ("rekords", "records"), " a defect; now the order is ready.")   # "records" here reads as the noun (phonemes)
     add("live", "l11", "Change one character of the order's signature: the server refuses it.")
 
     # 5. failure handling and human control
@@ -161,19 +167,29 @@ def lines(D):
     # the live look policy (v1-policy2): about a tenth fewer critical boxes (CI under 1), recall unchanged (CI across 1); figures on the board
     (c2, (c2lo, c2hi)), (r2, (r2lo, r2hi)) = md["policy2"]["crit_ratio"], md["policy2"]["recall_ratio"]
     assert round(1 - c2, 1) == 0.1 and c2hi < 1 and r2lo < 1 < r2hi, md["policy2"]
-    add("results", "r8", "But its boxes find ", P(md["chance"]), " at random, and a person gets five and a half times the critical boxes.", *leak,
-        " The live policy sends a tenth fewer, with recall unchanged.")
+    # what a person signs is critical findings, not boxes (README): about two a photo under v1's first policy, about one under v1-policy2
+    sg = md["policy2"]["sign"]
+    assert round(sg[0]) == 2 and round(sg[1]) == 1, sg
+    add("results", "r8", "But its boxes find ", P(md["chance"]), " at random, and it draws five and a half times the critical boxes.", *leak,
+        " A person signs about two critical findings a photo, about one with the live policy, and recall is unchanged.")
     assert abs(cl["any"] - 2 / 3) < 0.01 and md["clean_any"] == [0.0, cl["any"]], "r7 says two in three, and none for v1"
     add("results", "r7", "On ", W(cl["n"]), " undamaged synthetic photos, the classical engine flags ", ("two in three", "2 in 3"), "; v1, none.")
 
-    # 8b. two real photos of our own, each a recorded run of the live engine (build.py real_run): each line built from its trace
+    # 8b. two real photos of our own, each run live on the site (build.py real_run): each line built from its trace
     PR = lambda x: (f"{dec(100 * x, 1)} percent", f"{100 * x:.1f} %") if x < 0.1 else P(x)   # as the PIXELS READ card prints it
     for i, R in enumerate(D.get("real") or []):
         n, seen = R["n_looks"], R["seen"]
         assert n == len(R["looks"]) and R["n_found"] == len(R["found"]) and (n or not R["found"]), R
         assert R["kind"] == "onnx" and R["engine"] == D["model_segmenter"], "q lines say the trained segmenter"
         lead = "Our own wall, no ground truth: " if i == 0 else "On a second wall, "
-        if n == 0:   # the overview (saliency at a coarse level, no segmenter) proposed nothing, so no look ran the segmenter
+        if n == 1 and R["looks"][0]["cause"] == "fallback-l2":   # no candidate: the zero-candidate fallback's one whole-photo look at L2
+            L0 = R["looks"][0]
+            assert R["candidates"] == 0 and L0["refused"] == "blur" and L0["mask_px"] > 0 and not R["found"] and seen and not any(R["paths_hit"]), \
+                "q says no region, one whole-photo look whose crack pixels the blur gate threw away, nothing flagged"
+            assert L0["sharpness"] < D["sharp_min"] and any(x.startswith("re-shoot: blur") for x in R["na"]), R["na"]
+            parts = [lead, "no region was proposed, so it looked at the whole photo. The segmenter saw crack pixels, but the blur gate refused this sharp view, and nothing was flagged."]
+            beats = {"eng": "wall", "read": "proposed", "rep": "refused", "end": "nothing"}   # the look lands as "looked at the whole photo" is said
+        elif n == 0:   # the overview (saliency at a coarse level, no segmenter) proposed nothing, so no look ran the segmenter
             assert R["candidates"] == 0 and not R["found"] and seen and not any(R["paths_hit"]), "q says no region, nothing flagged, the crack missed"
             parts = [lead, "no region was proposed, so the trained segmenter never ran, and missed ", seen["say"], "."]
             beats = {"eng": "wall", "read": "proposed", "rep": "never ran", "end": "missed"}

@@ -133,7 +133,7 @@ const PT = window.PRIVATE && window.PRIVATE.team && window.portraitChapter && wi
 const ENGINE = `trained ${D.model.name}, look policy v1-policy2`, ENG = `${D.model.name} · v1-policy2`;   // the live site's engine when the footage was recorded, and now (build.py data())
 const STRIPB = { open: `recorded ${LIT.recorded} · ${ENG} · synthetic photo bridge_03`,
   team: PT ? `our photos, drawn by OpenCV 5: ${PT.calls.map((c) => `<code>${c}</code>`).join(', ')}` : ENTRY,
-  real: D.real.length ? `video/live · jobs ${D.real.map((r) => r.job).join(', ')} · ${D.real[0].engine}` : '',
+  real: D.real.length ? `live jobs ${D.real.map((r) => r.job).join(', ')} · ${D.real[0].engine}` : '',
   problem: 'sources: docs/impact-sources.md', live: `recorded ${LIT.recorded} on the live site · ${ENG}`,
   break: `injected drills · recorded ${LIT.recorded} · ${ENG}`,
   mcp: 'docs/mcp-session: a recorded Claude session', arch: 'docs/architecture.png · docs/agent-loop.svg · public/docs/aws-simple.svg',
@@ -385,13 +385,17 @@ function buildLive() {
     KF(ev['step:3'] + 0.3, 948, 289, 600), KF(ev['step:3'] + 1.8, 950, 750, 660),
     KF(ev['step:4'] + 0.3, 420, 560, 1000), KF(ev['done:guided'] + 0.3, 560, 330, 1080),
     KF(ev['click:Sign them off'], 640, 560, 1240), KF(ev['click:Sign them off'] + 1.4, 330, 720, 840),
-    KF(ev[`approved:${N - 1}`] + 0.3, 420, 700, 900), KF(ev[`approved:${N - 1}`] + 1.2, 945, 400, 700),
-    KF(ev[`approved:${N - 1}`] + 3.6, 640, 580, 1240)], { rec: RECTAG });   // under l11, out to both stamps: APPROVED and the order SIGNED
+    KF(ev[`approved:${N - 1}`] + 0.3, 420, 700, 900), KF(ev[`approved:${N - 1}`] + 1.2, 945, 400, 700),   // APPROVED, then the order: needs a look
+    KF(ev['click:Check reviewer'] - 0.3, 340, 600, 820),   // the rebar's entry, Checked by eye: the name, the note, Defect found
+    KF(ev['checked:0'] + 0.3, 330, 500, 780), KF(ev['checked:0'] + 1.6, 900, 300, 760),   // the entry checked by eye; then the order ready
+    KF(ev['checked:0'] + 3.2, 640, 420, 1240)], { rec: RECTAG });   // under l11, out to both: the entry checked by eye and the order ready
   const [hcls, hconf, floor, hlev] = D.guided.held, [ccls, cstep, crule] = D.guided.crit;
   railcall(cstep, `${fmt(hconf)} &lt; ${floor}`, `${hcls.replace('_', ' ')} at L${hlev}, under the floor: held for a confirm look; the ${ccls} is critical`, at('l4') + 0.3, end('l4') + 0.3);
   railcall(cstep + 1, 'check by eye', `its L${D.guided.confirm_level} confirm look did not confirm it: a needs-a-look entry, not a critical finding`, at('l6') + 0.2, end('l6') + 0.3);
   railcall(D.guided.halt_step, `${D.guided.critical} critical`, `every candidate region looked at (${D.guided.stop[0]}); the ${D.guided.drafts.join(' and ')} are drafts, no sign-off`, at('l7') + LINE.l7.dur * 0.4, end('l7') + 0.3);
-  railcall('✓', 'a person', `approves the ${ccls}; the server signs. The order stays ${D.guided.order[0]}: the rebar is still to check by eye`, at('l9') + 0.3, end('l9') + 0.3);
+  railcall('✓', 'a person', `approves the ${ccls}; the server signs. The rebar still needs a look`, at('l9') + 0.3, end('l9') + 0.3);
+  const [dec, note, who] = D.guided.checked, TC = filmOf(fw.S, ev['checked:0']);   // the card lands with the check on screen, not before it
+  railcall('✓', 'checked by eye', `${dec.replace('-', ' ')} by ${who}: “${note}”. The order is ${D.guided.order[0]}`, TC, at('l11') + 1.2);
   railcall('!', `HTTP ${D.tamper.status}`, D.tamper.error, at('l11') + 1.4, end('l11') + 0.6);
   // c. the tampered token, answered by the server
   const term = el('div', 'term', S.e); css(term, { right: '28px', bottom: '28px', width: '980px', zIndex: 9 });
@@ -592,9 +596,10 @@ function buildResults() {
     <div class="abs h2" data-w="two and a half" data-l="r6" style="left:30px;top:284px;font-size:40px;white-space:nowrap">${fmt(M.ratio[0], 1)}× the classical engine <span style="color:var(--line-2)">(${fmt(M.ratio[1][0])}–${fmt(M.ratio[1][1])})</span> · ${cb.n} real CODEBRIM photos</div>
     <div class="box amb" data-w="random" data-l="r8" style="left:30px;top:346px;width:720px;height:228px;padding:16px 22px"><div class="lab amber" style="font-size:19px">chance · its boxes placed at random</div>
       <div class="h2 amber" style="font-size:64px;margin:8px 0 6px">${pc(M.chance)}</div><div class="mono" style="font-size:21px">find ${fmt(M.chance)} of the defects; its own boxes ${fmt(M.recall)}</div></div>
-    <div class="box amb" data-w="a person" data-l="r8" style="left:780px;top:346px;width:720px;height:228px;padding:16px 22px"><div class="lab amber" style="font-size:19px">for a person to sign off</div>
-      <div class="h2 amber" style="font-size:64px;margin:8px 0 6px">${fmt(M.crit[0])} <span style="font-size:34px">critical boxes per photo</span></div><div class="mono" style="font-size:21px">classical engine ${fmt(M.crit[1])}: ${fmt(M.crit_ratio[0], 1)}× (${fmt(M.crit_ratio[1][0])}–${fmt(M.crit_ratio[1][1])})</div>
-      <div class="mono amber" data-w="the live policy" data-l="r8" style="font-size:19px;line-height:1.35;margin-top:8px">live policy v1-policy2: ${fmt(P2.crit)} critical boxes per photo (${fmt(P2.crit_ratio[0])}×, CI ${fmt(P2.crit_ratio[1][0])}–${fmt(P2.crit_ratio[1][1])}), recall ${fmt(P2.recall_ratio[0])}× (CI ${fmt(P2.recall_ratio[1][0])}–${fmt(P2.recall_ratio[1][1])})</div></div>
+    <div class="box amb" data-w="draws" data-l="r8" style="left:780px;top:346px;width:720px;height:228px;padding:16px 22px"><div class="lab amber" style="font-size:19px">a person signs · critical findings, not boxes</div>
+      <div class="mono" style="font-size:20px;line-height:1.3;margin-top:6px">critical boxes, parts of findings: ${fmt(M.crit[0])} per photo; classical engine ${fmt(M.crit[1])}: ${fmt(M.crit_ratio[0], 1)}× (${fmt(M.crit_ratio[1][0])}–${fmt(M.crit_ratio[1][1])})</div>
+      <div class="h2 amber" data-w="a person" data-l="r8" style="font-size:56px;margin:6px 0 4px;white-space:nowrap">${fmt(P2.sign[0])} <span style="font-size:30px">critical findings per photo</span></div>
+      <div class="mono amber" data-w="the live policy" data-l="r8" style="font-size:19px;line-height:1.3">live policy v1-policy2: ${fmt(P2.sign[1])} to sign (${fmt(P2.crit)} critical boxes, ${fmt(P2.crit_ratio[0])}×, CI ${fmt(P2.crit_ratio[1][0])}–${fmt(P2.crit_ratio[1][1])}), recall ${fmt(P2.recall_ratio[0])}× (CI ${fmt(P2.recall_ratio[1][0])}–${fmt(P2.recall_ratio[1][1])})</div></div>
     <div class="box" data-w="one in" data-l="r6" style="left:30px;top:592px;width:1470px;height:112px;padding:14px 22px;display:flex;align-items:center;gap:34px">
       <div style="flex:none"><div class="lab" style="font-size:19px;white-space:nowrap">comparison · classical engine</div><div class="h2" style="font-size:52px;margin-top:6px;white-space:nowrap">about 1 in ${cb.one_in}</div></div>
       <div class="mono" style="font-size:22px;line-height:1.35;color:var(--line-2)">every classical method, ours included: recall ${fmt(cb.range[0])}–${fmt(cb.range[1])}; its boxes at random ${fmt(cb.chance)}</div></div>
@@ -709,8 +714,13 @@ function buildReal() {
     const tEng = T(bt.eng), tRead = T(bt.read), tRep = T(bt.rep, R.n_looks ? 0.3 : 0), tEnd = T(bt.end);
     const nP = R.paths_hit.length, kP = R.paths_hit.filter(Boolean).length;
     const classes = R.found.length ? [...new Set(R.found.map((f) => f.cls.replace('_', ' ')))].join(', ') : 'nothing';
-    const cards = [['ENGINE', R.kind === 'onnx' ? `trained ${D.model?.name || ''}` : 'classical', R.engine, tEng], ['LOOKS', `${R.n_looks}`, R.n_looks ? `after an L${R.ov_level} overview; coverage ${pc(R.coverage)}` : `the L${R.ov_level} overview found ${R.candidates} candidate regions`, tRead],
-      ['PIXELS READ', '', `of ${R.w} × ${R.h} px`, tRead + 0.35], ['REPORTED', classes, `${R.n_found} finding${R.n_found === 1 ? '' : 's'}`, tRep],
+    // a look the quality gate refused (the zero-candidate fallback's whole-photo look on IMG_2332): its mask is thrown away
+    const fb = R.looks.find((L) => L.cause === 'fallback-l2'), bad = R.looks.find((L) => L.refused);
+    const stopStamp = R.n_looks ? (bad && R.looks.every((L) => L.refused) ? `LOOK REFUSED · ${bad.refused.toUpperCase()}` : '') : `STOPPED · ${R.candidates} CANDIDATES`;
+    const cards = [['ENGINE', R.kind === 'onnx' ? `trained ${D.model?.name || ''}` : 'classical', R.engine, tEng],
+      ['LOOKS', `${R.n_looks}`, fb ? `fallback: one L${fb.level} look, the whole photo` : R.n_looks ? `after an L${R.ov_level} overview; coverage ${pc(R.coverage)}` : `the L${R.ov_level} overview found ${R.candidates} candidate regions`, tRead],
+      ['PIXELS READ', '', `of ${R.w} × ${R.h} px`, tRead + 0.35],
+      ['REPORTED', classes, bad ? `refused as ${bad.refused}, ${fmt(bad.sharpness, 1)} < ${fmt(D.sharp_min, 0)}: ${bad.mask_px.toLocaleString('en-US')} crack px dropped` : `${R.n_found} finding${R.n_found === 1 ? '' : 's'}`, tRep],
       ...(R.seen ? [['BY EYE (not ground truth)', R.seen.say.replace(/^the /, ''), nP > 1 ? `${kP} of ${nP} traced lines found` : kP ? 'found' : 'missed', tEnd]] : [])]
       .map(([lab, big, sub, t0], i) => { const c = el('div', 'box', H, `<div class="lab" style="font-size:19px">${lab}</div><div class="h2 amber" style="font-size:${Math.min(44, Math.floor(360 / (0.5 * Math.max(1, big.length))))}px;line-height:44px;height:44px;margin:8px 0 6px;white-space:nowrap"></div><div class="mono" style="font-size:20px;line-height:1.3;color:var(--line-2)">${sub}</div>`);
         css(c, { left: CX + 'px', top: i * 168 + 'px', width: CW + 'px', height: '152px', padding: '14px 18px', overflow: 'hidden', borderColor: i === 4 ? (kP ? 'var(--amber)' : 'var(--red)') : 'var(--line)' });
@@ -726,7 +736,7 @@ function buildReal() {
       cands.forEach((c) => c.setAttribute('opacity', seg(t, tRead - 0.1, tRead + 0.2)));
       // the window: off the photo's right edge, onto the whole photo, then to each look; it leaves after the last
       let rect = [PW + 40, PH * 0.3, 260, 260].map((v, i) => lerp(v, ovRect[i], eio(ov))), lab = `OVERVIEW · L${R.ov_level} · 1:${2 ** R.ov_level}`;
-      R.looks.forEach((L, i) => { const p = eio(seg(t, lookAt[i] - 0.35, lookAt[i])); if (p > 0) { rect = rect.map((v, j) => lerp(v, X(L.window)[j], p)); if (p > 0.5) lab = `LOOK ${L.n} · L${L.level} · 1:${2 ** L.level}`; } });
+      R.looks.forEach((L, i) => { const p = eio(seg(t, lookAt[i] - 0.35, lookAt[i])); if (p > 0) { rect = rect.map((v, j) => lerp(v, X(L.window)[j], p)); if (p > 0.5) lab = `LOOK ${L.n} · L${L.level} · 1:${2 ** L.level}${L.refused && t >= tRep ? ` · REFUSED: ${L.refused.toUpperCase()}` : ''}`; } });
       const tp = R.looks.length ? lookAt[R.looks.length - 1] : u0 + 0.5, pulse = 1 - 0.03 * bump(seg(t, tp, tp + 0.3));
       rect = [rect[0] + rect[2] * (1 - pulse) / 2, rect[1] + rect[3] * (1 - pulse) / 2, rect[2] * pulse, rect[3] * pulse];
       win.set(rect, lab, Math.min(seg(t, u0 - 0.1, u0 + 0.1), 1 - seg(t, tRep + 0.2, tRep + 0.6)));
@@ -737,7 +747,7 @@ function buildReal() {
       veil.style.opacity = R.seen ? eo(seg(t, Math.min(tEnd - 0.4, tRep + 0.3), Math.min(tEnd - 0.4, tRep + 0.3) + 0.4)).toFixed(3) : 0;
       paths.forEach(([h, l]) => { h.setAttribute('stroke-dashoffset', 1 - pp); l.setAttribute('stroke-dashoffset', 1 - pp); });
       const sp = seg(t, tRep, tRep + 0.3), vp = seg(t, tEnd + 0.4, tEnd + 0.7);
-      const stop = R.n_looks ? '' : `STOPPED · ${R.candidates} CANDIDATES`, verdict = R.seen ? (nP > 1 ? `${kP} OF ${nP}` : kP ? 'FOUND' : 'MISSED') : '';
+      const stop = stopStamp, verdict = R.seen ? (nP > 1 ? `${kP} OF ${nP}` : kP ? 'FOUND' : 'MISSED') : '';
       const showV = vp > 0 && verdict;
       stamp.textContent = showV ? `${verdict} · BY EYE` : stop; stamp.className = 'stamp' + (showV && !kP ? ' red' : '');
       const q = showV ? vp : stop ? sp * (1 - seg(t, tEnd + 0.15, tEnd + 0.4)) : 0;
@@ -750,7 +760,7 @@ function buildReal() {
     });
     cue(u0 + 0.05, 'whoosh'); cue(u0 + 0.4, 'scribble', tRead - u0 - 0.5); cards.forEach((c, i) => cue(c.t0, 'tick', i + 2)); if (cards[2]) cue(cards[2].t0, 'count', 0.9);
     R.looks.forEach((L, i) => cue(lookAt[i] - 0.35, 'whoosh')); fins.forEach(({ f }) => cue((lookAt[R.looks.findIndex((L) => L.n === f.step)] ?? tRep) + 0.25, 'pop', 3));
-    if (!R.n_looks) cue(tRep, 'thud'); if (R.seen) cue(tEnd + 0.4, kP ? 'stamp' : 'alert');
+    if (stopStamp) cue(tRep, 'thud'); if (R.seen) cue(tEnd + 0.4, kP ? 'stamp' : 'alert');
   });
   // the camera holds each sheet (photo and cards), pushing in 8 %, and glides from the first to the second between the lines
   S.draws.unshift(camBoard(B, K));
@@ -858,8 +868,8 @@ function buildShort() {
   const card = el('div', 'box amb', stage, `<div class="lab amber" style="font-size:21px">trained ${M.name}, held out · the site runs it with v1-policy2</div>
     <div style="display:flex;align-items:flex-end;gap:26px;margin-top:6px"><div class="h1 amber" style="font-size:120px;line-height:.85;white-space:nowrap;flex:none">${pc(M.recall)}</div>
     <div class="mono" style="font-size:25px;line-height:1.35">recall on ${M.n} real CODEBRIM photos: ${fmt(M.ratio[0], 1)}× the classical engine</div></div>
-    <div class="mono" style="font-size:23px;margin-top:10px;color:var(--line-2)">chance ${pc(M.chance)} · ${fmt(M.crit[0])} critical boxes per photo for a person</div>
-    <div class="mono amber" style="font-size:23px;margin-top:4px">with v1-policy2: ${fmt(P2.crit)} (${fmt(P2.crit_ratio[0])}×), recall ${fmt(P2.recall_ratio[0])}×</div>`);
+    <div class="mono" style="font-size:23px;margin-top:10px;color:var(--line-2)">chance ${pc(M.chance)} · a person signs ${fmt(P2.sign[0])} critical findings per photo</div>
+    <div class="mono amber" style="font-size:23px;margin-top:4px">with v1-policy2: ${fmt(P2.sign[1])} to sign, recall ${fmt(P2.recall_ratio[0])}×</div>`);
   css(card, { left: '60px', top: '1572px', width: '960px', height: '250px', padding: '18px 26px' });
   const big = card.querySelector('.h1'), TV = l2.t + l2.dur * l2.text.indexOf('trained') / l2.text.length;
   const caps = [[l0.t, l0.t + l0.dur, LINE.o1.cap], [l1.t, l1.t + l1.dur, l1.text], [l2.t, l2.t + l2.dur, l2.text]];   // the captions of the three lines the short speaks

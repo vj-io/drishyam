@@ -116,7 +116,9 @@ def in_text(rel, *phrases):
     return phrases[0] if len(phrases) == 1 else list(phrases)
 
 
-REALS = [VIDEO / "live", *sorted((VIDEO / "live/variants").glob("*"))]   # the team's wall photos: video/live/real.*, then each variant
+# the team's wall photos, each run live on the site (record.py --walls); the older local runs in video/live/real.* and
+# video/live/variants/ are kept because docs/report.md cites them
+REALS = [VIDEO / "live/walls" / x for x in ("IMG_2332", "IMG_2330")]
 
 
 def data(model=MODEL, reals=REALS):
@@ -257,8 +259,11 @@ def data(model=MODEL, reals=REALS):
     by_find = [b["cls"] for b in gt["boxes"] if hit(b, fin.values())]
     by_eye = [b["cls"] for b in gt["boxes"] if not hit(b, fin.values()) and hit(b, eye)]
     assert by_eye == [m[1]] and len(by_find) + len(by_eye) == len(gt["boxes"]), (by_find, by_eye)
-    o = load("video/live/order_status.json")   # the work order after the sign-off (record.py)
-    assert o["status"] == "incomplete" and [a["finding_id"] for a in o["approvals"]] == [x["id"] for x in crit], o
+    o = load("video/live/order_status.json")   # the work order after the sign-off and the check by eye (record.py)
+    signed = [a["finding_id"] for a in o["approvals"] if "finding_id" in a]
+    # the person's check of the rebar: Defect found, which the photo shows there (by_eye above: its ground truth box)
+    rs = [(r["cls"], r["decision"]) for r in o["resolutions"]]
+    assert o["status"] == "ready" and signed == [x["id"] for x in crit] and rs == [(m[1], "defect-found")] == [(c, "defect-found") for c in by_eye], o
     lv = job["levels"]
     assert all(lv[k + 1] == [half(x) for x in lv[k]] for k in range(len(lv) - 1)), f"each pyramid level halves the last, rounding up: {lv}"
     assert lv[0][0] % lv[3][0] == 0 and steps[0]["cause"] == "survey" and steps[0]["rationale"].startswith("one L3 look"), steps[0]
@@ -278,7 +283,8 @@ def data(model=MODEL, reals=REALS):
                    "stop": src("why it stopped", [halt["cause"], halt["rationale"], done["unvisited"]], f, "step[action=halt].cause, rationale; done.unvisited"),
                    "halt_step": src("the step that stopped it", halt["step"], f, "step[action=halt].step"),
                    "gt": src("ground truth (synthetic): boxes touched by a finding of their class / by the needs-a-look entry", [by_find, by_eye], "public/samples/index.json", "bridge_03 boxes against the findings and not_assessed"),
-                   "order": src("the work order after the sign-off: status, approvals", [o["status"], len(o["approvals"])], "video/live/order_status.json", "status, approvals"),
+                   "order": src("the work order after the sign-off and the check by eye: status, findings approved", [o["status"], len(signed)], "video/live/order_status.json", "status, approvals[finding_id]"),
+                   "checked": src("the rebar checked by eye: decision, note, reviewer", [o["resolutions"][0][k] for k in ("decision", "note", "reviewer")], "video/live/order_status.json", "resolutions[0]"),
                    "job": done.get("job") or ev[0]["job"]}
     f = "video/live/break.ndjson"; ev = ndjson(f)
     pl = next(e for e in ev if e["type"] == "planner" and e["status"] == "rejected")
@@ -402,12 +408,17 @@ def data(model=MODEL, reals=REALS):
         D["model"]["policy2"] = {
             "crit": src("v1-policy2 (live look policy): critical boxes per photo, CODEBRIM held out", c2["v1-policy2@0.3"]["critical_per_image"], hf, "['v1-policy2'].read.codebrim.matrix['v1-policy2@0.3'].critical_per_image"),
             "crit_ratio": src("v1-policy2 / v1: critical boxes per photo, paired 95 % CI", q["critical"], hf, f"pairs['codebrim@0.3: v1-policy2 / {name}'].critical"),
-            "recall_ratio": src("v1-policy2 / v1: recall, paired 95 % CI", q["recall"], hf, f"pairs['codebrim@0.3: v1-policy2 / {name}'].recall")}
+            "recall_ratio": src("v1-policy2 / v1: recall, paired 95 % CI", q["recall"], hf, f"pairs['codebrim@0.3: v1-policy2 / {name}'].recall"),
+            # what a person signs: critical findings, not boxes (README's glance line, tests/test_report_doc.py gate_quote())
+            "sign": src("critical findings a person signs per photo, CODEBRIM held out: v1's first policy, v1-policy2", [c2[f"{name}@0.3"]["signoffs_per_image"], c2["v1-policy2@0.3"]["signoffs_per_image"]],
+                        hf, f"['v1-policy2'].read.codebrim.matrix['{name}@0.3', 'v1-policy2@0.3'].signoffs_per_image")}
     else:
         src("trained segmenter", "results pending", f, "absent at build time")
 
     D["team"] = team_private()   # None: name cards
     D["real"] = [r for r in map(real_run, reals) if r]   # []: no real-photo chapter
+    f = "drishyam/imaging.py"   # the quality gate's blur threshold, beside a look it refused (the real-photo chapter)
+    D["sharp_min"] = src("the quality gate's blur threshold (Laplacian variance)", float(re.search(r"^SHARPNESS_MIN = ([\d.]+)", (ROOT / f).read_text(), re.M)[1]), f, "SHARPNESS_MIN")
 
     # words and figures typed into the scene text, each checked against the file it comes from
     D["lit"] = {
@@ -421,7 +432,9 @@ def data(model=MODEL, reals=REALS):
         "graviton": src("Lambda CPU", in_text("docs/aws.md", "arm64 (Graviton)"), "docs/aws.md", "line 4"),
         "behind": src("health card: what the Lambda sits behind", in_text("README.md", "behind CloudFront"), "README.md", "Live demo line"),
         "stack": src("reproduce sheet: what the CDK stack is", in_text("infra/drishyam_stack.py", "Lambda arm64 behind CloudFront and WAF"), "infra/drishyam_stack.py", "stack description"),
-        "policy": src("the live engine's look policy, and since when", in_text("public/index.html", "with the v1-policy2 look policy since 2026-10-22"), "public/index.html", "#rebar-note"),
+        "policy": src("the live engine's look policy, and since when", in_text("public/index.html", "With v1-policy2, live since 2026-10-22"), "public/index.html", "How it works, the confirm look"),
+        "lede": src("what it does, for whom (p3)", in_text("public/index.html", "it chooses where to look, zooms in where its segmenter is unsure, drafts cracks, spalling and other defects for review, and hands every critical finding to a person"),
+                    "public/index.html", "the hero's .lede"),
         "title": src("cold-open title", in_text("public/index.html", "ONE PHOTO, A FEW LOOKS, ONE HUMAN"), "public/index.html", "the site's figure note"),
         "limits": src("limits, in the site's words", in_text("public/index.html", "Pixels, not millimetres", "AI-assisted, not an inspection", "Only a person can approve",
                                                              "Its licence does not allow sharing the photos"), "public/index.html", "footer note, Human sign-off, the CODEBRIM citation"),
@@ -489,7 +502,11 @@ def real_run(base):
     assert list(Image.open(photo).size) == [job["width"], job["height"]], f"{f} is not a job on {photo.name}"
     lv = next(k for k, (w, h) in enumerate(job["levels"]) if w * h == ov["pixels_used"])   # the overview reads one pyramid level whole
     steps = [e for e in ev if e["type"] == "step"]
-    looks = [{"n": k + 1, "action": e["decision"]["action"], "level": e["decision"]["args"]["level"], "window": e["window"]} for k, e in enumerate(x for x in steps if x["decision"]["action"] != "halt")]
+    clip = lambda b: [max(0, b[0]), max(0, b[1]), min(b[0] + b[2], job["width"]) - max(0, b[0]), min(b[1] + b[3], job["height"]) - max(0, b[1])]   # the part of the window on the photo
+    # each look, and the quality gate's verdict on it: a refused look (blur, glare, dark) drafts nothing, and its findings are dropped
+    looks = [{"n": k + 1, "action": e["decision"]["action"], "level": e["decision"]["args"]["level"], "window": clip(e["window"]), "cause": e["cause"],
+              "refused": None if e["quality"]["ok"] else e["quality"]["reason"], "mask_px": e["observation"]["mask_area_px"], "sharpness": e["observation"]["sharpness"]}
+             for k, e in enumerate(x for x in steps if x["decision"]["action"] != "halt")]
     halt = next(e for e in steps if e["decision"]["action"] == "halt")
     fin = {}
     for e in ev:
@@ -497,9 +514,10 @@ def real_run(base):
             fin[e["finding"]["id"]] = e["finding"]   # its last state
     S = done["summary"]
     assert len(looks) == S["steps"] and len(fin) == S["findings"], (len(looks), len(fin), S)
-    arm = (job.get("cost_model") or {}).get("micro_arm", "")
+    arm = (job.get("cost_model") or {}).get("micro_arm", "")   # a fixed-cost run's table; a live run has none
     kind = "onnx" if meta["engine"].startswith("onnx") else "classical"
-    assert ("dacl10k" in arm) == (kind == "onnx"), f"real.json says {meta['engine']}, but the trace was charged {arm or 'live'} costs"
+    assert all(e["profile"] == meta["engine"] for e in steps), f"real.json says {meta['engine']}, but the trace ran {steps[0]['profile']}"
+    assert not arm or ("dacl10k" in arm) == (kind == "onnx"), f"real.json says {meta['engine']}, but the trace was charged {arm} costs"
     found = [{"id": x["id"], "cls": x["cls"], "box": x["box"], "conf": x["confidence"], "state": x["state"], "critical": x["critical"]} for x in fin.values()]
     seen = meta.get("seen")
     hit, wrong, paths_hit = [], [x["id"] for x in found], []
@@ -521,8 +539,13 @@ def real_run(base):
          "cause": src(f"real photo {meta['image']}: why it stopped", f"{halt['cause']}: {halt['rationale']}", f, "step[action=halt].cause, rationale"),
          "coverage": src(f"real photo {meta['image']}: coverage (share of the overview's saliency that a look saw)", done["coverage"], f, "done.coverage"),
          "unvisited": done.get("unvisited", []), "seen": seen, "hit": hit, "wrong": wrong, "paths_hit": paths_hit,
+         "na": src(f"real photo {meta['image']}: the work order's not-assessed entries (action: reason)", [f"{a['action']}: {a['reason']}" for a in done["work_order"]["not_assessed"]], f, "done.work_order.not_assessed"),
          # each traced line, top to bottom of the photo, by its mean height: 'upper', 'lower' when there are two
          "path_y": [sum(y for _, y in q) / len(q) for q in (seen or {}).get("paths", [])]}
+    for L in looks:
+        if L["refused"]:
+            src(f"real photo {meta['image']}: look {L['n']} ({L['cause']}, L{L['level']}): refused by the quality gate, its sharpness, its mask's px",
+                [L["refused"], L["sharpness"], L["mask_px"]], f, f"step[{L['n']}].quality.reason, observation.sharpness, observation.mask_area_px")
     if seen:
         src(f"real photo {meta['image']}: what the team sees, by eye (not ground truth)", f"{seen['say']} ({', '.join(seen['classes'])})", "real.json", "seen")
         src(f"real photo {meta['image']}: findings on it / not on it (by eye)", [hit, wrong], f, "finding boxes touching seen.path")
@@ -582,8 +605,8 @@ def events():
             out.setdefault(f"step:{e['n']}" if run == "guided" else f"step-{run}:{e['n']}", e["t"])
         elif e["kind"] == "done":
             out.setdefault(f"done:{e['run']}", e["t"])
-        elif e["kind"] == "approved":
-            out.setdefault(f"approved:{e['n']}", e["t"])
+        elif e["kind"] in ("approved", "checked"):
+            out.setdefault(f"{e['kind']}:{e['n']}", e["t"])
     return out, E
 
 
@@ -626,9 +649,12 @@ def footage_warp(placed, scenes, ev):
         [at["l7"] + du["l7"] + 0.1, ev["done:guided"] + 0.3],   # l9 waits (its pause) for the cut to the sign-off
         ["cut", ev["done:guided"] + 2.6, ev["click:Sign them off"] - 1.4],
         [at["l9"] - 0.2, ev["click:Sign them off"]],
-        [at["l9"] + 0.5 * du["l9"], ev[f"approved:{last}"] + 0.2],   # the approval lands as l9 turns to the order it leaves incomplete
-        [at["l11"] - 0.3, ev[f"approved:{last}"] + 2.0],
-        [sc["t1"], ev[f"approved:{last}"] + 3.9],   # the page is still until it scrolls on to "Now break it"
+        [at["l9"] + du["l9"] - 0.2, ev[f"approved:{last}"] + 0.2],   # the approval lands as l9 ends; the order then reads "needs a look"
+        ["cut", ev[f"approved:{last}"] + 1.8, ev["click:Check reviewer"] - 0.9],   # the page's wait and its scroll to the entry
+        [at["l10"] + 0.4, ev["click:Check reviewer"] - 0.3],
+        [at["l10"] + 0.8 * du["l10"], ev["checked:0"] + 0.2],   # the rebar checked by eye: Defect found, and the order reads ready
+        [at["l11"] - 0.3, ev["checked:0"] + 2.0],
+        [sc["t1"], ev["checked:0"] + 3.6],   # the page is still until it scrolls on to "Now break it"
     ]}
     sc = scenes["break"]
     cb = ev["click:Now break it"]
@@ -732,11 +758,11 @@ REQS = [   # competition requirement -> where the film covers it (scene ids or n
     ("Narrated (offline Kokoro voice af_heart) with burned-in captions; the same cues in public/video/drishyam.vtt", ["open", "end"]),
     ("The team: Vaibhav Jangid, Bhavya Dhoot. Each real photo, then the window's looks turn it into OpenCV line art (Canny, findContours, approxPolyDP); name cards without the private inputs", ["team"]),
     ("Problem and user, with sources on screen", ["problem"]),
-    ("Disclosed before the demo plays: the footage was recorded 2026-10-22 on the live site, the trained v1 with its v1-policy2 look policy, the build the site runs now", ["l0"]),
+    ("Disclosed before the demo plays: the footage was recorded 2026-10-23 on the live site, the trained v1 with its v1-policy2 look policy, the build the site runs now", ["l0"]),
     ("/api/health on the live site: opencv 5.0.0, aarch64, aws-lambda", ["l1"]),
     ("The application working: the guided run on bridge_03 ('Watch it inspect a bridge'), recorded live, with what it sent to a person to check by eye (the rebar under the confidence floor, not confirmed)", ["l2", "l3", "l4", "l5", "l6", "l7"]),
     ("Plain-words trace (the NOTE and 'What it decided and why' panels)", ["l3", "l4", "l5", "l6", "l7"]),
-    ("Human sign-off: reviewer name, Approve, APPROVED stamp, work order signed and still incomplete (the rebar to check by eye)", ["l9"]),
+    ("Human sign-off: reviewer name, Approve, APPROVED stamp; then the rebar checked by eye on the page (Defect found, with a note), and the work order ready", ["l9", "l10"]),
     ("Human control: a tampered work-order token refused (403)", ["l11"]),
     ("Failure handling: 'Now break it' (slowed segmenter -> governor; malformed planner reply -> allow-list)", ["b0", "b1", "b2"]),
     ("Human control: 'Try KILL' (KILL halts with kill-switch, Resume replays, then the stop rule ends it with a region unvisited)", ["b3"]),
@@ -746,9 +772,9 @@ REQS = [   # competition requirement -> where the film covers it (scene ids or n
     ("The live site now runs the trained segmenter v1 on OpenCV 5 DNN ENGINE_NEW, and its Lambda step p95 then and now (video/live/aws-smoke.log)", ["a4", "a5"]),
     ("Principal results: recall vs pixels, with one downscale, the tiling family and chance", ["r1", "r3"]),
     ("Ablations (public/results/ablations.json)", ["r5"]),
-    ("Real photos (CODEBRIM), the headline board: trained v1, held out (results/heldout_models.json), against the classical engine (about 1 in 5, the comparison row), its chance recall and critical boxes, and what the live look policy v1-policy2 changes (fewer critical boxes, recall unchanged); no CODEBRIM image shown", ["r6", "r8"]),
+    ("Real photos (CODEBRIM), the headline board: trained v1, held out (results/heldout_models.json), against the classical engine (about 1 in 5, the comparison row), its chance recall, its critical boxes (the scorer's unit) and the critical findings a person signs, and what the live look policy v1-policy2 changes (about half the sign-offs, recall unchanged); no CODEBRIM image shown", ["r6", "r8"]),
     ("False alarms on synthetic photos with no damage (public/results/clean/summary.json), the classical engine and v1", ["r7"]),
-    ("Two real photos of our own (painted walls, no ground truth): the looks, the findings, what it missed (video/live/real.*, video/live/variants/IMG_2330/real.*)", ["real"]),
+    ("Two real photos of our own (painted walls, no ground truth), each run live on the site: the looks (on IMG_2332 the zero-candidate fallback look, refused as blur), the findings, what it missed (video/live/walls/*/real.*)", ["real"]),
     ("Failure cases: failures.json plates and their rules; one CODEBRIM case in words only", ["failures"]),
     ("Limits and responsible use", ["limits"]),
     ("Reproduce: make test, make eval, scripts/aws.sh", ["repro"]),
