@@ -1,3 +1,4 @@
+import itertools
 import struct
 import zlib
 
@@ -143,3 +144,155 @@ def test_l0_box_is_never_degenerate_under_yaw_and_pitch():
             bx, by, bw, bh = imaging.l0_box(rect, to_l0, (2048, 1536))
             assert bw >= 0 and bh >= 0 and 0 <= bx <= 2048 and 0 <= by <= 1536
             assert bx + bw <= 2048 and by + bh <= 1536
+
+
+# ---- the blur gate (JobConfig.blur_gate): the Laplacian variance, or it and the re-blur ratio (imaging.reblur) ----
+def dead_leaves(n: int, seed: int = 0) -> np.ndarray:
+    """Grey discs of power-law sizes drawn over each other: the dead-leaves model, whose statistics do not change with
+    scale (Lee, Mumford and Huang 2001), so its pyramid levels are the same scene at half and quarter scale."""
+    rng = np.random.default_rng(seed)
+    img = np.full((n, n, 3), 128, np.uint8)
+    for _ in range(6000):
+        g = int(rng.integers(40, 220))
+        cv2.circle(img, (int(rng.integers(0, n)), int(rng.integers(0, n))),
+                   int(n * 0.2 / (1 + rng.pareto(1.5) * 30)) + 1, (g, g, g), -1, cv2.LINE_AA)
+    return img
+
+
+def central_views(img, levels=(0, 1, 2)) -> list[np.ndarray]:
+    """The 512-px view at the photo's centre at each level, as the agent's gaze renders it."""
+    pyr = imaging.build_pyramid(img)
+    return [imaging.gaze(pyr, img.shape[1] / 2, img.shape[0] / 2, k)[0] for k in levels]
+
+
+def gray(view):
+    return cv2.cvtColor(view, cv2.COLOR_BGR2GRAY)
+
+
+def cracked_concrete():
+    from .conftest import add_crack
+
+    return add_crack(concrete(2048, 2048, 3), (200, 900))
+
+
+def faint(view, k=0.25):
+    """The view at k of its contrast, about its mean."""
+    return np.clip(view.mean() + (view.astype(np.float32) - view.mean()) * k, 0, 255).astype(np.uint8)
+
+
+@pytest.mark.parametrize("make, faint_reason", [(cracked_concrete, None), (lambda: dead_leaves(2048), "blur")])
+def test_the_reblur_ratio_does_not_move_with_contrast(make, faint_reason):
+    """A quarter of the contrast (about the mean): the Laplacian variance falls 16-fold, so the Laplacian gate refuses
+    the faint copy of a view it passes; the re-blur ratio is a ratio of gradient sums and stays within 8-bit rounding.
+    So the both-gates gate passes the faint concrete, whose ratio says sharp, and still refuses the faint dead-leaves
+    copy: its discs, flat between anti-aliased edges, read 0.41, above REBLUR_MAX."""
+    view = central_views(make(), (1,))[0]
+    low = faint(view)
+    assert abs(imaging.reblur(gray(low)) - imaging.reblur(gray(view))) < 0.02
+    assert imaging.quality(view)["ok"] and imaging.quality(low)["reason"] == "blur"
+    assert imaging.quality(view, "both")["ok"] and imaging.quality(low, "both")["reason"] == faint_reason
+
+
+def test_the_reblur_ratio_does_not_move_with_the_pyramid_level():
+    """The same scale-free scene at L0, L1 and L2 (one and two pyrDown steps): the Laplacian variance spreads over more
+    than 2x, the re-blur ratio over less than 0.05, a sixth of what a sigma-2 blur adds to it."""
+    views = central_views(dead_leaves(2048))
+    lap = [imaging.quality(v)["sharpness"] for v in views]
+    rb = [imaging.reblur(gray(v)) for v in views]
+    assert max(lap) > 2 * min(lap) and max(rb) - min(rb) < 0.05
+    assert min(imaging.reblur(gray(cv2.GaussianBlur(v, (0, 0), 2.0))) - r for v, r in zip(views, rb)) > 0.3
+
+
+@pytest.mark.parametrize("make", [cracked_concrete, lambda: dead_leaves(2048)])
+def test_the_reblur_ratio_rises_with_blur_and_the_gate_refuses_a_sigma_2_view(make):
+    """Monotone in the Gaussian sigma (view px), and a sigma-2 copy, the rule's 'too blurred to trust'
+    (results/dev/blur_gate.json), is refused by the both-gates gate: both its Laplacian variance and its ratio say
+    blur."""
+    view = central_views(make(), (1,))[0]
+    rb = [imaging.reblur(gray(cv2.GaussianBlur(view, (0, 0), s) if s else view)) for s in (0, 0.5, 1, 1.5, 2, 3, 4)]
+    assert all(a < b for a, b in itertools.pairwise(rb)), rb
+    assert imaging.quality(cv2.GaussianBlur(view, (0, 0), 2.0), "both")["reason"] == "blur"
+
+
+def test_the_both_gates_gate_only_takes_back_blur_refusals_the_laplacian_gate_makes():
+    """Sharp, faint, sigma-2 blurred and half blown-out views of three scenes at L0-L2: the both-gates gate refuses a
+    view only for the reason the Laplacian gate refuses it, and differs from it only by passing a view the Laplacian
+    gate calls blur whose re-blur ratio is at most REBLUR_MAX (here the faint concrete ones)."""
+    taken_back = 0
+    for img in (cracked_concrete(), dead_leaves(2048), concrete(2048, 2048, 4)):
+        for view in central_views(img):
+            glare = view.copy()
+            glare[:256] = 255
+            for v in (view, faint(view), cv2.GaussianBlur(view, (0, 0), 2.0), glare):
+                old, new = imaging.quality(v), imaging.quality(v, "both")
+                assert new["reason"] == old["reason"] or (
+                    old["reason"] == "blur" and new["ok"] and new["reblur"] <= imaging.REBLUR_MAX)
+                taken_back += old["reason"] == "blur" and new["ok"]
+    assert taken_back >= 4
+
+
+def test_known_limit_a_faint_surface_blurred_past_its_grain_reads_sharp():
+    """Known limit (results/dev/blur_gate.json): concrete grain at a fifth of its contrast, blurred by sigma 8 L0 px
+    and seen at L1 (4 view px of blur). The grain is gone; what is left is 8-bit steps, which a measure that ignores
+    contrast reads as sharp, so the both-gates gate takes back the Laplacian gate's refusal and passes the view."""
+    view = central_views(cv2.GaussianBlur(faint(concrete(2048, 2048, 4), 0.2), (0, 0), 8.0), (1,))[0]
+    assert imaging.quality(view)["reason"] == "blur" and imaging.quality(view, "both")["ok"]
+
+
+def test_a_view_with_no_gradient_is_blur_under_both_gates_without_a_warning():
+    """Nothing to judge focus by: the ratio's denominator is 0, so the measure is 1, and the Laplacian variance is 0:
+    refused by both gates; no division warning, also on a view too small to keep any pixel inside the ratio's border."""
+    import warnings
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        for flat in (np.full((512, 512, 3), 128, np.uint8), np.full((3, 3, 3), 128, np.uint8)):
+            assert imaging.reblur(gray(flat)) == 1.0
+            q = imaging.quality(flat, "both")
+            assert (q["reason"], q["reblur"]) == ("blur", 1.0) and imaging.quality(flat)["reason"] == "blur"
+
+
+def test_the_blur_gate_must_be_one_it_knows():
+    """"reblur" (the re-blur ratio alone: the first rule, replaced before any dev read) is no longer a gate."""
+    for name in ("sharpness", "reblur"):
+        with pytest.raises(ValueError, match="blur gate"):
+            imaging.quality(np.zeros((64, 64, 3), np.uint8), name)
+
+
+def without_blur_gate(monkeypatch):
+    """drishyam.imaging without its lines marked `# blur-gate`: the quality gate as it was before the knob."""
+    import re
+    import sys
+    import types
+    from pathlib import Path
+
+    src = Path(imaging.__file__).read_text()
+    kept = "".join(ln for ln in src.splitlines(keepends=True) if not re.search(r"#\s*blur-gate\b", ln))
+    assert kept != src
+    mod = types.ModuleType("drishyam._imaging_without_blur_gate")
+    mod.__package__ = "drishyam"
+    monkeypatch.setitem(sys.modules, mod.__name__, mod)
+    exec(compile(kept, "drishyam/imaging.py without the blur gate", "exec"), mod.__dict__)  # noqa: S102 -- our own source
+    assert "gate" in imaging.quality.__code__.co_varnames and "gate" not in mod.quality.__code__.co_varnames
+    return mod
+
+
+def test_with_the_laplacian_gate_quality_is_what_it_was_on_every_bundled_sample(monkeypatch):
+    """Every bundled sample, views at L0-L3 at its centre and its four quarter points: quality() with no gate and with
+    "laplacian" returns exactly what the quality gate returned before the knob."""
+    from pathlib import Path
+
+    old = without_blur_gate(monkeypatch)
+    samples = sorted((Path(__file__).resolve().parent.parent / "public" / "samples").glob("*.jpg"))
+    assert len(samples) == 10
+    n = 0
+    for p in samples:
+        img = cv2.imread(str(p))
+        pyr, (h, w) = imaging.build_pyramid(img), img.shape[:2]
+        for level in range(4):
+            for fx, fy in ((0.5, 0.5), (0.25, 0.25), (0.75, 0.25), (0.25, 0.75), (0.75, 0.75)):
+                crop = imaging.gaze(pyr, fx * w, fy * h, level)[0]
+                want = old.quality(crop)
+                assert imaging.quality(crop) == want and imaging.quality(crop, "laplacian") == want
+                n += 1
+    assert n == 200

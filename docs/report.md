@@ -744,6 +744,14 @@ On the dev splits only, each read by a rule written down before its run:
   (`results/local-macos-x86/int8.json`, [bench.md](bench.md));
 - prefetching the next look: off. On GitHub's runners it shortened one-thread jobs but slowed steps on x86 at 2
   and 4 threads, and it never ran on the function ([bench.md](bench.md)).
+- a scale-free blur gate (`JobConfig.blur_gate "both"`): a view is blur only if its Laplacian variance is under 12
+  and its re-blur ratio (Crété-Roffet et al., 2007) is above 0.37, set on a pool of photos outside the dev and
+  held-out sets. It is Harm under its rule, committed before its one dev run: on the 190 dev photos it took back 43
+  of the 49 refusals of views as they were, all on CODEBRIM (share refused −0.0505, CI −0.0836 to −0.0235), but
+  passed 8 of the 846 σ-2 blurred copies the Laplacian gate refuses (−0.0094, CI −0.0176 to −0.0023). Recall on
+  CODEBRIM dev100 was ×1.04 (1.01–1.09), and nothing changed on synth_dev or the clean split. Before any dev read
+  it replaced a rule for the re-blur gate alone, which on the pool refused more sharp views than the Laplacian
+  gate (71 against 47) ([results/dev/blur_gate.json](../results/dev/blur_gate.json)).
 
 ## 9. Failures
 
@@ -794,7 +802,10 @@ general. Held out it is part of v1-policy2's one read (section 8); a run of v1 w
 unread. On `real_01` it does not catch the crack: at the current code the fallback look's v1 mask shows crack pixels,
 but the quality gate refuses the view as blur (Laplacian variance under 12: the smooth paint gives it little
 texture), so nothing is drafted, and the work order lists the photo twice, `check-by-eye` and `re-shoot`, a re-shoot
-instruction that is wrong for this sharp photo. The site's **Watch it on a real wall** replays the older recording.
+instruction that is wrong for this sharp photo. A gate that judges focus against the view's own contrast
+(`blur_gate "both"`) would pass this look: its re-blur ratio is 0.20, and v1 then verifies at L1 and drafts 4
+crack boxes, none critical. It is not adopted, because on dev it also passes views blurred too much to trust
+(section 8). The site's **Watch it on a real wall** replays the older recording.
 
 On the other wall photo (`real_02.jpg`, IMG_2330, two cracks by
 eye) the same engine took one look and drafted one crack, a 678 × 70 px box on part of the lower crack; the upper
@@ -917,7 +928,7 @@ the replay exactly.
   that image-driven gaze order beats random order only on the larger photos (section 8).
 - On one of our own wall photos the overview proposed no region and a hairline crack visible by eye was missed
   (section 9): the recorded run took no look, and with the zero-candidate fallback the one whole-photo look is refused
-  by the blur gate. Its work order has no finding, but it lists the whole photo as `not_assessed`
+  by the blur gate (a scale-free gate that passes it was measured on dev and not adopted, section 8). Its work order has no finding, but it lists the whole photo as `not_assessed`
   (action `check-by-eye`) and reads `incomplete`, not `ready`, until a person checks the photo by eye and records it
   (the web review's Checked by eye, or `drishyam review <work order> na0 nothing-found|defect-found`), so it does not
   pass for a clean wall.
