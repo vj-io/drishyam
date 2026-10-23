@@ -272,8 +272,9 @@ and AWS and Arm (the arm Lambda, its latency then and now).
 ## Known on screen
 
 - `docs/architecture.png` is shown as committed. Its segment box says "default: classical, no weights" (the code's
-  default); the deployed site opts in to v1, as `a4` says over it. Its footnote cites `segment.py:239` for `cv2.dnn.ENGINE_NEW`;
-  the call is now at `drishyam/segment.py:298`. The claim itself (the one OpenCV-5-only call) still holds.
+  default); the deployed site opts in to v1, as `a4` says over it. Its footnote (as of 0453fe5, before the film's render)
+  names two OpenCV-5-only uses: the `cv2.dnn.ENGINE_NEW` argument (`OnnxSegmenter._load`), and a NumPy bool mask read
+  as `CV_Bool` by `cv2.copyTo` in `segment.restrict` (`CV_BOOL_MASKS`, on since 2026-10-22).
 - The site's step panel (FIG. 2.3b) has a fixed height, so at step 3 the last line of its WHAT IT SAW box is clipped
   by the box. The camera's view of that panel ends above WHAT IT SAW (`film.js`, the step-3 key), so the clipped line
   is not in the film; the fix belongs in the site.
