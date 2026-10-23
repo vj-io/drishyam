@@ -499,8 +499,10 @@ def test_report_prose_quotes_are_the_json():
 
 
 def test_real_photo_miss_is_the_trace():
-    """The IMG_2332 failure case: the v1 run on real_01 proposed no candidate, took no look and drafted nothing."""
-    recs = [json.loads(line) for line in (REPO / "public/samples/real_01.ndjson").read_text().splitlines()]
+    """The IMG_2332 failure case: the v1 run on real_01 proposed no candidate, took no look and drafted nothing (the local
+    run of 2026-10-21, the site's replay until 2026-10-23); the live run the site now replays takes the fallback look."""
+    old = REPO / "results/real-walls-2026-10-21"
+    recs = [json.loads(line) for line in (old / "real_01.ndjson").read_text().splitlines()]
     ov = next(r for r in recs if r["type"] == "overview")
     done = next(r for r in recs if r["type"] == "done")
     assert ov["candidates"] == [] and done["cause"] == "exhausted" and done["summary"]["steps"] == 0
@@ -511,12 +513,23 @@ def test_real_photo_miss_is_the_trace():
     assert wo["findings"] == [] and na["box"] == [0, 0, job["width"], job["height"]]
     assert f"lists the whole photo as `not_assessed` (action `{na['action']}`) and reads `{wo['status']}`, not `ready`" in flat(REPORT)
     assert f"{ov['pixels_frac']:.4f} of the pixels" in flat(REPORT) and "public/samples/real_01.jpg" in REPORT
-    other = [json.loads(line) for line in (REPO / "public/samples/real_02.ndjson").read_text().splitlines()][-1]
+    other = [json.loads(line) for line in (old / "real_02.ndjson").read_text().splitlines()][-1]
     (f,) = other["work_order"]["findings"]  # IMG_2330: one look, one crack
     seen = load("video/live/variants/IMG_2330/real.json")["seen"]["paths"]
     lower = max(seen, key=lambda path: min(y for _, y in path))
     assert f["cls"] == "crack" and min(y for _, y in lower) <= f["box"][1] + f["box"][3]
     assert f"a {f['box'][2]} × {f['box'][3]} px box on part of the lower crack" in flat(REPORT)
+    # the live runs the site replays (public/samples/real_0N.ndjson), as section 9 quotes them
+    live = [json.loads(line) for line in (REPO / "public/samples/real_01.ndjson").read_text().splitlines()]
+    (look,) = [r for r in live if r["type"] == "step" and r["cause"] == "fallback-l2"]
+    done, job = live[-1], live[0]["job"]
+    assert look["quality"] == {"ok": False, "reason": "blur"} and done["summary"]["findings"] == 0
+    assert (f"(`public/samples/real_01.ndjson`, job `{job}`, measured costs): sharpness {look['observation']['sharpness']}, "
+            f"{look['observation']['mask_area_px']:,} crack px, nothing drafted, {done['summary']['pixels_frac']} of the pixels") in flat(REPORT)
+    last = [json.loads(line) for line in (REPO / "public/samples/real_02.ndjson").read_text().splitlines()][-1]
+    (f2,) = last["work_order"]["findings"]
+    assert f2["cls"] == "crack" and min(y for _, y in lower) <= f2["box"][1] + f2["box"][3]
+    assert f"(job `{last['work_order']['job']}`) did the same, with a {f2['box'][2]} × {f2['box'][3]} px box" in flat(REPORT)
 
 
 def test_site_states_v1_policy2_as_the_json():

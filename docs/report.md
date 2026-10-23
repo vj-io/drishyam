@@ -427,7 +427,7 @@ The FR-21 ablations (random gaze order, no uncertainty term, no survey look, no 
   0.26 of the pixels on average: 189 of 200 jobs hit the cap (each at 0.27 of the pixels, so p50 = p95 = 0.27), and
   the other 11 stop earlier (7 on the stop rule, 4 with every candidate looked at).
 
-The images are procedural (`evals/synth.py`): 2048×1536 weathered concrete with drawn cracks, spalls, efflorescence, exposed rebar and rust run-off, plus graffiti, formwork lines, water stains, blur and glare as distractors. The eight bundled samples in `public/samples/` come from the same generator. The two others there, `real_01` and `real_02`, are our own photos of a painted plaster wall with no ground truth, so no number in this report uses them; the site replays the v1 segmenter's recorded run on each (`real_0N.ndjson`; the same runs as `video/live/real.ndjson` and `video/live/variants/IMG_2330/real.ndjson`).
+The images are procedural (`evals/synth.py`): 2048×1536 weathered concrete with drawn cracks, spalls, efflorescence, exposed rebar and rust run-off, plus graffiti, formwork lines, water stains, blur and glare as distractors. The eight bundled samples in `public/samples/` come from the same generator. The two others there, `real_01` and `real_02`, are our own photos of a painted plaster wall with no ground truth, so no number in this report uses them; the site replays the v1 engine's run on each, recorded live on the site on 2026-10-23 with measured costs (`real_0N.ndjson`: copies of `video/live/walls/IMG_2332/real.ndjson` and `video/live/walls/IMG_2330/real.ndjson`, embedded images removed). Section 9 also cites the local runs of 2026-10-21 that the site replayed before (`results/real-walls-2026-10-21/`).
 
 ![Recall against pixels processed](recall_vs_pixels.png)
 
@@ -784,8 +784,9 @@ the site.
 ![Our photo of a painted plaster wall (IMG_2332), no ground truth](../public/samples/thumbs/real_01.jpg)
 
 `public/samples/real_01.jpg` is our own photo (IMG_2332) of a painted plaster wall, with no ground truth; by eye one
-hairline crack runs corner to corner. Run with the v1 segmenter (weights sha256 `c49416c1...`, the fixed cost table
-`results/local-macos-x86-dacl10k-retime/`, 30 % cap; `public/samples/real_01.ndjson`), the overview proposed no
+hairline crack runs corner to corner. Run locally on 2026-10-21 with the v1 segmenter (weights sha256 `c49416c1...`,
+the fixed cost table `results/local-macos-x86-dacl10k-retime/`, 30 % cap;
+`results/real-walls-2026-10-21/real_01.ndjson`, the site's replay until 2026-10-23), the overview proposed no
 candidate window, so the job ended after the overview, at 0.0157 of the pixels, with cause `exhausted` ("every
 candidate has been looked at", true of an empty list) and no finding. That recording predates the zero-candidate
 fallback: the segmenter never saw the photo, and the miss is the saliency prior's, which at L3 (1/8 scale) found no
@@ -806,11 +807,14 @@ texture), so nothing is drafted, and the work order lists the photo twice, `chec
 instruction that is wrong for this sharp photo. A gate that judges focus against the view's own contrast
 (`blur_gate "both"`) would pass this look: its re-blur ratio is 0.20, and v1 then verifies at L1 and drafts 4
 crack boxes, none critical. It is not adopted, because on dev it also passes views blurred too much to trust
-(section 8). The site's **Watch it on a real wall** replays the older recording.
+(section 8). The site's **Watch it on a real wall** replays that look as the live site ran it on 2026-10-23
+(`public/samples/real_01.ndjson`, job `j_da1449`, measured costs): sharpness 5.1, 9,136 crack px, nothing drafted,
+0.099 of the pixels.
 
 On the other wall photo (`real_02.jpg`, IMG_2330, two cracks by
-eye) the same engine took one look and drafted one crack, a 678 × 70 px box on part of the lower crack; the upper
-crack got no finding. With no ground truth neither photo is scored.
+eye) the same local run (`results/real-walls-2026-10-21/real_02.ndjson`) took one look and drafted one crack, a
+678 × 70 px box on part of the lower crack; the upper crack got no finding. The live run the site replays (job
+`j_d2b9b0`) did the same, with a 652 × 76 px box. With no ground truth neither photo is scored.
 
 ## 10. Agentic evidence
 
@@ -928,8 +932,8 @@ the replay exactly.
   measurable, that the uncertainty term and the seeding earn a little recall only uncapped on the 2048×1536 set, and
   that image-driven gaze order beats random order only on the larger photos (section 8).
 - On one of our own wall photos the overview proposed no region and a hairline crack visible by eye was missed
-  (section 9): the recorded run took no look, and with the zero-candidate fallback the one whole-photo look is refused
-  by the blur gate (a scale-free gate that passes it was measured on dev and not adopted, section 8). Its work order has no finding, but it lists the whole photo as `not_assessed`
+  (section 9): the local run of 2026-10-21 took no look, and with the zero-candidate fallback (the live run the site
+  replays) the one whole-photo look is refused by the blur gate (a scale-free gate that passes it was measured on dev and not adopted, section 8). Its work order has no finding, but it lists the whole photo as `not_assessed`
   (action `check-by-eye`) and reads `incomplete`, not `ready`, until a person checks the photo by eye and records it
   (the web review's Checked by eye, or `drishyam review <work order> na0 nothing-found|defect-found`), so it does not
   pass for a clean wall.

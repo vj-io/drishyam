@@ -19,6 +19,8 @@ const NOTE = 'Press Run and the agent’s reasoning appears here, one decision a
 // the e2e test pins this date to the fixture's, so a re-recorded fixture must update it.
 const RECORDED = 'a saved job, recorded on the classical engine on 2026-10-17 with all three failure drills switched on';
 const FIXTURE = 'fixtures/mock.jpg';  // the photo that saved job ran on: the only one ?mock=1 may replay it over
+// the wall replays (public/samples/real_0N.ndjson): video/live/walls/*/real.ndjson, from video/record.py --walls
+const WALLS = 'Recorded live on this site on 2026-10-23 (the v1 engine on our own photo)';
 
 const el = {
   pill: $('#job-pill'), text: $('#job-text'), count: $('#job-steps'), kill: $('#kill'), resume: $('#resume'), sound: $('#sound'),
@@ -179,6 +181,8 @@ const agentTime = () => (modelled() ? 'modelled agent time' : 'agent time');
 // The server's pause between looks: as the job record echoes it, else as this page asked for it (pace_ms).
 const paceMs = () => S.job?.pace_ms ?? S.opts.pace ?? 0;
 
+const heatmap = () => Boolean(dataUrl('image/png', S.overview?.heatmap_png_b64));  // a recording may have its images removed
+
 const overviewLevel = () => {
   const i = S.job?.levels?.findIndex(([w, hh]) => w * hh === S.overview?.pixels_used) ?? -1;
   return i >= 0 ? i : null;
@@ -193,7 +197,7 @@ function overviewText() {
   const n = S.overview.candidates?.length ?? 0;
   const top = (S.job?.levels?.length ?? 1) - 1;
   return `It shrank the photo into a pyramid (L0 is full size, each level up halves it, down to L${top}), `
-    + `mapped where damage looks likely (the heatmap) and marked ${n} region${n === 1 ? '' : 's'} worth a closer look (dashed boxes).`;
+    + `mapped where damage looks likely${heatmap() ? ' (the heatmap)' : ''} and marked ${n} region${n === 1 ? '' : 's'} worth a closer look (dashed boxes).`;
 }
 
 /** The camera panel: the newest look's crop as the agent saw it, or the stages before the first look. */
@@ -202,6 +206,10 @@ function showCam(k) {
   const url = look ? dataUrl('image/jpeg', look.crop_jpeg_b64) : null;
   el.camImg.hidden = el.pip.hidden = !url;
   el.stages.hidden = Boolean(url);
+  if (look && !url) {  // a recording with its images removed (the wall replays)
+    el.camCap.textContent = `step ${look.step}: this recording keeps no image of its looks`;
+    return;
+  }
   if (!url) {
     el.camCap.textContent = S.mode === 'running'
       ? (S.job ? 'Before the first look: the stages above light up as the server prepares the photo'
@@ -336,7 +344,8 @@ function handle(ev) {
       narrate(photoText());
       if (!S.arrived) {
         el.text.textContent = S.opts.killHint ? `${recorded() ? 'Recorded run' : 'Live'}: each look is shown the moment it arrives. Press KILL in this bar while it is looking.`
-          : S.opts.trace ? `Recorded run of the v1 engine on our own photo, replayed from its saved trace (no server), at reading speed${ev.cost_model?.kind === 'fixed' ? '; its seconds and $ are modelled, not measured' : ''}.`
+          : S.opts.trace ? `${ev.cost_model?.kind === 'fixed' ? 'Recorded run of the v1 engine on our own photo; its seconds and $ are modelled, not measured'
+            : `${WALLS}, measured costs`}. Replayed from its saved trace (no server), at reading speed${heatmap() ? '' : '; the recording keeps no images, so no heatmap or crops'}.`
           : MOCK ? `Recorded run: replaying ${RECORDED} (no server), at reading speed.`
             : paceMs() > 0 ? `Paced for viewing: the agent waits ${paceMs() / 1000} s between looks; timings exclude the wait.`
               : 'Running live on the server; each decision is shown at reading speed.';
@@ -621,12 +630,15 @@ function recap() {
   const flagged = S.order.findings.map((f) => `${words(f.cls)} (${f.critical ? 'critical' : 'a draft'})`);
   const other = real && samples.find((x) => x.synthetic === false && x.trace && x.file !== real.file);
   const otherBtn = other && h('button', { class: 'btn btn--amber btn--sm', type: 'button' }, 'Our other wall photo');
+  const whole = S.steps.find((x) => x.cause === 'fallback-l2');  // the one look a photo with no candidate gets
   otherBtn?.addEventListener('click', () => guidedReal(other.file));
   el.recap.replaceChildren(
     h('h4', { class: 'recap__t' }, 'What you just saw'),
     h('ul', { class: 'recap__list' },
       real ? h('li', { class: 'recap__real' }, h('b', {}, 'REAL PHOTO (ours)'), ', no ground truth, so nothing here is scored. '
-        + `On the v1 engine’s recorded run (the dacl10k-trained segmenter) the agent flagged ${flagged.length ? flagged.join(', ') : 'nothing'}${S.overview?.candidates?.length ? '' : ': it saw no region worth a closer look'}. `
+        + `On the v1 engine’s recorded run (the dacl10k-trained segmenter) the agent flagged ${flagged.length ? flagged.join(', ') : 'nothing'}${S.overview?.candidates?.length ? ''
+          : whole ? `: its overview proposed no region, so it took one look at the whole photo${whole.quality?.ok === false ? `, which the quality gate refused (${whole.quality.reason})` : ''}`
+            : ': it saw no region worth a closer look'}. `
         + `${real.note} Anything we see by eye that it did not flag, it missed.`) : null,
       h('li', {}, h('b', {}, String(S.steps.length)), ` decision${S.steps.length === 1 ? '' : 's'} (${looks ? looks : 'no'} look${looks === 1 ? '' : 's'}${stopped}), `
         + `${S.steps.length === 1 ? 'with its' : 'every one with a'} recorded cause: ${why.join(', ')}.`),

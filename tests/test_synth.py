@@ -150,8 +150,11 @@ def test_samples_manifest_and_sizes():
         assert "boxes" not in m and "distractors" not in m
         ev = [json.loads(ln) for ln in (SAMPLES_DIR / m["trace"]).read_text().splitlines()]
         assert cv2.imread(str(SAMPLES_DIR / m["file"])).shape[1::-1] == (m["width"], m["height"]) == (ev[0]["width"], ev[0]["height"])
-        assert ev[0]["cost_model"]["micro_arm"].endswith("-dacl10k-retime") and ev[-1]["work_order"]["profile"] == "onnx:drishyam_dacl10k.onnx"
-        assert "token" not in ev[0] and "kill_token" not in ev[0] and "token" not in ev[-1]
+        assert ev[-1]["work_order"]["profile"] == "onnx:drishyam_dacl10k.onnx" and "cost_model" not in ev[0]  # measured live
+        # the live run on that photo, as video/record.py --walls saved it: tokens and embedded images removed
+        image = {"real_01.jpg": "IMG_2332", "real_02.jpg": "IMG_2330"}[m["file"]]
+        assert (SAMPLES_DIR / m["trace"]).read_bytes() == (SAMPLES_DIR.parents[1] / "video/live/walls" / image / "real.ndjson").read_bytes()
+        assert ev[0]["kill_token"] == ev[-1]["token"] == "<removed>"
     for m in manifest:
         assert (SAMPLES_DIR / m["file"]).stat().st_size < synth.SAMPLE_LIMIT and (SAMPLES_DIR / m["thumb"]).exists()
 

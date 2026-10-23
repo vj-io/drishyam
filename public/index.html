@@ -72,7 +72,7 @@
       <p class="gloss">It works like a PTZ camera (pan-tilt-zoom), done in software: it pans and zooms across one big photo instead of moving a real camera.</p>
       <div class="cta">
         <button class="btn btn--amber btn--xl" id="guided" type="button"><span>Watch it inspect a bridge <span class="cta__time">(about 40 s)</span></span></button>
-        <button class="btn btn--amber btn--xl" id="guided-real" type="button" hidden><span>Watch it on a real wall <span class="cta__time">(our own photo, recorded)</span></span></button>
+        <button class="btn btn--amber btn--xl" id="guided-real" type="button" hidden><span>Watch it on a real wall <span class="cta__time">(our own photo, recorded live)</span></span></button>
         <a class="btn" id="own" href="#step-photo">Try your own photo</a>
         <a class="cta__link" id="video-link" href="#video">Watch the film (4:27)</a>
       </div>
@@ -622,7 +622,7 @@
   <dl class="faq">
     <div class="faq__item">
       <dt>Is this live or recorded?</dt>
-      <dd>Live. The photo goes to the API and every look is computed on the spot with stock OpenCV 5. The page then shows the decisions at reading speed; the agent itself is much faster. The status bar shows the agent&rsquo;s own time; the upload, decode and privacy blur on the server come on top of it. <a href="?mock=1#demo">Watch a recorded run</a> replays a saved job instead, recorded on the classical engine on 2026-10-17 with all three failure drills switched on, and is labelled recorded. So does <b>Watch it on a real wall</b>: it replays the v1 engine&rsquo;s saved run on our own photo, so you see exactly the run the docs report; pick that photo and press Run to run it live on the server&rsquo;s own engine (named at the foot of the page), whose result can differ.</dd>
+      <dd>Live. The photo goes to the API and every look is computed on the spot with stock OpenCV 5. The page then shows the decisions at reading speed; the agent itself is much faster. The status bar shows the agent&rsquo;s own time; the upload, decode and privacy blur on the server come on top of it. <a href="?mock=1#demo">Watch a recorded run</a> replays a saved job instead, recorded on the classical engine on 2026-10-17 with all three failure drills switched on, and is labelled recorded. So does <b>Watch it on a real wall</b>: it replays the v1 engine&rsquo;s run on our own photo, recorded live on this site on 2026-10-23 with measured costs, so you see exactly the run the docs report; its images (the heatmap and crops) were not kept. Pick that photo and press Run to run it live again on the server&rsquo;s own engine (named at the foot of the page), whose result can differ.</dd>
     </div>
     <div class="faq__item">
       <dt>What is OpenCV doing here?</dt>
