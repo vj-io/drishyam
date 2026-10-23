@@ -821,8 +821,8 @@ eye) the same local run (`results/real-walls-2026-10-21/real_02.ndjson`) took on
 ## 10. Agentic evidence
 
 Every step's action is a logged function of an OpenCV output or a runtime
-statistic, with a `cause`. A recorded trace (synthetic sample `bridge_03`, the classical engine, which zooms to L0
-where v1 stops at L1, 30 % pixel cap, the published fixed arm64
+statistic, with a `cause`. A recorded trace of the **classical engine**, not of v1, the live engine (synthetic sample
+`bridge_03`; the classical engine zooms to L0 where v1 stops at L1; 30 % pixel cap, the published fixed arm64
 costs on a virtual clock, so machine load does not change it and a re-run on x86 gives the same file:
 [trace-bridge_03.ndjson](trace-bridge_03.ndjson), from `python -m evals.trace_sample`), its first four steps abridged
 (the seeds without their entropy):
