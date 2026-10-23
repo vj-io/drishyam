@@ -7,7 +7,7 @@ import { size } from './panels.js';
 const SERIES = [
   ['downscale', 'downscale once', 'downscale', 'rect'],
   ['tiling', 'tiling (L2, L1, L0 grids)', 'tiling', 'diamond'],
-  ['drishyam', 'Drishyam', 'drishyam', 'circle'],
+  ['drishyam', 'Drishyam, classical engine', 'drishyam', 'circle'],  // summary.json and codebrim/summary.json: its published runs
 ];
 // v1's Drishyam curve on the same images (evals.model_eval --publish): the segmenter the live demo runs since 2026-10-21,
 // with its first look policy (v1-policy2, live since 2026-10-22, is #policy2-note under FIG. 4.2).
@@ -227,7 +227,8 @@ function heroChips(sum, real, v1) {
   const v1ci = interval(v1p?.recall_ci);
   const rd = headline(real?.policies);
   if (num(v1p?.recall)) {
-    fill('stat-real', `Live engine (v1), real bridge photos (CODEBRIM${num(v1.real.n_images) ? `, ${v1.real.n_images}` : ''})`,
+    // codebrim_dacl10k/summary.json is v1's first look policy; v1-policy2, the live one, is FIG. 4.2's note
+    fill('stat-real', `Live segmenter v1, first look policy: real bridge photos (CODEBRIM${num(v1.real.n_images) ? `, ${v1.real.n_images}` : ''})`,
       v1p.recall, { decimals: 2, prefix: 'recall ' },
       `at the ${pct(v1.real.headline_stats.budget)} pixel cap${v1ci ? ` (CI ${dec(v1ci[0])}–${dec(v1ci[1])})` : ''}`
       + `${num(v1p.chance_recall) ? `; chance ${dec(v1p.chance_recall)}` : ''}`
@@ -399,7 +400,9 @@ function renderFailures(list, realList) {
   const fig = root.closest('.win')?.querySelector('.win__fig');
   if (fig) fig.textContent = n > 1 ? `FIG. 5.1–5.${n}` : 'FIG. 5.1';
   root.replaceChildren(h('div', { class: 'stack' },
-    h('p', { class: 'note' }, 'Where it was wrong, and the rule that would have caught it. Kept in the open on purpose.'),
+    h('p', { class: 'note' }, 'Where it was wrong, and the rule that would have caught it. Kept in the open on purpose. '
+      + 'These plates come from the classical engine’s published run on the 200 held-out synthetic images (2026-10-18, agent of '
+      + 'commit 832299b), not from v1, the engine the live demo runs.'),
     h('div', { class: 'fails' }, plates.map(([category, cases], i) => h('article', { class: 'fail' },
       h('div', { class: 'fail__fig' }, `FIG. 5.${i + 1}`),
       h('h4', { class: 'fail__t' }, category),
@@ -424,7 +427,7 @@ function realFailures(real, n) {
   return h('details', { class: 'data' },
     h('summary', {}, `FIG. 5.${n} · Real-photo failures (described; photos not redistributable)`),
     h('div', { class: 'stack' },
-      h('p', { class: 'note' }, `${real.length} cases from the CODEBRIM evaluation, written out because its licence does not allow sharing the photos.`),
+      h('p', { class: 'note' }, `${real.length} cases from the classical engine’s CODEBRIM evaluation (the same published runs, not v1), written out because its licence does not allow sharing the photos.`),
       table('Real-photo failures', ['photo', 'class', 'what happened'],
         real.map((f) => [String(f.id ?? ''), inWords(f.class ?? '–'), inWords(f.what_happened)])),
       table('Rules that would catch them', ['failure', 'rule that would catch it'],

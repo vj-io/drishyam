@@ -137,7 +137,7 @@ const STRIPB = { open: `recorded ${LIT.recorded} · ${ENG} · synthetic photo br
   problem: 'sources: docs/impact-sources.md', live: `recorded ${LIT.recorded} on the live site · ${ENG}`,
   break: `injected drills · recorded ${LIT.recorded} · ${ENG}`,
   mcp: 'docs/mcp-session-v1: a recorded Claude session on v1', arch: 'docs/architecture.png · docs/agent-loop.svg · public/docs/aws-simple.svg',
-  results: 'public/results/*.json · results/heldout_models.json', failures: 'public/results/failures.json', limits: 'pixels, not millimetres', repro: D.urls.repo.replace('https://', ''), end: '' };
+  results: 'public/results/*.json · results/heldout_models.json', failures: 'public/results/failures.json · the classical engine’s synth200 run', limits: 'pixels, not millimetres', repro: D.urls.repo.replace('https://', ''), end: '' };
 
 let strip, stripA, stripB, stripNo, rail, chs = [], railNote, railCall, capBox, capSpan;
 const CALLS = [];
@@ -362,7 +362,8 @@ function buildLive() {
     const dot = svgEl('circle', { r: 6, fill: '#FFC857' }, lead);
     return { e, r, T, box, path, dot, i };
   });
-  const foot = el('div', 'abs src', hw, `commit ${D.health.commit.slice(0, 7)} · the response is saved in video/live/health.json`); css(foot, { left: '0px', top: '720px', fontSize: '22px' });
+  const HN = D.health_now, foot = el('div', 'abs src', hw, `recorded on build ${D.health.commit.slice(0, 7)} (${D.health.version}), the response saved in video/live/health.json · the site now runs ${HN.version} (${HN.commit.slice(0, 7)}): its only agent change is a blur-gate option, off by default`);
+  css(foot, { left: '0px', top: '712px', width: '1530px', fontSize: '21px', lineHeight: '1.4', whiteSpace: 'normal' });
   const l0 = LINE.l0, dOut = at('l1') + 0.3, TS = l0.t + 0.9;   // the field lights at TS, its card follows; both cards leave as l1 begins
   const segHl = el('div', 'hl', H.overlays); css(segHl, { border: '0', boxShadow: 'none', background: 'rgba(255,200,87,.42)' });
   const segPath = svgEl('path', { fill: 'none', stroke: '#FFC857', 'stroke-width': 3.5, pathLength: 1, 'stroke-dasharray': 1 }, lead);
@@ -393,9 +394,12 @@ function buildLive() {
   railcall(cstep, `${fmt(hconf)} &lt; ${floor}`, `${hcls.replace('_', ' ')} at L${hlev}, under the floor: held for a confirm look; the ${ccls} is critical`, at('l4') + 0.3, end('l4') + 0.3);
   railcall(cstep + 1, 'check by eye', `its L${D.guided.confirm_level} confirm look did not confirm it: a needs-a-look entry, not a critical finding`, at('l6') + 0.2, end('l6') + 0.3);
   railcall(D.guided.halt_step, `${D.guided.critical} critical`, `every candidate region looked at (${D.guided.stop[0]}); the ${D.guided.drafts.join(' and ')} are drafts, no sign-off`, at('l7') + LINE.l7.dur * 0.4, end('l7') + 0.3);
-  railcall('✓', 'a person', `approves the ${ccls}; the server signs. The rebar still needs a look`, at('l9') + 0.3, end('l9') + 0.3);
+  railcall('✓', 'Approve', `a reviewer's decision (here clicked by the script); the server signs. The rebar still needs a look`, at('l9') + 0.3, end('l9') + 0.3);
   const [dec, note, who] = D.guided.checked, TC = filmOf(fw.S, ev['checked:0']);   // the card lands with the check on screen, not before it
-  railcall('✓', 'checked by eye', `${dec.replace('-', ' ')} by ${who}: “${note}”. The order is ${D.guided.order[0]}`, TC, at('l11') + 1.2);
+  railcall('✓', 'checked by eye', `${dec.replace('-', ' ')}, entered by the script: “${note}”. The order is ${D.guided.order[0]}`, TC, at('l11') + 1.2);
+  // the review clicks in this footage are the recording script's (video/record.py), said on screen while they play
+  const scripted = el('div', 'abs', S.e, `<b class="amber">REVIEW CLICKS SCRIPTED FOR THIS RECORDING</b> · video/record.py types “${who}” · on the site a person makes them; the server cannot tell who clicks (docs/security.md)`);
+  css(scripted, { left: '16px', top: '60px', width: '1498px', padding: '9px 16px', zIndex: 8, background: 'rgba(4,20,44,.95)', border: '2.5px solid var(--amber)', font: '500 19px/1.35 var(--fm)', color: 'var(--line)' });
   railcall('!', `HTTP ${D.tamper.status}`, D.tamper.error, at('l11') + 1.4, end('l11') + 0.6);
   // c. the tampered token, answered by the server
   const term = el('div', 'term', S.e); css(term, { right: '28px', bottom: '28px', width: '980px', zIndex: 9 });
@@ -411,13 +415,14 @@ function buildLive() {
       h.path.setAttribute('d', `M${x0.toFixed(1)} ${y0.toFixed(1)} V${((y0 + y1) / 2).toFixed(1)} H${x1} V${y1}`); h.path.setAttribute('stroke-dashoffset', 1 - q);
       h.dot.setAttribute('cx', x0); h.dot.setAttribute('cy', y0); h.dot.setAttribute('opacity', p);
       const bq = seg(t, h.T + 0.5, h.T + 0.8); css(h.box, { opacity: bq, transform: `translateY(${((1 - eo(bq)) * 24).toFixed(1)}px)` }); });
-      foot.style.opacity = seg(t, hls[2].T + 0.8, hls[2].T + 1.1);
+      foot.style.opacity = seg(t, TS + 0.45, TS + 0.75);   // with the RECORDED card, through l1
       { const p = seg(t, TS, TS + 0.3) * (1 - seg(t, dOut - 0.3, dOut)), [sx, sy] = H.toScreen(SEG[0] - 3, SEG[1], H.c), bw = (SEG[2] + 6) * H.c[2], bh = SEG[3] * H.c[2];
         css(segHl, { opacity: p, left: sx + 'px', top: sy + 'px', width: bw + 'px', height: bh + 'px' });
         const x0 = 3 + sx + bw / 2, y0 = 49 + sy + bh + 2, q = eio(seg(t, TS + 0.1, TS + 0.5));
         segPath.setAttribute('d', `M${x0.toFixed(1)} ${y0.toFixed(1)} V${((y0 + 440) / 2).toFixed(1)} H385 V440`); segPath.setAttribute('stroke-dashoffset', 1 - q); segPath.setAttribute('opacity', p); }
       disc.forEach(({ b, T }) => { const q = eo(seg(t, T, T + 0.35)), o = 1 - seg(t, dOut - 0.3, dOut); css(b, { opacity: Math.min(q, o), transform: `translateY(${((1 - q) * 24 - (1 - o) * 16).toFixed(1)}px)` }); }); }
     if (t >= F.warp.live.t0 - 0.25) await fw.draw(t);
+    scripted.style.opacity = (seg(t, at('l9') - 0.7, at('l9') - 0.4) * (1 - seg(t, at('l11') - 0.3, at('l11')))).toFixed(3);
     const T0 = at('l11') - 0.1, p = eo(seg(t, T0, T0 + 0.4)), ty = (u) => Math.floor(seg(t, T0 + 0.3 + u, T0 + 0.9 + u) * 200);
     term.style.opacity = p; term.style.transform = `translateY(${((1 - p) * 40).toFixed(1)}px)`;
     const full = (h) => h.replace(/<[^>]+>/g, '');
@@ -567,7 +572,7 @@ function buildResults() {
   const P2X = 2100, P3Y = 1300;   // panels far enough apart that a zoomed view never shows a neighbour's cut edge
   // P1: the chart
   const p1 = el('div', 'abs', board); css(p1, { left: '0px', top: '0px', width: '1530px', height: '836px' });
-  el('div', 'abs', p1, `<span class="fig">FIG. 4</span><span class="lab" style="margin-left:16px;font-size:24px">${sy.n} labelled synthetic photos, ${sy.size[0]} × ${sy.size[1]} px · public/results/summary.json</span>`).style.cssText = 'left:0;top:0';
+  el('div', 'abs', p1, `<span class="fig">FIG. 4</span><span class="lab" style="margin-left:16px;font-size:24px">the classical engine · ${sy.n} synthetic photos, ${sy.size[0]} × ${sy.size[1]} px</span><span class="src" style="margin-left:14px;font-size:18px">public/results/summary.json</span>`).style.cssText = 'left:0;top:0';
   const ch = el('div', 'abs', p1); css(ch, { left: '0px', top: '56px' });
   const C = chartSvg(ch, sy.policies, 1100, 770);
   const legend = el('div', 'abs', p1, `<div class="mono" style="font-size:22px;line-height:1.6"><span style="color:#9CC8FF">■</span> one downscale<br><span>◆</span> tiling (L2, L1, L0)<br><span class="amber">●</span> Drishyam, by pixel cap<br><span class="src" style="font-size:18px">bars: 95 % CI · dashes: chance, its boxes at random</span></div>`);
@@ -586,7 +591,7 @@ function buildResults() {
   p2.innerHTML = `<div class="lab" style="font-size:24px">Ablations, ${pc(sy.cap)} cap: recall / full agent</div><div class="src">public/results/ablations.json</div>
     <table class="t" style="margin-top:12px"><tr><th>variant</th>${dsl.map((d) => `<th>${ab[d].label}</th>`).join('')}</tr>
     ${[['no-survey', 'no survey look'], ['no-verify', 'no verify'], ['no-uncertainty', 'no uncertainty term'], ['governor-on', 'governor on']].map(([k, n]) => `<tr><td>${n}</td>${dsl.map((d) => vr(ab[d][k])).join('')}</tr>`).join('')}
-    <tr><td>random gaze order (95 % CI)</td>${dsl.map((d) => `<td class="n ${ab[d].random_hi < 1 ? 'bad' : ''}">${fmt(ab[d].random_lo)}–${fmt(ab[d].random_hi)}</td>`).join('')}</tr></table>`;
+    <tr><td>random gaze order (95 % CI)</td>${dsl.map((d) => `<td class="n ${ab[d].random_vs === 'below' ? 'bad' : ''}">${fmt(ab[d].random_lo)}–${fmt(ab[d].random_hi)}</td>`).join('')}</tr></table>`;
   // P3: the headline board, the trained v1 on real photos, held out (r6, r8); the classical engine is its comparison row
   const cb = D.codebrim, cl = D.clean, M = D.model, P2 = M.policy2, p3 = el('div', 'box amb', board); css(p3, { left: '0px', top: P3Y + 'px', width: '1530px', height: '836px' });
   const tw = M.tiling_wins.length ? `tiling with ${M.name} at ${M.tiling_wins.join(' and ')} finds as much or more (${M.tiling.slice(0, M.tiling_wins.length).map(([px, r]) => `${fmt(r)} at ${fmt(px)} of the pixels`).join(', ')})` : 'no tiling level finds as much';
@@ -846,37 +851,40 @@ function buildEnd() {
 function buildShort() {
   document.body.classList.add('short'); css(document.documentElement, { width: '1080px', height: '1920px' }); css(document.body, { width: '1080px', height: '1920px' });
   const Sh = window.SHORT, ev = F.ev, dur = Sh.dur, [l0, l1, l2] = Sh.lines, M = D.model;
-  // it ends on the settled APPROVED stamp: the last recorded frame before the page scrolls on to the next finding
+  // the settled APPROVED stamp: the last recorded frame before the page scrolls on to the rebar's entry
   const SETTLED = Math.max(...F.frames.filter((x) => x.t <= ev['approved:0'] + 1.5 && x.sy === F.frames.find((y) => y.t >= ev['approved:0']).sy).map((x) => x.t)) - ev['approved:0'];
   el('div', 'sheetframe', stage);
-  // the top 12 % and the bottom of the frame are the app's (motion-kit safe zones): the name, the label, the footage, the
-  // caption and the URL sit between them; the v1 card fills the lower third
-  const top = el('div', 'abs', stage, `<div class="h1" style="font-size:112px">DRISHYAM</div><div class="lab" style="font-size:24px;margin-top:10px">one photo · a few looks · one human</div>`);
+  // the top 12 % and the bottom 20 % of the frame are the app's (motion-kit safe zones): the name and what it is, the label,
+  // the footage, the caption, the URL and the v1 card all sit between y 230 and 1536
+  const top = el('div', 'abs', stage, `<div class="h1" style="font-size:112px">DRISHYAM</div><div class="lab" style="font-size:22px;margin-top:10px;color:var(--line)">bridge-photo inspection agent · OpenCV ${D.health.opencv.split('.')[0]} on AWS</div>`);
   css(top, { left: '108px', top: '236px', width: '864px' });
-  // the footage's date and engine, on screen for the whole cut (the film's l0 line), and what the run left for a person besides the sign-off
-  const rec = el('div', 'abs lab', stage, `recorded ${LIT.recorded} · live site · ${ENG}<br><span class="amber">the rebar went to a person to check by eye</span>`);
-  css(rec, { left: '108px', top: '390px', width: '864px', fontSize: '22px', lineHeight: '1.5', color: 'var(--line-2)' });
+  // the footage's date and engine, on screen for the whole cut (the film's l0 line), what the run left for a person, and
+  // that the review clicks in it are the recording script's
+  const rec = el('div', 'abs lab', stage, `recorded ${LIT.recorded} · live site · ${ENG}<br><span class="amber">the rebar went to a person to check by eye</span><br><span style="color:var(--line)">review clicks scripted here; on the site a person makes them</span>`);
+  css(rec, { left: '108px', top: '392px', width: '900px', fontSize: '19px', lineHeight: '1.45', color: 'var(--line-2)' });
   // the run (steps 1-4, retimed to line 1), a cut to the reviewer field, the typing at real time, a jump cut to the Approve
-  // click, the stamp at real time; the settled frame holds to the end
+  // click, the stamp at real time; then a cut to the rebar's Checked by eye entry, played on to the order reading ready
   const P1 = l0.t + l0.dur + 0.3, TY = F.events.find((e) => e.kind === 'type' && e.t0 >= ev['click:Reviewer'] - 0.01);
   const A = ev['click:Reviewer'] - 0.5, B = TY.t + 0.15, C = ev['click:Approve#0'] - 0.5, E = ev['approved:0'] + SETTLED;
   const T2 = P1 + 0.1 + (B - A), T3 = T2 + 0.05 + (E - C);   // both pieces at 1x (a cut keeps the speed on both sides: film.js segments)
+  const K0 = ev['click:Check reviewer'] - 0.4, K1 = ev['checked:0'] + 1.6, T4 = dur - 0.25;   // the check, sped up to fit what is left
   const warp = { t0: 0, t1: dur, pts: [{ t: 0.2, f: ev['step:1'] - 0.3 }, { t: P1, f: ev['step:4'] + 1.0 }, { cut: true, a: ev['step:4'] + 1.1, b: A }, { t: T2, f: B },
-    { cut: true, a: B + 0.05, b: C }, { t: T3, f: E }] };
-  const host = el('div', 'abs', stage); css(host, { left: '40px', top: '480px', width: '1000px', height: '880px' });
-  const fw = new Footage(host, 1000, 880, D.urls.live.replace('https://', ''), warp, [{ T: 0.2, c: [340, 560, 620] }, { T: P1 - 0.3, c: [330, 600, 520] },
-    { T: P1 + 0.3, c: [330, 700, 640] }, { T: T3 - 0.4, c: [340, 640, 660] }, { T: dur, c: [340, 650, 600] }]);
-  const cap = el('div', 'abs', stage); css(cap, { left: '108px', top: '1380px', width: '864px', height: '118px', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }); const cs = el('span', '', cap);
-  css(cs, { display: 'inline-block', padding: '10px 22px', background: 'rgba(4,20,44,.94)', border: '2.5px solid var(--line-3)', borderLeft: '8px solid var(--amber)', font: '500 34px/1.3 var(--fm)', color: 'var(--line)' });
-  const url = el('div', 'abs mono', stage, D.urls.live.replace('https://', '')); css(url, { left: '60px', top: '1508px', width: '960px', textAlign: 'center', font: '700 40px/1 var(--fm)', color: 'var(--amber)' });
+    { cut: true, a: B + 0.05, b: C }, { t: T3, f: E }, { cut: true, a: E + 0.05, b: K0 }, { t: T4, f: K1 }] };
+  const host = el('div', 'abs', stage); css(host, { left: '40px', top: '500px', width: '1000px', height: '630px' });
+  const fw = new Footage(host, 1000, 630, D.urls.live.replace('https://', ''), warp, [{ T: 0.2, c: [340, 560, 700] }, { T: P1 - 0.3, c: [330, 600, 600] },
+    { T: P1 + 0.3, c: [330, 700, 700] }, { T: T3 - 0.4, c: [340, 650, 720] }, { T: filmOf(segments(warp), K0 + 0.5) ?? T3 + 0.4, c: [330, 600, 720] },
+    { T: filmOf(segments(warp), ev['checked:0'] + 0.3) ?? T4 - 1, c: [330, 500, 720] }, { T: T4, c: [900, 300, 720] }]);
+  const cap = el('div', 'abs', stage); css(cap, { left: '80px', top: '1140px', width: '920px', height: '112px', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }); const cs = el('span', '', cap);
+  css(cs, { display: 'inline-block', padding: '8px 20px', background: 'rgba(4,20,44,.94)', border: '2.5px solid var(--line-3)', borderLeft: '8px solid var(--amber)', font: '500 27px/1.3 var(--fm)', color: 'var(--line)' });
+  const url = el('div', 'abs mono', stage, D.urls.live.replace('https://', '')); css(url, { left: '60px', top: '1264px', width: '960px', textAlign: 'center', font: '700 38px/1 var(--fm)', color: 'var(--amber)' });
   // the lower third: what the site runs now, held out (the film's headline board, short form)
   const P2 = M.policy2;
   const card = el('div', 'box amb', stage, `<div class="lab amber" style="font-size:21px">trained ${M.name}, held out · the site runs it with v1-policy2</div>
-    <div style="display:flex;align-items:flex-end;gap:26px;margin-top:6px"><div class="h1 amber" style="font-size:120px;line-height:.85;white-space:nowrap;flex:none">${pc(M.recall)}</div>
+    <div style="display:flex;align-items:flex-end;gap:26px;margin-top:6px"><div class="h1 amber" style="font-size:100px;line-height:.85;white-space:nowrap;flex:none">${pc(M.recall)}</div>
     <div class="mono" style="font-size:25px;line-height:1.35">recall on ${M.n} real CODEBRIM photos: ${fmt(M.ratio[0], 1)}× the classical engine</div></div>
     <div class="mono" style="font-size:23px;margin-top:10px;color:var(--line-2)">chance ${pc(M.chance)} · a person signs ${fmt(P2.sign[0])} critical findings per photo</div>
     <div class="mono amber" style="font-size:23px;margin-top:4px">with v1-policy2: ${fmt(P2.sign[1])} to sign, recall ${fmt(P2.recall_ratio[0])}×</div>`);
-  css(card, { left: '60px', top: '1572px', width: '960px', height: '250px', padding: '18px 26px' });
+  css(card, { left: '60px', top: '1314px', width: '960px', height: '218px', padding: '14px 24px' });   // ends at y 1532, above the bottom 20 %
   const big = card.querySelector('.h1'), TV = l2.t + l2.dur * l2.text.indexOf('trained') / l2.text.length;
   const caps = [[l0.t, l0.t + l0.dur, LINE.o1.cap], [l1.t, l1.t + l1.dur, l1.text], [l2.t, l2.t + l2.dur, l2.text]];   // the captions of the three lines the short speaks
   window.DURATION = dur;
@@ -887,9 +895,9 @@ function buildShort() {
     css(card, { opacity: q, transform: `translateY(${((1 - q) * 30).toFixed(1)}px)`, background: `linear-gradient(rgba(255,200,87,${(0.36 * fl).toFixed(3)}), rgba(255,200,87,${(0.36 * fl).toFixed(3)})), rgba(11,50,100,.92)` });
     big.textContent = `${Math.round(100 * M.recall * eo(seg(t, 1.0, 1.7)))} %`;
     host.style.opacity = seg(t, 0, 0.3); await fw.draw(t);
-    if (t > T3 + 0.05) { fw.tag.textContent = 'LAST FRAME'; fw.tag.className = 'tag rt'; }   // the settled frame is held, not played
+    if (t > T4 + 0.02) { fw.tag.textContent = 'LAST FRAME'; fw.tag.className = 'tag rt'; }   // the last quarter second is held, not played
   };
-  fw.clicksSfx(); const T = filmOf(fw.S, ev['approved:0'] + 0.2); if (T) cue(T, 'stamp'); cue(1.0, 'count', 0.7); cue(l2.t, 'final'); cue(TV, 'tick', 5);
+  fw.clicksSfx(); for (const k of ['approved:0', 'checked:0']) { const T = filmOf(fw.S, ev[k] + 0.2); if (T) cue(T, 'stamp'); } cue(1.0, 'count', 0.7); cue(l2.t, 'final'); cue(TV, 'tick', 5);
   window.SFX = SFX.sort((a, b) => a.t - b.t);
   window.ready = Promise.all([document.fonts.load('700 60px "Archivo Narrow"'), document.fonts.load('500 30px "IBM Plex Mono"'), document.fonts.load('700 30px "IBM Plex Mono"'), document.fonts.ready, ...loads]).then(() => window.render(0));
 }

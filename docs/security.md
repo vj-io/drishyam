@@ -63,7 +63,7 @@ the control that stops it. Every control named here has a test in `tests/` (the 
   record, so a KILL pressed before that record is held by the page and sent the moment it arrives; the server
   reads it after the next step record, so the first look still runs
   (`tests/e2e/test_ui_mock.py::test_kill_before_the_first_record`). When the server does not confirm a KILL
-  within 6 s, or sends no first record within 8 s of a KILL pressed before it, the page stops showing the job
+  within 6 s, or sends no first record within 15 s of a KILL pressed before it, the page stops showing the job
   (or cancels the upload) and says the server may still be running it, up to its time cap; it calls neither a
   kill (`test_kill_the_server_never_confirms`).
   The operator-wide switch is `DRISHYAM_KILL_SWITCH=1` (env) or the `DRISHYAM_KILL_FILE` flag file.

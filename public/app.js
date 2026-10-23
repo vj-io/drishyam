@@ -13,12 +13,17 @@ const HOLD = 5000;  // the decision that finds the first critical damage stays t
 const GUIDE = 'bridge_03.jpg';  // exposed rebar: the default run ends with critical findings for a human
 const GUIDE_REAL = 'real_02.jpg';  // our own wall photo the v1 engine took a look at: its guided run replays the recorded job
 const GUIDE_PACE_MS = 1000;  // asks the server to wait this long between looks (pace_ms); its timings exclude the wait
-const KILL_WAIT_S = 8;  // a KILL pressed before the server's first record waits this long for it, then cancels the upload
+// A KILL pressed before the server's first record waits this long for it, then cancels the upload (and is never sent).
+// That record follows the upload, a cold start (0.86 to 6.27 s to the first byte over the v1 smoke runs, docs/aws.md),
+// the decode and the privacy blur: one took 6.97 s in a 2026-10-23 audit of the live site, about 1 s inside the old 8 s.
+const KILL_WAIT_S = 15;
 const NOTE = 'Press Run and the agent’s reasoning appears here, one decision at a time, in plain words.';
 // ?mock=1 replays public/fixtures/job.ndjson (its step times, its accurate/fast models and its injected drills say so);
 // the e2e test pins this date to the fixture's, so a re-recorded fixture must update it.
 const RECORDED = 'a saved job, recorded on the classical engine on 2026-10-17 with all three failure drills switched on';
 const FIXTURE = 'fixtures/mock.jpg';  // the photo that saved job ran on: the only one ?mock=1 may replay it over
+// the wall replays (public/samples/real_0N.ndjson): video/live/walls/*/real.ndjson, from video/record.py --walls
+const WALLS = 'Recorded live on this site on 2026-10-23 (the v1 engine on our own photo)';
 
 const el = {
   pill: $('#job-pill'), text: $('#job-text'), count: $('#job-steps'), kill: $('#kill'), resume: $('#resume'), sound: $('#sound'),
@@ -179,6 +184,8 @@ const agentTime = () => (modelled() ? 'modelled agent time' : 'agent time');
 // The server's pause between looks: as the job record echoes it, else as this page asked for it (pace_ms).
 const paceMs = () => S.job?.pace_ms ?? S.opts.pace ?? 0;
 
+const heatmap = () => Boolean(dataUrl('image/png', S.overview?.heatmap_png_b64));  // a recording may have its images removed
+
 const overviewLevel = () => {
   const i = S.job?.levels?.findIndex(([w, hh]) => w * hh === S.overview?.pixels_used) ?? -1;
   return i >= 0 ? i : null;
@@ -193,7 +200,7 @@ function overviewText() {
   const n = S.overview.candidates?.length ?? 0;
   const top = (S.job?.levels?.length ?? 1) - 1;
   return `It shrank the photo into a pyramid (L0 is full size, each level up halves it, down to L${top}), `
-    + `mapped where damage looks likely (the heatmap) and marked ${n} region${n === 1 ? '' : 's'} worth a closer look (dashed boxes).`;
+    + `mapped where damage looks likely${heatmap() ? ' (the heatmap)' : ''} and marked ${n} region${n === 1 ? '' : 's'} worth a closer look (dashed boxes).`;
 }
 
 /** The camera panel: the newest look's crop as the agent saw it, or the stages before the first look. */
@@ -202,6 +209,10 @@ function showCam(k) {
   const url = look ? dataUrl('image/jpeg', look.crop_jpeg_b64) : null;
   el.camImg.hidden = el.pip.hidden = !url;
   el.stages.hidden = Boolean(url);
+  if (look && !url) {  // a recording with its images removed (the wall replays)
+    el.camCap.textContent = `step ${look.step}: this recording keeps no image of its looks`;
+    return;
+  }
   if (!url) {
     el.camCap.textContent = S.mode === 'running'
       ? (S.job ? 'Before the first look: the stages above light up as the server prepares the photo'
@@ -267,7 +278,7 @@ function togglePlay() {
 function clearJob() {
   stopPlay();
   Object.assign(S, { job: null, overview: null, done: null, token: null, order: null, ui: null, rev: 0, planners: new Map(), critSeen: false, found: [], sent: [], crit: null });
-  el.tbChecked.textContent = 'human reviewer';
+  el.tbChecked.textContent = 'unsigned';  // until a person signs or checks by eye
   viewport.reset(null);
   S.steps = viewport.steps;
   trace.clear();
@@ -336,7 +347,8 @@ function handle(ev) {
       narrate(photoText());
       if (!S.arrived) {
         el.text.textContent = S.opts.killHint ? `${recorded() ? 'Recorded run' : 'Live'}: each look is shown the moment it arrives. Press KILL in this bar while it is looking.`
-          : S.opts.trace ? `Recorded run of the v1 engine on our own photo, replayed from its saved trace (no server), at reading speed${ev.cost_model?.kind === 'fixed' ? '; its seconds and $ are modelled, not measured' : ''}.`
+          : S.opts.trace ? `${ev.cost_model?.kind === 'fixed' ? 'Recorded run of the v1 engine on our own photo; its seconds and $ are modelled, not measured'
+            : `${WALLS}, measured costs`}. Replayed from its saved trace (no server), at reading speed${heatmap() ? '' : '; the recording keeps no images, so no heatmap or crops'}.`
           : MOCK ? `Recorded run: replaying ${RECORDED} (no server), at reading speed.`
             : paceMs() > 0 ? `Paced for viewing: the agent waits ${paceMs() / 1000} s between looks; timings exclude the wait.`
               : 'Running live on the server; each decision is shown at reading speed.';
@@ -578,7 +590,7 @@ function updateDone() {
     replay(S.ui.pill, 'is-stamped');
   }
   const signers = [...new Set((S.order.approvals ?? []).map((a) => a.reviewer).filter(Boolean))];
-  el.tbChecked.textContent = signers.length ? signers.join(', ') : 'human reviewer';
+  el.tbChecked.textContent = signers.length ? signers.join(', ') : 'unsigned';
   const critical = S.order.findings.some((f) => f.critical);
   const gap = gapText();
   const part = partText();
@@ -621,12 +633,15 @@ function recap() {
   const flagged = S.order.findings.map((f) => `${words(f.cls)} (${f.critical ? 'critical' : 'a draft'})`);
   const other = real && samples.find((x) => x.synthetic === false && x.trace && x.file !== real.file);
   const otherBtn = other && h('button', { class: 'btn btn--amber btn--sm', type: 'button' }, 'Our other wall photo');
+  const whole = S.steps.find((x) => x.cause === 'fallback-l2');  // the one look a photo with no candidate gets
   otherBtn?.addEventListener('click', () => guidedReal(other.file));
   el.recap.replaceChildren(
     h('h4', { class: 'recap__t' }, 'What you just saw'),
     h('ul', { class: 'recap__list' },
       real ? h('li', { class: 'recap__real' }, h('b', {}, 'REAL PHOTO (ours)'), ', no ground truth, so nothing here is scored. '
-        + `On the v1 engine’s recorded run (the dacl10k-trained segmenter) the agent flagged ${flagged.length ? flagged.join(', ') : 'nothing'}${S.overview?.candidates?.length ? '' : ': it saw no region worth a closer look'}. `
+        + `On the v1 engine’s recorded run (the dacl10k-trained segmenter) the agent flagged ${flagged.length ? flagged.join(', ') : 'nothing'}${S.overview?.candidates?.length ? ''
+          : whole ? `: its overview proposed no region, so it took one look at the whole photo${whole.quality?.ok === false ? `, which the quality gate refused (${whole.quality.reason})` : ''}`
+            : ': it saw no region worth a closer look'}. `
         + `${real.note} Anything we see by eye that it did not flag, it missed.`) : null,
       h('li', {}, h('b', {}, String(S.steps.length)), ` decision${S.steps.length === 1 ? '' : 's'} (${looks ? looks : 'no'} look${looks === 1 ? '' : 's'}${stopped}), `
         + `${S.steps.length === 1 ? 'with its' : 'every one with a'} recorded cause: ${why.join(', ')}.`),
@@ -771,11 +786,19 @@ function stop(why, unconfirmed = false) {
   setMode('killed', `Killed at step ${n}${why} — state preserved. Resume re-sends the photo and replays your ${n} moves.`);
 }
 
+/** KILL pressed, the halt not here yet: the pill says so at once, not "running", while the records the server sends before
+    it reads the KILL (it reads one only after a step record) still arrive. The halt, or stop(), sets the final state. */
+function stopping(text) {
+  el.pill.className = 'pill pill--stopping';
+  el.pill.textContent = 'stopping';
+  el.text.textContent = text;
+}
+
 /** POST /api/kill for `job` (its first record): the server halts before its next look and sends the kill-switch record. */
 function sendKill(job) {
   postKill(job.job, job.kill_token);
   skip();
-  el.text.textContent = 'KILL sent: the agent halts before its next look…';
+  stopping('KILL sent: stopping before the agent’s next look…');
   clearTimeout(S.killTimer);
   S.killTimer = setTimeout(() => {
     if (S.mode === 'running' && !S.arrived) stop(': the server did not confirm KILL within 6 s', true);
@@ -790,7 +813,7 @@ function kill() {
   if (!S.events.length && !recorded()) {  // the job id and kill token come with the server's first record (a Resume's too)
     if (S.killPending) return;
     S.killPending = true;
-    el.text.textContent = 'KILL pressed before the server answered: the page has no job id yet, so KILL is sent the moment it arrives.';
+    stopping('KILL pressed before the server answered: the page has no job id yet, so KILL is sent the moment it arrives.');
     narrate('KILL queued: it is sent as soon as the server answers.');
     clearTimeout(S.killTimer);
     S.killTimer = setTimeout(() => {  // no answer at all: cancel the upload rather than leave KILL doing nothing

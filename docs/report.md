@@ -11,7 +11,9 @@ implementation · 7 Related work · 8 Evaluation · 9 Failures · 10 Agentic evi
 
 Recall is the share of labelled defects found at the 30 % pixel cap, with paired 95 % bootstrap intervals over
 photos; chance is the same model's boxes moved to random places, and IoU-only drops the contains-the-centre match
-(section 8). Each segmenter was scored once on the held-out sets (`results/heldout_models.json`);
+(section 8). Each row was scored once on each held-out set (`results/heldout_models.json`), but v1 had been
+scored on CODEBRIM eval200 and synth200 once before (2026-10-18, unpublished): its row is its second scoring there,
+and v1-policy2's is v1's third read (section 8);
 `tests/test_report_doc.py` fails if a number here drifts from that file or, for the Lambda timings, from
 [aws.md](aws.md).
 
@@ -29,7 +31,7 @@ v1-policy2, the live one (section 8). The last column counts boxes: each connect
 look that drew it, that is critical by class and area. That is the unit the scorer matches, and one finding has
 several.
 
-- **v1 runs live since 2026-10-21**, with the v1-policy2 look policy since 2026-10-22 (deployed commit 1227371, smoke-tested: [aws.md](aws.md)). It was chosen on the
+- **v1 runs live since 2026-10-21**, with the v1-policy2 look policy since 2026-10-22 (deployed commit 08cd9b3, smoke-tested: [aws.md](aws.md)). It was chosen on the
   dev splits only (`results/dev/model_choice_dev.json`); held out it is again the only model with no measurable
   loss against any other. These are its second scorings (one earlier, unpublished). Its CC BY-NC 4.0 weights are
   release assets of v1.1.0, not in git.
@@ -81,8 +83,8 @@ the triage of a backlog may cost. **Judges** need a trace in which an OpenCV out
 failure drills they can trigger, a live endpoint and honest failure cases. The **operator** who pays for the AWS
 account needs caps, a budget alert and one command that stops all spending.
 
-The narrated submission film (4:27, captions on) is an asset of the v1.1.2 release
-([drishyam.mp4](https://github.com/vj-io/drishyam/releases/download/v1.1.2/drishyam.mp4), not in git) and also plays
+The narrated submission film (4:37, captions on) is an asset of the v1.1.3 release
+([drishyam.mp4](https://github.com/vj-io/drishyam/releases/download/v1.1.3/drishyam.mp4), not in git) and also plays
 on the site's Docs and links sheet; `video/plan.md` says how it is built and where each number in it comes from.
 
 Not built yet: approval from an SNS email link (approval is the web review or `drishyam review`); the COOL
@@ -170,14 +172,14 @@ limits and the cost table, is [aws.md](aws.md).
   AppErrors) and X-Ray tracing. The alarms and a 20 USD monthly budget publish to one SNS topic, whose email
   subscription is confirmed: a test alarm (AppErrors set to ALARM by hand) reached the owner's email on 2026-10-21.
   The alarms have no OK action, so a recovery sends no email.
-- **Smoke test** (`scripts/aws.sh smoke` with `WAF_LOOP=1`, `scripts/smoke.sh`): `smoke 2026-10-23T04:50:56Z
-  result=pass`, against the live build, commit 1227371, the commit `/api/health` reports: a job on `bridge_03.jpg`
+- **Smoke test** (`scripts/aws.sh smoke` with `WAF_LOOP=1`, `scripts/smoke.sh`): `smoke 2026-10-23T07:45:28Z
+  result=pass`, against the live build, commit 08cd9b3, the commit `/api/health` reports: a job on `bridge_03.jpg`
   ended `awaiting_review` after 6 steps; KILL, sent after step 2 streamed, halted the second job after 3 steps; a
-  `POST` without the body hash and a direct Function URL call both got 403; the WAF answered 429 at the 39th
-  empty-bodied job start (WAF evaluates rates about every 10 s, so it blocks late); and the step p95 was 980.3 ms over
+  `POST` without the body hash and a direct Function URL call both got 403; the WAF answered 429 at the 26th
+  empty-bodied job start (WAF evaluates rates about every 10 s, so it blocks late); and the step p95 was 997.4 ms over
   6 steps, under v1's 1500 ms limit. The live browser suite (`tests/e2e/test_ui_live.py`) passed twice against this
-  deploy; against the one before it, a2b8688, it passed three of four runs, once its guided run taking 40.8 s, over
-  the suite's 40 s limit ([aws.md](aws.md)). With v1 a step's p95 was 0.52 to 1.14 s over the eleven v1 smoke runs to f12f50f, and every later run
+  deploy (guided runs 39.4 s and 40.7 s) and twice against 1227371 before it; against a2b8688 it passed three of four
+  runs, once its guided run taking 40.8 s, over the suite's limit then of 40 s (45 s now) ([aws.md](aws.md)). With v1 a step's p95 was 0.52 to 1.14 s over the eleven v1 smoke runs to f12f50f, and every later run
   [aws.md](aws.md) quotes falls in that range, against 67.7 to 88.0 ms for the classical engine before it.
 - **Cost.** Spent so far: 0.62 USD before credits, month to date on 2026-10-21 (Cost Explorer; 0.59 of it the WAF),
   0.00 USD after them. The list-price estimate is about 10 USD a month at 1,000 jobs a month, 8 of it the WAF ([aws.md](aws.md)). The $ shown
@@ -427,7 +429,7 @@ The FR-21 ablations (random gaze order, no uncertainty term, no survey look, no 
   0.26 of the pixels on average: 189 of 200 jobs hit the cap (each at 0.27 of the pixels, so p50 = p95 = 0.27), and
   the other 11 stop earlier (7 on the stop rule, 4 with every candidate looked at).
 
-The images are procedural (`evals/synth.py`): 2048×1536 weathered concrete with drawn cracks, spalls, efflorescence, exposed rebar and rust run-off, plus graffiti, formwork lines, water stains, blur and glare as distractors. The eight bundled samples in `public/samples/` come from the same generator. The two others there, `real_01` and `real_02`, are our own photos of a painted plaster wall with no ground truth, so no number in this report uses them; the site replays the v1 segmenter's recorded run on each (`real_0N.ndjson`; the same runs as `video/live/real.ndjson` and `video/live/variants/IMG_2330/real.ndjson`).
+The images are procedural (`evals/synth.py`): 2048×1536 weathered concrete with drawn cracks, spalls, efflorescence, exposed rebar and rust run-off, plus graffiti, formwork lines, water stains, blur and glare as distractors. The eight bundled samples in `public/samples/` come from the same generator. The two others there, `real_01` and `real_02`, are our own photos of a painted plaster wall with no ground truth, so no number in this report uses them; the site replays the v1 engine's run on each, recorded live on the site on 2026-10-23 with measured costs (`real_0N.ndjson`, with their heatmaps and crops; `video/live/walls/IMG_2332/real.ndjson` and `video/live/walls/IMG_2330/real.ndjson` are the same runs with the images removed). Section 9 also cites the local runs of 2026-10-21 that the site replayed before (`results/real-walls-2026-10-21/`).
 
 ![Recall against pixels processed](recall_vs_pixels.png)
 
@@ -673,7 +675,7 @@ score, overlapping critical findings of one class merged, and the zero-candidate
 were committed before any of them ran ([results/dev/policy2_sweep.json](../results/dev/policy2_sweep.json), commit
 54b5601); two passed every clause, and the one that found more critical-class boxes became v1's default in the code
 (`drishyam.agent.POLICY2`), and the live site runs it since 2026-10-22 (first deployed from commit adf9474; the live
-build is 1227371, [aws.md](aws.md)). It was then scored **once** on
+build is 08cd9b3, [aws.md](aws.md)). It was then scored **once** on
 the held-out sets with v1's recipe and cost table (`runs/heldout/run_policy2.sh`, at commit 44d891d; the leakage
 check first, the same counts). This is v1's third read of CODEBRIM eval200 and synth200 and its second of the clean
 set; a held-out run of v1 with the fallback alone was started and stopped, and its output was never read or used.
@@ -784,8 +786,9 @@ the site.
 ![Our photo of a painted plaster wall (IMG_2332), no ground truth](../public/samples/thumbs/real_01.jpg)
 
 `public/samples/real_01.jpg` is our own photo (IMG_2332) of a painted plaster wall, with no ground truth; by eye one
-hairline crack runs corner to corner. Run with the v1 segmenter (weights sha256 `c49416c1...`, the fixed cost table
-`results/local-macos-x86-dacl10k-retime/`, 30 % cap; `public/samples/real_01.ndjson`), the overview proposed no
+hairline crack runs corner to corner. Run locally on 2026-10-21 with the v1 segmenter (weights sha256 `c49416c1...`,
+the fixed cost table `results/local-macos-x86-dacl10k-retime/`, 30 % cap;
+`results/real-walls-2026-10-21/real_01.ndjson`, the site's replay until 2026-10-23), the overview proposed no
 candidate window, so the job ended after the overview, at 0.0157 of the pixels, with cause `exhausted` ("every
 candidate has been looked at", true of an empty list) and no finding. That recording predates the zero-candidate
 fallback: the segmenter never saw the photo, and the miss is the saliency prior's, which at L3 (1/8 scale) found no
@@ -806,17 +809,20 @@ texture), so nothing is drafted, and the work order lists the photo twice, `chec
 instruction that is wrong for this sharp photo. A gate that judges focus against the view's own contrast
 (`blur_gate "both"`) would pass this look: its re-blur ratio is 0.20, and v1 then verifies at L1 and drafts 4
 crack boxes, none critical. It is not adopted, because on dev it also passes views blurred too much to trust
-(section 8). The site's **Watch it on a real wall** replays the older recording.
+(section 8). The site's **Watch it on a real wall** replays that look as the live site ran it on 2026-10-23
+(`public/samples/real_01.ndjson`, job `j_f25b21`, measured costs): sharpness 5.1, 9,136 crack px, nothing drafted,
+0.099 of the pixels.
 
 On the other wall photo (`real_02.jpg`, IMG_2330, two cracks by
-eye) the same engine took one look and drafted one crack, a 678 × 70 px box on part of the lower crack; the upper
-crack got no finding. With no ground truth neither photo is scored.
+eye) the same local run (`results/real-walls-2026-10-21/real_02.ndjson`) took one look and drafted one crack, a
+678 × 70 px box on part of the lower crack; the upper crack got no finding. The live run the site replays (job
+`j_5b2049`) did the same, with a 652 × 76 px box. With no ground truth neither photo is scored.
 
 ## 10. Agentic evidence
 
 Every step's action is a logged function of an OpenCV output or a runtime
-statistic, with a `cause`. A recorded trace (synthetic sample `bridge_03`, the classical engine, which zooms to L0
-where v1 stops at L1, 30 % pixel cap, the published fixed arm64
+statistic, with a `cause`. A recorded trace of the **classical engine**, not of v1, the live engine (synthetic sample
+`bridge_03`; the classical engine zooms to L0 where v1 stops at L1; 30 % pixel cap, the published fixed arm64
 costs on a virtual clock, so machine load does not change it and a re-run on x86 gives the same file:
 [trace-bridge_03.ndjson](trace-bridge_03.ndjson), from `python -m evals.trace_sample`), its first four steps abridged
 (the seeds without their entropy):
@@ -850,7 +856,7 @@ Failure drills, each runnable from the UI (`chaos` toggles) and covered by tests
 | --- | --- |
 | 20 planner timeouts + 20 malformed planner replies | 40 / 40 recovered by the rule planner (`test_20_timeouts_and_20_malformed_all_recover`) |
 | Forced p95 spike on the segmenter | the next step's cause is `p95>SLA` and its model is `fast` (`test_forced_p95_spike_changes_next_steps_model`) |
-| KILL during a live job | kill sent during step 3 → step 4 halted with cause `kill-switch` (`test_kill_endpoint_halts_a_running_job`, the live e2e run; on the deployed site, check 3 of `scripts/smoke.sh`, sent once step 2 has streamed: halted after 3 steps in the 1227371 smoke run, section 5) |
+| KILL during a live job | kill sent during step 3 → step 4 halted with cause `kill-switch` (`test_kill_endpoint_halts_a_running_job`, the live e2e run; on the deployed site, check 3 of `scripts/smoke.sh`, sent once step 2 has streamed: halted after 3 steps in the 08cd9b3 smoke run, section 5) |
 | $ and pixel caps | the job halts inside one step with coverage and unvisited regions reported (`test_pixel_cap_is_never_exceeded`, `test_seconds_and_usd_caps_halt`) |
 | Agent tries to approve its own critical finding | `ForbiddenTransition` (`test_agent_cannot_decide_or_downgrade`) |
 
@@ -907,7 +913,8 @@ the replay exactly.
 ## 11. Responsible use and limits
 
 - Evidence-first UI: crop, measurements and gaze step before any confidence
-  number; an "AI-assisted, not an inspection" banner on every finding.
+  number; one "AI-assisted, not an inspection" banner above the findings list, the same words in the site's footer
+  and FAQ, and a `disclaimer` field in every work order.
 - Pixels only. No millimetres without a scale reference; no safety ratings. With v1 a crack's width is its mask's
   width, not the crack's: the mask is 15 to 17 crop pixels wide at every level, so the width scales with the look's
   level (in the MCP v1 session, 34 and 69 px for one hairline on `real_01`; section 10). Criticality is a pixel-area threshold
@@ -928,8 +935,8 @@ the replay exactly.
   measurable, that the uncertainty term and the seeding earn a little recall only uncapped on the 2048×1536 set, and
   that image-driven gaze order beats random order only on the larger photos (section 8).
 - On one of our own wall photos the overview proposed no region and a hairline crack visible by eye was missed
-  (section 9): the recorded run took no look, and with the zero-candidate fallback the one whole-photo look is refused
-  by the blur gate (a scale-free gate that passes it was measured on dev and not adopted, section 8). Its work order has no finding, but it lists the whole photo as `not_assessed`
+  (section 9): the local run of 2026-10-21 took no look, and with the zero-candidate fallback (the live run the site
+  replays) the one whole-photo look is refused by the blur gate (a scale-free gate that passes it was measured on dev and not adopted, section 8). Its work order has no finding, but it lists the whole photo as `not_assessed`
   (action `check-by-eye`) and reads `incomplete`, not `ready`, until a person checks the photo by eye and records it
   (the web review's Checked by eye, or `drishyam review <work order> na0 nothing-found|defect-found`), so it does not
   pass for a clean wall.

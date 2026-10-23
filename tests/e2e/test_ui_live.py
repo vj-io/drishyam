@@ -126,6 +126,7 @@ def run(base, server_log=None):
         expect(page.locator("#gallery .thumb[data-file='bridge_03.jpg']")).to_have_attribute("aria-pressed", "true", timeout=15000)
         expect(page.locator("#look")).to_be_enabled(timeout=15000)
         expect(page.locator("#try-kill")).to_be_enabled()           # the KILL drill is offered before any run
+        expect(page.locator("#guided .cta__time")).to_have_text("(about 40 s)")   # the claim the timing below checks
         page.locator("#guided").click()
         t0 = time.time()
         expect(page.locator("#narrator")).to_contain_text("Sending the photo", timeout=2000)  # the page answers the click at once
@@ -143,7 +144,9 @@ def run(base, server_log=None):
         notes = set()
         status = p.wait_done(timeout=90, notes=notes)     # the whole guided run at reading speed, no Skip
         took = time.time() - t0
-        assert took < 40, f"the guided run took {took:.1f} s"
+        # The button says "about 40 s": live guided runs took 32.7 to 40.8 s from click to done, median about 36 s
+        # (docs/aws.md). 45 s allows that slow tail; a run over it would make the label wrong, not the test strict.
+        assert took < 45, f"the guided run took {took:.1f} s; the button says about 40 s"
         expect(page.locator("#job-text")).to_contain_text("we replayed it slowly so you can read it")
         p.plain()
         expect(page.locator("#findings .finding").first).to_be_visible()
@@ -274,7 +277,8 @@ def run(base, server_log=None):
         print("ok  no CSP violations, no console errors")
 
         # 3b. The guided run on a real photo of ours: the v1 engine's recorded job is replayed from public/samples (no job
-        #     on the server), labelled as our photo with no ground truth, and the recap says what the agent flagged.
+        #     on the server), labelled as our photo with no ground truth, and the recap says what the agent flagged. The
+        #     recordings are live runs with their heatmaps and crops (one with its images removed would say so in the bar and the camera).
         page.reload()
         expect(page.locator("#gallery .thumb")).to_have_count(10, timeout=15000)
         index = json.loads((ROOT / "public/samples/index.json").read_text())
@@ -295,7 +299,12 @@ def run(base, server_log=None):
         assert sum("/api/jobs" in u for u in p.requests) == jobs, "the real-photo guided run replays a recording: no job on the server"
         expect(page.locator("#trace .trace__line[data-step]")).to_have_count(sum(e["type"] == "step" for e in recorded))
         expect(page.locator("#findings .finding")).to_have_count(recorded[-1]["summary"]["findings"])
-        expect(page.locator("#job-text")).to_contain_text("(modelled)")
+        if recorded[0].get("cost_model", {}).get("kind") == "fixed":
+            expect(page.locator("#job-text")).to_contain_text("(modelled)")
+        else:
+            expect(page.locator("#job-text")).not_to_contain_text("(modelled)")
+        if any(e.get("crop_jpeg_b64") == "<removed: image>" for e in recorded):   # video/record.py removed the images
+            expect(page.locator("#cam-cap")).to_contain_text("this recording keeps no image of its looks")
         expect(page.locator("#recap .recap__real")).to_contain_text("REAL PHOTO (ours), no ground truth")
         expect(page.locator("#recap .recap__real")).to_contain_text(real["note"])
         expect(page.locator("#trace .chip", has_text="p95>SLA")).to_have_count(slow)
@@ -312,8 +321,11 @@ def run(base, server_log=None):
         page.get_by_role("button", name="Our other wall photo").click()
         expect(page.locator("#gallery .thumb[data-file='real_01.jpg']")).to_have_attribute("aria-pressed", "true", timeout=15000)
         expect(page.locator("#recap .recap__real")).to_contain_text("flagged nothing", timeout=30000)
+        first = [json.loads(ln) for ln in (ROOT / "public/samples/real_01.ndjson").read_text().splitlines()]
+        if any(e["type"] == "step" and e.get("cause") == "fallback-l2" for e in first):   # the zero-candidate fallback's look
+            expect(page.locator("#recap .recap__real")).to_contain_text("its overview proposed no region, so it took one look at the whole photo")
         expect(page.locator("#recap")).to_contain_text("Not assessed: no candidate region was proposed, so the whole photo is not assessed")
-        expect(page.locator("#job-pill")).to_have_text("needs a look", ignore_case=True)  # not "done": no look ran
+        expect(page.locator("#job-pill")).to_have_text("needs a look", ignore_case=True)  # not "done": the photo is not assessed
         assert sum("/api/jobs" in u for u in p.requests) == jobs
         p.clean()
         print("ok  real photos: the v1 runs replayed from their recordings (no server job), labelled, recap says what it flagged, "

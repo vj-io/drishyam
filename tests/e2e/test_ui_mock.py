@@ -547,7 +547,7 @@ def test_desktop_mock(browser, base):
     # the real-photo card is the live engine's and comes first, short: its interval and chance (REAL has no point at
     # the 30 % cap, so no classical recall beside it); every number stated before the runs is in FIG. 4.2's note
     expect(p.locator(".stats > .stat").first).to_have_id("stat-real")
-    expect(p.locator("#stat-real .stat__k")).to_have_text("Live engine (v1), real bridge photos (CODEBRIM, 200)")
+    expect(p.locator("#stat-real .stat__k")).to_have_text("Live segmenter v1, first look policy: real bridge photos (CODEBRIM, 200)")
     expect(p.locator("#stat-real .stat__v")).to_have_text("recall 0.49")
     expect(p.locator("#stat-real .stat__s")).to_have_text(
         "at the 30 % pixel cap (CI 0.44–0.54); chance 0.30.")
@@ -894,7 +894,7 @@ def test_guided(browser, base):
     p = s.page
     p.goto(f"{base}/")
     expect(p.locator("#look")).to_be_enabled(timeout=T)
-    expect(p.locator("#guided")).to_contain_text(re.compile(r"under \d+ s"))
+    expect(p.locator("#guided")).to_contain_text(re.compile(r"\(about \d+ s\)"))   # test_ui_live.py times it
     p.click("#guided")
     until(lambda: LIVE["jobs"], "the guided job request", page=p)
     assert LIVE["jobs"][0]["query"].get("pace_ms") == ["1000"], LIVE["jobs"][0]["query"]
@@ -1435,6 +1435,7 @@ def test_kill_before_the_first_record(browser, base):
     """KILL pressed while the photo is still on its way, before the server's first record (which carries the job id
     and kill token): the page says, in the bar and the NOTE, that KILL is queued, and sends it the moment the job
     record arrives. The server reads a KILL only after a step record, so look 1 runs and the halt comes at step 2.
+    From the click to the halt the pill reads "stopping", never "running" again, and the bar says KILL was sent.
     Meanwhile the camera panel says a job is on its way, never "No look yet. Press Run.". The operator-wide switch,
     set before the job began, halts it before any look: then nothing on the page says a state is kept or can be
     resumed, and the done state counts no looks and no findings. In a recording, KILL before its first record says
@@ -1448,12 +1449,21 @@ def test_kill_before_the_first_record(browser, base):
     until(lambda: LIVE["jobs"], "the upload to reach the server", page=p)       # its first record is 2.5 s away
     expect(p.locator("#cam-cap")).to_have_text("Sending the photo: the first look follows the server’s preparation")
     p.click("#kill")
+    expect(p.locator("#job-pill")).to_have_text("stopping")   # at once: the job id, and so the halt, are seconds away
+    p.evaluate("""() => { const bar = document.querySelector('#taskbar'), pill = document.querySelector('#job-pill');
+      const text = document.querySelector('#job-text'); window.__bar = [[pill.textContent, text.textContent]];
+      new MutationObserver(() => window.__bar.push([pill.textContent, text.textContent]))
+        .observe(bar, { subtree: true, childList: true, characterData: true }); }""")   # every state, however short
     expect(p.locator("#job-text")).to_contain_text("the page has no job id yet, so KILL is sent the moment it arrives")
     expect(p.locator("#narrator")).to_have_text("KILL queued: it is sent as soon as the server answers.")   # a phone reads the NOTE
     assert not LIVE["kills"], "nothing can be sent before the job id is known"
     until(lambda: LIVE["kills"], "POST /api/kill once the job record arrives", page=p)
     assert [{k: v for k, v in r.items() if k != "signed"} for r in LIVE["kills"]] == [{"job": JOB["job"], "kill_token": JOB["kill_token"]}]
     expect(p.locator("#job-pill")).to_have_text("halted", timeout=T)
+    bar = p.evaluate("window.__bar")
+    pills = [pill for pill, _ in bar]
+    assert pills.index("halted") > 0 and set(pills[:pills.index("halted")]) == {"stopping"}, f"KILL to halt: {bar}"
+    assert any(t == "KILL sent: stopping before the agent’s next look…" for pill, t in bar if pill == "stopping"), bar
     expect(p.locator(".trace__line .chip", has_text=re.compile("^kill-switch$"))).to_have_count(1)
     expect(p.locator("#job-text")).to_contain_text("Halted by KILL at step 1: the trace shows kill-switch and the state is kept.")
     expect(p.locator(".trace__line[data-step]")).to_have_count(2)            # look 1, then the halt
@@ -1514,16 +1524,17 @@ def test_kill_before_the_first_record(browser, base):
         s.context.close()
     finally:
         LIVE["fixture_delay"] = 0
-    print("ok  KILL before the first record: queued, sent once the job id arrives, halts after look 1; the operator switch "
+    print("ok  KILL before the first record: queued, the pill \"stopping\" from the click to the halt, sent once the job id "
+          "arrives, halts after look 1; the operator switch "
           "before any look keeps nothing; a recording says nothing had started")
 
 
 def test_kill_the_server_never_confirms(browser, base):
-    """KILL is never reported as a kill the server did not make. No job record within 8 s of a KILL pressed before it:
+    """KILL is never reported as a kill the server did not make. No job record within 15 s of a KILL pressed before it:
     the page cancels the upload and says the server may run the job on. A KILL sent but never confirmed within 6 s:
     the page stops showing the job (pill "stopped", not "killed"), says the server may still be running it, and
     keeps what arrived for Resume."""
-    reset_live([{"lines": JOB_LINES, "delay": 0.25, "lead": 15}])
+    reset_live([{"lines": JOB_LINES, "delay": 0.25, "lead": 20}])
     s = Session(browser, "kill-unanswered", viewport={"width": 1440, "height": 900})
     p = s.page
     p.goto(f"{base}/")
@@ -1531,8 +1542,11 @@ def test_kill_the_server_never_confirms(browser, base):
     p.click("#look")
     until(lambda: LIVE["jobs"], "the upload to reach the server", page=p)
     p.click("#kill")
-    expect(p.locator("#job-pill")).to_have_text("ready", timeout=12_000)
-    expect(p.locator("#job-text")).to_contain_text("the server had not answered 8 s after KILL, so the page cancelled the upload")
+    expect(p.locator("#job-pill")).to_have_text("stopping")   # KILL queued, the wait counting up in the bar
+    p.wait_for_timeout(9000)                                   # past the old 8 s limit, KILL still waits for the job id
+    expect(p.locator("#job-pill")).to_have_text("stopping")
+    expect(p.locator("#job-pill")).to_have_text("ready", timeout=10_000)
+    expect(p.locator("#job-text")).to_contain_text("the server had not answered 15 s after KILL, so the page cancelled the upload")
     expect(p.locator("#job-text")).to_contain_text("it may run on, unseen, up to its time cap")
     expect(p.locator("#look")).to_be_enabled()
     assert not LIVE["kills"], "no job id ever arrived, so nothing could be sent"
@@ -1548,6 +1562,7 @@ def test_kill_the_server_never_confirms(browser, base):
     p.locator("#skip").click(timeout=T)
     expect(p.locator(".trace__line[data-step='1']")).to_be_visible(timeout=T)
     p.click("#kill")
+    expect(p.locator("#job-pill")).to_have_text("stopping")   # at once, until the halt or the 6 s limit
     until(lambda: LIVE["kills"], "POST /api/kill", page=p)
     expect(p.locator("#job-pill")).to_have_text("stopped", timeout=10_000)
     expect(p.locator("#job-text")).to_contain_text("The page stopped showing the job at step")
@@ -1556,7 +1571,7 @@ def test_kill_the_server_never_confirms(browser, base):
     expect(p.locator("#resume")).to_be_visible()
     s.check_clean()
     s.context.close()
-    print("ok  KILL never confirmed: the upload is cancelled after 8 s, or the page stops showing the job after 6 s; neither is called a kill")
+    print("ok  KILL never confirmed: the upload is cancelled after 15 s, or the page stops showing the job after 6 s; neither is called a kill")
 
 
 def test_contract_fields_in_words(browser, base):
@@ -1744,7 +1759,7 @@ def test_accessibility(browser, base):
         assert not problems, f"{size['width']} px: Tab stops without a visible ring, under the sticky bars or out of order: {problems[:6]}"
         text = p.evaluate("document.body.textContent.replace(/\\s+/g, ' ')")
         assert text.count("a payment-method restriction") == 1 and text.count("COOL on Graviton: not run") == 2, "the COOL reason once, both notices"
-        assert text.count("in a recorded session Claude chose each call") == 1 and text.count("No LLM runs in this demo") == 2
+        assert text.count("in sessions recorded on v1, the live engine, Claude chose each call") == 1 and text.count("No LLM runs in this demo") == 2
         s.check_clean()
         s.context.close()
     print("ok  accessibility: focus ring on every Tab stop, none under the bars, WCAG AA contrast, no explanation given twice")

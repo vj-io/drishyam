@@ -71,10 +71,10 @@
       <p class="lede">For bridge inspectors reviewing high-resolution photos: it chooses where to look, zooms in where its segmenter is unsure, drafts cracks, spalling and other defects for review, and hands every critical finding to a person to sign off.</p>
       <p class="gloss">It works like a PTZ camera (pan-tilt-zoom), done in software: it pans and zooms across one big photo instead of moving a real camera.</p>
       <div class="cta">
-        <button class="btn btn--amber btn--xl" id="guided" type="button"><span>Watch it inspect a bridge <span class="cta__time">(under 40 s)</span></span></button>
-        <button class="btn btn--amber btn--xl" id="guided-real" type="button" hidden><span>Watch it on a real wall <span class="cta__time">(our own photo, recorded)</span></span></button>
+        <button class="btn btn--amber btn--xl" id="guided" type="button"><span>Watch it inspect a bridge <span class="cta__time">(about 40 s)</span></span></button>
+        <button class="btn btn--amber btn--xl" id="guided-real" type="button" hidden><span>Watch it on a real wall <span class="cta__time">(our own photo, recorded live)</span></span></button>
         <a class="btn" id="own" href="#step-photo">Try your own photo</a>
-        <a class="cta__link" id="video-link" href="#video">Watch the film (4:27)</a>
+        <a class="cta__link" id="video-link" href="#video">Watch the film (4:37)</a>
       </div>
       <p class="note" id="rebar-note">Live, the guided photo&rsquo;s exposed rebar scores 0.58, under the 0.6 confidence floor, so a person checks it by eye; the spalling is still critical.</p>
       <p class="stakes">The US has 624,939 bridges (FHWA, 2026), and the rule is a routine inspection at intervals of up to 24 months (23 CFR 650.311). One drone inspection of a single bridge produced 2,536 photos. Someone has to look at every one. <a href="https://github.com/vj-io/drishyam/blob/main/docs/impact-sources.md" rel="noopener noreferrer">Sources</a></p>
@@ -176,7 +176,7 @@
     <dl class="tblock" aria-hidden="true">
       <div class="tblock__title"><dt>Title</dt><dd>Drishyam &mdash; virtual-PTZ bridge inspector</dd></div>
       <div><dt>Drawn by</dt><dd>agent</dd></div>
-      <div><dt>Checked by</dt><dd>human reviewer</dd></div>
+      <div><dt>Checked by</dt><dd>unsigned</dd></div>
       <div><dt>Scale</dt><dd>pyramid L4 &rarr; L0</dd></div>
       <div><dt>Sheet</dt><dd class="tblock__sheet">1 of 7</dd></div>
     </dl>
@@ -374,7 +374,7 @@
               <div><dt>stop rule</dt><dd>stop when the next look is worth less than it would cost.</dd></div>
               <div><dt>cap-hit</dt><dd>a budget cap (pixels, $, seconds or steps) was reached, so it stopped.</dd></div>
               <div><dt>kill switch</dt><dd>your KILL button: it halts before the next look and keeps the state for Resume.</dd></div>
-              <div><dt>v1-policy2</dt><dd>the live look policy since 2026-10-22, for the v1 segmenter: a critical mask under confidence 0.6 gets a confirm look before it becomes a finding.</dd></div>
+              <div><dt>v1-policy2</dt><dd>the live look policy since 2026-10-22, for the v1 segmenter: first looks on a tile grid, exposed rebar and spalling weighted 2&times;, a confirm look for a critical mask under confidence 0.6, and overlapping critical findings merged (FIG. 3.1 and 3.2).</dd></div>
               <div><dt>confirm look</dt><dd>one more look at the same level, centred on the doubtful mask. If it does not confirm the mask, a person checks that spot by eye.</dd></div>
               <div><dt>planner</dt><dd>an optional language-model planner. Its plans must pass an allow-list; if it fails, the built-in rule planner decides.</dd></div>
             </dl>
@@ -400,7 +400,7 @@
       <div class="win__body stack">
         <dl class="tblock tblock--live" aria-label="Drawing status">
           <div><dt>Drawn by</dt><dd>agent</dd></div>
-          <div><dt>Checked by</dt><dd id="tb-checked">human reviewer</dd></div>
+          <div><dt>Checked by</dt><dd id="tb-checked">unsigned</dd></div>
           <div><dt>Step</dt><dd class="tblock__sheet" id="tb-sheet">0 of 0</dd></div>
           <div><dt>Scale</dt><dd id="tb-scale">overview</dd></div>
         </dl>
@@ -439,7 +439,7 @@
         <p class="formula" aria-label="score of r equals p times s times one plus u times a divided by t-hat">score(r) = <b data-n="1">p</b> &middot; <b data-n="2">s</b> &middot; (1 + <b data-n="3">u</b>) &middot; <b data-n="4">a</b> / <b data-n="5">t&#770;</b></p>
         <dl class="terms">
           <div><dt data-n="1">p</dt><dd>saliency prior from the overview, 0&ndash;1. How likely is something here?</dd></div>
-          <div><dt data-n="2">s</dt><dd>class severity weight of the most severe class a look has already seen in the region, 1 while no look has seen a class there. Exposed rebar 3.0, spalling 2.0, crack 1.5, corrosion 1.0, efflorescence 0.5.</dd></div>
+          <div><dt data-n="2">s</dt><dd>class severity weight of the most severe class a look has already seen in the region, 1 while no look has seen a class there. Exposed rebar 3.0, spalling 2.0, crack 1.5, corrosion 1.0, efflorescence 0.5. The live policy, v1-policy2, doubles the two critical classes, so the trace says severity 6 for exposed rebar and 4 for spalling.</dd></div>
           <div><dt data-n="3">u</dt><dd>segmenter entropy over the region from the finest look that has shown it, 0 until one has. How unsure are we?</dd></div>
           <div><dt data-n="4">a</dt><dd>fraction of the region not yet seen at the target level. Don&rsquo;t look twice.</dd></div>
           <div><dt data-n="5">t&#770;</dt><dd>predicted milliseconds for the planned ops, from the live p95. What does looking cost?</dd></div>
@@ -451,9 +451,9 @@
       <div class="win__bar"><span class="win__fig" aria-hidden="true">FIG. 3.2</span><h3 class="win__title" id="t-rules">Five rules</h3></div>
       <div class="win__body">
         <ol class="rules">
-          <li><b>Next gaze.</b> Take the highest score. Ties go to the larger unseen share, then top-left first. That is deterministic for the same timings; live latency changes t&#770;, so two runs can differ.</li>
+          <li><b>Next gaze.</b> Take the highest score. Ties go to the larger unseen share, then top-left first. That is deterministic for the same timings; live latency changes t&#770;, so two runs can differ. With v1-policy2 the candidates are first grouped into 512-px tiles at the first look&rsquo;s level, cut as the tiling baseline cuts them: one first look per tile that holds a candidate, covering that tile.</li>
           <li><b>Escalate (zoom in).</b> Zoom one pyramid level finer (2&times;) on the same centre when entropy &gt; &tau; (0.5), meaning the segmenter is unsure, or the mask is under 64 px, down to L0 (full resolution). The live v1 engine stops sooner: a look spans at least 0.3 of the photo&rsquo;s long side, so its finest level is L1 (half size) on a 2048-px photo and L2 on a 4608-px one, and a look there is neither escalated nor double-checked further.</li>
-          <li><b>Verify (double-check).</b> When a mask appears at a new level, re-segment one level finer and record the IoU of the same class&rsquo;s two masks (how much they overlap). Under 0.5 means one more look, or a human for a critical class. If that class is gone or under 0.5 but the finer look&rsquo;s main mask covers the same place (IoU 0.5 or more) as another class, it is a <i>class change</i>: the finer look&rsquo;s class is kept, and a human is asked when either finding is critical. With v1-policy2, live since 2026-10-22, a mask that would make a new critical finding with a confidence under 0.6 first gets one confirm look at the same level, centred on it; if that look does not confirm it, a person checks it by eye (a needs-a-look entry, not a critical finding).</li>
+          <li><b>Verify (double-check).</b> When a mask appears at a new level, re-segment one level finer and record the IoU of the same class&rsquo;s two masks (how much they overlap). Under 0.5 means one more look, or a human for a critical class. If that class is gone or under 0.5 but the finer look&rsquo;s main mask covers the same place (IoU 0.5 or more) as another class, it is a <i>class change</i>: the finer look&rsquo;s class is kept, and a human is asked when either finding is critical. With v1-policy2, live since 2026-10-22, a mask that would make a new critical finding with a confidence under 0.6 first gets one confirm look at the same level, centred on it; if that look does not confirm it, a person checks it by eye (a needs-a-look entry, not a critical finding). Overlapping critical findings of one class are merged: a critical mask joins a critical finding of its class when either box lies at least half inside the other.</li>
           <li><b>Stop.</b> When the best remaining score falls below &lambda; = max(&epsilon; &times; value so far &divide; cost so far, &epsilon; &times; v0 &divide; t&#770;), that is, when the next look is worth less than it costs, or any cap is hit. &epsilon; is 0.25. The second term is the floor, the least any look must promise: v0 (2.0) is the value of a look that finds nothing, so a photo with nothing to find can stop before its cap. It counts only once a look has shown the best candidate, so the stop rule never ends a job on the saliency prior alone. An overview that proposes no region gets one look at L2 spanning the whole photo (cause <i>fallback-l2</i>), and the work order still marks the whole photo as not assessed, for a person to look at.</li>
           <li><b>Governor.</b> The budget-and-speed watchdog runs before every step and may override the model, level or view size. Every override writes a cause into the trace.</li>
         </ol>
@@ -493,15 +493,15 @@
     <section class="win pop" aria-labelledby="t-live">
       <div class="win__bar"><span class="win__fig" aria-hidden="true">FIG. 3.5</span><h3 class="win__title" id="t-live">What runs live, and what does not</h3></div>
       <div class="win__body stack">
-        <p class="say"><b>No LLM runs in this demo.</b> The live agent is the rule policy above, and the drill planners are scripted to fail. The LLM path is the MCP server: in a recorded session Claude chose each call from the numbers the tools measured: saliency priors, entropy, IoU and the budget left (its prompt states the decision rules). <a href="https://github.com/vj-io/drishyam/blob/main/docs/mcp-session/transcript.md" rel="noopener noreferrer">Read the recorded session</a>.</p>
-        <p class="say"><b>OpenCV 5.</b> Since 2026-10-21 the live demo runs v1, our dacl10k-trained segmenter, through the one OpenCV 5-only call it makes: <code>cv2.dnn.readNetFromONNX</code> with <code>engine=cv2.dnn.ENGINE_NEW</code> (<code>ENGINE_CLASSIC</code> cannot import the model). Run without the model (no <code>DRISHYAM_ONNX</code>), the agent uses the classical engine, which needs no OpenCV 5-only API. Since 2026-10-22 it looks with the policy v1-policy2 (FIG. 3.2, rule 3). The engine that answered is named at the foot of the page.</p>
+        <p class="say"><b>No LLM runs in this demo.</b> The live agent is the rule policy above, and the drill planners are scripted to fail. The LLM path is the MCP server: in sessions recorded on v1, the live engine, Claude chose each call from the numbers the tools measured: saliency priors, entropy, IoU and the budget left (its prompt states the decision rules). <a href="https://github.com/vj-io/drishyam/blob/main/docs/mcp-session-v1/transcript.md" rel="noopener noreferrer">Read the recorded sessions (v1 engine)</a>.</p>
+        <p class="say"><b>OpenCV 5.</b> Since 2026-10-21 the live demo runs v1, our dacl10k-trained segmenter. It makes two OpenCV 5-only calls: <code>cv2.dnn.readNetFromONNX</code> with <code>engine=cv2.dnn.ENGINE_NEW</code> (<code>ENGINE_CLASSIC</code> cannot import the model), and, since 2026-10-22, <code>cv2.copyTo</code> with a NumPy bool mask read as <code>CV_Bool</code> (<code>segment.restrict</code>, <code>CV_BOOL_MASKS</code>). Run without the model (no <code>DRISHYAM_ONNX</code>), the agent uses the classical engine, which makes only the second. Since 2026-10-22 it looks with the policy v1-policy2 (FIG. 3.1 and 3.2). The engine that answered is named at the foot of the page.</p>
       </div>
     </section>
 
   </div>
   <dl class="tblock tblock--mini" aria-hidden="true">
     <div><dt>Drawn by</dt><dd>agent</dd></div>
-    <div><dt>Checked by</dt><dd>human reviewer</dd></div>
+    <div><dt>Checked by</dt><dd>unsigned</dd></div>
     <div><dt>Sheet</dt><dd class="tblock__sheet">3 of 7</dd></div>
   </dl>
 </section>
@@ -550,12 +550,12 @@
     <h2 id="h-fail" class="sheet__title">FAILURES</h2>
   </div>
   <section class="win pop" aria-labelledby="t-fail">
-    <div class="win__bar"><span class="win__fig" aria-hidden="true">FIG. 5.1</span><h3 class="win__title" id="t-fail">Failure plates</h3></div>
+    <div class="win__bar"><span class="win__fig" aria-hidden="true">FIG. 5.1</span><h3 class="win__title" id="t-fail">Failure plates: the classical engine on the synthetic test set, not the live v1</h3></div>
     <div class="win__body" id="fail"><p class="note">Loading failure gallery&hellip;</p></div>
   </section>
   <dl class="tblock tblock--mini" aria-hidden="true">
     <div><dt>Drawn by</dt><dd>eval harness</dd></div>
-    <div><dt>Checked by</dt><dd>human reviewer</dd></div>
+    <div><dt>Checked by</dt><dd>unsigned</dd></div>
     <div><dt>Sheet</dt><dd class="tblock__sheet">5 of 7</dd></div>
   </dl>
 </section>
@@ -581,7 +581,7 @@
           <li><b>Privacy blur.</b> Faces, people and vehicles are found with OpenCV DNN models and blurred before any look is taken. A photo in which one person fills more than a quarter of the frame is refused: this inspects structures, not people.</li>
           <li><b>Signed work orders.</b> The work order is signed with HMAC-SHA256 and every sign-off returns a new signature, so an edited order no longer verifies. The download includes the signature.</li>
         </ol>
-        <p class="note guards__llm">No LLM runs in this demo: the live agent is the rule policy (FIG. 3.2); FIG. 3.5 says what runs live and where the LLM path is. <a href="https://github.com/vj-io/drishyam/blob/main/docs/mcp-session/transcript.md" rel="noopener noreferrer">Read the recorded MCP session</a>.</p>
+        <p class="note guards__llm">No LLM runs in this demo: the live agent is the rule policy (FIG. 3.2); FIG. 3.5 says what runs live and where the LLM path is. <a href="https://github.com/vj-io/drishyam/blob/main/docs/mcp-session-v1/transcript.md" rel="noopener noreferrer">Read the recorded MCP sessions (v1 engine)</a>.</p>
       </div>
     </section>
     <section class="win pop win--wide" aria-labelledby="t-auto">
@@ -604,7 +604,7 @@
   </div>
   <dl class="tblock tblock--mini" aria-hidden="true">
     <div><dt>Drawn by</dt><dd>agent</dd></div>
-    <div><dt>Checked by</dt><dd>human reviewer</dd></div>
+    <div><dt>Checked by</dt><dd>unsigned</dd></div>
     <div><dt>Sheet</dt><dd class="tblock__sheet">6 of 7</dd></div>
   </dl>
 </section>
@@ -622,7 +622,7 @@
   <dl class="faq">
     <div class="faq__item">
       <dt>Is this live or recorded?</dt>
-      <dd>Live. The photo goes to the API and every look is computed on the spot with stock OpenCV 5. The page then shows the decisions at reading speed; the agent itself is much faster. The status bar shows the agent&rsquo;s own time; the upload, decode and privacy blur on the server come on top of it. <a href="?mock=1#demo">Watch a recorded run</a> replays a saved job instead, recorded on the classical engine on 2026-10-17 with all three failure drills switched on, and is labelled recorded. So does <b>Watch it on a real wall</b>: it replays the v1 engine&rsquo;s saved run on our own photo, so you see exactly the run the docs report; pick that photo and press Run to run it live on the server&rsquo;s own engine (named at the foot of the page), whose result can differ.</dd>
+      <dd>Live. The photo goes to the API and every look is computed on the spot with stock OpenCV 5. The page then shows the decisions at reading speed; the agent itself is much faster. The status bar shows the agent&rsquo;s own time; the upload, decode and privacy blur on the server come on top of it. <a href="?mock=1#demo">Watch a recorded run</a> replays a saved job instead, recorded on the classical engine on 2026-10-17 with all three failure drills switched on, and is labelled recorded. So does <b>Watch it on a real wall</b>: it replays the v1 engine&rsquo;s run on our own photo, recorded live on this site on 2026-10-23 with measured costs, so you see exactly the run the docs report; its images (the heatmap and crops) were not kept. Pick that photo and press Run to run it live again on the server&rsquo;s own engine (named at the foot of the page), whose result can differ.</dd>
     </div>
     <div class="faq__item">
       <dt>What is OpenCV doing here?</dt>
@@ -630,7 +630,7 @@
     </div>
     <div class="faq__item">
       <dt>Why not just tile the photo?</dt>
-      <dd>Tiling checks every 512 px tile at full resolution: 48 tiles for a 3000 &times; 2250 photo (turn on &ldquo;compare with tiling&rdquo; after a run to see them). The agent looks at the photo small first and zooms only where something might be, so it processes far fewer pixels. Whether it finds as much is measured in <a href="#benchmarks">Benchmarks</a>: with the classical engine, on the synthetic set it finds less than tiling, and one downscaled pass does at least as well; the dashed red line there is v1, the live segmenter, with its first look policy; the live policy since 2026-10-22, v1-policy2, is summarised under FIG. 4.2.</dd>
+      <dd>Tiling checks every 512 px tile at full resolution: 48 tiles for a 3000 &times; 2250 photo (turn on &ldquo;compare with tiling&rdquo; after a run to see them). The agent looks at the photo small first and zooms only where something might be, so it processes far fewer pixels than full-resolution tiling, but not fewer than a coarser grid: on CODEBRIM, v1-policy2 finds 0.98&times; the recall of L2 tiling (the same tiles on the photo at a quarter of its size) with 1.40&times; its pixels (FIG. 4.2). Whether it finds as much is measured in <a href="#benchmarks">Benchmarks</a>: with the classical engine, on the synthetic set it finds less than tiling, and one downscaled pass does at least as well; the dashed red line there is v1, the live segmenter, with its first look policy; the live policy since 2026-10-22, v1-policy2, is summarised under FIG. 4.2.</dd>
     </div>
     <div class="faq__item">
       <dt>What does it cost?</dt>
@@ -649,7 +649,7 @@
     <div class="win__bar"><span class="win__fig" aria-hidden="true">END</span><h2 class="win__title" id="h-docs">Docs and links</h2></div>
     <div class="win__body stack">
       <figure class="video" id="video">
-        <figcaption class="video__cap"><span class="win__fig">FILM</span> <b>The submission film, 4:27, with burned-in captions.</b> The live demo on AWS, the failure drills and KILL, Claude driving the same tools over MCP, the results (held out for the trained segmenter), and two of our own wall photos: on one it missed the crack, on the other it found one of two. Narrated by an offline AI voice.</figcaption>
+        <figcaption class="video__cap"><span class="win__fig">FILM</span> <b>The submission film, 4:37, with burned-in captions.</b> The live demo on AWS, the failure drills and KILL, Claude driving the same tools over MCP, the results (held out for the trained segmenter), and two of our own wall photos: on one it missed the crack, on the other it found one of two. Narrated by an offline AI voice.</figcaption>
         <video controls preload="none" poster="video/poster.jpg" width="1920" height="1080">
           <source src="video/drishyam.mp4" type="video/mp4">
           <track kind="captions" src="video/drishyam.vtt" srclang="en" label="English">
@@ -663,7 +663,7 @@
           <li><a href="https://github.com/vj-io/drishyam/blob/main/docs/PRD.md" rel="noopener noreferrer">PRD</a></li>
           <li><a href="https://github.com/vj-io/drishyam/blob/main/docs/api-contract.md" rel="noopener noreferrer">API contract</a></li>
           <li><a href="https://github.com/vj-io/drishyam/blob/main/docs/mcp.md" rel="noopener noreferrer">MCP usage</a></li>
-          <li><a href="https://github.com/vj-io/drishyam/blob/main/docs/mcp-session/transcript.md" rel="noopener noreferrer">Claude drives it over MCP (recorded)</a></li>
+          <li><a href="https://github.com/vj-io/drishyam/blob/main/docs/mcp-session-v1/transcript.md" rel="noopener noreferrer">Claude drives it over MCP (recorded on v1)</a></li>
           <li><a href="https://github.com/vj-io/drishyam/blob/main/docs/architecture.png" rel="noopener noreferrer">Architecture diagram</a></li>
           <li><a href="https://github.com/vj-io/drishyam/blob/main/docs/impact-sources.md" rel="noopener noreferrer">Impact sources</a></li>
           <li><a href="?mock=1#demo">Recorded run</a></li>
