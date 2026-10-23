@@ -128,6 +128,7 @@ STALE_CLAIMS = {
     "about 24,000": "a person signs critical findings, not boxes; the measured 2,536-photo backlog queued 684",
     "rev 1.1.0": "the figures are REV 1.1.1",
     "deployed commit adf9474": "the deployed commit is the one docs/aws.md names first; adf9474 first deployed v1-policy2",
+    "(the heatmap and crops) were not kept": "the wall replays carry their heatmap and crops since 8af7abd (public/samples/real_0N.ndjson)",
     # the 2026-10-23 audit of docs/requirements.md
     "need a kaggle gpu run": "v1's trained weights are release assets of v1.1.0, live since 2026-10-21",
     "is not built, so there is no": "segment.drop_straight_lines drops a straight crack component (commit 9857a5a)",
@@ -154,6 +155,7 @@ OLD_CLAIMS = [
     "done (engine + export pipeline); trained dacl10k weights need a Kaggle GPU run",
     ("dropping a crack finding whose thinned centreline fits one straight line (a `cv2.fitLine` residual rule against "
      "form joints and edges) is not built, so there is no before/after on `data/synth_dev` for it."),
+    "so you see exactly the run the docs report; its images (the heatmap and crops) were not kept.",
 ]
 
 
