@@ -16,6 +16,13 @@ FULL_SPEC = {
 }
 
 
+def _no_images(obj):
+    """A trace record as video/record.py's strip() leaves it: each embedded image replaced by a marker."""
+    if isinstance(obj, dict):
+        return {k: "<removed: image>" if k in ("crop_jpeg_b64", "heatmap_png_b64") else _no_images(v) for k, v in obj.items()}
+    return [_no_images(v) for v in obj] if isinstance(obj, list) else obj
+
+
 def _in_bounds(box, w, h):
     x, y, bw, bh = box
     return x >= 0 and y >= 0 and bw >= 1 and bh >= 1 and x + bw <= w and y + bh <= h
@@ -151,9 +158,11 @@ def test_samples_manifest_and_sizes():
         ev = [json.loads(ln) for ln in (SAMPLES_DIR / m["trace"]).read_text().splitlines()]
         assert cv2.imread(str(SAMPLES_DIR / m["file"])).shape[1::-1] == (m["width"], m["height"]) == (ev[0]["width"], ev[0]["height"])
         assert ev[-1]["work_order"]["profile"] == "onnx:drishyam_dacl10k.onnx" and "cost_model" not in ev[0]  # measured live
-        # the live run on that photo, as video/record.py --walls saved it: tokens and embedded images removed
+        # the live run on that photo, as video/record.py --walls --keep-images saved it: tokens removed, images kept (the
+        # overview's heatmap); with its images removed it is the film's copy in video/live/walls, record for record
         image = {"real_01.jpg": "IMG_2332", "real_02.jpg": "IMG_2330"}[m["file"]]
-        assert (SAMPLES_DIR / m["trace"]).read_bytes() == (SAMPLES_DIR.parents[1] / "video/live/walls" / image / "real.ndjson").read_bytes()
+        walls = [json.loads(ln) for ln in (SAMPLES_DIR.parents[1] / "video/live/walls" / image / "real.ndjson").read_text().splitlines()]
+        assert [_no_images(e) for e in ev] == walls and any(e.get("heatmap_png_b64", "").startswith("iVBOR") for e in ev)
         assert ev[0]["kill_token"] == ev[-1]["token"] == "<removed>"
     for m in manifest:
         assert (SAMPLES_DIR / m["file"]).stat().st_size < synth.SAMPLE_LIMIT and (SAMPLES_DIR / m["thumb"]).exists()

@@ -278,7 +278,7 @@ def run(base, server_log=None):
 
         # 3b. The guided run on a real photo of ours: the v1 engine's recorded job is replayed from public/samples (no job
         #     on the server), labelled as our photo with no ground truth, and the recap says what the agent flagged. The
-        #     recordings are live runs with their images removed: the bar says so, and so does the camera.
+        #     recordings are live runs with their heatmaps and crops (one with its images removed would say so in the bar and the camera).
         page.reload()
         expect(page.locator("#gallery .thumb")).to_have_count(10, timeout=15000)
         index = json.loads((ROOT / "public/samples/index.json").read_text())

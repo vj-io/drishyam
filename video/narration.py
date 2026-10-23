@@ -66,7 +66,7 @@ def lines(D):
     assert round(1 / g["pixels_frac"]) == 4, "o1 says a quarter"
     assert h["segmenter"] == D["model_segmenter"] and h["segmenter"].startswith("onnx:"), "o1 and l0 say the footage ran the trained engine"
     assert g["critical"] == 1, "o1 says one critical finding, o2 'it'"
-    add("open", "o1", "Its trained engine read a quarter of the pixels and flagged ", W(g["critical"]), " critical finding.")
+    add("open", "o1", "A bridge-photo inspection agent on OpenCV ", CV, " reads a quarter of the pixels and flags ", W(g["critical"]), " critical finding.")
     add("open", "o2", "It will not sign it off. A person must.")
 
     # 2. team
@@ -107,12 +107,15 @@ def lines(D):
     add("live", "l6", "So the ", RB, " goes to a person to check by eye, not as a critical finding.")
     assert g["after"] == [3, ["crack"]] and g["stop"][0] == "exhausted" and g["stop"][2] == [] and "crack" in g["gt"][0], g["after"]
     add("live", "l7", "Three more looks find a crack; with every region looked at, it stops.")
-    add("live", "l9", "Only a person can approve the spalling.")
+    # the review clicks in this footage are video/record.py's (it types "Demo reviewer"), not a person's: said here and on
+    # screen (film.js), with the rule that holds on the site; the server cannot tell who clicks (docs/security.md)
+    assert D["lit"]["self_asserted"], "the banner cites docs/security.md"
+    add("live", "l9", "Only a reviewer's decision moves the order; in this recording, a script clicks Approve.")
     L[-1]["pause"] = 0.5   # the footage cuts from the end of the run to the sign-off here (build.py footage_warp)
     # then, on the page, a person checks the rebar's needs-a-look entry by eye: Defect found (the photo shows the bars), and
     # only then is the order ready (build.py data() asserts the order, the decision and the ground truth)
     assert g["order"] == ["ready", g["critical"]] and g["checked"][0] == "defect-found", (g["order"], g["checked"])
-    add("live", "l10", "A person then checks the ", RB, " by eye and ", ("rekords", "records"), " a defect; now the order is ready.")   # "records" here reads as the noun (phonemes)
+    add("live", "l10", "The script also enters the ", RB, "'s check by eye, a defect; only then is the order ready.")
     add("live", "l11", "Change one character of the order's signature: the server refuses it.")
 
     # 5. failure handling and human control
@@ -144,7 +147,8 @@ def lines(D):
 
     # 8. principal results: the agent's policy, on the classical engine
     assert not s["meets_target"] and s["cap"] == 0.3
-    add("results", "r1", "On ", W(s["n"]), " synthetic photos it finds ", P(s["ratio"]), " of full tiling's recall at ", P(s["head"]["pixels_frac"]),
+    assert s["segmenter"] == "classical-v1", "r1 names the classical segmenter"
+    add("results", "r1", "With the classical segmenter, on ", W(s["n"]), " synthetic photos it finds ", P(s["ratio"]), " of full tiling's recall at ", P(s["head"]["pixels_frac"]),
         " of the pixels, short of its ", P(s["target"]), " target.")
     assert s["ds_ci"][0] < 1.0 < s["ds_ci"][1] and s["ds"]["recall"] > s["head"]["recall"], "r3 says the downscale does about as well"
     add("results", "r3", "One downscaled pass does about as well.")
@@ -153,7 +157,9 @@ def lines(D):
     assert all(abs(ab[d][v] - 1) < 0.02 and ab[d]["vs"][v] == "no measurable difference" for d in ab for v in ("no-uncertainty", "governor-on")), "r5 says these change nothing measurable"
     assert all(ab[d]["vs"]["no-verify"] in ("no measurable difference", "above the full agent") for d in ab), "r5 says dropping verify costs no recall"
     # complete by construction: every other variant (no verify, no uncertainty, governor on) is asserted above to lose no recall
-    add("results", "r5", "Ablations: only dropping the survey look loses recall, and a random gaze order matches it on smaller photos.")
+    # random gaze order: below the full agent on the 4608 px set and on CODEBRIM, matching it on the 2048 px set (ablations.json's verdicts)
+    assert {d: ab[d]["random_vs"] for d in ab} == {"synth200": "matches", "synth_large": "below", "codebrim": "below"}, {d: ab[d]["random_vs"] for d in ab}
+    add("results", "r5", "Ablations: dropping the survey look loses recall everywhere; a random gaze order loses it on the larger and the real photos.")
     # real photos: the trained v1, held out, is the headline; the classical engine (every classical method about 1 in N,
     # above its own chance, on the board's comparison row) is what it is compared with. build.py has checked the same
     # photos, the governor off, and cost tables timed on one machine.
@@ -206,7 +212,8 @@ def lines(D):
     # 9. failure cases
     fs = D["fails_said"]
     assert fs["glare_listed"] and fs["formwork_kept_coarse"], fs
-    add("failures", "f1", "Failures in the open: graffiti read as spalling, a formwork line as a crack, glare, and blur.")
+    assert fs["classical"], "f1 says the cases are the classical engine's"
+    add("failures", "f1", "The classical engine's failures, in the open: graffiti ", ("red", "read"), " as spalling, a formwork line as a crack, glare, and blur.")   # "read" here is the past tense (phonemes)
     assert len(D["fails"]) == 4 and "built" in next(x for x in D["fails"] if x["cat"].startswith("Formwork")), D["fails"]
     # failures.json: only the glare gate caught its case; graffiti and blur have no rule, and the formwork case needs the
     # full-resolution check that is "Not implemented" (its straight-line test is built and kept the line)

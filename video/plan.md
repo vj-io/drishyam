@@ -1,7 +1,7 @@
 # Drishyam submission video: plan
 
 The narrated video for the OpenCV AI Competition 2026, powered by AWS (Agentic Vision entry): at most 5 minutes (this
-cut runs 4:27, the owner's 3.5 to 4 minutes, plus the re-recorded live chapter), 1920x1080, offline AI voice (Kokoro `af_heart` through the brag-scaled `narrate` skill), captions burned in and
+cut runs 4:37, the owner's 3.5 to 4 minutes, plus the re-recorded live chapter), 1920x1080, offline AI voice (Kokoro `af_heart` through the brag-scaled `narrate` skill), captions burned in and
 also shipped as WebVTT. The look is the site's own engineering-sheet blueprint (`public/styles.css` tokens and
 fonts; the brag-styles `patent-office` set): one sheet per chapter, a sheet index on the left, the sheet number
 stamping in at each chapter.
@@ -13,7 +13,7 @@ stamping in at each chapter.
 | `public/video/drishyam.mp4` | the video (H.264 + AAC, poster baked in as frame 0) | no: `public/video/*.mp4` is ignored; it ships to the site bucket at deploy time and as a release asset |
 | `public/video/drishyam.vtt` | captions, the same cues as the burned-in ones (written by the same build as the MP4) | yes |
 | `public/video/poster.jpg` | the agent's confirm look on the rebar in the live run (line `l5`, step 3: the camera panel with its crop and WHY THIS LOOK, "...the confirm look did not confirm it, so a person checks it by eye"), settled | yes |
-| `brag-output/drishyam-short.mp4` | 15-20 s 9:16 cut: the cold open's run, the sign-off (the typing at real time, then a jump cut to Approve), ending on the settled APPROVED stamp of the spalling and the URL; labelled "recorded 2026-10-23 · live site · v1 · v1-policy2" and "the rebar went to a person to check by eye"; its three lines are o1, "Only a person can approve a critical finding." and "Try it live: the trained v1."; v1's held-out result in the lower third, with the critical findings a person signs per photo (2.17, and 1.15 with v1-policy2; recall 0.99×) | no (brag-output/ is ignored) |
+| `brag-output/drishyam-short.mp4` | 15-20 s 9:16 cut: under the name, "bridge-photo inspection agent · OpenCV 5 on AWS"; the cold open's run, the sign-off (the typing at real time, then a jump cut to Approve, the APPROVED stamp), then a cut to the rebar's Checked by eye entry played on (about 2x) to the order reading ready, with the last quarter second held; labelled "recorded 2026-10-23 · live site · v1 · v1-policy2", "the rebar went to a person to check by eye" and "review clicks scripted here; on the site a person makes them"; its three lines are o1, "Only a person can approve a critical finding." and "Try it live: the trained v1."; v1's held-out result in a card that ends at y 1532, above the bottom 20 % the platforms' buttons take, with the critical findings a person signs per photo (2.17, and 1.15 with v1-policy2; recall 0.99×) | no (brag-output/ is ignored) |
 | `brag-output/standin/film/` | `build.py --standin`: the film with the stand-in real-photo runs, if `--make-standin` made them (nothing is pending any more): `drishyam-standin.mp4`, `drishyam-standin.vtt`, `poster-standin.jpg`, `plan-tables.md` | no |
 
 The site's player is static markup in `public/index.html`, where the removed `initVideo()` (commit 939f973) put it:
@@ -104,12 +104,16 @@ stays visible beside it, amber where a finding's box of a class the team sees to
 stamp lands: MISSED or FOUND for one line, "k OF n" for several. A finding away from every traced line would be "off
 the team's lines", never a false alarm (there is no ground truth).
 
-Recorded 2026-10-23 on the live site (commit a2b8688, v1 with v1-policy2, measured costs, 30 % pixel cap): each photo
-is the bundled sample (`public/samples/real_01.jpg` is IMG_2332, `real_02.jpg` is IMG_2330, byte for byte), run with
-**Look**, not **Watch it on a real wall** (which replays an older recording), by `video/record.py --walls` (2 job
-starts). The lines `q1`, `q2` are built from the traces in `video/narration.py` and asserted against them:
+Recorded 2026-10-23 at about 06:18Z on the live site (1.1.2, commit 1227371, v1 with v1-policy2, measured costs, 30 %
+pixel cap; its `/api/health` then is `video/live/walls/health.json`): each photo is the bundled sample
+(`public/samples/real_01.jpg` is IMG_2332, `real_02.jpg` is IMG_2330, byte for byte), run with **Look** by
+`video/record.py --walls --keep-images` (2 job starts). The same runs, with their heatmaps and crops (all of the
+bundled photo, no EXIF) and the token fields removed, are the site's **Watch it on a real wall** replays
+(`public/samples/real_0N.ndjson`, about 40 and 55 KB); `video/live/walls/` keeps them without the images, and
+`tests/test_synth.py` checks that the two agree record for record. They replaced the recordings of 03:16Z the same day
+(a2b8688, jobs `j_da1449` and `j_d2b9b0`, kept without images), which made the same decisions. The lines `q1`, `q2` are built from the traces in `video/narration.py` and asserted against them:
 
-- IMG_2332 (`video/live/walls/IMG_2332/`, job `j_da1449`): the L3 overview proposed no candidate region, so the
+- IMG_2332 (`video/live/walls/IMG_2332/`, job `j_f25b21`): the L3 overview proposed no candidate region, so the
   zero-candidate fallback took one look at L2 whose window spans the whole photo (cause `fallback-l2`). v1's mask there
   holds 9,136 crack px, but the quality gate refused the view as blur (Laplacian variance 5.1, under `SHARPNESS_MIN`
   12: the smooth paint gives it little texture), so its findings were dropped: nothing flagged, 9.9 % of the pixels read,
@@ -118,15 +122,16 @@ starts). The lines `q1`, `q2` are built from the traces in `video/narration.py` 
   looked at the whole photo. The segmenter saw crack pixels, but the blur gate refused this sharp view, and nothing was
   flagged." The both-gates blur gate that would pass this view was measured on dev and not adopted
   (`results/dev/blur_gate.json`); the film does not mention it.
-- IMG_2330 (`video/live/walls/IMG_2330/`, job `j_d2b9b0`): one look at L1 and one crack, whose box touches the lower
+- IMG_2330 (`video/live/walls/IMG_2330/`, job `j_5b2049`): one look at L1 and one crack, whose box touches the lower
   of the two cracks the team traced; the upper one is outside the look; coverage 21 %. "On a second wall, one close
   look flagged a crack on the lower of two we traced, and never looked closely at most of the wall."
 
 Each `real.json` is the older run's (what the team sees by eye) with this run's engine and profile. The older local
-runs (2026-10-20, fixed costs `local-macos-x86-dacl10k-retime`: `video/live/real.*`, job `j_2b765d`, which predates
-the fallback and took no look; `video/live/variants/IMG_2330/real.*`, job `j_67658a`) stay where they are: docs/report.md
-cites them beside the site's replays (`public/samples/real_01.ndjson`, `real_02.ndjson`, jobs `j_5b5e8f` and
-`j_d3fd41`). A run whose shape no line form covers stops the build at its assert.
+runs stay where they are: 2026-10-20, fixed costs `local-macos-x86-dacl10k-retime` (`video/live/real.*`, job
+`j_2b765d`, which predates the fallback and took no look, and `video/live/variants/IMG_2330/real.*`, job `j_67658a`;
+`tests/test_report_doc.py` reads their `real.json`), and 2026-10-21 (`results/real-walls-2026-10-21/`, jobs `j_5b5e8f`
+and `j_d3fd41`, the site's replays until 2026-10-23, which docs/report.md section 9 cites). A run whose shape no line
+form covers stops the build at its assert.
 
 **The trained segmenter (lines `r6` and `r8`, the headline board FIG. 4.3, and `r7`'s clean-set half).** `public/results/codebrim_dacl10k/summary.json` is
 quoted only like for like: its summary must say `onnx:`, governor off and not confounded, its 30 % cap point (one point
@@ -149,7 +154,12 @@ the line from the real summary, measures the whole film (both real photos) again
 summary charged another machine's cost table is refused.
 
 The live site runs v1 with the v1-policy2 look policy (since 2026-10-22), and the footage is of that build (the
-`/api/health` recorded with it, `video/live/health.json`: version 1.1.1, commit a2b8688). `video/live/aws-smoke.log` is a copy of
+`/api/health` recorded with it, `video/live/health.json`: version 1.1.1, commit a2b8688). The line under the health
+cards says so and gives the build the site runs now, from `video/live/walls/health.json` (1.1.2, 1227371, recorded
+with the wall photos): "recorded on build a2b8688 (1.1.1) ... the site now runs 1.1.2 (1227371): its only agent change
+is a blur-gate option, off by default". `video/build.py` checks that only `drishyam/__init__.py`, `agent.py` and
+`imaging.py` changed between the two commits, and that `results/dev/blur_gate.json` says the knob off is the code as it
+was. `video/live/aws-smoke.log` is a copy of
 the main checkout's `runs/aws-smoke.log` (every `scripts/aws.sh smoke` run's `/api/health` and step p95) up to
 2026-10-21T11:38:30Z: `docs/aws.md` and `tests/test_live_state_doc.py` quote its eleven v1 runs, so the two smoke runs
 of 2026-10-22 (adf9474, c1830c4) are not in the copy yet. The build groups the runs by the segmenter their health
@@ -184,12 +194,15 @@ minutes later):
 
 ## Length
 
-Nothing is pending: the committed tables below are the film as rendered, 267.5 s (247.9 s before the fix pass of
-2026-10-23, 239.9 s before the live chapter was first re-recorded on 2026-10-22). The fix pass added about 20 s by
-replacing stale lines, not by adding chapters: `p3` in the site hero's words (+7 s), the rebar checked by eye (`l9`
+Nothing is pending: the committed tables below are the film as rendered, 277.7 s (247.9 s before the fix passes of
+2026-10-23, 239.9 s before the live chapter was first re-recorded on 2026-10-22). The first two passes added about 20 s
+by replacing stale lines, not by adding chapters: `p3` in the site hero's words (+7 s), the rebar checked by eye (`l9`
 and a new `l10`, +2 s), `r8` in the unit a person signs (+3 s), `q1`'s fallback look (+4 s) and the MCP chapter on the
-v1 session (+4 s). The site's two mentions of the length (`public/index.html`), README.md and docs/report.md give it as
-4:27; `video/build.py` stops after the layout if any of them does not say the film's length. With the trained segmenter's line,
+v1 session (+4 s). The third (the re-grade of v1.1.2) added about 10 s: `o1` says what the agent is (+3 s), `l9` and
+`l10` say the review clicks are the recording script's (+3 s), and `r1`, `r5` and `f1` name the classical engine or
+say what the ablations show (+4 s). The site's two mentions of the length (`public/index.html`), README.md (twice) and
+docs/report.md give it as 4:37; `video/build.py` stops after the layout if any of them does not say the film's
+length. With the trained segmenter's line,
 both real photos and the portraits on, the narration first measured 285 s; it came to 4:00 by cutting words and
 holds, not chapters:
 
@@ -230,10 +243,16 @@ and AWS and Arm (the arm Lambda, its latency then and now).
   look, at L1 and centred on it, does not confirm it, so the rebar goes to a person to check by eye (the work order's
   `needs-a-look` entry), not as a critical finding. The rebar is in this synthetic photo's ground truth; every other
   ground-truth box is touched by a finding of its class. Three more looks find the crack, and it stops with every
-  candidate looked at. A person approves the spalling, and the order then reads "needs a look" (`incomplete`). The same
-  person then checks the rebar's entry by eye on the page (Checked by eye: the reviewer name, the note "exposed rebar in
-  the spall", **Defect found**, because the photo shows three bars there and its ground truth has the rebar), the server
-  re-signs the order, and it reads `ready` (`order_status.json`: status, the two approvals, the resolution). The build
+  candidate looked at. The spalling is approved, and the order then reads "needs a look" (`incomplete`). Then the
+  rebar's entry is checked by eye on the page (Checked by eye: the reviewer name, the note "exposed rebar in the
+  spall", **Defect found**, because the photo shows three bars there and its ground truth has the rebar), the server
+  re-signs the order, and it reads `ready` (`order_status.json`: status, the two approvals, the resolution). Both review
+  decisions in this footage are clicked by `video/record.py`, not by a person: `l9` and `l10` say so ("in this
+  recording, a script clicks Approve"; "the script also enters the rebar's check by eye"), and a banner over the
+  footage says it while they play, "REVIEW CLICKS SCRIPTED FOR THIS RECORDING · video/record.py types "Demo reviewer"
+  · on the site a person makes them; the server cannot tell who clicks (docs/security.md)". The rule the voice keeps
+  is that only a reviewer's decision moves the order; the reviewer name is self-asserted (docs/security.md, Known
+  limits). The 9:16 cut carries the same label. The build
   asserts that the one resolution is the rebar's, Defect found, and that the ground truth has the rebar there;
   `record.py` refuses to record a decision for any other entry.
 - The footage is retimed so each recorded event lands on the line that explains it. The window bar always shows
@@ -271,9 +290,11 @@ and AWS and Arm (the arm Lambda, its latency then and now).
 
 ## Known on screen
 
-- `docs/architecture.png` is shown as committed. Its segment box says "default: classical, no weights" (the code's
-  default); the deployed site opts in to v1, as `a4` says over it. Its footnote cites `segment.py:239` for `cv2.dnn.ENGINE_NEW`;
-  the call is now at `drishyam/segment.py:298`. The claim itself (the one OpenCV-5-only call) still holds.
+- `docs/architecture.png` is shown as committed (REV 1.1.1, its header naming 1.1.2, 1227371). Its segment box names
+  v1 as the live engine, with the classical engine as the fallback (no weights); its footnote names v1's two
+  OpenCV-5-only calls, as the site's FIG. 3.5 does: `cv2.dnn.readNetFromONNX` with `engine=cv2.dnn.ENGINE_NEW`
+  (`segment.py`, `OnnxSegmenter._load`) and `cv2.copyTo` with a NumPy bool mask read as `CV_Bool` (`segment.restrict`,
+  `CV_BOOL_MASKS`, on since 2026-10-22). `a4` says the site runs v1 on OpenCV 5's new DNN engine.
 - The site's step panel (FIG. 2.3b) has a fixed height, so at step 3 the last line of its WHAT IT SAW box is clipped
   by the box. The camera's view of that panel ends above WHAT IT SAW (`film.js`, the step-3 key), so the clipped line
   is not in the film; the fix belongs in the site.
@@ -286,49 +307,49 @@ and AWS and Arm (the arm Lambda, its latency then and now).
 
 | Requirement | Covered by | From | To |
 | --- | --- | --- | --- |
-| At most 5 minutes, 1920x1080 | open, end | 0:00.0 | 4:27.5 |
-| Narrated (offline Kokoro voice af_heart) with burned-in captions; the same cues in public/video/drishyam.vtt | open, end | 0:00.0 | 4:27.5 |
-| The team: Vaibhav Jangid, Bhavya Dhoot. Each real photo, then the window's looks turn it into OpenCV line art (Canny, findContours, approxPolyDP); name cards without the private inputs | team | 0:09.0 | 0:23.1 |
-| Problem and user, with sources on screen | problem | 0:23.1 | 0:46.0 |
-| Disclosed before the demo plays: the footage was recorded 2026-10-23 on the live site, the trained v1 with its v1-policy2 look policy, the build the site runs now | l0 | 0:46.5 | 0:51.8 |
-| /api/health on the live site: opencv 5.0.0, aarch64, aws-lambda | l1 | 0:52.0 | 0:55.9 |
-| The application working: the guided run on bridge_03 ('Watch it inspect a bridge'), recorded live, with what it sent to a person to check by eye (the rebar under the confidence floor, not confirmed) | l2, l3, l4, l5, l6, l7 | 0:56.1 | 1:24.8 |
-| Plain-words trace (the NOTE and 'What it decided and why' panels) | l3, l4, l5, l6, l7 | 1:00.3 | 1:24.8 |
-| Human sign-off: reviewer name, Approve, APPROVED stamp; then the rebar checked by eye on the page (Defect found, with a note), and the work order ready | l9, l10 | 1:25.5 | 1:32.9 |
-| Human control: a tampered work-order token refused (403) | l11 | 1:33.2 | 1:37.2 |
-| Failure handling: 'Now break it' (slowed segmenter -> governor; malformed planner reply -> allow-list) | b0, b1, b2 | 1:38.0 | 1:46.4 |
-| Human control: 'Try KILL' (KILL halts with kill-switch, Resume replays, then the stop rule ends it with a region unvisited) | b3 | 1:46.7 | 1:50.9 |
-| Honesty: no LLM runs in the live demo; the drill planners are scripted | b4 | 1:51.3 | 1:55.2 |
-| An LLM driving the OpenCV tools over MCP, on the live v1 engine (docs/mcp-session-v1, bridge_03): a measured mask disagreement sent to a human, the crack looked at, the budget check, the labelled defects found, and the session's limit (not blind) | mcp | 1:55.6 | 2:15.8 |
-| Architecture: docs/agent-loop.svg, public/docs/aws-simple.svg, docs/architecture.png (AWS path and OpenCV layer) | arch | 2:15.8 | 2:48.6 |
-| The live site now runs the trained segmenter v1 on OpenCV 5 DNN ENGINE_NEW, and its Lambda step p95 then and now (video/live/aws-smoke.log) | a4, a5 | 2:36.9 | 2:48.2 |
-| Principal results: recall vs pixels, with one downscale, the tiling family and chance | r1, r3 | 2:49.1 | 3:01.2 |
-| Ablations (public/results/ablations.json) | r5 | 3:01.5 | 3:08.6 |
-| Real photos (CODEBRIM), the headline board: trained v1, held out (results/heldout_models.json), against the classical engine (about 1 in 5, the comparison row), its chance recall, its critical boxes (the scorer's unit) and the critical findings a person signs, and what the live look policy v1-policy2 changes (about half the sign-offs, recall unchanged); no CODEBRIM image shown | r6, r8 | 3:08.8 | 3:31.7 |
-| False alarms on synthetic photos with no damage (public/results/clean/summary.json), the classical engine and v1 | r7 | 3:31.9 | 3:38.1 |
-| Two real photos of our own (painted walls, no ground truth), each run live on the site: the looks (on IMG_2332 the zero-candidate fallback look, refused as blur), the findings, what it missed (video/live/walls/*/real.*) | real | 3:38.5 | 3:59.1 |
-| Failure cases: failures.json plates and their rules; one CODEBRIM case in words only | failures | 3:59.1 | 4:09.9 |
-| Limits and responsible use | limits | 4:09.9 | 4:16.9 |
-| Reproduce: make test, make eval, scripts/aws.sh | repro | 4:16.9 | 4:21.5 |
-| End card: live URL, repository, team | end | 4:21.5 | 4:27.5 |
+| At most 5 minutes, 1920x1080 | open, end | 0:00.0 | 4:37.7 |
+| Narrated (offline Kokoro voice af_heart) with burned-in captions; the same cues in public/video/drishyam.vtt | open, end | 0:00.0 | 4:37.7 |
+| The team: Vaibhav Jangid, Bhavya Dhoot. Each real photo, then the window's looks turn it into OpenCV line art (Canny, findContours, approxPolyDP); name cards without the private inputs | team | 0:11.8 | 0:25.9 |
+| Problem and user, with sources on screen | problem | 0:25.9 | 0:48.8 |
+| Disclosed before the demo plays: the footage was recorded 2026-10-23 on the live site, the trained v1 with its v1-policy2 look policy, the build the site runs now | l0 | 0:49.3 | 0:54.6 |
+| /api/health on the live site: opencv 5.0.0, aarch64, aws-lambda; the build the footage was recorded on, and the build the site runs now | l0, l1 | 0:49.3 | 0:58.7 |
+| The application working: the guided run on bridge_03 ('Watch it inspect a bridge'), recorded live, with what it sent to a person to check by eye (the rebar under the confidence floor, not confirmed) | l2, l3, l4, l5, l6, l7 | 0:59.0 | 1:27.6 |
+| Plain-words trace (the NOTE and 'What it decided and why' panels) | l3, l4, l5, l6, l7 | 1:03.1 | 1:27.6 |
+| Human review on the page: Approve, APPROVED stamp, then the rebar's check by eye (Defect found, with a note) and the work order ready; in this footage the clicks are the recording script's, said in the voice and on screen | l9, l10 | 1:28.4 | 1:39.0 |
+| Human control: a tampered work-order token refused (403) | l11 | 1:39.3 | 1:43.3 |
+| Failure handling: 'Now break it' (slowed segmenter -> governor; malformed planner reply -> allow-list) | b0, b1, b2 | 1:44.1 | 1:52.5 |
+| Human control: 'Try KILL' (KILL halts with kill-switch, Resume replays, then the stop rule ends it with a region unvisited) | b3 | 1:52.8 | 1:57.0 |
+| Honesty: no LLM runs in the live demo; the drill planners are scripted | b4 | 1:57.4 | 2:01.2 |
+| An LLM driving the OpenCV tools over MCP, on the live v1 engine (docs/mcp-session-v1, bridge_03): a measured mask disagreement sent to a human, the crack looked at, the budget check, the labelled defects found, and the session's limit (not blind) | mcp | 2:01.6 | 2:21.9 |
+| Architecture: docs/agent-loop.svg, public/docs/aws-simple.svg, docs/architecture.png (AWS path and OpenCV layer) | arch | 2:21.9 | 2:54.6 |
+| The live site now runs the trained segmenter v1 on OpenCV 5 DNN ENGINE_NEW, and its Lambda step p95 then and now (video/live/aws-smoke.log) | a4, a5 | 2:42.9 | 2:54.2 |
+| Principal results: recall vs pixels, with one downscale, the tiling family and chance (the classical engine, said) | r1, r3 | 2:55.1 | 3:08.9 |
+| Ablations (public/results/ablations.json) | r5 | 3:09.1 | 3:17.3 |
+| Real photos (CODEBRIM), the headline board: trained v1, held out (results/heldout_models.json), against the classical engine (about 1 in 5, the comparison row), its chance recall, its critical boxes (the scorer's unit) and the critical findings a person signs, and what the live look policy v1-policy2 changes (about half the sign-offs, recall unchanged); no CODEBRIM image shown | r6, r8 | 3:17.6 | 3:40.4 |
+| False alarms on synthetic photos with no damage (public/results/clean/summary.json), the classical engine and v1 | r7 | 3:40.7 | 3:46.9 |
+| Two real photos of our own (painted walls, no ground truth), each run live on the site: the looks (on IMG_2332 the zero-candidate fallback look, refused as blur), the findings, what it missed (video/live/walls/*/real.*) | real | 3:47.3 | 4:07.8 |
+| Failure cases: failures.json plates and their rules (the classical engine's synthetic run, said); one CODEBRIM case in words only | failures | 4:07.8 | 4:20.1 |
+| Limits and responsible use | limits | 4:20.1 | 4:27.0 |
+| Reproduce: make test, make eval, scripts/aws.sh | repro | 4:27.0 | 4:31.7 |
+| End card: live URL, repository, team | end | 4:31.7 | 4:37.7 |
 
 ### Chapters (from this build)
 
 | Chapter | Starts | Ends | Lines |
 | --- | --- | --- | --- |
-| Cold open | 0:00.0 | 0:09.0 | o1, o2 |
-| Team | 0:09.0 | 0:23.1 | t1, t2 |
-| Problem and user | 0:23.1 | 0:46.0 | p1, p2, p3 |
-| Live demo | 0:46.0 | 1:37.6 | l0, l1, l2, l3, l4, l5, l6, l7, l9, l10, l11 |
-| Failure drills | 1:37.6 | 1:55.6 | b0, b1, b2, b3, b4 |
-| An LLM over MCP | 1:55.6 | 2:15.8 | m1, m2, m3, m4 |
-| Architecture | 2:15.8 | 2:48.6 | a0, a1, a3, a4, a5 |
-| Results | 2:48.6 | 3:38.5 | r1, r3, r5, r6, r8, r7 |
-| Real photos (ours) | 3:38.5 | 3:59.1 | q1, q2 |
-| Failure cases | 3:59.1 | 4:09.9 | f1, f2 |
-| Limits | 4:09.9 | 4:16.9 | x1 |
-| Reproduce | 4:16.9 | 4:21.5 | y1 |
-| End | 4:21.5 | 4:27.5 | e1 |
+| Cold open | 0:00.0 | 0:11.8 | o1, o2 |
+| Team | 0:11.8 | 0:25.9 | t1, t2 |
+| Problem and user | 0:25.9 | 0:48.8 | p1, p2, p3 |
+| Live demo | 0:48.8 | 1:43.7 | l0, l1, l2, l3, l4, l5, l6, l7, l9, l10, l11 |
+| Failure drills | 1:43.7 | 2:01.6 | b0, b1, b2, b3, b4 |
+| An LLM over MCP | 2:01.6 | 2:21.9 | m1, m2, m3, m4 |
+| Architecture | 2:21.9 | 2:54.6 | a0, a1, a3, a4, a5 |
+| Results | 2:54.6 | 3:47.3 | r1, r3, r5, r6, r8, r7 |
+| Real photos (ours) | 3:47.3 | 4:07.8 | q1, q2 |
+| Failure cases | 4:07.8 | 4:20.1 | f1, f2 |
+| Limits | 4:20.1 | 4:27.0 | x1 |
+| Reproduce | 4:27.0 | 4:31.7 | y1 |
+| End | 4:31.7 | 4:37.7 | e1 |
 
 ### Every number and URL, with its source
 
@@ -336,6 +357,7 @@ and AWS and Arm (the arm Lambda, its latency then and now).
 | --- | --- | --- | --- |
 | synthetic photos | 200 | `public/results/summary.json` | n_images |
 | synthetic photo size (px) | [2048, 1536] | `public/results/summary.json` | dataset |
+| the engine of the synthetic results (FIG. 4, r1) | classical-v1 | `public/results/summary.json` | segmenter |
 | pixel cap of the headline point | 0.3 | `public/results/summary.json` | headline_stats.budget |
 | recall vs exhaustive tiling | 0.8706 | `public/results/summary.json` | headline_stats.recall_ratio_vs_tiling |
 | its 95 % CI | [0.8109, 0.9284] | `public/results/summary.json` | headline_stats.recall_ratio_vs_tiling_ci |
@@ -379,6 +401,7 @@ and AWS and Arm (the arm Lambda, its latency then and now).
 | ablation 2048 px synthetic: no-verify verdict | above the full agent | `public/results/ablations.json` | datasets.synth200.by_cap['0.3']['no-verify'].vs_full |
 | ablation 2048 px synthetic: no-uncertainty verdict | no measurable difference | `public/results/ablations.json` | datasets.synth200.by_cap['0.3']['no-uncertainty'].vs_full |
 | ablation 2048 px synthetic: governor-on verdict | no measurable difference | `public/results/ablations.json` | datasets.synth200.by_cap['0.3']['governor-on'].vs_full |
+| ablation 2048 px synthetic: random order verdict | matches | `public/results/ablations.json` | datasets.synth200.random_order[0] |
 | ablation 2048 px synthetic: random order / full, pooled 95 % CI | [0.97, 1.0] | `public/results/ablations.json` | datasets.synth200.random_order[0] |
 | ablation 4608 px synthetic: no-survey / full | 0.8571 | `public/results/ablations.json` | datasets.synth_large.by_cap['0.3']['no-survey'].ratio_vs_full |
 | ablation 4608 px synthetic: no-verify / full | 1.0057 | `public/results/ablations.json` | datasets.synth_large.by_cap['0.3']['no-verify'].ratio_vs_full |
@@ -391,6 +414,7 @@ and AWS and Arm (the arm Lambda, its latency then and now).
 | ablation 4608 px synthetic: no-verify verdict | no measurable difference | `public/results/ablations.json` | datasets.synth_large.by_cap['0.3']['no-verify'].vs_full |
 | ablation 4608 px synthetic: no-uncertainty verdict | no measurable difference | `public/results/ablations.json` | datasets.synth_large.by_cap['0.3']['no-uncertainty'].vs_full |
 | ablation 4608 px synthetic: governor-on verdict | no measurable difference | `public/results/ablations.json` | datasets.synth_large.by_cap['0.3']['governor-on'].vs_full |
+| ablation 4608 px synthetic: random order verdict | below | `public/results/ablations.json` | datasets.synth_large.random_order[0] |
 | ablation 4608 px synthetic: random order / full, pooled 95 % CI | [0.82, 0.92] | `public/results/ablations.json` | datasets.synth_large.random_order[0] |
 | ablation CODEBRIM: no-survey / full | 0.6636 | `public/results/ablations.json` | datasets.codebrim.by_cap['0.3']['no-survey'].ratio_vs_full |
 | ablation CODEBRIM: no-verify / full | 1.0275 | `public/results/ablations.json` | datasets.codebrim.by_cap['0.3']['no-verify'].ratio_vs_full |
@@ -403,11 +427,13 @@ and AWS and Arm (the arm Lambda, its latency then and now).
 | ablation CODEBRIM: no-verify verdict | no measurable difference | `public/results/ablations.json` | datasets.codebrim.by_cap['0.3']['no-verify'].vs_full |
 | ablation CODEBRIM: no-uncertainty verdict | no measurable difference | `public/results/ablations.json` | datasets.codebrim.by_cap['0.3']['no-uncertainty'].vs_full |
 | ablation CODEBRIM: governor-on verdict | no measurable difference | `public/results/ablations.json` | datasets.codebrim.by_cap['0.3']['governor-on'].vs_full |
+| ablation CODEBRIM: random order verdict | below | `public/results/ablations.json` | datasets.codebrim.random_order[0] |
 | ablation CODEBRIM: random order / full, pooled 95 % CI | [0.92, 1.0] | `public/results/ablations.json` | datasets.codebrim.random_order[0] |
 | failure plate s0162 | Graffiti read as damage | `public/results/failures.json` | [image=failures/f01.jpg].category, rule_that_would_catch_it |
 | failure plate s0139 | Formwork line read as crack | `public/results/failures.json` | [image=failures/f03.jpg].category, rule_that_would_catch_it |
 | failure plate s0040 | Glare caught by the quality gate | `public/results/failures.json` | [image=failures/f05.jpg].category, rule_that_would_catch_it |
 | failure plate s0085 | Crack hidden in blur | `public/results/failures.json` | [image=failures/f07.jpg].category, rule_that_would_catch_it |
+| failure cases: whose runs | Twelve measured failures from the classical engine's published synthetic run | `docs/report.md` | section 9 |
 | failure rules not built yet (of the four shown) | 2 | `public/results/failures.json` | rule_that_would_catch_it without 'Implemented (...)' |
 | failure cases caught (of the four shown) | ["Glare caught by the quality gate"] | `public/results/failures.json` | category containing 'caught' |
 | failure cases whose fix is not built (of the other three) | 3 | `public/results/failures.json` | rule 'Not implemented', or 'Implemented (...)' with a 'Not implemented:' part |
@@ -444,6 +470,10 @@ and AWS and Arm (the arm Lambda, its latency then and now).
 | /api/health build | stock (not COOL) | `video/live/health.json` | build |
 | /api/health commit | a2b86883638f0ab0a57ba436d869b8fda4d7c0c8 | `video/live/health.json` | commit |
 | /api/health segmenter | onnx:drishyam_dacl10k.onnx | `video/live/health.json` | segmenter |
+| /api/health version | 1.1.1 | `video/live/health.json` | version |
+| /api/health now (the wall photos' recording) version | 1.1.2 | `video/live/walls/health.json` | version |
+| /api/health now (the wall photos' recording) commit | 1227371efb83d0574168d5fc4eacd7f5db1dbf1c | `video/live/walls/health.json` | commit |
+| agent code between the footage's build and the live one | Knob off is the code as it was | `results/dev/blur_gate.json; git diff --name-only <footage> <now> -- drishyam/` | drishyam/__init__.py, drishyam/agent.py, drishyam/imaging.py: the blur-gate option, off by default |
 | MCP: first verify call | 4 | `docs/mcp-session-v1/bridge_03/exchange.jsonl` | [tool=verify][0].n |
 | MCP: its IoU (L2 vs L1) | 0.468 | `docs/mcp-session-v1/bridge_03/exchange.jsonl` | [tool=verify][0].content[0].value.iou |
 | MCP: the budget check | 19 | `docs/mcp-session-v1/bridge_03/exchange.jsonl` | [tool=runtime_stats].n |
@@ -491,7 +521,7 @@ and AWS and Arm (the arm Lambda, its latency then and now).
 | team portraits: the OpenCV calls in the header | ["cv2.Canny", "cv2.findContours", "cv2.approxPolyDP"] | `$DRISHYAM_PRIVATE_DIR/team/out/portraits.py` | cv2 calls in the script (OpenCV 5); private, git-ignored |
 | team photos: photo-1, photo-2 | ["Vaibhav Jangid", "Bhavya Dhoot"] | `$DRISHYAM_PRIVATE_DIR/team/team.json` | photo-1.name, photo-2.name (both agreed to appear) |
 | real photo IMG_2332: engine | onnx:drishyam_dacl10k.onnx | `video/live/walls/IMG_2332/real.json` | engine |
-| real photo IMG_2332: profile | live site (commit a2b8688), measured costs, 30 % pixel cap | `real.json` | profile |
+| real photo IMG_2332: profile | live site (commit 1227371), measured costs, 30 % pixel cap | `real.json` | profile |
 | real photo IMG_2332: candidate regions in the overview | 0 | `video/live/walls/IMG_2332/real.ndjson` | overview.candidates |
 | real photo IMG_2332: looks | 1 | `video/live/walls/IMG_2332/real.ndjson` | done.summary.steps |
 | real photo IMG_2332: share of pixels read | 0.099 | `video/live/walls/IMG_2332/real.ndjson` | done.summary.pixels_frac |
@@ -504,7 +534,7 @@ and AWS and Arm (the arm Lambda, its latency then and now).
 | real photo IMG_2332: findings on it / not on it (by eye) | [[], []] | `video/live/walls/IMG_2332/real.ndjson` | finding boxes touching seen.path |
 | real photo IMG_2332: each traced line touched by a finding (by eye) | [false] | `video/live/walls/IMG_2332/real.ndjson` | seen.paths[i] inside a finding box of a seen class |
 | real photo IMG_2330: engine | onnx:drishyam_dacl10k.onnx | `video/live/walls/IMG_2330/real.json` | engine |
-| real photo IMG_2330: profile | live site (commit a2b8688), measured costs, 30 % pixel cap | `real.json` | profile |
+| real photo IMG_2330: profile | live site (commit 1227371), measured costs, 30 % pixel cap | `real.json` | profile |
 | real photo IMG_2330: candidate regions in the overview | 1 | `video/live/walls/IMG_2330/real.ndjson` | overview.candidates |
 | real photo IMG_2330: looks | 1 | `video/live/walls/IMG_2330/real.ndjson` | done.summary.steps |
 | real photo IMG_2330: share of pixels read | 0.0545 | `video/live/walls/IMG_2330/real.ndjson` | done.summary.pixels_frac |
@@ -527,6 +557,7 @@ and AWS and Arm (the arm Lambda, its latency then and now).
 | reproduce sheet: what the CDK stack is | Lambda arm64 behind CloudFront and WAF | `infra/drishyam_stack.py` | stack description |
 | the live engine's look policy, and since when | With v1-policy2, live since 2026-10-22 | `public/index.html` | How it works, the confirm look |
 | what it does, for whom (p3) | it chooses where to look, zooms in where its segmenter is unsure, drafts cracks, spalling and other defects for review, and hands every critical finding to a person | `public/index.html` | the hero's .lede |
+| the reviewer's name is self-asserted: the server cannot tell who clicks | The reviewer name is self-asserted | `docs/security.md` | Known limits |
 | cold-open title | ONE PHOTO, A FEW LOOKS, ONE HUMAN | `public/index.html` | the site's figure note |
 | limits, in the site's words | ["Pixels, not millimetres", "AI-assisted, not an inspection", "Only a person can approve", "Its licence does not allow sharing the photos"] | `public/index.html` | footer note, Human sign-off, the CODEBRIM citation |
 | reproduce: what make test runs | unit, API, MCP, CLI and eval tests (same as CI) | `Makefile` | 'test:' comment |
@@ -539,49 +570,49 @@ and AWS and Arm (the arm Lambda, its latency then and now).
 
 | Id | Starts | Spoken | Caption |
 | --- | --- | --- | --- |
-| o1 | 0:01.5 | Its trained engine read a quarter of the pixels and flagged one critical finding. | Its trained engine read a quarter of the pixels and flagged 1 critical finding. |
-| o2 | 0:06.3 | It will not sign it off. A person must. | It will not sign it off. A person must. |
-| t1 | 0:09.5 | Drishyam, an Agentic Vision entry to the OpenCV AI Competition, powered by AWS. | Drishyam, an Agentic Vision entry to the OpenCV AI Competition, powered by AWS. |
-| t2 | 0:17.4 | Built by Vaibhav Jangid, lead engineer, and Bhavya Dhoot, design and presentation. | Built by Vaibhav Jangid, lead engineer, and Bhavya Dhoot, design and presentation. |
-| p1 | 0:23.6 | America has about six hundred twenty-five thousand bridges, inspected at least every two years. | America has about 625,000 bridges, inspected at least every two years. |
-| p2 | 0:29.5 | One drone inspection took more than twenty-five hundred photos of one bridge. | One drone inspection took more than 2,500 photos of one bridge. |
-| p3 | 0:34.3 | Drishyam is for the engineer reviewing them: it chooses where to look, zooms in where its segmenter is unsure, drafts defects for review, and hands every critical finding to a person. | Drishyam is for the engineer reviewing them: it chooses where to look, zooms in where its segmenter is unsure, drafts defects for review, and hands every critical finding to a person. |
-| l0 | 0:46.5 | Recorded October twenty-third on the live site: the trained v1 and its new look policy. | Recorded 23 October on the live site: the trained v1 and its new look policy. |
-| l1 | 0:52.0 | Live on AWS: OpenCV five on an arm Lambda. | Live on AWS: OpenCV 5 on an arm Lambda. |
-| l2 | 0:56.1 | Watch it inspect a bridge; a privacy pass finds nothing to blur. | Watch it inspect a bridge; a privacy pass finds nothing to blur. |
-| l3 | 1:00.3 | One survey look at the whole photo, at one eighth size, finds spalling and corrosion. | One survey look at the whole photo, at one eighth size, finds spalling and corrosion. |
-| l4 | 1:05.4 | One level finer, the spalling is big enough to be critical, but the reebar scores under the confidence floor. | One level finer, the spalling is big enough to be critical, but the rebar scores under the confidence floor. |
-| l5 | 1:11.8 | It takes one confirm look, centred on the reebar, and does not confirm it. | It takes one confirm look, centred on the rebar, and does not confirm it. |
-| l6 | 1:16.3 | So the reebar goes to a person to check by eye, not as a critical finding. | So the rebar goes to a person to check by eye, not as a critical finding. |
-| l7 | 1:20.9 | Three more looks find a crack; with every region looked at, it stops. | Three more looks find a crack; with every region looked at, it stops. |
-| l9 | 1:25.5 | Only a person can approve the spalling. | Only a person can approve the spalling. |
-| l10 | 1:27.8 | A person then checks the reebar by eye and rekords a defect; now the order is ready. | A person then checks the rebar by eye and records a defect; now the order is ready. |
-| l11 | 1:33.2 | Change one character of the order's signature: the server refuses it. | Change one character of the order's signature: the server refuses it. |
-| b0 | 1:38.0 | Now, break it. | Now, break it. |
-| b1 | 1:39.3 | Slow the segmenter, and the governor switches to the fast model. | Slow the segmenter, and the governor switches to the fast model. |
-| b2 | 1:43.0 | The planner drill sends a shell command; the allow-list rejects it. | The planner drill sends a shell command; the allow-list rejects it. |
-| b3 | 1:46.7 | KILL halts it before the next look; Resume replays the moves and carries on. | KILL halts it before the next look; Resume replays the moves and carries on. |
-| b4 | 1:51.3 | No language model runs live; these planners are scripted to fail. | No language model runs live; these planners are scripted to fail. |
-| m1 | 1:56.1 | Over MCP, Claude drove the same tools on the same photo, with v1. | Over MCP, Claude drove the same tools on the same photo, with v1. |
-| m2 | 2:01.2 | At call four the spall's two masks disagreed, so Claude handed it to a human. | At call 4 the spall's two masks disagreed, so Claude handed it to a human. |
-| m3 | 2:06.0 | Then it looked at the crack, and stopped at call nineteen, at seventeen percent of the pixels. | Then it looked at the crack, and stopped at call 19, at 17 % of the pixels. |
-| m4 | 2:11.2 | It found all four labelled defects, but it had read the labels beforehand. | It found all four labelled defects, but it had read the labels beforehand. |
-| a0 | 2:16.3 | Each step is perception, decision and action, with a human gate at the end. | Each step is perception, decision and action, with a human gate at the end. |
-| a1 | 2:20.9 | CloudFront and a rate-limiting firewall front the arm Lambda; DynamoDB keeps kill flags, Secrets Manager the key. | CloudFront and a rate-limiting firewall front the arm Lambda; DynamoDB keeps kill flags, Secrets Manager the key. |
-| a3 | 2:28.6 | OpenCV does the looking: a pyramid, saliency, warp perspective as a pan-tilt-zoom camera, a blur gate, face blurring. | OpenCV does the looking: a pyramid, saliency, warpPerspective as a pan-tilt-zoom camera, a blur gate, face blurring. |
-| a4 | 2:36.9 | The site now runs v1 on OpenCV five's new DNN engine. | The site now runs v1 on OpenCV 5's new DNN engine. |
-| a5 | 2:41.9 | On Lambda a step took under ninety milliseconds at p ninety-five then, and under one point two seconds now. | On Lambda a step took under 90 ms at p95 then, and under 1.2 s now. |
-| r1 | 2:49.1 | On two hundred synthetic photos it finds eighty-seven percent of full tiling's recall at twenty-six percent of the pixels, short of its ninety percent target. | On 200 synthetic photos it finds 87 % of full tiling's recall at 26 % of the pixels, short of its 90 % target. |
-| r3 | 2:59.0 | One downscaled pass does about as well. | One downscaled pass does about as well. |
-| r5 | 3:01.5 | Ablations: only dropping the survey look loses recall, and a random gaze order matches it on smaller photos. | Ablations: only dropping the survey look loses recall, and a random gaze order matches it on smaller photos. |
-| r6 | 3:08.8 | On two hundred real CODEBRIM photos, held out, the trained v1 finds forty-nine percent: two and a half times the classical engine's one in five. | On 200 real CODEBRIM photos, held out, the trained v1 finds 49 %: two and a half times the classical engine's 1 in 5. |
-| r8 | 3:18.4 | But its boxes find thirty percent at random, and it draws five and a half times the critical boxes. A person signs about two critical findings a photo, about one with the live policy, and recall is unchanged. | But its boxes find 30 % at random, and it draws five and a half times the critical boxes. A person signs about two critical findings a photo, about one with the live policy, and recall is unchanged. |
-| r7 | 3:31.9 | On fifty-one undamaged synthetic photos, the classical engine flags two in three; v1, none. | On 51 undamaged synthetic photos, the classical engine flags 2 in 3; v1, none. |
-| q1 | 3:39.0 | Our own wall, no ground truth: no region was proposed, so it looked at the whole photo. The segmenter saw crack pixels, but the blur gate refused this sharp view, and nothing was flagged. | Our own wall, no ground truth: no region was proposed, so it looked at the whole photo. The segmenter saw crack pixels, but the blur gate refused this sharp view, and nothing was flagged. |
-| q2 | 3:51.7 | On a second wall, one close look flagged a crack on the lower of two we traced, and never looked closely at most of the wall. | On a second wall, one close look flagged a crack on the lower of two we traced, and never looked closely at most of the wall. |
-| f1 | 3:59.6 | Failures in the open: graffiti read as spalling, a formwork line as a crack, glare, and blur. | Failures in the open: graffiti read as spalling, a formwork line as a crack, glare, and blur. |
-| f2 | 4:05.7 | Only the glare gate caught its case; three fixes are not built yet. | Only the glare gate caught its case; three fixes are not built yet. |
-| x1 | 4:10.4 | Pixels, not millimetres. AI-assisted, not an inspection. Only a person can approve. | Pixels, not millimetres. AI-assisted, not an inspection. Only a person can approve. |
-| y1 | 4:17.4 | Make test, make eval, and one script for the AWS stack. | make test, make eval, and one script for the AWS stack. |
-| e1 | 4:21.9 | Drishyam. It looks where it matters, and asks a human first. | Drishyam. It looks where it matters, and asks a human first. |
+| o1 | 0:01.5 | A bridge-photo inspection agent on OpenCV five reads a quarter of the pixels and flags one critical finding. | A bridge-photo inspection agent on OpenCV 5 reads a quarter of the pixels and flags 1 critical finding. |
+| o2 | 0:09.2 | It will not sign it off. A person must. | It will not sign it off. A person must. |
+| t1 | 0:12.3 | Drishyam, an Agentic Vision entry to the OpenCV AI Competition, powered by AWS. | Drishyam, an Agentic Vision entry to the OpenCV AI Competition, powered by AWS. |
+| t2 | 0:20.3 | Built by Vaibhav Jangid, lead engineer, and Bhavya Dhoot, design and presentation. | Built by Vaibhav Jangid, lead engineer, and Bhavya Dhoot, design and presentation. |
+| p1 | 0:26.4 | America has about six hundred twenty-five thousand bridges, inspected at least every two years. | America has about 625,000 bridges, inspected at least every two years. |
+| p2 | 0:32.4 | One drone inspection took more than twenty-five hundred photos of one bridge. | One drone inspection took more than 2,500 photos of one bridge. |
+| p3 | 0:37.1 | Drishyam is for the engineer reviewing them: it chooses where to look, zooms in where its segmenter is unsure, drafts defects for review, and hands every critical finding to a person. | Drishyam is for the engineer reviewing them: it chooses where to look, zooms in where its segmenter is unsure, drafts defects for review, and hands every critical finding to a person. |
+| l0 | 0:49.3 | Recorded October twenty-third on the live site: the trained v1 and its new look policy. | Recorded 23 October on the live site: the trained v1 and its new look policy. |
+| l1 | 0:54.9 | Live on AWS: OpenCV five on an arm Lambda. | Live on AWS: OpenCV 5 on an arm Lambda. |
+| l2 | 0:59.0 | Watch it inspect a bridge; a privacy pass finds nothing to blur. | Watch it inspect a bridge; a privacy pass finds nothing to blur. |
+| l3 | 1:03.1 | One survey look at the whole photo, at one eighth size, finds spalling and corrosion. | One survey look at the whole photo, at one eighth size, finds spalling and corrosion. |
+| l4 | 1:08.2 | One level finer, the spalling is big enough to be critical, but the reebar scores under the confidence floor. | One level finer, the spalling is big enough to be critical, but the rebar scores under the confidence floor. |
+| l5 | 1:14.7 | It takes one confirm look, centred on the reebar, and does not confirm it. | It takes one confirm look, centred on the rebar, and does not confirm it. |
+| l6 | 1:19.1 | So the reebar goes to a person to check by eye, not as a critical finding. | So the rebar goes to a person to check by eye, not as a critical finding. |
+| l7 | 1:23.8 | Three more looks find a crack; with every region looked at, it stops. | Three more looks find a crack; with every region looked at, it stops. |
+| l9 | 1:28.4 | Only a reviewer's decision moves the order; in this recording, a script clicks Approve. | Only a reviewer's decision moves the order; in this recording, a script clicks Approve. |
+| l10 | 1:33.6 | The script also enters the reebar's check by eye, a defect; only then is the order ready. | The script also enters the rebar's check by eye, a defect; only then is the order ready. |
+| l11 | 1:39.3 | Change one character of the order's signature: the server refuses it. | Change one character of the order's signature: the server refuses it. |
+| b0 | 1:44.1 | Now, break it. | Now, break it. |
+| b1 | 1:45.3 | Slow the segmenter, and the governor switches to the fast model. | Slow the segmenter, and the governor switches to the fast model. |
+| b2 | 1:49.1 | The planner drill sends a shell command; the allow-list rejects it. | The planner drill sends a shell command; the allow-list rejects it. |
+| b3 | 1:52.8 | KILL halts it before the next look; Resume replays the moves and carries on. | KILL halts it before the next look; Resume replays the moves and carries on. |
+| b4 | 1:57.4 | No language model runs live; these planners are scripted to fail. | No language model runs live; these planners are scripted to fail. |
+| m1 | 2:02.1 | Over MCP, Claude drove the same tools on the same photo, with v1. | Over MCP, Claude drove the same tools on the same photo, with v1. |
+| m2 | 2:07.3 | At call four the spall's two masks disagreed, so Claude handed it to a human. | At call 4 the spall's two masks disagreed, so Claude handed it to a human. |
+| m3 | 2:12.1 | Then it looked at the crack, and stopped at call nineteen, at seventeen percent of the pixels. | Then it looked at the crack, and stopped at call 19, at 17 % of the pixels. |
+| m4 | 2:17.3 | It found all four labelled defects, but it had read the labels beforehand. | It found all four labelled defects, but it had read the labels beforehand. |
+| a0 | 2:22.4 | Each step is perception, decision and action, with a human gate at the end. | Each step is perception, decision and action, with a human gate at the end. |
+| a1 | 2:27.0 | CloudFront and a rate-limiting firewall front the arm Lambda; DynamoDB keeps kill flags, Secrets Manager the key. | CloudFront and a rate-limiting firewall front the arm Lambda; DynamoDB keeps kill flags, Secrets Manager the key. |
+| a3 | 2:34.7 | OpenCV does the looking: a pyramid, saliency, warp perspective as a pan-tilt-zoom camera, a blur gate, face blurring. | OpenCV does the looking: a pyramid, saliency, warpPerspective as a pan-tilt-zoom camera, a blur gate, face blurring. |
+| a4 | 2:42.9 | The site now runs v1 on OpenCV five's new DNN engine. | The site now runs v1 on OpenCV 5's new DNN engine. |
+| a5 | 2:48.0 | On Lambda a step took under ninety milliseconds at p ninety-five then, and under one point two seconds now. | On Lambda a step took under 90 ms at p95 then, and under 1.2 s now. |
+| r1 | 2:55.1 | With the classical segmenter, on two hundred synthetic photos it finds eighty-seven percent of full tiling's recall at twenty-six percent of the pixels, short of its ninety percent target. | With the classical segmenter, on 200 synthetic photos it finds 87 % of full tiling's recall at 26 % of the pixels, short of its 90 % target. |
+| r3 | 3:06.7 | One downscaled pass does about as well. | One downscaled pass does about as well. |
+| r5 | 3:09.1 | Ablations: dropping the survey look loses recall everywhere; a random gaze order loses it on the larger and the real photos. | Ablations: dropping the survey look loses recall everywhere; a random gaze order loses it on the larger and the real photos. |
+| r6 | 3:17.6 | On two hundred real CODEBRIM photos, held out, the trained v1 finds forty-nine percent: two and a half times the classical engine's one in five. | On 200 real CODEBRIM photos, held out, the trained v1 finds 49 %: two and a half times the classical engine's 1 in 5. |
+| r8 | 3:27.1 | But its boxes find thirty percent at random, and it draws five and a half times the critical boxes. A person signs about two critical findings a photo, about one with the live policy, and recall is unchanged. | But its boxes find 30 % at random, and it draws five and a half times the critical boxes. A person signs about two critical findings a photo, about one with the live policy, and recall is unchanged. |
+| r7 | 3:40.7 | On fifty-one undamaged synthetic photos, the classical engine flags two in three; v1, none. | On 51 undamaged synthetic photos, the classical engine flags 2 in 3; v1, none. |
+| q1 | 3:47.8 | Our own wall, no ground truth: no region was proposed, so it looked at the whole photo. The segmenter saw crack pixels, but the blur gate refused this sharp view, and nothing was flagged. | Our own wall, no ground truth: no region was proposed, so it looked at the whole photo. The segmenter saw crack pixels, but the blur gate refused this sharp view, and nothing was flagged. |
+| q2 | 4:00.4 | On a second wall, one close look flagged a crack on the lower of two we traced, and never looked closely at most of the wall. | On a second wall, one close look flagged a crack on the lower of two we traced, and never looked closely at most of the wall. |
+| f1 | 4:08.3 | The classical engine's failures, in the open: graffiti red as spalling, a formwork line as a crack, glare, and blur. | The classical engine's failures, in the open: graffiti read as spalling, a formwork line as a crack, glare, and blur. |
+| f2 | 4:15.9 | Only the glare gate caught its case; three fixes are not built yet. | Only the glare gate caught its case; three fixes are not built yet. |
+| x1 | 4:20.6 | Pixels, not millimetres. AI-assisted, not an inspection. Only a person can approve. | Pixels, not millimetres. AI-assisted, not an inspection. Only a person can approve. |
+| y1 | 4:27.5 | Make test, make eval, and one script for the AWS stack. | make test, make eval, and one script for the AWS stack. |
+| e1 | 4:32.1 | Drishyam. It looks where it matters, and asks a human first. | Drishyam. It looks where it matters, and asks a human first. |
 <!-- generated:end -->

@@ -83,7 +83,7 @@ the triage of a backlog may cost. **Judges** need a trace in which an OpenCV out
 failure drills they can trigger, a live endpoint and honest failure cases. The **operator** who pays for the AWS
 account needs caps, a budget alert and one command that stops all spending.
 
-The narrated submission film (4:27, captions on) is an asset of the v1.1.2 release
+The narrated submission film (4:37, captions on) is an asset of the v1.1.2 release
 ([drishyam.mp4](https://github.com/vj-io/drishyam/releases/download/v1.1.2/drishyam.mp4), not in git) and also plays
 on the site's Docs and links sheet; `video/plan.md` says how it is built and where each number in it comes from.
 
@@ -429,7 +429,7 @@ The FR-21 ablations (random gaze order, no uncertainty term, no survey look, no 
   0.26 of the pixels on average: 189 of 200 jobs hit the cap (each at 0.27 of the pixels, so p50 = p95 = 0.27), and
   the other 11 stop earlier (7 on the stop rule, 4 with every candidate looked at).
 
-The images are procedural (`evals/synth.py`): 2048×1536 weathered concrete with drawn cracks, spalls, efflorescence, exposed rebar and rust run-off, plus graffiti, formwork lines, water stains, blur and glare as distractors. The eight bundled samples in `public/samples/` come from the same generator. The two others there, `real_01` and `real_02`, are our own photos of a painted plaster wall with no ground truth, so no number in this report uses them; the site replays the v1 engine's run on each, recorded live on the site on 2026-10-23 with measured costs (`real_0N.ndjson`: copies of `video/live/walls/IMG_2332/real.ndjson` and `video/live/walls/IMG_2330/real.ndjson`, embedded images removed). Section 9 also cites the local runs of 2026-10-21 that the site replayed before (`results/real-walls-2026-10-21/`).
+The images are procedural (`evals/synth.py`): 2048×1536 weathered concrete with drawn cracks, spalls, efflorescence, exposed rebar and rust run-off, plus graffiti, formwork lines, water stains, blur and glare as distractors. The eight bundled samples in `public/samples/` come from the same generator. The two others there, `real_01` and `real_02`, are our own photos of a painted plaster wall with no ground truth, so no number in this report uses them; the site replays the v1 engine's run on each, recorded live on the site on 2026-10-23 with measured costs (`real_0N.ndjson`, with their heatmaps and crops; `video/live/walls/IMG_2332/real.ndjson` and `video/live/walls/IMG_2330/real.ndjson` are the same runs with the images removed). Section 9 also cites the local runs of 2026-10-21 that the site replayed before (`results/real-walls-2026-10-21/`).
 
 ![Recall against pixels processed](recall_vs_pixels.png)
 
@@ -810,13 +810,13 @@ instruction that is wrong for this sharp photo. A gate that judges focus against
 (`blur_gate "both"`) would pass this look: its re-blur ratio is 0.20, and v1 then verifies at L1 and drafts 4
 crack boxes, none critical. It is not adopted, because on dev it also passes views blurred too much to trust
 (section 8). The site's **Watch it on a real wall** replays that look as the live site ran it on 2026-10-23
-(`public/samples/real_01.ndjson`, job `j_da1449`, measured costs): sharpness 5.1, 9,136 crack px, nothing drafted,
+(`public/samples/real_01.ndjson`, job `j_f25b21`, measured costs): sharpness 5.1, 9,136 crack px, nothing drafted,
 0.099 of the pixels.
 
 On the other wall photo (`real_02.jpg`, IMG_2330, two cracks by
 eye) the same local run (`results/real-walls-2026-10-21/real_02.ndjson`) took one look and drafted one crack, a
 678 × 70 px box on part of the lower crack; the upper crack got no finding. The live run the site replays (job
-`j_d2b9b0`) did the same, with a 652 × 76 px box. With no ground truth neither photo is scored.
+`j_5b2049`) did the same, with a 652 × 76 px box. With no ground truth neither photo is scored.
 
 ## 10. Agentic evidence
 

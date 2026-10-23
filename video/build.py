@@ -132,6 +132,7 @@ def data(model=MODEL, reals=REALS):
     D["syn"] = {
         "n": src("synthetic photos", s["n_images"], f, "n_images"),
         "size": src("synthetic photo size (px)", dims(s["dataset"]), f, "dataset"),
+        "segmenter": src("the engine of the synthetic results (FIG. 4, r1)", s["segmenter"], f, "segmenter"),
         "cap": src("pixel cap of the headline point", hs["budget"], f, "headline_stats.budget"),
         "head": h, "tiling": pts(s["policies"]["tiling"])[-1], "ds": pts(s["policies"]["downscale"])[0],
         "ratio": src("recall vs exhaustive tiling", hs["recall_ratio_vs_tiling"], f, "headline_stats.recall_ratio_vs_tiling"),
@@ -191,6 +192,8 @@ def data(model=MODEL, reals=REALS):
                               for k in ("no-survey", "no-verify", "no-uncertainty", "governor-on")}
         m = re.search(r"seeds pooled per image: ([\d.]+)-([\d.]+)", v["random_order"][0])
         D["abl"][ds]["random_lo"], D["abl"][ds]["random_hi"] = float(m[1]), float(m[2])
+        D["abl"][ds]["random_vs"] = src(f"ablation {names.get(ds, ds)}: random order verdict", "below" if "random order is below the full agent" in v["random_order"][0]
+                                        else "matches" if "random order matches the full agent" in v["random_order"][0] else "?", f, f"datasets.{ds}.random_order[0]")
         src(f"ablation {names.get(ds, ds)}: random order / full, pooled 95 % CI", [float(m[1]), float(m[2])], f, f"datasets.{ds}.random_order[0]")
         D["abl"][ds]["label"] = names.get(ds, ds)
 
@@ -220,7 +223,9 @@ def data(model=MODEL, reals=REALS):
                        "caught": [x["cat"] for x in D["fails"] if "caught" in x["cat"]],
                        "not_fixed": sum(1 for x in D["fails"] if "caught" not in x["cat"] and ("built" not in x or x["missing"])),
                        "formwork_kept_coarse": "kept it at the look that drafted it" in fw["what_happened"] and "never withdraws" in fw["rule_that_would_catch_it"],
-                       "glare_listed": "not_assessed" in gl["rule_that_would_catch_it"] and "re-shoot" in gl["rule_that_would_catch_it"]}
+                       "glare_listed": "not_assessed" in gl["rule_that_would_catch_it"] and "re-shoot" in gl["rule_that_would_catch_it"],
+                       # f1: the plates are the classical engine's synthetic run, not the live v1 (report section 9)
+                       "classical": src("failure cases: whose runs", in_text("docs/report.md", "Twelve measured failures from the classical engine's published synthetic run"), "docs/report.md", "section 9")}
     src("failure rules not built yet (of the four shown)", D["fails_said"]["not_built"], f, "rule_that_would_catch_it without 'Implemented (...)'")
     src("failure cases caught (of the four shown)", D["fails_said"]["caught"], f, "category containing 'caught'")
     src("failure cases whose fix is not built (of the other three)", D["fails_said"]["not_fixed"], f, "rule 'Not implemented', or 'Implemented (...)' with a 'Not implemented:' part")
@@ -303,7 +308,15 @@ def data(model=MODEL, reals=REALS):
     f = "video/live/tamper.json"; t = load(f)
     D["tamper"] = {"status": src("tampered token: HTTP status", t["status"], f, "status"), "error": src("tampered token: error", t["response"]["error"], f, "response.error")}
     f = "video/live/health.json"; h = load(f)
-    D["health"] = {k: src(f"/api/health {k}", h[k], f, k) for k in ("opencv", "arch", "host", "build", "commit", "segmenter")}
+    D["health"] = {k: src(f"/api/health {k}", h[k], f, k) for k in ("opencv", "arch", "host", "build", "commit", "segmenter", "version")}
+    # the live site now (its /api/health when the wall photos were recorded, record.py --walls), against the footage's build:
+    # between the two, the agent code changed only by the blur-gate option, off by default ("knob off is the code as it was")
+    f = "video/live/walls/health.json"; hn = load(f)
+    D["health_now"] = {k: src(f"/api/health now (the wall photos' recording) {k}", hn[k], f, k) for k in ("version", "commit")}
+    changed = subprocess.run(["git", "diff", "--name-only", h["commit"], hn["commit"], "--", "drishyam/"], cwd=ROOT, capture_output=True, text=True, check=True).stdout.split()
+    assert set(changed) <= {"drishyam/__init__.py", "drishyam/agent.py", "drishyam/imaging.py"}, changed
+    D["health_now"]["same_agent"] = src("agent code between the footage's build and the live one", in_text("results/dev/blur_gate.json", "Knob off is the code as it was"),
+                                        "results/dev/blur_gate.json; git diff --name-only <footage> <now> -- drishyam/", f"{', '.join(changed)}: the blur-gate option, off by default")
 
     # MCP session: the recorded session on the live v1 engine, bridge_03 (docs/mcp-session-v1); the 2026-10-18 session
     # in docs/mcp-session ran on the classical engine
@@ -447,6 +460,7 @@ def data(model=MODEL, reals=REALS):
         "policy": src("the live engine's look policy, and since when", in_text("public/index.html", "With v1-policy2, live since 2026-10-22"), "public/index.html", "How it works, the confirm look"),
         "lede": src("what it does, for whom (p3)", in_text("public/index.html", "it chooses where to look, zooms in where its segmenter is unsure, drafts cracks, spalling and other defects for review, and hands every critical finding to a person"),
                     "public/index.html", "the hero's .lede"),
+        "self_asserted": src("the reviewer's name is self-asserted: the server cannot tell who clicks", in_text("docs/security.md", "The reviewer name is self-asserted"), "docs/security.md", "Known limits"),
         "title": src("cold-open title", in_text("public/index.html", "ONE PHOTO, A FEW LOOKS, ONE HUMAN"), "public/index.html", "the site's figure note"),
         "limits": src("limits, in the site's words", in_text("public/index.html", "Pixels, not millimetres", "AI-assisted, not an inspection", "Only a person can approve",
                                                              "Its licence does not allow sharing the photos"), "public/index.html", "footer note, Human sign-off, the CODEBRIM citation"),
@@ -772,10 +786,10 @@ REQS = [   # competition requirement -> where the film covers it (scene ids or n
     ("The team: Vaibhav Jangid, Bhavya Dhoot. Each real photo, then the window's looks turn it into OpenCV line art (Canny, findContours, approxPolyDP); name cards without the private inputs", ["team"]),
     ("Problem and user, with sources on screen", ["problem"]),
     ("Disclosed before the demo plays: the footage was recorded 2026-10-23 on the live site, the trained v1 with its v1-policy2 look policy, the build the site runs now", ["l0"]),
-    ("/api/health on the live site: opencv 5.0.0, aarch64, aws-lambda", ["l1"]),
+    ("/api/health on the live site: opencv 5.0.0, aarch64, aws-lambda; the build the footage was recorded on, and the build the site runs now", ["l0", "l1"]),
     ("The application working: the guided run on bridge_03 ('Watch it inspect a bridge'), recorded live, with what it sent to a person to check by eye (the rebar under the confidence floor, not confirmed)", ["l2", "l3", "l4", "l5", "l6", "l7"]),
     ("Plain-words trace (the NOTE and 'What it decided and why' panels)", ["l3", "l4", "l5", "l6", "l7"]),
-    ("Human sign-off: reviewer name, Approve, APPROVED stamp; then the rebar checked by eye on the page (Defect found, with a note), and the work order ready", ["l9", "l10"]),
+    ("Human review on the page: Approve, APPROVED stamp, then the rebar's check by eye (Defect found, with a note) and the work order ready; in this footage the clicks are the recording script's, said in the voice and on screen", ["l9", "l10"]),
     ("Human control: a tampered work-order token refused (403)", ["l11"]),
     ("Failure handling: 'Now break it' (slowed segmenter -> governor; malformed planner reply -> allow-list)", ["b0", "b1", "b2"]),
     ("Human control: 'Try KILL' (KILL halts with kill-switch, Resume replays, then the stop rule ends it with a region unvisited)", ["b3"]),
@@ -783,12 +797,12 @@ REQS = [   # competition requirement -> where the film covers it (scene ids or n
     ("An LLM driving the OpenCV tools over MCP, on the live v1 engine (docs/mcp-session-v1, bridge_03): a measured mask disagreement sent to a human, the crack looked at, the budget check, the labelled defects found, and the session's limit (not blind)", ["mcp"]),
     ("Architecture: docs/agent-loop.svg, public/docs/aws-simple.svg, docs/architecture.png (AWS path and OpenCV layer)", ["arch"]),
     ("The live site now runs the trained segmenter v1 on OpenCV 5 DNN ENGINE_NEW, and its Lambda step p95 then and now (video/live/aws-smoke.log)", ["a4", "a5"]),
-    ("Principal results: recall vs pixels, with one downscale, the tiling family and chance", ["r1", "r3"]),
+    ("Principal results: recall vs pixels, with one downscale, the tiling family and chance (the classical engine, said)", ["r1", "r3"]),
     ("Ablations (public/results/ablations.json)", ["r5"]),
     ("Real photos (CODEBRIM), the headline board: trained v1, held out (results/heldout_models.json), against the classical engine (about 1 in 5, the comparison row), its chance recall, its critical boxes (the scorer's unit) and the critical findings a person signs, and what the live look policy v1-policy2 changes (about half the sign-offs, recall unchanged); no CODEBRIM image shown", ["r6", "r8"]),
     ("False alarms on synthetic photos with no damage (public/results/clean/summary.json), the classical engine and v1", ["r7"]),
     ("Two real photos of our own (painted walls, no ground truth), each run live on the site: the looks (on IMG_2332 the zero-candidate fallback look, refused as blur), the findings, what it missed (video/live/walls/*/real.*)", ["real"]),
-    ("Failure cases: failures.json plates and their rules; one CODEBRIM case in words only", ["failures"]),
+    ("Failure cases: failures.json plates and their rules (the classical engine's synthetic run, said); one CODEBRIM case in words only", ["failures"]),
     ("Limits and responsible use", ["limits"]),
     ("Reproduce: make test, make eval, scripts/aws.sh", ["repro"]),
     ("End card: live URL, repository, team", ["end"]),

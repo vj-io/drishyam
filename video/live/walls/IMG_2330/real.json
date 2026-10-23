@@ -1,7 +1,7 @@
 {
  "image": "IMG_2330",
  "engine": "onnx:drishyam_dacl10k.onnx",
- "profile": "live site (commit a2b8688), measured costs, 30 % pixel cap",
+ "profile": "live site (commit 1227371), measured costs, 30 % pixel cap",
  "seen": {
   "say": "the hairline cracks",
   "classes": [

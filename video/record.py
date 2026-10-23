@@ -43,11 +43,12 @@ def log(kind, **kw):
     print(f"{EV[-1]['t']:7.2f} {kind} {json.dumps(kw)[:110]}", flush=True)
 
 
-def strip(obj):
+def strip(obj, images=True):
+    """Token fields always removed; the embedded images too unless images=False."""
     if isinstance(obj, dict):
-        return {k: ("<removed>" if k in SECRET else "<removed: image>" if k in IMAGES else strip(v)) for k, v in obj.items()}
+        return {k: ("<removed>" if k in SECRET else "<removed: image>" if images and k in IMAGES else strip(v, images)) for k, v in obj.items()}
     if isinstance(obj, list):
-        return [strip(v) for v in obj]
+        return [strip(v, images) for v in obj]
     return obj
 
 
@@ -266,15 +267,20 @@ def health():
 WALLS = {"IMG_2332": ("real_01.jpg", LIVE), "IMG_2330": ("real_02.jpg", LIVE / "variants" / "IMG_2330")}   # sample, the older run's folder
 
 
-def walls():
+def walls(keep_images=False):
     """The team's two wall photos, bundled as public/samples/real_0N.jpg (the same files), each run live with Look (2 job
-    starts; not Watch it on a real wall, which replays an older recording). Each trace, token fields and embedded images
-    removed, -> video/live/walls/<image>/real.ndjson, with a real.json: the older run's (what the team sees by eye) with
-    this run's engine and profile. The older runs stay where they are (docs/report.md cites them)."""
-    h = json.loads((LIVE / "health.json").read_text())
+    starts; Watch it on a real wall replays these recordings). Each trace, token fields and embedded images removed,
+    -> video/live/walls/<image>/real.ndjson, with a real.json: the older run's (what the team sees by eye) with this run's
+    engine and profile; the site's /api/health at the time -> video/live/walls/health.json. With keep_images (--keep-images)
+    the trace with its images (the overview's heatmap and each look's crop, all of the bundled sample) and the token
+    fields removed also goes to public/samples/real_0N.ndjson, the site's replay. The older local runs stay where they
+    are (docs/report.md cites them)."""
     with sync_playwright() as p:
         b = p.chromium.launch()
         pg = b.new_page(viewport={"width": W, "height": H}, accept_downloads=True)
+        pg.goto(BASE + "/api/health", wait_until="load")
+        h = json.loads(pg.evaluate("document.querySelector('pre')?.textContent || document.body.innerText"))
+        (LIVE / "walls").mkdir(parents=True, exist_ok=True); (LIVE / "walls" / "health.json").write_text(json.dumps(h, separators=(",", ":")) + "\n")
         for image, (sample, old) in WALLS.items():
             pg.goto(BASE + "/", wait_until="load")
             pg.locator("#look:not([disabled])").wait_for(timeout=30000)
@@ -286,7 +292,10 @@ def walls():
             pg.wait_for_function(f"d => d.includes(document.querySelector('#job-pill')?.textContent.trim().toLowerCase())", arg=list(DONE), timeout=150000)
             with pg.expect_download() as dl:
                 pg.evaluate("() => [...document.querySelectorAll('#done button')].find(b => b.textContent.trim() === 'Download trace.ndjson').click()")
-            ev = [strip(json.loads(ln)) for ln in pathlib.Path(dl.value.path()).read_text().splitlines() if ln.strip()]
+            raw = [json.loads(ln) for ln in pathlib.Path(dl.value.path()).read_text().splitlines() if ln.strip()]
+            ev = [strip(e) for e in raw]
+            if keep_images:
+                (ROOT / "public/samples" / sample.replace(".jpg", ".ndjson")).write_text("".join(json.dumps(strip(e, images=False), separators=(",", ":")) + "\n" for e in raw))
             prof = next(e["profile"] for e in ev if e["type"] == "step")
             cap = next(e for e in ev if e["type"] == "job")["budget"]["pixel_cap_frac"]
             out = LIVE / "walls" / image; out.mkdir(parents=True, exist_ok=True)
@@ -298,4 +307,4 @@ def walls():
 
 
 if __name__ == "__main__":
-    health() if "--health" in sys.argv else walls() if "--walls" in sys.argv else main()
+    health() if "--health" in sys.argv else walls("--keep-images" in sys.argv) if "--walls" in sys.argv else main()
