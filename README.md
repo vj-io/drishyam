@@ -247,6 +247,8 @@ COOL on Graviton was not run: the Marketplace AMI could not be subscribed from o
 - Vaibhav Jangid, lead engineer (agent policy, OpenCV pipeline, evaluation, AWS deployment)
 - Bhavya Dhoot, design, demo and presentation (site design, video)
 
+To pick the work back up from a fresh clone, start at [docs/handoff.md](docs/handoff.md).
+
 ## Licence
 
 MIT. Bundled models: YuNet (MIT) and NanoDet-Plus (Apache 2.0) from OpenCV Zoo, see [models/README.md](models/README.md). Fonts: SIL OFL 1.1.
