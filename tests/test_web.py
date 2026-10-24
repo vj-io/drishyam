@@ -157,6 +157,7 @@ def test_review_flow_and_tampering(photo):
     wo = r.json()["work_order"]
     assert next(f for f in wo["findings"] if f["id"] == fid)["state"] == "approved"
     assert wo["approvals"][0]["reviewer"] == "Test Engineer"
+    assert wo["approvals"][0]["prev_mac"] == done["token"].split(".")[1]
     assert client.post("/api/review", json={**body, "token": r.json()["token"]}).status_code == 409
     forged = findings.sign(done["work_order"], b"x" * 32)
     assert client.post("/api/review", json={**body, "token": forged}).status_code == 403
@@ -341,6 +342,48 @@ def test_one_emf_line_per_job_on_lambda(photo, monkeypatch, capsys):
     assert (m["Status"], m["JobSeconds"], m["PixelsFrac"], m["Steps"], m["Findings"]) == (
         done["status"], s["seconds"], s["pixels_frac"], s["steps"], s["findings"])
     assert isinstance(m["_aws"]["Timestamp"], int)
+    assert set(m["prep_ms"]) == {"read", "decode", "privacy"}
+
+
+def test_first_event_reports_the_time_before_the_job_clock(photo):
+    """Body read, decode and privacy pass run before the stream starts; the job's seconds leave them out."""
+    first = lines(post(photo, params="?pixel_cap=0.2"))[0]
+    assert first["type"] == "job" and set(first["prep_ms"]) == {"read", "decode", "privacy"}
+    assert all(isinstance(v, float) and v >= 0 for v in first["prep_ms"].values())
+    assert first["prep_ms"]["decode"] > 0 and first["prep_ms"]["privacy"] > 0
+
+
+def test_one_log_line_per_review(photo, monkeypatch, capsys, caplog):
+    """CloudWatch keeps every human decision: EMF metric Reviews by Decision, with the reviewer and both tokens
+    as SHA-256 only. Two decisions forked from one token log the same input hash."""
+    import hashlib
+    import logging
+
+    from drishyam import web
+
+    done = lines(post(photo, params="?pixel_cap=1"))[-1]
+    fid = next(f["id"] for f in done["work_order"]["findings"] if f["state"] == "pending_review")
+    body = {"token": done["token"], "finding_id": fid, "decision": "approve", "reviewer": "Test Engineer"}
+    with caplog.at_level(logging.INFO, logger="drishyam"):
+        assert client.post("/api/review", json=body).status_code == 200
+    assert sum(r.getMessage().startswith("review ") for r in caplog.records) == 1 and "Test Engineer" not in caplog.text
+    capsys.readouterr()
+    monkeypatch.setattr(web, "HOST", "aws-lambda")
+    outs = [client.post("/api/review", json={**body, "decision": d}).json()["token"] for d in ("approve", "reject")]
+    assert client.post("/api/review", json={**body, "token": outs[0]}).status_code == 409  # refused: no line
+    emf = [json.loads(x) for x in capsys.readouterr().out.splitlines() if x.startswith('{"_aws"')]
+    assert len(emf) == 2 and "Test Engineer" not in json.dumps(emf)
+    (spec,) = emf[0]["_aws"]["CloudWatchMetrics"]
+    assert spec["Namespace"] == "Drishyam" and spec["Dimensions"] == [["Decision"]]
+    assert spec["Metrics"] == [{"Name": "Reviews", "Unit": "Count"}]
+
+    def sha(v):
+        return hashlib.sha256(v.encode()).hexdigest()
+
+    for m, d, out in zip(emf, ("approve", "reject"), outs, strict=True):
+        assert (m["Decision"], m["decision"], m["Reviews"], m["finding"]) == (d, d, 1, fid)
+        assert m["wo"] == done["work_order"]["id"] and m["reviewer_sha256"] == sha("Test Engineer")
+        assert (m["token_in_sha256"], m["token_out_sha256"]) == (sha(done["token"]), sha(out))
 
 
 def test_signing_key_fails_closed_on_a_deployment(monkeypatch):

@@ -191,13 +191,15 @@ def clean_reviewer(name: str) -> str:
 
 
 def apply_review(token: str, key: bytes, finding_id: str, decision: str, reviewer: str) -> tuple[str, dict]:
-    """Human review of a signed work order; returns the re-signed order."""
+    """Human review of a signed work order; returns the re-signed order. Each approval records `prev_mac`, the
+    MAC of the token it was applied to, so two orders forked from one token show up as siblings."""
     reviewer = clean_reviewer(reviewer)
     wo = verify(token, key)
     match = [f for f in wo["findings"] if f["id"] == finding_id]
     if not match:
         raise ReviewError(f"no finding {finding_id!r} in this work order")
     decide(match[0], decision, actor="human")
-    wo["approvals"].append({"finding_id": finding_id, "decision": decision, "reviewer": reviewer, "at": now_iso()})
+    wo["approvals"].append({"finding_id": finding_id, "decision": decision, "reviewer": reviewer, "at": now_iso(),
+                            "prev_mac": token.split(".")[1]})
     wo["status"] = order_status(wo)
     return sign(wo, key), wo

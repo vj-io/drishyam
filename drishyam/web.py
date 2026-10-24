@@ -113,21 +113,42 @@ def _kill_key(job_id: str, kill_token: str) -> str:
     return f"{job_id}-{hashlib.sha256(kill_token.encode()).hexdigest()[:32]}"
 
 
-def _log_done(job_id: str, ev: dict) -> None:
-    """One line per finished job: a CloudWatch EMF record on Lambda (metrics without an API call), else plain."""
+def _emf(dimension: str, metrics: list[dict], fields: dict) -> None:
+    """One CloudWatch EMF record (metrics without an API call) in the Drishyam namespace."""
+    print(json.dumps({
+        "_aws": {"Timestamp": int(time.time() * 1000),
+                 "CloudWatchMetrics": [{"Namespace": "Drishyam", "Dimensions": [[dimension]], "Metrics": metrics}]},
+        **fields}, separators=(",", ":")), flush=True)
+
+
+def _log_done(job_id: str, ev: dict, prep_ms: dict) -> None:
+    """One line per finished job: an EMF record on Lambda, else plain."""
     s = ev["summary"]
     if HOST != "aws-lambda":
-        log.info("job %s %s cause=%s steps=%s px=%.3f s=%.2f", job_id, ev["status"], ev["cause"],
-                 s["steps"], s["pixels_frac"], s["seconds"])
+        log.info("job %s %s cause=%s steps=%s px=%.3f s=%.2f prep_ms=%s", job_id, ev["status"], ev["cause"],
+                 s["steps"], s["pixels_frac"], s["seconds"], prep_ms)
         return
     metrics = [{"Name": "JobSeconds", "Unit": "Seconds"}, {"Name": "PixelsFrac", "Unit": "None"},
                {"Name": "Steps", "Unit": "Count"}, {"Name": "Findings", "Unit": "Count"}]
-    print(json.dumps({
-        "_aws": {"Timestamp": int(time.time() * 1000),
-                 "CloudWatchMetrics": [{"Namespace": "Drishyam", "Dimensions": [["Status"]], "Metrics": metrics}]},
-        "Status": ev["status"], "JobSeconds": s["seconds"], "PixelsFrac": s["pixels_frac"], "Steps": s["steps"],
-        "Findings": s["findings"], "job": job_id, "cause": ev["cause"],
-    }, separators=(",", ":")), flush=True)
+    _emf("Status", metrics, {"Status": ev["status"], "JobSeconds": s["seconds"], "PixelsFrac": s["pixels_frac"],
+                             "Steps": s["steps"], "Findings": s["findings"], "job": job_id, "cause": ev["cause"],
+                             "prep_ms": prep_ms})
+
+
+def _log_review(finding_id: str, wo: dict, token_in: str, token_out: str) -> None:
+    """One line per human decision, so CloudWatch keeps a record of each: an EMF record on Lambda (metric
+    Reviews by Decision), else plain. The reviewer name and both tokens appear only as SHA-256 hex."""
+    def sha(v: str) -> str:
+        return hashlib.sha256(v.encode()).hexdigest()
+
+    a = wo["approvals"][-1]
+    rec = {"wo": wo["id"], "finding": finding_id, "decision": a["decision"], "reviewer_sha256": sha(a["reviewer"]),
+           "token_in_sha256": sha(token_in), "token_out_sha256": sha(token_out)}
+    if HOST != "aws-lambda":
+        log.info("review %s", json.dumps(rec, separators=(",", ":")))
+        return
+    _emf("Decision", [{"Name": "Reviews", "Unit": "Count"}], {"Decision": a["decision"], "Reviews": 1, **rec})
+
 
 app = FastAPI(title="Drishyam", docs_url=None, redoc_url=None, openapi_url=None)
 
@@ -216,16 +237,22 @@ async def create_job(
         replay = _parse_replay(request.headers.get("x-drishyam-replay"))
     except ValueError as exc:
         return error(422, str(exc))
+    t0 = time.perf_counter()
     data = await _read_capped(request, MAX_UPLOAD_BYTES)
     if data is None:
         return error(413, f"image is larger than {MAX_UPLOAD_BYTES} bytes; the page re-encodes big photos for you")
+    t1 = time.perf_counter()
     try:
         img = await run_in_threadpool(imaging.decode_image, data)
+        t2 = time.perf_counter()
         priv = await run_in_threadpool(privacy.privacy_pass, img)
     except imaging.ImageError as exc:
         return error(400, str(exc))
     except privacy.PeopleDominant as exc:
         return error(422, str(exc))
+    # Server time before the job's clock starts, so not in its seconds or $: body read, decode, privacy pass.
+    prep_ms = {k: round(s * 1000, 1) for k, s in
+               (("read", t1 - t0), ("decode", t2 - t1), ("privacy", time.perf_counter() - t2))}
 
     stop = threading.Event()
     paused = [0.0]  # seconds spent in viewing pauses: the job's clock leaves them out of its seconds and $
@@ -248,10 +275,11 @@ async def create_job(
             if ev["type"] == "job":
                 ev["privacy"] = priv
                 ev["kill_token"] = kill_token
+                ev["prep_ms"] = prep_ms
             elif ev["type"] == "done":
                 ev["token"] = findings.sign(ev["work_order"], KEY)
                 finished = True
-                _log_done(job.id, ev)
+                _log_done(job.id, ev, prep_ms)
             return json.dumps(ev, separators=(",", ":")) + "\n"
 
         try:
@@ -320,6 +348,7 @@ async def review(request: Request):
         token, wo = findings.apply_review(body.token, KEY, body.finding_id, body.decision, body.reviewer)
     except findings.ReviewError as exc:
         return error(exc.status, str(exc))
+    _log_review(body.finding_id, wo, body.token, token)
     return {"token": token, "work_order": wo}
 
 

@@ -103,6 +103,16 @@ def test_work_order_signing_and_review():
         F.apply_review(token2, KEY, "f1", "reject", "Ann")
 
 
+def test_orders_forked_from_one_token_share_prev_mac():
+    """One pre-review token can be signed into conflicting decisions (a known limit); prev_mac makes them siblings."""
+    token = F.sign(F.work_order("j_x", [make(), make(fid="f2")], []), KEY)
+    (t1, wo1), (t2, wo2) = (F.apply_review(token, KEY, "f1", d, "Ann") for d in ("approve", "reject"))
+    assert F.verify(t1, KEY)["findings"][0]["state"] == "approved" and F.verify(t2, KEY)["findings"][0]["state"] == "rejected"
+    assert wo1["approvals"][-1]["prev_mac"] == wo2["approvals"][-1]["prev_mac"] == token.split(".")[1]
+    _, wo3 = F.apply_review(t1, KEY, "f2", "approve", "Ann")  # a chain: each entry names the token before it
+    assert [a["prev_mac"] for a in wo3["approvals"]] == [token.split(".")[1], t1.split(".")[1]]
+
+
 def test_tampering_expiry_and_reviewer_validation():
     token = F.sign(F.work_order("j_x", [make()], []), KEY)
     body, mac = token.split(".")
